@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/analysis-result.v1.json",
+  "title": "Linxira Bio analysis result envelope",
+  "type": "object",
+  "required": ["schema_version", "job_id", "capability", "status", "result", "provenance", "warnings"],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "job_id": { "type": "string", "minLength": 1 },
+    "capability": { "type": "string" },
+    "status": { "enum": ["ok", "error"] },
+    "result": { "type": "object" },
+    "provenance": {
+      "type": "object",
+      "required": ["engine_version", "execution_mode"],
+      "properties": {
+        "engine_version": { "type": "string" },
+        "execution_mode": {
+          "enum": ["local-cpu", "local-gpu", "hpc", "cloud", "authenticated-browser"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

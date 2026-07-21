@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Sequence Statistics"
+  short_description: "Compute verified FASTA sequence and assembly metrics"
+  default_prompt: "Use $analyze-sequence-statistics to calculate and validate statistics for this FASTA file."

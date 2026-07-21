@@ -1,0 +1,11 @@
+.research/
+.tools/
+.cache/
+build/
+target/
+.agents/
+.linxira/
+__pycache__/
+*.py[cod]
+*.profraw
+*.profdata

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Route Bio Analysis"
+  short_description: "Route bioinformatics work to verified capabilities"
+  default_prompt: "Use $route-bio-analysis to select a verified local-first workflow for this biological dataset."

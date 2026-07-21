@@ -1,0 +1,93 @@
+{
+  "schema_version": "1",
+  "product": "linxira-bio-sdk",
+  "capabilities": [
+    {
+      "id": "system.doctor.v1",
+      "status": "available",
+      "category": "system",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio doctor --json"
+    },
+    {
+      "id": "environment.audit.v1",
+      "status": "available",
+      "category": "system",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio environment audit --json"
+    },
+    {
+      "id": "environment.plan.v1",
+      "status": "available",
+      "category": "system",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio environment plan <profile> --json"
+    },
+    {
+      "id": "environment.apply.v1",
+      "status": "planned",
+      "category": "system",
+      "default_execution": "local-cpu",
+      "requires_explicit_approval": true
+    },
+    {
+      "id": "sequence.stats.v1",
+      "status": "available",
+      "category": "sequence-io",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence stats <input.fasta> --json"
+    },
+    {
+      "id": "system.worker.v1",
+      "status": "available",
+      "category": "system",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio-worker <job-request.json>"
+    },
+    {
+      "id": "system.gui.v1",
+      "status": "experimental",
+      "category": "system",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio-ui"
+    },
+    {
+      "id": "fastq.qc.v1",
+      "status": "planned",
+      "category": "read-qc",
+      "default_execution": "local-cpu"
+    },
+    {
+      "id": "interval.intersect.v1",
+      "status": "planned",
+      "category": "genome-intervals",
+      "default_execution": "local-cpu"
+    },
+    {
+      "id": "alignment.qc.v1",
+      "status": "planned",
+      "category": "alignment-files",
+      "default_execution": "local-cpu"
+    },
+    {
+      "id": "variant.stats.v1",
+      "status": "planned",
+      "category": "variant-calling",
+      "default_execution": "local-cpu"
+    },
+    {
+      "id": "protein.af2.predict.v1",
+      "status": "planned",
+      "category": "structural-biology",
+      "default_execution": "local-gpu",
+      "fallback_execution": ["hpc", "cloud"]
+    },
+    {
+      "id": "protein.af3.server.v1",
+      "status": "planned",
+      "category": "structural-biology",
+      "default_execution": "authenticated-browser",
+      "requires_explicit_approval": true
+    }
+  ]
+}

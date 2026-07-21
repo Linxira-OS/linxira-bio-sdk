@@ -1,0 +1,4 @@
+interface:
+  display_name: "Select Bio Execution"
+  short_description: "Choose local, HPC, cloud, or browser execution"
+  default_prompt: "Use $select-bio-execution to choose a safe execution mode for this bioinformatics job."

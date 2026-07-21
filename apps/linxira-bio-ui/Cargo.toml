@@ -1,0 +1,23 @@
+[package]
+name = "linxira-bio-ui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "linxira-bio-ui"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "0.35.0", default-features = false, features = [
+    "accesskit",
+    "default_fonts",
+    "wayland",
+    "wgpu",
+    "x11",
+] }
+linxira-bio-protocol = { version = "0.1.0", path = "../../engine/crates/linxira-bio-protocol" }
+linxira-bio-worker = { version = "0.1.0", path = "../../engine/crates/linxira-bio-worker" }
+serde_json.workspace = true

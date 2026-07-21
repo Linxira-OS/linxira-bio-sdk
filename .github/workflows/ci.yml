@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-gnu:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc
+      - run: >-
+          rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
+          --component rustfmt --component clippy
+      - name: Configure GNU linker
+        shell: pwsh
+        run: |
+          "C:\msys64\ucrt64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=C:\msys64\ucrt64\bin\gcc.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - run: cargo +stable-x86_64-pc-windows-gnu fmt --all -- --check
+      - run: cargo +stable-x86_64-pc-windows-gnu clippy --locked --workspace --all-targets -- -D warnings
+      - run: cargo +stable-x86_64-pc-windows-gnu test --locked --workspace
+      - run: cargo +stable-x86_64-pc-windows-gnu run --locked -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
+      - run: python scripts/validate-repository.py
+
+  debian-bookworm:
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    steps:
+      - run: apt-get update
+      - run: >-
+          apt-get install -y build-essential curl git libgl1-mesa-dev libwayland-dev
+          libx11-dev libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev
+          libxrandr-dev pkg-config python3
+      - uses: actions/checkout@v4
+      - run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+      - run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - run: rustup component add rustfmt clippy
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - run: cargo test --locked --workspace
+      - run: cargo run --locked -p linxira-bio-worker -- tests/fixtures/jobs/sequence-stats.json
+      - run: cargo run --locked -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
+      - run: python scripts/validate-repository.py
+
+  arch-linux:
+    runs-on: ubuntu-latest
+    container: archlinux:base
+    steps:
+      - run: >-
+          pacman -Syu --noconfirm base-devel curl git libx11 libxcursor libxi
+          libxinerama libxkbcommon libxrandr mesa pkgconf python rustup wayland
+      - uses: actions/checkout@v4
+      - run: rustup default stable
+      - run: rustup component add rustfmt clippy
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - run: cargo test --locked --workspace
+      - run: cargo run --locked -p linxira-bio-cli -- doctor --json
+      - run: python scripts/validate-repository.py
+
+  license-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check

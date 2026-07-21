@@ -1,0 +1,16 @@
+[package]
+name = "linxira-bio-worker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "linxira-bio-worker"
+path = "src/main.rs"
+
+[dependencies]
+linxira-bio-core = { version = "0.1.0", path = "../linxira-bio-core" }
+linxira-bio-protocol = { version = "0.1.0", path = "../linxira-bio-protocol" }
+serde_json.workspace = true

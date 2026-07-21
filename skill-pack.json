@@ -1,0 +1,33 @@
+{
+  "schema_version": "1",
+  "id": "linxira-bio-skills",
+  "product": "linxira-bio-sdk",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+  "third_party_notices": "THIRD_PARTY.md",
+  "capability_catalog": "capabilities/catalog.json",
+  "skills": [
+    {
+      "id": "route-bio-analysis",
+      "path": "skills/route-bio-analysis",
+      "kind": "router"
+    },
+    {
+      "id": "select-bio-execution",
+      "path": "skills/select-bio-execution",
+      "kind": "policy"
+    },
+    {
+      "id": "configure-bio-environment",
+      "path": "skills/configure-bio-environment",
+      "kind": "executable",
+      "capabilities": ["environment.audit.v1", "environment.plan.v1"]
+    },
+    {
+      "id": "analyze-sequence-statistics",
+      "path": "skills/analyze-sequence-statistics",
+      "kind": "executable",
+      "capabilities": ["sequence.stats.v1"]
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/tool-catalog.v1.json",
+  "title": "Linxira Bio environment tool catalog",
+  "type": "object",
+  "required": ["schema_version", "profiles", "tools"],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "tools"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "description": { "type": "string", "minLength": 1 },
+          "tools": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "display_name", "category", "probes", "install"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "display_name": { "type": "string", "minLength": 1 },
+          "category": { "type": "string", "minLength": 1 },
+          "probes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["program", "args"],
+              "properties": {
+                "program": { "type": "string", "minLength": 1 },
+                "args": { "type": "array", "items": { "type": "string" } },
+                "output_contains": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "install": {
+            "type": "object",
+            "propertyNames": { "enum": ["windows", "debian", "arch"] },
+            "additionalProperties": {
+              "type": "object",
+              "required": ["strategy", "package", "source_url", "requires_admin"],
+              "properties": {
+                "strategy": { "type": "string", "minLength": 1 },
+                "package": { "type": "string", "minLength": 1 },
+                "source_url": { "type": "string", "format": "uri" },
+                "requires_admin": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

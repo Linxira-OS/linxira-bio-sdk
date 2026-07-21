@@ -1,0 +1,18 @@
+{
+  "schema_version": "1",
+  "id": "local-core",
+  "description": "Local-first verified bioinformatics capabilities",
+  "skills": [
+    "route-bio-analysis",
+    "select-bio-execution",
+    "configure-bio-environment",
+    "analyze-sequence-statistics"
+  ],
+  "required_capabilities": [
+    "system.doctor.v1",
+    "system.worker.v1",
+    "environment.audit.v1",
+    "environment.plan.v1",
+    "sequence.stats.v1"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/job-request.v1.json",
+  "title": "Linxira Bio job request",
+  "type": "object",
+  "required": ["schema_version", "job_id", "capability", "inputs", "execution"],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "job_id": { "type": "string", "minLength": 1 },
+    "capability": { "type": "string", "minLength": 1 },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "execution": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["local-cpu", "local-gpu", "hpc", "cloud", "authenticated-browser"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "parameters": { "type": "object" }
+  },
+  "additionalProperties": false
+}

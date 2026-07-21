@@ -1,0 +1,315 @@
+{
+  "schema_version": "1",
+  "profiles": [
+    {
+      "id": "local-core",
+      "description": "Built-in Rust capabilities with no external tool requirement",
+      "tools": []
+    },
+    {
+      "id": "scripting",
+      "description": "Python and R runtimes for compatible analysis workflows",
+      "tools": ["python", "r"]
+    },
+    {
+      "id": "sequence-search",
+      "description": "Local nucleotide and protein database search",
+      "tools": ["ncbi-blast", "diamond"]
+    },
+    {
+      "id": "genomics-cli",
+      "description": "Common alignment, variant, interval, and mapping tools",
+      "tools": ["samtools", "bcftools", "bedtools", "minimap2"]
+    },
+    {
+      "id": "full-local",
+      "description": "All currently registered local runtimes and bioinformatics tools",
+      "tools": [
+        "python",
+        "r",
+        "ncbi-blast",
+        "diamond",
+        "samtools",
+        "bcftools",
+        "bedtools",
+        "minimap2"
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "id": "python",
+      "display_name": "Python",
+      "category": "runtime",
+      "probes": [
+        { "program": "python", "args": ["--version"] },
+        { "program": "python3", "args": ["--version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "official-installer",
+          "package": "Python 3",
+          "source_url": "https://www.python.org/downloads/windows/",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "python3 python3-venv python3-pip",
+          "source_url": "https://packages.debian.org/stable/python3",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "python python-pip",
+          "source_url": "https://archlinux.org/packages/core/x86_64/python/",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "r",
+      "display_name": "R",
+      "category": "runtime",
+      "probes": [
+        { "program": "Rscript", "args": ["--version"] },
+        { "program": "R", "args": ["--version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "official-installer",
+          "package": "R",
+          "source_url": "https://cran.r-project.org/bin/windows/base/",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "r-base",
+          "source_url": "https://packages.debian.org/stable/r-base",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "r",
+          "source_url": "https://archlinux.org/packages/extra/x86_64/r/",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "ncbi-blast",
+      "display_name": "NCBI BLAST+",
+      "category": "sequence-search",
+      "probes": [
+        { "program": "blastn", "args": ["-version"] },
+        { "program": "blastp", "args": ["-version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "official-archive",
+          "package": "NCBI BLAST+",
+          "source_url": "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "ncbi-blast+",
+          "source_url": "https://packages.debian.org/stable/ncbi-blast+",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "blast+",
+          "source_url": "https://archlinux.org/packages/extra/x86_64/blast+/",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "diamond",
+      "display_name": "DIAMOND",
+      "category": "sequence-search",
+      "probes": [
+        { "program": "diamond", "args": ["version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "github-release",
+          "package": "DIAMOND",
+          "source_url": "https://github.com/bbuchfink/diamond/releases",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "diamond-aligner",
+          "source_url": "https://packages.debian.org/stable/diamond-aligner",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "diamond",
+          "source_url": "https://archlinux.org/packages/extra/x86_64/diamond/",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "samtools",
+      "display_name": "samtools",
+      "category": "alignment-files",
+      "probes": [
+        { "program": "samtools", "args": ["--version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "wsl-debian",
+          "package": "samtools",
+          "source_url": "https://packages.debian.org/stable/samtools",
+          "requires_admin": true
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "samtools",
+          "source_url": "https://packages.debian.org/stable/samtools",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "samtools",
+          "source_url": "https://archlinux.org/packages/extra/x86_64/samtools/",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "bcftools",
+      "display_name": "bcftools",
+      "category": "variant-files",
+      "probes": [
+        { "program": "bcftools", "args": ["--version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "wsl-debian",
+          "package": "bcftools",
+          "source_url": "https://packages.debian.org/stable/bcftools",
+          "requires_admin": true
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "bcftools",
+          "source_url": "https://packages.debian.org/stable/bcftools",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "bcftools",
+          "source_url": "https://archlinux.org/packages/extra/x86_64/bcftools/",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "bedtools",
+      "display_name": "bedtools",
+      "category": "genome-intervals",
+      "probes": [
+        { "program": "bedtools", "args": ["--version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "wsl-debian",
+          "package": "bedtools",
+          "source_url": "https://packages.debian.org/stable/bedtools",
+          "requires_admin": true
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "bedtools",
+          "source_url": "https://packages.debian.org/stable/bedtools",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "bedtools",
+          "source_url": "https://archlinux.org/packages/extra/x86_64/bedtools/",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "minimap2",
+      "display_name": "minimap2",
+      "category": "read-alignment",
+      "probes": [
+        { "program": "minimap2", "args": ["--version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "wsl-debian",
+          "package": "minimap2",
+          "source_url": "https://packages.debian.org/stable/minimap2",
+          "requires_admin": true
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "minimap2",
+          "source_url": "https://packages.debian.org/stable/minimap2",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "minimap2",
+          "source_url": "https://archlinux.org/packages/extra/x86_64/minimap2/",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "wsl",
+      "display_name": "WSL Debian",
+      "category": "execution",
+      "probes": [
+        {
+          "program": "wsl.exe",
+          "args": ["--list", "--quiet"],
+          "output_contains": "debian"
+        }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "windows-feature",
+          "package": "WSL with Debian",
+          "source_url": "https://learn.microsoft.com/windows/wsl/install",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "nvidia-gpu",
+      "display_name": "NVIDIA GPU driver",
+      "category": "acceleration",
+      "probes": [
+        { "program": "nvidia-smi", "args": ["--query-gpu=name,driver_version,memory.total", "--format=csv,noheader"] }
+      ],
+      "install": {}
+    },
+    {
+      "id": "docker",
+      "display_name": "Docker",
+      "category": "execution",
+      "probes": [
+        { "program": "docker", "args": ["--version"] }
+      ],
+      "install": {}
+    },
+    {
+      "id": "rust",
+      "display_name": "Rust toolchain",
+      "category": "development",
+      "probes": [
+        { "program": "rustc", "args": ["--version"] }
+      ],
+      "install": {}
+    }
+  ]
+}

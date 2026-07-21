@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/capability.v1.json",
+  "title": "Linxira Bio capability catalog",
+  "type": "object",
+  "required": ["schema_version", "product", "capabilities"],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "product": { "const": "linxira-bio-sdk" },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status", "category", "default_execution"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*\\.v[1-9][0-9]*$" },
+          "status": { "enum": ["planned", "experimental", "available", "deprecated"] },
+          "category": { "type": "string" },
+          "default_execution": {
+            "enum": ["local-cpu", "local-gpu", "hpc", "cloud", "authenticated-browser"]
+          },
+          "fallback_execution": {
+            "type": "array",
+            "items": { "enum": ["local-cpu", "local-gpu", "hpc", "cloud", "authenticated-browser"] },
+            "uniqueItems": true
+          },
+          "command": { "type": "string" },
+          "requires_explicit_approval": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
