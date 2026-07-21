@@ -11,7 +11,7 @@ jobs:
   windows-gnu:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: msys2/setup-msys2@v2
         id: msys2
         with:
@@ -46,7 +46,7 @@ jobs:
           apt-get install -y build-essential curl git libgl1-mesa-dev libwayland-dev
           libx11-dev libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev
           libxrandr-dev pkg-config python3
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
       - run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - run: rustup component add rustfmt clippy
@@ -64,7 +64,7 @@ jobs:
       - run: >-
           pacman -Syu --noconfirm base-devel curl git libx11 libxcursor libxi
           libxinerama libxkbcommon libxrandr mesa pkgconf python rustup wayland
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup default stable
       - run: rustup component add rustfmt clippy
       - run: cargo fmt --all -- --check
@@ -76,7 +76,7 @@ jobs:
   license-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
