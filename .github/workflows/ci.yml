@@ -13,6 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: msys2/setup-msys2@v2
+        id: msys2
         with:
           msystem: UCRT64
           update: true
@@ -23,8 +24,13 @@ jobs:
       - name: Configure GNU linker
         shell: pwsh
         run: |
-          "C:\msys64\ucrt64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          "CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=C:\msys64\ucrt64\bin\gcc.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $ucrtBin = Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'ucrt64\bin'
+          $linker = Join-Path $ucrtBin 'gcc.exe'
+          if (-not (Test-Path -LiteralPath $linker -PathType Leaf)) {
+            throw "MSYS2 UCRT64 linker not found at $linker"
+          }
+          $ucrtBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=$linker" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - run: cargo +stable-x86_64-pc-windows-gnu fmt --all -- --check
       - run: cargo +stable-x86_64-pc-windows-gnu clippy --locked --workspace --all-targets -- -D warnings
       - run: cargo +stable-x86_64-pc-windows-gnu test --locked --workspace
@@ -49,7 +55,7 @@ jobs:
       - run: cargo test --locked --workspace
       - run: cargo run --locked -p linxira-bio-worker -- tests/fixtures/jobs/sequence-stats.json
       - run: cargo run --locked -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
-      - run: python scripts/validate-repository.py
+      - run: python3 scripts/validate-repository.py
 
   arch-linux:
     runs-on: ubuntu-latest
