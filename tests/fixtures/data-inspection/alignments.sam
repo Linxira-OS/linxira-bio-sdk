@@ -1,0 +1,4 @@
+@HD	VN:1.6	SO:coordinate
+@SQ	SN:chr1	LN:1000
+read1	0	chr1	10	60	4M	*	0	0	ACGT	IIII	NM:i:0
+read2	16	chr1	25	50	4M	*	0	0	TGCA	IIII	NM:i:1

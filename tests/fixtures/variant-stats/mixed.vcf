@@ -1,0 +1,12 @@
+##fileformat=VCFv4.3
+##contig=<ID=chr1,length=1000>
+##contig=<ID=chr2,length=1000>
+##contig=<ID=chrX,length=1000>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample-a	sample-b
+chr1	10	.	A	G	.	PASS	.	GT:DP	0/1:12	./.:0
+chr1	20	.	C	A	.	q10	.	GT	0/0	0/1
+chr2	30	.	AT	A	.	PASS	.	GT	1/1	0/.
+chr2	40	.	AC	GT	.	.	.	GT	0/1	0/0
+chrX	50	.	A	G,T	.	PASS	.	GT	1/2	0/2
+chrX	60	.	N	<DEL>	.	LowQual	.	GT	.	1
+chrX	70	.	G	G]chr2:42]	.	PASS	.	GT	0/1	0/0

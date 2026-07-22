@@ -6,13 +6,21 @@
     "route-bio-analysis",
     "select-bio-execution",
     "configure-bio-environment",
-    "analyze-sequence-statistics"
+    "analyze-sequence-statistics",
+    "analyze-fastq-quality",
+    "analyze-variant-statistics",
+    "inspect-bio-dataset",
+    "export-bio-table"
   ],
   "required_capabilities": [
     "system.doctor.v1",
     "system.worker.v1",
     "environment.audit.v1",
     "environment.plan.v1",
-    "sequence.stats.v1"
+    "sequence.stats.v1",
+    "fastq.qc.v1",
+    "variant.stats.v1",
+    "dataset.inspect.v1",
+    "table.export.v1"
   ]
 }

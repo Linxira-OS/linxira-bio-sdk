@@ -25,6 +25,21 @@
             "uniqueItems": true
           },
           "command": { "type": "string" },
+          "input_formats": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "recognized_formats": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "output_formats": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
           "requires_explicit_approval": { "type": "boolean" }
         },
         "additionalProperties": false

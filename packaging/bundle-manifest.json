@@ -5,15 +5,21 @@
     "README.md",
     "LICENSE",
     "THIRD_PARTY.md",
+    "Cargo.lock",
+    "deny.toml",
     "AGENTS.md",
     "skill-pack.json",
     "capabilities/catalog.json",
-    "runtimes/catalog.json"
+    "runtimes/catalog.json",
+    "tools/catalog.json",
+    "profiles/local-core.json",
+    "licenses/NotoSansCJK-OFL.txt"
   ],
   "include_trees": [
     "docs",
     "schemas",
-    "skills"
+    "skills",
+    "workflows"
   ],
   "binaries": {
     "windows": [

@@ -30,17 +30,23 @@ browser, and delivery workflows.
 - Python SDK: planned after the CLI contract stabilizes
 - MCP server: planned after the capability and result schemas stabilize
 
-## Current Capability
+## Current Capabilities
 
-The current local core audits bioinformatics prerequisites and calculates
-deterministic FASTA sequence and assembly statistics:
+The current local core audits bioinformatics prerequisites, identifies and
+previews common biological files, calculates deterministic FASTA, FASTQ, and
+VCF statistics, and exports structured result tables as CSV, TSV, JSON, JSONL,
+or XLSX:
 
 ```bash
 cargo run -p linxira-bio-cli -- environment audit --json
 cargo run -p linxira-bio-cli -- environment plan sequence-search --mode managed-user --json
 cargo run -p linxira-bio-cli -- runtime catalog --json
+cargo run -p linxira-bio-cli -- dataset inspect tests/fixtures/data-inspection/variants.vcf --json
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
+cargo run -p linxira-bio-cli -- fastq qc tests/fixtures/fastq-qc/valid.fastq --json
+cargo run -p linxira-bio-cli -- variant stats tests/fixtures/variant-stats/mixed.vcf --json
+cargo run -p linxira-bio-cli -- export table result.json result.xlsx
 ```
 
 Environment plans support `local-core`, `scripting`, `managed-runtimes`,
@@ -59,14 +65,25 @@ Inspect the runtime and capability catalog:
 cargo run -p linxira-bio-cli -- doctor --json
 cargo run -p linxira-bio-cli -- capabilities --json
 cargo run -p linxira-bio-worker -- tests/fixtures/jobs/sequence-stats.json
+cargo run -p linxira-bio-worker -- tests/fixtures/jobs/dataset-inspect.json
 cargo run -p linxira-bio-ui
 ```
 
 Release bundles are staged from `packaging/bundle-manifest.json`, which always
 includes the canonical bilingual `docs/` tree, schemas, catalogs, skills, and
-license notices. Validate those inputs with
-`python scripts/stage-release.py --check`; platform packaging calls the same
-script with its compiled binary directory.
+license notices. Repository contract checks use the pinned Draft 2020-12
+validator in `requirements-ci.txt`:
+
+```bash
+python -m venv .venv-ci
+# Activate .venv-ci, then run:
+python -m pip install --requirement requirements-ci.txt
+python scripts/validate-repository.py
+python scripts/stage-release.py --check
+```
+
+Platform packaging calls the same release staging script with its compiled
+binary directory.
 
 ## Execution Model
 
@@ -80,8 +97,9 @@ the service terms. The project never stores or auto-fills account credentials.
 
 See `docs/ARCHITECTURE.md`, `docs/RUNTIME_MANAGEMENT.md`,
 `docs/AI_AND_SDK.md`, `docs/DOCUMENTATION_POLICY.md`, and the existing policy
-documents for the product boundary, staged scope, and non-Visual-Studio build
-direction.
+documents for the product boundary, staged scope, supported data formats, and
+non-Visual-Studio build direction. The exact read, inspect, analysis, and
+export matrix is in `docs/DATA_FORMATS.md`.
 
 ## Source Policy
 

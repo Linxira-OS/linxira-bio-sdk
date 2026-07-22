@@ -1,0 +1,25 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-dataset-inspect-v2",
+  "capability": "dataset.inspect.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-file",
+      "role": "file",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-file-1",
+          "path": "../data-inspection/variants.vcf",
+          "format": "vcf",
+          "compression": "none",
+          "size_bytes": 192
+        }
+      ]
+    }
+  ],
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {}
+}

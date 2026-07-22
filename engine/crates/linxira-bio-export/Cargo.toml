@@ -1,0 +1,15 @@
+[package]
+name = "linxira-bio-export"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+csv = "1.4"
+rust_xlsxwriter = "0.92"
+same-file = "1.0"
+serde.workspace = true
+serde_json.workspace = true
+tempfile = "3.27"

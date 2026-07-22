@@ -1,0 +1,12 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-variant-stats",
+  "capability": "variant.stats.v1",
+  "inputs": {
+    "vcf": "../variant-stats/mixed.vcf"
+  },
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {}
+}

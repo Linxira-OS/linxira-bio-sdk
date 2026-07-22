@@ -12,8 +12,8 @@ code. Do not treat an indexed or planned capability as implemented.
 
 1. Identify the biological question, input files, expected output, and required
    scientific QC.
-2. Inspect formats from file contents or validated metadata; do not rely only on
-   file extensions.
+2. Run `inspect-bio-dataset` for local files so format detection uses content,
+   compression signatures, and validated metadata rather than only extensions.
 3. Run `linxira-bio capabilities --json` and select an `available` capability.
 4. Read the exact execution skill for that capability.
 5. Invoke `select-bio-execution` when resource, GPU, remote-data, cloud, or
@@ -28,15 +28,22 @@ a replacement script silently.
 
 ## Category Routing
 
-- FASTA, FASTQ, sequence manipulation, and assembly statistics: sequence and
-  read-QC skills.
-- BED, GFF, GTF, coverage, and coordinate joins: genome-interval skills.
-- SAM, BAM, CRAM, pileup, and mapping QC: alignment-file skills.
-- VCF, BCF, variants, genotypes, and normalization: variant skills.
-- Counts, expression, sparse matrices, RNA-seq, and single-cell data:
-  expression skills.
-- PDB, mmCIF, PAE, pLDDT, structure comparison, and prediction:
-  structural-biology skills.
+- FASTA assembly statistics and FASTQ read QC: use
+  `analyze-sequence-statistics` for supported FASTA and
+  `analyze-fastq-quality` for supported FASTQ. Other sequence manipulation and
+  assembly capabilities remain planned.
+- BED, GFF, GTF, coverage, and coordinate joins: built-in genome-interval
+  capabilities remain planned; use an approved external workflow or report the
+  gap.
+- SAM, BAM, CRAM, pileup, and mapping QC: built-in alignment capabilities
+  remain planned; use an approved external workflow or report the gap.
+- VCF, BCF, variants, genotypes, and normalization: variant skills. Use
+  `analyze-variant-statistics` only for supported VCF summaries; BCF remains
+  recognized but unsupported.
+- Counts, expression, sparse matrices, RNA-seq, and single-cell data: built-in
+  expression capabilities remain planned.
+- PDB, mmCIF, PAE, pLDDT, structure comparison, and prediction: built-in
+  structural-biology capabilities remain planned.
 - Missing Python, R, BLAST, DIAMOND, command-line tools, WSL, or GPU runtime:
   `configure-bio-environment` before the domain capability runs.
 - Scheduler, cloud, GPU, or authenticated web service: execution selection

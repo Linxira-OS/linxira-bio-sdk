@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Variant Statistics"
+  short_description: "Summarize verified local VCF variant statistics"
+  default_prompt: "Use $analyze-variant-statistics to summarize and validate this VCF dataset."

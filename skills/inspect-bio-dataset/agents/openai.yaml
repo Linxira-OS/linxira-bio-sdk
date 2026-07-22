@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inspect Bio Dataset"
+  short_description: "Identify and validate local bioinformatics files"
+  default_prompt: "Use $inspect-bio-dataset to identify and validate this biological data file before analysis."

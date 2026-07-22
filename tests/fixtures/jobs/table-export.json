@@ -1,0 +1,14 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-table-export",
+  "capability": "table.export.v1",
+  "inputs": {
+    "json": "../results/metrics.json"
+  },
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "output": "../../../target/test-results/metrics.csv"
+  }
+}

@@ -1,13 +1,74 @@
 #!/usr/bin/env python3
-"""Validate the dependency-free repository contracts used in CI."""
+"""Validate repository schemas, instances, and cross-file contracts used in CI."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
+try:
+    from jsonschema import Draft202012Validator, FormatChecker
+except ImportError as error:
+    raise SystemExit(
+        "jsonschema is required; install the pinned CI dependencies from "
+        "requirements-ci.txt"
+    ) from error
+
 
 ROOT = Path(__file__).resolve().parents[1]
+
+try:
+    SCHEMA_FORMAT_CHECKER = FormatChecker(
+        formats=("date-time", "hostname", "uri")
+    )
+except KeyError as error:
+    raise SystemExit(
+        "JSON Schema format dependencies are missing; install the pinned CI "
+        "dependencies from requirements-ci.txt"
+    ) from error
+
+SCHEMA_FILES = (
+    "schemas/analysis-result-v2.schema.json",
+    "schemas/analysis-result.schema.json",
+    "schemas/artifact.schema.json",
+    "schemas/bundle-manifest.schema.json",
+    "schemas/capability.schema.json",
+    "schemas/dataset-manifest.schema.json",
+    "schemas/environment-plan.schema.json",
+    "schemas/job-request-v2.schema.json",
+    "schemas/job-request.schema.json",
+    "schemas/runtime-catalog.schema.json",
+    "schemas/runtime-lock.schema.json",
+    "schemas/tool-catalog.schema.json",
+    "schemas/workflow-pack-catalog.schema.json",
+    "schemas/workflow-pack-manifest.schema.json",
+)
+
+CATALOG_AND_MANIFEST_CONTRACTS = (
+    ("capabilities/catalog.json", "schemas/capability.schema.json"),
+    ("tools/catalog.json", "schemas/tool-catalog.schema.json"),
+    ("runtimes/catalog.json", "schemas/runtime-catalog.schema.json"),
+    ("packaging/bundle-manifest.json", "schemas/bundle-manifest.schema.json"),
+    ("workflows/catalog.json", "schemas/workflow-pack-catalog.schema.json"),
+)
+
+JOB_SCHEMAS = {
+    "1": "schemas/job-request.schema.json",
+    "2": "schemas/job-request-v2.schema.json",
+}
+
+RESULT_SCHEMAS = {
+    "1": "schemas/analysis-result.schema.json",
+    "2": "schemas/analysis-result-v2.schema.json",
+}
+
+FORMAT_CHECK_FIXTURE = "tests/fixtures/schema-validation/formats.json"
+REQUIRED_SCHEMA_FORMATS = {"date-time", "hostname", "uri"}
+BUNDLED_FONT = "apps/linxira-bio-ui/assets/fonts/NotoSansSC-Regular.otf"
+BUNDLED_FONT_SHA256 = (
+    "a2b93e6c2db05d6bbbf6f27d413ec73269735b7b679019c8a5aa9670ff0ffbf2"
+)
 
 ENGLISH_CAPABILITY_SECTIONS = (
     "Purpose",
@@ -40,6 +101,162 @@ def load_json(relative_path: str) -> object:
     path = ROOT / relative_path
     with path.open(encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def load_json_path(path: Path) -> object:
+    with path.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def display_path(path: Path) -> str:
+    return path.relative_to(ROOT).as_posix()
+
+
+def validate_json_instance(
+    instance_path: Path, schema_path: str, schema: dict[str, object]
+) -> None:
+    instance = load_json_path(instance_path)
+    errors = sorted(
+        Draft202012Validator(
+            schema, format_checker=SCHEMA_FORMAT_CHECKER
+        ).iter_errors(instance),
+        key=lambda error: tuple(str(part) for part in error.absolute_path),
+    )
+    if not errors:
+        return
+
+    details = "\n".join(
+        f"  - {error.json_path}: {error.message}" for error in errors[:8]
+    )
+    remaining = len(errors) - 8
+    if remaining > 0:
+        details += f"\n  - ... and {remaining} more validation errors"
+    raise ValueError(
+        f"{display_path(instance_path)} does not match {schema_path}:\n{details}"
+    )
+
+
+def validate_versioned_fixtures(
+    directory: Path,
+    schemas_by_version: dict[str, str],
+    schemas: dict[str, dict[str, object]],
+) -> int:
+    fixture_paths = sorted(directory.glob("*.json"))
+    if not fixture_paths:
+        raise ValueError(f"no JSON fixtures found under {display_path(directory)}")
+
+    seen_versions: set[str] = set()
+    for fixture_path in fixture_paths:
+        fixture = load_json_path(fixture_path)
+        if not isinstance(fixture, dict):
+            raise ValueError(f"{display_path(fixture_path)} must contain an object")
+        version = fixture.get("schema_version")
+        if not isinstance(version, str) or version not in schemas_by_version:
+            raise ValueError(
+                f"{display_path(fixture_path)} has unsupported schema_version {version!r}"
+            )
+        schema_path = schemas_by_version[version]
+        validate_json_instance(fixture_path, schema_path, schemas[schema_path])
+        seen_versions.add(version)
+
+    missing_versions = set(schemas_by_version) - seen_versions
+    if missing_versions:
+        missing = ", ".join(sorted(missing_versions))
+        raise ValueError(
+            f"{display_path(directory)} lacks fixtures for schema version(s): {missing}"
+        )
+    return len(fixture_paths)
+
+
+def validate_format_checker_contract() -> int:
+    fixture = load_json(FORMAT_CHECK_FIXTURE)
+    if not isinstance(fixture, list) or not fixture:
+        raise ValueError(f"{FORMAT_CHECK_FIXTURE} must contain a non-empty array")
+
+    seen_expectations: dict[str, set[bool]] = {}
+    for index, case in enumerate(fixture):
+        if not isinstance(case, dict):
+            raise ValueError(f"{FORMAT_CHECK_FIXTURE}[{index}] must contain an object")
+        format_name = case.get("format")
+        value = case.get("value")
+        valid = case.get("valid")
+        if (
+            not isinstance(format_name, str)
+            or format_name not in REQUIRED_SCHEMA_FORMATS
+            or not isinstance(value, str)
+            or not isinstance(valid, bool)
+        ):
+            raise ValueError(
+                f"{FORMAT_CHECK_FIXTURE}[{index}] has an invalid format test case"
+            )
+
+        errors = list(
+            Draft202012Validator(
+                {"type": "string", "format": format_name},
+                format_checker=SCHEMA_FORMAT_CHECKER,
+            ).iter_errors(value)
+        )
+        if valid == bool(errors):
+            expectation = "pass" if valid else "fail"
+            raise ValueError(
+                f"JSON Schema format check expected {format_name!r} value "
+                f"{value!r} to {expectation}"
+            )
+        seen_expectations.setdefault(format_name, set()).add(valid)
+
+    missing = {
+        (format_name, valid)
+        for format_name in REQUIRED_SCHEMA_FORMATS
+        for valid in (False, True)
+        if valid not in seen_expectations.get(format_name, set())
+    }
+    if missing:
+        details = ", ".join(
+            f"{format_name}:{'valid' if valid else 'invalid'}"
+            for format_name, valid in sorted(missing)
+        )
+        raise ValueError(f"{FORMAT_CHECK_FIXTURE} lacks cases for {details}")
+    return len(fixture)
+
+
+def validate_schema_contracts() -> tuple[int, int, int]:
+    format_check_count = validate_format_checker_contract()
+    schemas: dict[str, dict[str, object]] = {}
+    for schema_path in SCHEMA_FILES:
+        schema = load_json(schema_path)
+        if not isinstance(schema, dict):
+            raise ValueError(f"{schema_path} must contain a JSON object")
+        Draft202012Validator.check_schema(schema)
+        schemas[schema_path] = schema
+
+    validated_instances = 0
+    for instance_path, schema_path in CATALOG_AND_MANIFEST_CONTRACTS:
+        validate_json_instance(ROOT / instance_path, schema_path, schemas[schema_path])
+        validated_instances += 1
+
+    workflow_catalog = load_json("workflows/catalog.json")
+    assert isinstance(workflow_catalog, dict)
+    referenced_manifests = {
+        ROOT / manifest
+        for pack in workflow_catalog.get("packs", [])
+        if isinstance(pack, dict)
+        and isinstance((manifest := pack.get("manifest")), str)
+    }
+    discovered_manifests = set((ROOT / "workflows").rglob("manifest.json"))
+    for manifest_path in sorted(referenced_manifests | discovered_manifests):
+        if not manifest_path.is_file():
+            raise ValueError(f"workflow manifest is missing: {display_path(manifest_path)}")
+        schema_path = "schemas/workflow-pack-manifest.schema.json"
+        validate_json_instance(manifest_path, schema_path, schemas[schema_path])
+        validated_instances += 1
+
+    validated_instances += validate_versioned_fixtures(
+        ROOT / "tests" / "fixtures" / "jobs", JOB_SCHEMAS, schemas
+    )
+    validated_instances += validate_versioned_fixtures(
+        ROOT / "tests" / "fixtures" / "results", RESULT_SCHEMAS, schemas
+    )
+    return len(schemas), validated_instances, format_check_count
 
 
 def parse_skill_frontmatter(path: Path) -> dict[str, str]:
@@ -90,20 +307,14 @@ def validate_capability_documentation(capability: dict[str, object]) -> None:
 
 
 def validate() -> None:
+    schema_count, schema_instance_count, format_check_count = validate_schema_contracts()
     catalog = load_json("capabilities/catalog.json")
     tool_catalog = load_json("tools/catalog.json")
     runtime_catalog = load_json("runtimes/catalog.json")
     bundle_manifest = load_json("packaging/bundle-manifest.json")
     pack = load_json("skill-pack.json")
     profile = load_json("profiles/local-core.json")
-    load_json("schemas/capability.schema.json")
-    load_json("schemas/job-request.schema.json")
-    load_json("schemas/analysis-result.schema.json")
-    load_json("schemas/environment-plan.schema.json")
-    load_json("schemas/tool-catalog.schema.json")
-    load_json("schemas/runtime-catalog.schema.json")
-    load_json("schemas/runtime-lock.schema.json")
-    load_json("schemas/bundle-manifest.schema.json")
+    workflow_catalog = load_json("workflows/catalog.json")
 
     license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
     if "GNU AFFERO GENERAL PUBLIC LICENSE" not in license_text:
@@ -114,6 +325,9 @@ def validate() -> None:
         raise ValueError("Cargo workspace license is not AGPL-3.0-or-later")
     if not (ROOT / "deny.toml").is_file():
         raise ValueError("deny.toml is required")
+    bundled_font_hash = hashlib.sha256((ROOT / BUNDLED_FONT).read_bytes()).hexdigest()
+    if bundled_font_hash != BUNDLED_FONT_SHA256:
+        raise ValueError(f"bundled font SHA-256 mismatch: {BUNDLED_FONT}")
 
     if not isinstance(catalog, dict) or catalog.get("schema_version") != "1":
         raise ValueError("invalid capability catalog header")
@@ -127,6 +341,20 @@ def validate() -> None:
         raise ValueError("invalid release bundle manifest")
     if "docs" not in bundle_manifest.get("include_trees", []):
         raise ValueError("release bundle does not include canonical documentation")
+    if "workflows" not in bundle_manifest.get("include_trees", []):
+        raise ValueError("release bundle does not include the workflow catalog")
+    bundle_files = bundle_manifest.get("include_files", [])
+    required_bundle_files = {
+        "Cargo.lock",
+        "deny.toml",
+        "licenses/NotoSansCJK-OFL.txt",
+        "tools/catalog.json",
+        "profiles/local-core.json",
+    }
+    if not isinstance(bundle_files, list) or not required_bundle_files <= set(
+        bundle_files
+    ):
+        raise ValueError("release bundle lacks required tool or profile catalogs")
     if not isinstance(pack, dict) or pack.get("schema_version") != "1":
         raise ValueError("invalid skill-pack header")
     if pack.get("license") != "AGPL-3.0-or-later":
@@ -136,6 +364,27 @@ def validate() -> None:
         raise ValueError("skill-pack third-party notice file is missing")
     if not isinstance(profile, dict) or profile.get("schema_version") != "1":
         raise ValueError("invalid profile header")
+    if (
+        not isinstance(workflow_catalog, dict)
+        or workflow_catalog.get("schema_version") != "1"
+    ):
+        raise ValueError("invalid workflow pack catalog header")
+
+    workflow_sources = workflow_catalog.get("sources")
+    if not isinstance(workflow_sources, list):
+        raise ValueError("workflow pack catalog requires sources")
+    trust_levels = {source.get("trust") for source in workflow_sources if isinstance(source, dict)}
+    if trust_levels != {"official", "community"}:
+        raise ValueError("workflow pack catalog requires official and community sources")
+    for source in workflow_sources:
+        if not isinstance(source, dict):
+            raise ValueError("workflow source must be an object")
+        if source.get("requires_signature") is not True:
+            raise ValueError("workflow sources must require signed indexes")
+        if source.get("requires_install_approval") is not True:
+            raise ValueError("workflow installation must require approval")
+        if source.get("trust") == "community" and source.get("enabled_by_default") is not False:
+            raise ValueError("community workflow sources must default to disabled")
 
     capabilities = catalog.get("capabilities")
     if not isinstance(capabilities, list):
@@ -293,7 +542,9 @@ def validate() -> None:
         raise ValueError("profile references an unknown capability")
 
     print(
-        f"validated {len(capability_ids)} capabilities, "
+        f"validated {schema_count} schemas and {schema_instance_count} schema instances; "
+        f"{format_check_count} format checks; "
+        f"{len(capability_ids)} capabilities, "
         f"{len(skill_ids)} skills, {len(tool_ids)} tools, "
         f"{len(provider_ids)} runtime providers, and profile {profile.get('id')}"
     )

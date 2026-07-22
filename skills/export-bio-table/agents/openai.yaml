@@ -1,0 +1,4 @@
+interface:
+  display_name: "Export Bio Table"
+  short_description: "Export structured results to common table formats"
+  default_prompt: "Use $export-bio-table to export this structured analysis result for downstream use."

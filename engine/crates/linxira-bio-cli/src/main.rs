@@ -1,16 +1,18 @@
 #![forbid(unsafe_code)]
 
+use linxira_bio_core::dataset::{DatasetInspection, DatasetSupport, inspect_dataset};
 use linxira_bio_core::environment::{
     EnvironmentAudit, EnvironmentMode, EnvironmentPlan, EnvironmentPlanOptions, PlanActionState,
     audit_environment, parse_environment_mode, plan_environment_with_options,
 };
+use linxira_bio_core::fastq::{FastqQcMetrics, FastqQcOptions, QualityEncodingMode, fastq_qc_path};
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
-use linxira_bio_core::sequence::{SequenceStats, fasta_stats};
+use linxira_bio_core::sequence::{SequenceStats, fasta_stats_path};
+use linxira_bio_core::variant::{VcfStats, vcf_stats_path};
+use linxira_bio_export::export_json_file;
 use linxira_bio_protocol::{AnalysisResult, ExecutionMode};
 use std::env;
 use std::error::Error;
-use std::fs::File;
-use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -28,6 +30,10 @@ fn main() -> ExitCode {
 
 fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
     match arguments.as_slice() {
+        [help] if matches!(help.as_str(), "-h" | "--help") => {
+            println!("{}", usage());
+            Ok(())
+        }
         [command] if command == "capabilities" => print_capabilities(false),
         [command, json] if command == "capabilities" && json == "--json" => {
             print_capabilities(true)
@@ -45,6 +51,7 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         [environment, plan, arguments @ ..] if environment == "environment" && plan == "plan" => {
             print_environment_plan(arguments)
         }
+        [fastq, qc, arguments @ ..] if fastq == "fastq" && qc == "qc" => print_fastq_qc(arguments),
         [runtime, catalog] if runtime == "runtime" && catalog == "catalog" => {
             print_runtime_catalog(false)
         }
@@ -53,6 +60,22 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         {
             print_runtime_catalog(true)
         }
+        [dataset, inspect, path] if dataset == "dataset" && inspect == "inspect" => {
+            print_dataset_inspection(path, false)
+        }
+        [dataset, inspect, path, json]
+            if dataset == "dataset" && inspect == "inspect" && json == "--json" =>
+        {
+            print_dataset_inspection(path, true)
+        }
+        [export, table, input, output] if export == "export" && table == "table" => {
+            print_table_export(input, output, false)
+        }
+        [export, table, input, output, json]
+            if export == "export" && table == "table" && json == "--json" =>
+        {
+            print_table_export(input, output, true)
+        }
         [sequence, stats, path] if sequence == "sequence" && stats == "stats" => {
             print_sequence_stats(path, false)
         }
@@ -60,6 +83,14 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if sequence == "sequence" && stats == "stats" && json == "--json" =>
         {
             print_sequence_stats(path, true)
+        }
+        [variant, stats, path] if variant == "variant" && stats == "stats" => {
+            print_variant_stats(path, false)
+        }
+        [variant, stats, path, json]
+            if variant == "variant" && stats == "stats" && json == "--json" =>
+        {
+            print_variant_stats(path, true)
         }
         _ => Err(usage().into()),
     }
@@ -291,8 +322,7 @@ fn print_plan_text(plan: &EnvironmentPlan) {
 }
 
 fn print_sequence_stats(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
-    let file = File::open(Path::new(path))?;
-    let stats = fasta_stats(BufReader::new(file))?;
+    let stats = fasta_stats_path(Path::new(path))?;
 
     if json {
         print_stats_json(&stats)?;
@@ -300,6 +330,138 @@ fn print_sequence_stats(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
         print_stats_text(&stats);
     }
     Ok(())
+}
+
+fn print_fastq_qc(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut path = None;
+    let mut json = false;
+    let mut options = FastqQcOptions::default();
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--json" => json = true,
+            "--max-cycles" => {
+                index += 1;
+                options.max_cycles = arguments
+                    .get(index)
+                    .ok_or("--max-cycles requires a value")?
+                    .parse()?;
+            }
+            "--quality-encoding" => {
+                index += 1;
+                options.quality_encoding = match arguments
+                    .get(index)
+                    .ok_or("--quality-encoding requires a value")?
+                    .as_str()
+                {
+                    "auto" => QualityEncodingMode::Auto,
+                    "phred+33" => QualityEncodingMode::Phred33,
+                    "phred+64" => QualityEncodingMode::Phred64,
+                    value => return Err(format!("unsupported quality encoding: {value}").into()),
+                };
+            }
+            value if value.starts_with('-') => {
+                return Err(format!("unknown FASTQ QC option: {value}").into());
+            }
+            value if path.is_none() => path = Some(value),
+            value => return Err(format!("unexpected FASTQ QC argument: {value}").into()),
+        }
+        index += 1;
+    }
+    let path = path.ok_or("fastq qc requires an input path")?;
+    let metrics = fastq_qc_path(Path::new(path), options)?;
+    if json {
+        print_analysis_json("fastq-qc", "fastq.qc.v1", metrics)?;
+    } else {
+        print_fastq_qc_text(&metrics);
+    }
+    Ok(())
+}
+
+fn print_fastq_qc_text(metrics: &FastqQcMetrics) {
+    println!("read_count\t{}", metrics.read_count);
+    println!("total_bases\t{}", metrics.total_bases);
+    println!("mean_length\t{:.6}", metrics.mean_length);
+    println!("gc_percent\t{:.6}", metrics.gc_percent);
+    println!("mean_quality\t{:.6}", metrics.mean_quality);
+    println!("q20_percent\t{:.6}", metrics.q20_percent);
+    println!("q30_percent\t{:.6}", metrics.q30_percent);
+    println!("quality_encoding\t{:?}", metrics.quality_encoding);
+    for warning in &metrics.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_variant_stats(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let stats = vcf_stats_path(Path::new(path))?;
+    if json {
+        print_analysis_json("variant-stats", "variant.stats.v1", stats)?;
+    } else {
+        print_variant_stats_text(&stats);
+    }
+    Ok(())
+}
+
+fn print_variant_stats_text(stats: &VcfStats) {
+    println!("record_count\t{}", stats.record_count);
+    println!("sample_count\t{}", stats.sample_count);
+    println!("pass_record_count\t{}", stats.pass_record_count);
+    println!("filtered_record_count\t{}", stats.filtered_record_count);
+    println!("snp_count\t{}", stats.snp_count);
+    println!("indel_count\t{}", stats.indel_count);
+    println!(
+        "multiallelic_record_count\t{}",
+        stats.multiallelic_record_count
+    );
+    if let Some(ratio) = stats.ti_tv_ratio {
+        println!("ti_tv_ratio\t{ratio:.6}");
+    }
+    for warning in &stats.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_dataset_inspection(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let inspection = inspect_dataset(Path::new(path))?;
+    if json {
+        print_analysis_json("dataset-inspect", "dataset.inspect.v1", inspection)?;
+    } else {
+        print_inspection_text(&inspection);
+    }
+    Ok(())
+}
+
+fn print_table_export(input: &str, output: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let receipt = export_json_file(Path::new(input), Path::new(output))?;
+    if json {
+        print_analysis_json("table-export", "table.export.v1", receipt)?;
+    } else {
+        println!("{}", receipt.output_path);
+    }
+    Ok(())
+}
+
+fn print_inspection_text(inspection: &DatasetInspection) {
+    let support = match inspection.support {
+        DatasetSupport::Supported => "supported",
+        DatasetSupport::RecognizedUnsupported => "recognized, not yet supported",
+        DatasetSupport::Unknown => "unknown",
+    };
+    println!("file\t{}", inspection.path.display());
+    println!("format\t{}", inspection.format);
+    println!("compression\t{:?}", inspection.compression);
+    println!("support\t{support}");
+    println!("size_bytes\t{}", inspection.size_bytes);
+    if let Some(preview) = &inspection.preview {
+        println!("preview_records\t{}", preview.records_shown);
+        println!("preview_truncated\t{}", preview.truncated);
+    }
+    for warning in &inspection.warnings {
+        println!("warning\t{}: {}", warning.code, warning.message);
+    }
+    for error in &inspection.errors {
+        println!("error\t{}: {}", error.code, error.message);
+    }
 }
 
 fn print_stats_text(stats: &SequenceStats) {
@@ -323,5 +485,5 @@ fn print_stats_json(stats: &SequenceStats) -> Result<(), Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n  linxira-bio runtime catalog [--json]\n  linxira-bio sequence stats <input.fasta> [--json]"
+    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n  linxira-bio runtime catalog [--json]\n  linxira-bio dataset inspect <input> [--json]\n  linxira-bio sequence stats <input.fasta[.gz]> [--json]\n  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n  linxira-bio variant stats <input.vcf[.gz]> [--json]\n  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
 }

@@ -45,6 +45,29 @@
       "command": "linxira-bio sequence stats <input.fasta> --json"
     },
     {
+      "id": "dataset.inspect.v1",
+      "status": "available",
+      "category": "data-management",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio dataset inspect <input> --json",
+      "input_formats": [
+        "fasta", "fastq", "csv", "tsv", "bed", "gff3", "gtf", "vcf", "sam"
+      ],
+      "recognized_formats": [
+        "bam", "zip", "bcf", "cram", "h5ad", "loom", "hdf5", "rds", "pdb", "mmcif"
+      ],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "table.export.v1",
+      "status": "available",
+      "category": "reporting",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio export table <input.json> <output> --json",
+      "input_formats": ["json"],
+      "output_formats": ["csv", "tsv", "json", "jsonl", "xlsx"]
+    },
+    {
       "id": "system.worker.v1",
       "status": "available",
       "category": "system",
@@ -60,9 +83,12 @@
     },
     {
       "id": "fastq.qc.v1",
-      "status": "planned",
+      "status": "available",
       "category": "read-qc",
-      "default_execution": "local-cpu"
+      "default_execution": "local-cpu",
+      "command": "linxira-bio fastq qc <input.fastq> --json",
+      "input_formats": ["fastq"],
+      "output_formats": ["json"]
     },
     {
       "id": "interval.intersect.v1",
@@ -78,8 +104,29 @@
     },
     {
       "id": "variant.stats.v1",
-      "status": "planned",
+      "status": "available",
       "category": "variant-calling",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio variant stats <input.vcf> --json",
+      "input_formats": ["vcf"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "sequence.convert.biopython.v1",
+      "status": "planned",
+      "category": "sequence-io",
+      "default_execution": "local-cpu"
+    },
+    {
+      "id": "expression.deseq2.v1",
+      "status": "planned",
+      "category": "expression",
+      "default_execution": "local-cpu"
+    },
+    {
+      "id": "expression.matrix.qc.v1",
+      "status": "planned",
+      "category": "expression",
       "default_execution": "local-cpu"
     },
     {

@@ -1,0 +1,37 @@
+{
+  "schema_version": "1",
+  "sources": [
+    {
+      "id": "linxira-official",
+      "trust": "official",
+      "enabled_by_default": true,
+      "requires_signature": true,
+      "requires_install_approval": true,
+      "index_url": null
+    },
+    {
+      "id": "linxira-community",
+      "trust": "community",
+      "enabled_by_default": false,
+      "requires_signature": true,
+      "requires_install_approval": true,
+      "index_url": null
+    }
+  ],
+  "packs": [
+    {
+      "id": "org.linxira.sequence-conversion-biopython",
+      "capability": "sequence.convert.biopython.v1",
+      "status": "planned",
+      "trust": "official",
+      "runtime": "python"
+    },
+    {
+      "id": "org.linxira.bulk-expression-deseq2",
+      "capability": "expression.deseq2.v1",
+      "status": "planned",
+      "trust": "official",
+      "runtime": "r"
+    }
+  ]
+}

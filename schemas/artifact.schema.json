@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/artifact.v2.json",
+  "title": "Linxira Bio artifact",
+  "oneOf": [
+    { "$ref": "#/$defs/inputArtifact" },
+    { "$ref": "#/$defs/outputArtifact" }
+  ],
+  "$defs": {
+    "dataFormat": {
+      "enum": [
+        "fasta", "fastq", "csv", "tsv", "bed", "gff3", "gtf", "vcf",
+        "sam", "bam", "bcf", "cram", "genbank", "embl", "h5ad", "loom", "hdf5",
+        "rds", "pdb", "mmcif", "xlsx", "json", "jsonl", "parquet", "zip",
+        "unknown"
+      ]
+    },
+    "compressionFormat": {
+      "enum": ["none", "gzip", "bgzip", "bzip2", "xz", "zstd", "zip", "unknown"]
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "artifactFile": {
+      "type": "object",
+      "required": ["file_id", "path", "format", "compression", "size_bytes"],
+      "properties": {
+        "file_id": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 },
+        "format": { "$ref": "#/$defs/dataFormat" },
+        "compression": { "$ref": "#/$defs/compressionFormat" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "modified_at": { "type": "string", "format": "date-time" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "inputArtifact": {
+      "type": "object",
+      "required": ["artifact_id", "role", "cardinality", "files"],
+      "properties": {
+        "artifact_id": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 },
+        "cardinality": { "enum": ["single", "paired", "batch"] },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifactFile" },
+          "minItems": 1
+        },
+        "dataset_id": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "cardinality": { "const": "single" } }, "required": ["cardinality"] },
+          "then": { "properties": { "files": { "minItems": 1, "maxItems": 1 } } }
+        },
+        {
+          "if": { "properties": { "cardinality": { "const": "paired" } }, "required": ["cardinality"] },
+          "then": { "properties": { "files": { "minItems": 2, "maxItems": 2 } } }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "outputArtifact": {
+      "type": "object",
+      "required": ["artifact_id", "role", "kind", "path"],
+      "properties": {
+        "artifact_id": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["table", "plot", "domain-file", "log", "report", "directory"] },
+        "path": { "type": "string", "minLength": 1 },
+        "format": { "$ref": "#/$defs/dataFormat" },
+        "media_type": { "type": "string", "minLength": 1 },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "metadata": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

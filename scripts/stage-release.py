@@ -52,14 +52,25 @@ def validate_sources(manifest: dict[str, object]) -> None:
     if not isinstance(binaries, dict) or set(binaries) != {"windows", "debian", "arch"}:
         raise ValueError("bundle manifest requires Windows, Debian, and Arch binaries")
 
+    required_files = {
+        "Cargo.lock",
+        "deny.toml",
+        "licenses/NotoSansCJK-OFL.txt",
+        "tools/catalog.json",
+        "profiles/local-core.json",
+    }
+    if not required_files <= set(include_files):
+        raise ValueError("release bundle lacks a required catalog, policy, or license file")
+    required_trees = {"docs", "schemas", "skills", "workflows"}
+    if not required_trees <= set(include_trees):
+        raise ValueError("release bundle requires docs, schemas, skills, and workflows")
+
     for relative_path in include_files:
         if not isinstance(relative_path, str) or not repository_path(relative_path).is_file():
             raise ValueError(f"bundle file is missing: {relative_path}")
     for relative_path in include_trees:
         if not isinstance(relative_path, str) or not repository_path(relative_path).is_dir():
             raise ValueError(f"bundle tree is missing: {relative_path}")
-    if "docs" not in include_trees:
-        raise ValueError("release bundles must include the canonical docs tree")
 
 
 def copy_sources(manifest: dict[str, object], staging_root: Path) -> None:

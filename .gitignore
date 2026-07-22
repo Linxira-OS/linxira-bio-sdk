@@ -5,6 +5,7 @@ build/
 target/
 .agents/
 .linxira/
+.venv-ci/
 __pycache__/
 *.py[cod]
 *.profraw

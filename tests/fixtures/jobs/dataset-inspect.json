@@ -1,0 +1,15 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-dataset-inspect",
+  "capability": "dataset.inspect.v1",
+  "inputs": {
+    "file": "../data-inspection/sequences.fa"
+  },
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "max_preview_records": 1,
+    "max_preview_bytes": 1048576
+  }
+}

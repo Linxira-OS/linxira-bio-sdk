@@ -3,6 +3,7 @@ members = [
     "apps/linxira-bio-ui",
     "engine/crates/linxira-bio-cli",
     "engine/crates/linxira-bio-core",
+    "engine/crates/linxira-bio-export",
     "engine/crates/linxira-bio-protocol",
     "engine/crates/linxira-bio-worker",
 ]

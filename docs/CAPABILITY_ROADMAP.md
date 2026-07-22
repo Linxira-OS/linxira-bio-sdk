@@ -28,8 +28,9 @@
 - environment audit and platform-specific installation planning;
 - FASTA sequence statistics;
 - FASTQ quality control;
-- genomic interval primitives;
-- BAM and VCF summary adapters;
+- VCF descriptive statistics;
+- content-aware previews for BED, GFF3, GTF, SAM, and tabular data;
+- signature-only recognition for BAM and other planned binary formats;
 - local execution and provenance contracts.
 
 ### 0.2 SDK And Agent Tools

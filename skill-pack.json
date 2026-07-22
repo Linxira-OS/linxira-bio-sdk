@@ -32,6 +32,30 @@
       "path": "skills/analyze-sequence-statistics",
       "kind": "executable",
       "capabilities": ["sequence.stats.v1"]
+    },
+    {
+      "id": "analyze-fastq-quality",
+      "path": "skills/analyze-fastq-quality",
+      "kind": "executable",
+      "capabilities": ["fastq.qc.v1"]
+    },
+    {
+      "id": "analyze-variant-statistics",
+      "path": "skills/analyze-variant-statistics",
+      "kind": "executable",
+      "capabilities": ["variant.stats.v1"]
+    },
+    {
+      "id": "inspect-bio-dataset",
+      "path": "skills/inspect-bio-dataset",
+      "kind": "executable",
+      "capabilities": ["dataset.inspect.v1"]
+    },
+    {
+      "id": "export-bio-table",
+      "path": "skills/export-bio-table",
+      "kind": "executable",
+      "capabilities": ["table.export.v1"]
     }
   ]
 }

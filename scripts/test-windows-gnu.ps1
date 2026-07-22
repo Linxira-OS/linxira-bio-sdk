@@ -6,6 +6,51 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$ciPythonCandidates = @(
+    (Join-Path (Get-Location).Path '.venv-ci\Scripts\python.exe'),
+    (Join-Path (Get-Location).Path '.venv-ci\bin\python.exe')
+)
+$ciPython = $ciPythonCandidates |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+    Select-Object -First 1
+if (-not $ciPython) {
+    $bootstrapCandidates = @()
+    if ($env:CONDA_ROOT) {
+        $bootstrapCandidates += Join-Path $env:CONDA_ROOT 'python.exe'
+    }
+    if ($env:CONDA_PREFIX) {
+        $bootstrapCandidates += Join-Path $env:CONDA_PREFIX 'python.exe'
+    }
+    $bootstrapCandidates += Get-Command python -All -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty Source
+    $bootstrapPython = $bootstrapCandidates |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+        Select-Object -Unique |
+        Where-Object {
+            & $_ -m pip --version *> $null
+            $LASTEXITCODE -eq 0
+        } |
+        Select-Object -First 1
+    if (-not $bootstrapPython) {
+        throw 'No Python interpreter with pip is available to create .venv-ci.'
+    }
+    & $bootstrapPython -m venv .venv-ci
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Failed to create the isolated CI Python environment.'
+    }
+    $ciPython = $ciPythonCandidates |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+        Select-Object -First 1
+    if (-not $ciPython) {
+        throw 'The isolated CI Python interpreter was not created.'
+    }
+}
+& $ciPython -m pip install --disable-pip-version-check `
+    --requirement requirements-ci.txt
+if ($LASTEXITCODE -ne 0) {
+    throw 'Failed to install pinned CI Python dependencies.'
+}
+
 if (-not $GnuToolchainHome) {
     $GnuToolchainHome = 'C:\Rust\msys64\ucrt64'
 }
@@ -64,7 +109,7 @@ if ($LASTEXITCODE -ne 0) {
     throw 'CLI smoke test failed for the Windows GNU target.'
 }
 
-python scripts/validate-repository.py
+& $ciPython scripts/validate-repository.py
 if ($LASTEXITCODE -ne 0) {
     throw 'Repository contract validation failed.'
 }

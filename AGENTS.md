@@ -10,6 +10,12 @@ the agent skills that select and validate them.
   browser execution must be selected.
 - Read `skills/analyze-sequence-statistics/SKILL.md` for the implemented
   `sequence.stats.v1` capability.
+- Read `skills/analyze-fastq-quality/SKILL.md` for the implemented
+  `fastq.qc.v1` capability.
+- Read `skills/analyze-variant-statistics/SKILL.md` for the implemented
+  `variant.stats.v1` capability.
+- Read `skills/inspect-bio-dataset/SKILL.md` before analyzing imported data.
+- Read `skills/export-bio-table/SKILL.md` to export supported result tables.
 - Read `skills/configure-bio-environment/SKILL.md` to audit managed Python, R,
   Java, Conda/Bioconda, BLAST, DIAMOND, native command-line tools, WSL Debian,
   WSL Arch, Docker, Podman, or GPU prerequisites.

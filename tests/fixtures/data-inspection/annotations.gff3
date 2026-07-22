@@ -1,0 +1,3 @@
+##gff-version 3
+chr1	test	gene	1	1000	.	+	.	ID=gene1;Name=Example
+chr1	test	mRNA	1	1000	.	+	.	ID=tx1;Parent=gene1

@@ -9,10 +9,10 @@ Use the tested local capability instead of writing a one-off FASTA parser.
 
 ## Run
 
-1. Confirm that the input is a local, uncompressed FASTA text file. The current
-   capability does not accept gzip input.
-2. Confirm that the file starts with a non-empty `>` header and is appropriate
-   for aggregate sequence statistics.
+1. Confirm with `inspect-bio-dataset` that the input is a supported local FASTA.
+   Plain text, gzip, and BGZF streams are accepted.
+2. Confirm that the decompressed payload starts with a non-empty `>` header and
+   is appropriate for aggregate sequence statistics.
 3. Run the installed CLI:
 
 ```bash

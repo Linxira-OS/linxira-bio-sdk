@@ -14,10 +14,17 @@ path = "src/main.rs"
 eframe = { version = "0.35.0", default-features = false, features = [
     "accesskit",
     "default_fonts",
+    "glow",
     "wayland",
     "wgpu",
     "x11",
 ] }
 linxira-bio-protocol = { version = "0.1.0", path = "../../engine/crates/linxira-bio-protocol" }
+linxira-bio-export = { version = "0.1.0", path = "../../engine/crates/linxira-bio-export" }
 linxira-bio-worker = { version = "0.1.0", path = "../../engine/crates/linxira-bio-worker" }
+rfd = { version = "0.15.4", default-features = false, features = [
+    "async-std",
+    "xdg-portal",
+] }
+serde.workspace = true
 serde_json.workspace = true

@@ -3,7 +3,8 @@
 ## One Capability Surface
 
 Automation is built on the versioned capability contract, not on GUI control
-automation. The implementation order is:
+automation. New SDK integrations should use the artifact-aware v2 request and
+result envelopes; v1 remains a compatibility surface. The implementation order is:
 
 1. stabilize JSON job and result contracts;
 2. add JSON-RPC over standard input/output;

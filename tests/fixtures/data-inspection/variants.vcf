@@ -1,0 +1,5 @@
+##fileformat=VCFv4.3
+##contig=<ID=chr1,length=1000>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample1
+chr1	10	rs1	A	G	60	PASS	DP=20	GT:DP	0/1:20
+chr1	25	.	C	T,A	42	PASS	DP=16	GT:DP	1/2:16

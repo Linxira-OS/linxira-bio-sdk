@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze FASTQ Quality"
+  short_description: "Run verified local FASTQ read quality control"
+  default_prompt: "Use $analyze-fastq-quality to inspect and validate the quality of this FASTQ dataset."

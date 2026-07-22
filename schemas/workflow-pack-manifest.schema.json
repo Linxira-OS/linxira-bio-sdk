@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/workflow-pack-manifest.v1.json",
+  "title": "Linxira Bio workflow pack manifest",
+  "type": "object",
+  "required": [
+    "schema_version", "id", "version", "publisher", "license", "entrypoint",
+    "runtime", "input_schema", "output_schema", "platforms", "network",
+    "resources", "files"
+  ],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "publisher": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": false
+    },
+    "license": { "type": "string", "minLength": 1 },
+    "homepage": { "type": "string", "format": "uri" },
+    "entrypoint": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "arguments": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtime": {
+      "type": "object",
+      "required": ["kind", "version", "dependency_lock"],
+      "properties": {
+        "kind": { "enum": ["python", "r", "java", "native"] },
+        "version": { "type": "string", "minLength": 1 },
+        "dependency_lock": {
+          "type": "object",
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": { "$ref": "#/$defs/relativePath" },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "input_schema": { "$ref": "#/$defs/jsonSchema" },
+    "output_schema": { "$ref": "#/$defs/jsonSchema" },
+    "platforms": {
+      "type": "array",
+      "items": { "enum": ["windows-gnu", "debian", "arch"] },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "network": {
+      "type": "object",
+      "required": ["access"],
+      "properties": {
+        "access": { "enum": ["none", "required"] },
+        "allowed_hosts": {
+          "type": "array",
+          "items": { "type": "string", "format": "hostname" },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "access": { "const": "none" } }, "required": ["access"] },
+          "then": { "properties": { "allowed_hosts": { "maxItems": 0 } } }
+        },
+        {
+          "if": { "properties": { "access": { "const": "required" } }, "required": ["access"] },
+          "then": {
+            "required": ["allowed_hosts"],
+            "properties": { "allowed_hosts": { "minItems": 1 } }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "resources": {
+      "type": "object",
+      "required": ["gpu"],
+      "properties": {
+        "minimum_memory_mb": { "type": "integer", "minimum": 1 },
+        "minimum_disk_mb": { "type": "integer", "minimum": 1 },
+        "recommended_threads": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "gpu": { "enum": ["none", "optional", "required"] },
+        "minimum_vram_mb": { "type": "integer", "minimum": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "gpu": { "const": "none" } }, "required": ["gpu"] },
+          "then": { "not": { "required": ["minimum_vram_mb"] } }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": { "$ref": "#/$defs/relativePath" },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+    },
+    "jsonSchema": {
+      "type": "object",
+      "required": ["type"]
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,5 +1,22 @@
 use std::path::PathBuf;
 use std::process::Command;
+use std::{fs, process};
+
+#[test]
+fn prints_top_level_help_successfully() {
+    for flag in ["-h", "--help"] {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+            .arg(flag)
+            .output()
+            .expect("run linxira-bio help");
+
+        assert!(output.status.success(), "help flag {flag}");
+        assert!(output.stderr.is_empty(), "help flag {flag}");
+        let stdout = String::from_utf8(output.stdout).expect("UTF-8 help output");
+        assert!(stdout.contains("linxira-bio sequence stats"));
+        assert!(stdout.contains("linxira-bio export table"));
+    }
+}
 
 #[test]
 fn reports_sequence_statistics_as_json() {
@@ -34,6 +51,83 @@ fn exposes_available_and_planned_capabilities() {
     assert!(stdout.contains("\"sequence.stats.v1\""));
     assert!(stdout.contains("\"protein.af3.server.v1\""));
     assert!(stdout.contains("\"authenticated-browser\""));
+}
+
+#[test]
+fn inspects_a_dataset_as_json() {
+    let fixture = workspace_root().join("tests/fixtures/data-inspection/variants.vcf");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["dataset", "inspect"])
+        .arg(fixture)
+        .arg("--json")
+        .output()
+        .expect("run dataset inspection");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("UTF-8 output");
+    let result: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON result");
+
+    assert_eq!(result["capability"], "dataset.inspect.v1");
+    assert_eq!(result["result"]["format"], "vcf");
+    assert_eq!(result["result"]["preview"]["kind"], "variant");
+}
+
+#[test]
+fn exports_result_json_to_csv_and_xlsx() {
+    let root = std::env::temp_dir().join(format!("linxira-cli-export-{}", process::id()));
+    fs::create_dir_all(&root).expect("create export directory");
+    let input = root.join("result.json");
+    fs::write(
+        &input,
+        r#"{"schema_version":"1","result":{"sequence_count":3,"gc_percent":60.0}}"#,
+    )
+    .expect("write result fixture");
+
+    for extension in ["csv", "xlsx"] {
+        let output_path = root.join(format!("result.{extension}"));
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+            .args(["export", "table"])
+            .arg(&input)
+            .arg(&output_path)
+            .output()
+            .expect("run export");
+        assert!(output.status.success(), "export {extension}");
+        assert!(fs::metadata(output_path).expect("export metadata").len() > 0);
+    }
+
+    fs::remove_dir_all(root).expect("remove export directory");
+}
+
+#[test]
+fn reports_fastq_quality_control_as_json() {
+    let fixture = workspace_root().join("tests/fixtures/fastq-qc/valid.fastq");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["fastq", "qc"])
+        .arg(fixture)
+        .args(["--quality-encoding", "phred+33", "--json"])
+        .output()
+        .expect("run FASTQ QC");
+
+    assert!(output.status.success());
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    assert_eq!(result["capability"], "fastq.qc.v1");
+    assert_eq!(result["result"]["read_count"], 2);
+}
+
+#[test]
+fn reports_variant_statistics_as_json() {
+    let fixture = workspace_root().join("tests/fixtures/variant-stats/mixed.vcf");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["variant", "stats"])
+        .arg(fixture)
+        .arg("--json")
+        .output()
+        .expect("run variant statistics");
+
+    assert!(output.status.success());
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    assert_eq!(result["capability"], "variant.stats.v1");
+    assert_eq!(result["result"]["record_count"], 7);
 }
 
 #[test]

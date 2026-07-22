@@ -22,8 +22,18 @@ are technically convenient.
 | Component | License | Use |
 | --- | --- | --- |
 | `serde`, `serde_json` | MIT OR Apache-2.0 | Job, result, and capability serialization |
+| `csv` | Unlicense OR MIT | RFC 4180-compatible CSV and configurable TSV writing |
+| `flate2` | MIT OR Apache-2.0 | Streaming gzip and BGZF-compatible decompression |
 | `eframe`, `egui` | MIT OR Apache-2.0 | Native desktop GUI without an embedded WebView |
+| `rfd` | MIT | Native operating-system file dialogs |
+| `rust_xlsxwriter` | MIT OR Apache-2.0 | Native XLSX result export |
+| `same-file` | Unlicense OR MIT | Cross-platform file identity checks that prevent export input/output aliasing |
+| `sha2` | MIT OR Apache-2.0 | Artifact SHA-256 integrity and provenance checks |
+| `tempfile` | MIT OR Apache-2.0 | Same-directory temporary output used for atomic table export replacement |
+| `zip` | MIT | Bounded ZIP signature and metadata inspection without extraction |
+| `jsonschema` format-validation stack | MIT, BSD-3-Clause, Apache-2.0, ISC, MPL-2.0, and GPL-3.0-or-later | CI-only JSON Schema Draft 2020-12 validation; the Python environment is not included in application bundles |
 | `epaint_default_fonts` bundled fonts | OFL-1.1 AND Ubuntu-font-1.0 | Default native GUI fonts; retain the font license notices in desktop distributions |
+| Noto Sans SC 2.002 | OFL-1.1 | Bundled Simplified Chinese GUI fallback; font metadata identifies version 2.002 from `notofonts/noto-cjk`; retain `licenses/NotoSansCJK-OFL.txt` |
 | `hexf-parse` | CC0-1.0 | Transitive shader-number parsing used by the native GPU renderer |
 | `uv` | Apache-2.0 OR MIT | Planned user-scoped Python runtime provider; not redistributed yet |
 | `Pixi` | BSD-3-Clause | Planned mixed Python/R/Bioconda environment provider; not redistributed yet |
@@ -31,9 +41,14 @@ are technically convenient.
 | Miniforge and Conda | BSD-3-Clause | Planned compatibility provider for Conda/Bioconda environments; not redistributed yet |
 | Eclipse Temurin | GPL-2.0-only WITH Classpath-exception-2.0 | Planned Java 21/17 runtime provider; not redistributed yet |
 
+The bundled Noto Sans SC file has SHA-256
+`A2B93E6C2DB05D6BBBF6F27D413EC73269735B7B679019C8A5AA9670FF0FFBF2`.
+
 Transitive Rust dependencies are locked in `Cargo.lock` and checked by
-`cargo-deny` against `deny.toml`. Binary releases must include the generated
-dependency and notice report.
+`cargo-deny` against `deny.toml`; both files are included in staged bundles.
+Before publishing a binary release, generate and bundle a complete dependency
+license-notice report from that locked graph. CI staging is not a public binary
+release.
 
 Any adapted skill or implementation must record the exact source repository,
 revision, path, license, retained notice, and a concrete modification summary.

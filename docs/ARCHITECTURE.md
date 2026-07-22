@@ -16,9 +16,10 @@ Native GUI       CLI       Python SDK       MCP clients
        built-in Rust code     pinned external tools
 ```
 
-The GUI, CLI, SDK, and agents must submit the same `JobRequest` and consume the
-same `AnalysisResult`. A feature is not complete when it exists only as a GUI
-button or an agent prompt.
+The GUI, CLI, SDK, and agents use the same versioned job and result contracts.
+Legacy v1 remains supported; artifact-aware v2 adds stable file identity,
+integrity checks, structured diagnostics, and output artifacts. A feature is
+not complete when it exists only as a GUI button or an agent prompt.
 
 ## Repository Boundaries
 

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-result",
+  "capability": "sequence.stats.v1",
+  "status": "ok",
+  "result": {
+    "sequence_count": 3,
+    "total_bases": 12,
+    "gc_percent": 60.0
+  },
+  "provenance": {
+    "engine_version": "0.1.0",
+    "execution_mode": "local-cpu"
+  },
+  "warnings": []
+}

@@ -12,5 +12,8 @@ path = "src/main.rs"
 
 [dependencies]
 linxira-bio-core = { version = "0.1.0", path = "../linxira-bio-core" }
+linxira-bio-export = { version = "0.1.0", path = "../linxira-bio-export" }
 linxira-bio-protocol = { version = "0.1.0", path = "../linxira-bio-protocol" }
+serde.workspace = true
 serde_json.workspace = true
+sha2 = "0.10"

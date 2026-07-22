@@ -1,7 +1,10 @@
+use flate2::read::MultiGzDecoder;
 use serde::Serialize;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::io::{self, BufRead};
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, Read};
+use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SequenceStats {
@@ -157,6 +160,18 @@ pub fn fasta_stats(reader: impl BufRead) -> Result<SequenceStats, FastaError> {
     })
 }
 
+pub fn fasta_stats_path(path: impl AsRef<Path>) -> Result<SequenceStats, FastaError> {
+    let path = path.as_ref();
+    let mut prefix = [0_u8; 2];
+    let prefix_length = File::open(path)?.read(&mut prefix)?;
+    let input: Box<dyn Read> = if prefix_length == 2 && prefix == [0x1f, 0x8b] {
+        Box::new(MultiGzDecoder::new(File::open(path)?))
+    } else {
+        Box::new(File::open(path)?)
+    };
+    fasta_stats(BufReader::new(input))
+}
+
 fn ratio(numerator: u64, denominator: u64) -> f64 {
     if denominator == 0 {
         0.0
@@ -171,8 +186,11 @@ fn percent(numerator: u64, denominator: u64) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{FastaError, fasta_stats};
-    use std::io::Cursor;
+    use super::{FastaError, fasta_stats, fasta_stats_path};
+    use flate2::Compression;
+    use flate2::write::GzEncoder;
+    use std::fs;
+    use std::io::{Cursor, Write};
 
     #[test]
     fn calculates_expected_statistics() {
@@ -206,5 +224,27 @@ mod tests {
         let error = fasta_stats(Cursor::new(b"\n")).expect_err("empty input must fail");
 
         assert!(matches!(error, FastaError::NoRecords));
+    }
+
+    #[test]
+    fn reads_gzip_compressed_fasta_by_magic_bytes() {
+        let path = std::env::temp_dir().join(format!(
+            "linxira-sequence-stats-{}.data",
+            std::process::id()
+        ));
+        let mut encoder = GzEncoder::new(
+            fs::File::create(&path).expect("create fixture"),
+            Compression::default(),
+        );
+        encoder
+            .write_all(b">one\nACGT\n>two\nNN\n")
+            .expect("write fixture");
+        encoder.finish().expect("finish gzip stream");
+
+        let stats = fasta_stats_path(&path).expect("read compressed FASTA");
+        fs::remove_file(path).expect("remove fixture");
+
+        assert_eq!(stats.sequence_count, 2);
+        assert_eq!(stats.total_bases, 6);
     }
 }
