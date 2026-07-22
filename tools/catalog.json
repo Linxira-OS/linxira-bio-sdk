@@ -8,8 +8,18 @@
     },
     {
       "id": "scripting",
-      "description": "Python and R runtimes for compatible analysis workflows",
-      "tools": ["python", "r"]
+      "description": "Python, R, and Java runtimes for compatible analysis workflows",
+      "tools": ["python", "r", "java"]
+    },
+    {
+      "id": "managed-runtimes",
+      "description": "User-scoped runtime managers and their Python, R, and Java runtimes",
+      "tools": ["uv", "pixi", "rig", "miniforge", "python", "r", "java"]
+    },
+    {
+      "id": "containers",
+      "description": "Platform-appropriate local container and Unix execution backends",
+      "tools": ["wsl", "docker", "podman"]
     },
     {
       "id": "sequence-search",
@@ -25,8 +35,13 @@
       "id": "full-local",
       "description": "All currently registered local runtimes and bioinformatics tools",
       "tools": [
+        "uv",
+        "pixi",
+        "rig",
+        "miniforge",
         "python",
         "r",
+        "java",
         "ncbi-blast",
         "diamond",
         "samtools",
@@ -38,6 +53,127 @@
   ],
   "tools": [
     {
+      "id": "conda",
+      "display_name": "Conda",
+      "category": "runtime-manager",
+      "probes": [
+        { "program": "conda", "args": ["--version"] }
+      ],
+      "install": {}
+    },
+    {
+      "id": "miniforge",
+      "display_name": "Miniforge",
+      "category": "runtime-manager",
+      "probes": [
+        { "program": "conda", "args": ["info", "--json"], "output_contains": "miniforge" }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "official-installer",
+          "package": "Miniforge3",
+          "source_url": "https://github.com/conda-forge/miniforge/releases",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "official-installer",
+          "package": "Miniforge3",
+          "source_url": "https://github.com/conda-forge/miniforge/releases",
+          "requires_admin": false
+        },
+        "arch": {
+          "strategy": "official-installer",
+          "package": "Miniforge3",
+          "source_url": "https://github.com/conda-forge/miniforge/releases",
+          "requires_admin": false
+        }
+      }
+    },
+    {
+      "id": "uv",
+      "display_name": "uv",
+      "category": "runtime-manager",
+      "probes": [
+        { "program": "uv", "args": ["--version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "official-bootstrap",
+          "package": "uv",
+          "source_url": "https://github.com/astral-sh/uv/releases",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "official-bootstrap",
+          "package": "uv",
+          "source_url": "https://github.com/astral-sh/uv/releases",
+          "requires_admin": false
+        },
+        "arch": {
+          "strategy": "official-bootstrap",
+          "package": "uv",
+          "source_url": "https://github.com/astral-sh/uv/releases",
+          "requires_admin": false
+        }
+      }
+    },
+    {
+      "id": "pixi",
+      "display_name": "Pixi",
+      "category": "runtime-manager",
+      "probes": [
+        { "program": "pixi", "args": ["--version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "official-bootstrap",
+          "package": "pixi",
+          "source_url": "https://github.com/prefix-dev/pixi/releases",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "official-bootstrap",
+          "package": "pixi",
+          "source_url": "https://github.com/prefix-dev/pixi/releases",
+          "requires_admin": false
+        },
+        "arch": {
+          "strategy": "official-bootstrap",
+          "package": "pixi",
+          "source_url": "https://github.com/prefix-dev/pixi/releases",
+          "requires_admin": false
+        }
+      }
+    },
+    {
+      "id": "rig",
+      "display_name": "rig",
+      "category": "runtime-manager",
+      "probes": [
+        { "program": "rig", "args": ["--version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "official-archive",
+          "package": "rig",
+          "source_url": "https://github.com/r-lib/rig/releases",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "official-package",
+          "package": "rig",
+          "source_url": "https://github.com/r-lib/rig/releases",
+          "requires_admin": false
+        },
+        "arch": {
+          "strategy": "official-package",
+          "package": "rig",
+          "source_url": "https://github.com/r-lib/rig/releases",
+          "requires_admin": false
+        }
+      }
+    },
+    {
       "id": "python",
       "display_name": "Python",
       "category": "runtime",
@@ -47,22 +183,22 @@
       ],
       "install": {
         "windows": {
-          "strategy": "official-installer",
-          "package": "Python 3",
-          "source_url": "https://www.python.org/downloads/windows/",
+          "strategy": "uv-managed",
+          "package": "CPython 3.12",
+          "source_url": "https://github.com/astral-sh/python-build-standalone",
           "requires_admin": false
         },
         "debian": {
-          "strategy": "apt",
-          "package": "python3 python3-venv python3-pip",
-          "source_url": "https://packages.debian.org/stable/python3",
-          "requires_admin": true
+          "strategy": "uv-managed",
+          "package": "CPython 3.12",
+          "source_url": "https://github.com/astral-sh/python-build-standalone",
+          "requires_admin": false
         },
         "arch": {
-          "strategy": "pacman",
-          "package": "python python-pip",
-          "source_url": "https://archlinux.org/packages/core/x86_64/python/",
-          "requires_admin": true
+          "strategy": "uv-managed",
+          "package": "CPython 3.12",
+          "source_url": "https://github.com/astral-sh/python-build-standalone",
+          "requires_admin": false
         }
       }
     },
@@ -76,22 +212,51 @@
       ],
       "install": {
         "windows": {
-          "strategy": "official-installer",
-          "package": "R",
-          "source_url": "https://cran.r-project.org/bin/windows/base/",
+          "strategy": "rig-managed",
+          "package": "R release",
+          "source_url": "https://github.com/r-lib/rig",
           "requires_admin": false
         },
         "debian": {
-          "strategy": "apt",
-          "package": "r-base",
-          "source_url": "https://packages.debian.org/stable/r-base",
-          "requires_admin": true
+          "strategy": "rig-managed",
+          "package": "R release",
+          "source_url": "https://github.com/r-lib/rig",
+          "requires_admin": false
         },
         "arch": {
-          "strategy": "pacman",
-          "package": "r",
-          "source_url": "https://archlinux.org/packages/extra/x86_64/r/",
-          "requires_admin": true
+          "strategy": "rig-managed",
+          "package": "R release",
+          "source_url": "https://github.com/r-lib/rig",
+          "requires_admin": false
+        }
+      }
+    },
+    {
+      "id": "java",
+      "display_name": "Java",
+      "category": "runtime",
+      "probes": [
+        { "program": "java", "args": ["-version"], "output_contains": "version" },
+        { "program": "javac", "args": ["-version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "managed-runtime",
+          "package": "Eclipse Temurin 21 LTS",
+          "source_url": "https://api.adoptium.net/v3/",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "managed-runtime",
+          "package": "Eclipse Temurin 21 LTS",
+          "source_url": "https://api.adoptium.net/v3/",
+          "requires_admin": false
+        },
+        "arch": {
+          "strategy": "managed-runtime",
+          "package": "Eclipse Temurin 21 LTS",
+          "source_url": "https://api.adoptium.net/v3/",
+          "requires_admin": false
         }
       }
     },
@@ -268,6 +433,7 @@
       "id": "wsl",
       "display_name": "WSL Debian",
       "category": "execution",
+      "platforms": ["windows"],
       "probes": [
         {
           "program": "wsl.exe",
@@ -301,6 +467,29 @@
         { "program": "docker", "args": ["--version"] }
       ],
       "install": {}
+    },
+    {
+      "id": "podman",
+      "display_name": "Podman",
+      "category": "execution",
+      "platforms": ["debian", "arch"],
+      "probes": [
+        { "program": "podman", "args": ["--version"] }
+      ],
+      "install": {
+        "debian": {
+          "strategy": "apt",
+          "package": "podman",
+          "source_url": "https://packages.debian.org/stable/podman",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "podman",
+          "source_url": "https://archlinux.org/packages/extra/x86_64/podman/",
+          "requires_admin": true
+        }
+      }
     },
     {
       "id": "rust",

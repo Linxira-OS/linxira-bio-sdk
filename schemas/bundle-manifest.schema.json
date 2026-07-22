@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/bundle-manifest.v1.json",
+  "title": "Linxira Bio release bundle manifest",
+  "type": "object",
+  "required": [
+    "schema_version", "artifact_root", "include_files", "include_trees", "binaries"
+  ],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "artifact_root": { "type": "string", "minLength": 1 },
+    "include_files": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "include_trees": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "binaries": {
+      "type": "object",
+      "required": ["windows", "debian", "arch"],
+      "properties": {
+        "windows": { "$ref": "#/$defs/binaryList" },
+        "debian": { "$ref": "#/$defs/binaryList" },
+        "arch": { "$ref": "#/$defs/binaryList" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "binaryList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}

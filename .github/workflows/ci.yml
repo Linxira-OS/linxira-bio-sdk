@@ -36,6 +36,7 @@ jobs:
       - run: cargo +stable-x86_64-pc-windows-gnu test --locked --workspace
       - run: cargo +stable-x86_64-pc-windows-gnu run --locked -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
       - run: python scripts/validate-repository.py
+      - run: python scripts/stage-release.py --check
 
   debian-bookworm:
     runs-on: ubuntu-latest
@@ -56,6 +57,7 @@ jobs:
       - run: cargo run --locked -p linxira-bio-worker -- tests/fixtures/jobs/sequence-stats.json
       - run: cargo run --locked -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
       - run: python3 scripts/validate-repository.py
+      - run: python3 scripts/stage-release.py --check
 
   arch-linux:
     runs-on: ubuntu-latest
@@ -72,6 +74,7 @@ jobs:
       - run: cargo test --locked --workspace
       - run: cargo run --locked -p linxira-bio-cli -- doctor --json
       - run: python scripts/validate-repository.py
+      - run: python scripts/stage-release.py --check
 
   license-audit:
     runs-on: ubuntu-latest

@@ -25,6 +25,11 @@ are technically convenient.
 | `eframe`, `egui` | MIT OR Apache-2.0 | Native desktop GUI without an embedded WebView |
 | `epaint_default_fonts` bundled fonts | OFL-1.1 AND Ubuntu-font-1.0 | Default native GUI fonts; retain the font license notices in desktop distributions |
 | `hexf-parse` | CC0-1.0 | Transitive shader-number parsing used by the native GPU renderer |
+| `uv` | Apache-2.0 OR MIT | Planned user-scoped Python runtime provider; not redistributed yet |
+| `Pixi` | BSD-3-Clause | Planned mixed Python/R/Bioconda environment provider; not redistributed yet |
+| `rig` | MIT | Planned R version manager; R itself retains GPL terms |
+| Miniforge and Conda | BSD-3-Clause | Planned compatibility provider for Conda/Bioconda environments; not redistributed yet |
+| Eclipse Temurin | GPL-2.0-only WITH Classpath-exception-2.0 | Planned Java 21/17 runtime provider; not redistributed yet |
 
 Transitive Rust dependencies are locked in `Cargo.lock` and checked by
 `cargo-deny` against `deny.toml`. Binary releases must include the generated

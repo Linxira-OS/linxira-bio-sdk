@@ -1,0 +1,106 @@
+{
+  "schema_version": "1",
+  "default_scope": "user",
+  "providers": [
+    {
+      "id": "python-uv",
+      "runtime": "python",
+      "display_name": "Python (uv managed)",
+      "status": "cataloged",
+      "manager": "uv",
+      "version_policy": "3.12",
+      "default": true,
+      "user_scoped": true,
+      "platforms": ["windows", "debian", "arch"],
+      "source_url": "https://github.com/astral-sh/uv",
+      "licenses": ["Apache-2.0", "MIT", "Python-2.0"],
+      "health_checks": [
+        { "program": "uv", "args": ["--version"] },
+        { "program": "python", "args": ["--version"] }
+      ]
+    },
+    {
+      "id": "analysis-pixi",
+      "runtime": "mixed-analysis-environment",
+      "display_name": "Pixi analysis environments",
+      "status": "cataloged",
+      "manager": "pixi",
+      "version_policy": "stable",
+      "default": true,
+      "user_scoped": true,
+      "platforms": ["windows", "debian", "arch"],
+      "source_url": "https://github.com/prefix-dev/pixi",
+      "licenses": ["BSD-3-Clause"],
+      "health_checks": [
+        { "program": "pixi", "args": ["--version"] }
+      ]
+    },
+    {
+      "id": "analysis-miniforge",
+      "runtime": "mixed-analysis-environment",
+      "display_name": "Miniforge Conda environments",
+      "status": "cataloged",
+      "manager": "conda",
+      "version_policy": "stable",
+      "default": false,
+      "user_scoped": true,
+      "platforms": ["windows", "debian", "arch"],
+      "source_url": "https://github.com/conda-forge/miniforge",
+      "licenses": ["BSD-3-Clause"],
+      "health_checks": [
+        { "program": "conda", "args": ["info", "--json"] }
+      ]
+    },
+    {
+      "id": "r-rig",
+      "runtime": "r",
+      "display_name": "R (rig managed)",
+      "status": "cataloged",
+      "manager": "rig",
+      "version_policy": "release",
+      "default": true,
+      "user_scoped": true,
+      "platforms": ["windows", "debian", "arch"],
+      "source_url": "https://github.com/r-lib/rig",
+      "licenses": ["MIT", "GPL-2.0-or-later"],
+      "health_checks": [
+        { "program": "rig", "args": ["--version"] },
+        { "program": "Rscript", "args": ["--version"] }
+      ]
+    },
+    {
+      "id": "java-temurin-21",
+      "runtime": "java",
+      "display_name": "Eclipse Temurin 21 LTS",
+      "status": "cataloged",
+      "manager": "linxira-archive",
+      "version_policy": "21-lts-latest-security",
+      "default": true,
+      "user_scoped": true,
+      "platforms": ["windows", "debian", "arch"],
+      "source_url": "https://api.adoptium.net/v3/",
+      "licenses": ["GPL-2.0-only WITH Classpath-exception-2.0"],
+      "health_checks": [
+        { "program": "java", "args": ["-version"] },
+        { "program": "javac", "args": ["-version"] }
+      ]
+    },
+    {
+      "id": "java-temurin-17",
+      "runtime": "java",
+      "display_name": "Eclipse Temurin 17 LTS compatibility",
+      "status": "cataloged",
+      "manager": "linxira-archive",
+      "version_policy": "17-lts-latest-security",
+      "default": false,
+      "user_scoped": true,
+      "platforms": ["windows", "debian", "arch"],
+      "source_url": "https://api.adoptium.net/v3/",
+      "licenses": ["GPL-2.0-only WITH Classpath-exception-2.0"],
+      "health_checks": [
+        { "program": "java", "args": ["-version"] },
+        { "program": "javac", "args": ["-version"] }
+      ]
+    }
+  ]
+}

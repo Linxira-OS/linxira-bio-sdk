@@ -24,6 +24,13 @@
       "command": "linxira-bio environment plan <profile> --json"
     },
     {
+      "id": "runtime.catalog.v1",
+      "status": "available",
+      "category": "system",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio runtime catalog --json"
+    },
+    {
       "id": "environment.apply.v1",
       "status": "planned",
       "category": "system",

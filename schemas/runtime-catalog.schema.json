@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/runtime-catalog.v1.json",
+  "title": "Linxira Bio managed runtime catalog",
+  "type": "object",
+  "required": ["schema_version", "default_scope", "providers"],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "default_scope": { "const": "user" },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "runtime", "display_name", "status", "manager",
+          "version_policy", "default", "user_scoped", "platforms",
+          "source_url", "licenses", "health_checks"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "runtime": { "type": "string", "minLength": 1 },
+          "display_name": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["cataloged", "installable", "deprecated"] },
+          "manager": { "type": "string", "minLength": 1 },
+          "version_policy": { "type": "string", "minLength": 1 },
+          "default": { "type": "boolean" },
+          "user_scoped": { "type": "boolean" },
+          "platforms": {
+            "type": "array",
+            "items": { "enum": ["windows", "debian", "arch"] },
+            "uniqueItems": true,
+            "minItems": 1
+          },
+          "source_url": { "type": "string", "format": "uri" },
+          "licenses": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "health_checks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["program", "args"],
+              "properties": {
+                "program": { "type": "string", "minLength": 1 },
+                "args": { "type": "array", "items": { "type": "string" } }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

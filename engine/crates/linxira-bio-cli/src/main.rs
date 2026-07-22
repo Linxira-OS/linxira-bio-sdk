@@ -3,6 +3,7 @@
 use linxira_bio_core::environment::{
     EnvironmentAudit, EnvironmentPlan, PlanActionState, audit_environment, plan_environment,
 };
+use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
 use linxira_bio_core::sequence::{SequenceStats, fasta_stats};
 use linxira_bio_protocol::{AnalysisResult, ExecutionMode};
 use std::env;
@@ -56,6 +57,14 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         {
             print_environment_plan(profile, true)
         }
+        [runtime, catalog] if runtime == "runtime" && catalog == "catalog" => {
+            print_runtime_catalog(false)
+        }
+        [runtime, catalog, json]
+            if runtime == "runtime" && catalog == "catalog" && json == "--json" =>
+        {
+            print_runtime_catalog(true)
+        }
         [sequence, stats, path] if sequence == "sequence" && stats == "stats" => {
             print_sequence_stats(path, false)
         }
@@ -72,12 +81,47 @@ fn print_capabilities(json: bool) -> Result<(), Box<dyn Error>> {
     if json {
         println!("{CAPABILITY_CATALOG}");
     } else {
+        let catalog: serde_json::Value = serde_json::from_str(CAPABILITY_CATALOG)?;
         println!("Available:");
-        println!("  system.doctor.v1");
-        println!("  sequence.stats.v1");
+        if let Some(capabilities) = catalog
+            .get("capabilities")
+            .and_then(serde_json::Value::as_array)
+        {
+            for capability in capabilities.iter().filter(|capability| {
+                capability.get("status").and_then(serde_json::Value::as_str) == Some("available")
+            }) {
+                if let Some(id) = capability.get("id").and_then(serde_json::Value::as_str) {
+                    println!("  {id}");
+                }
+            }
+        }
         println!();
         println!("Run with --json for the complete catalog, including planned capabilities.");
     }
+    Ok(())
+}
+
+fn print_runtime_catalog(json: bool) -> Result<(), Box<dyn Error>> {
+    let catalog = load_runtime_catalog()?;
+    if json {
+        println!("{}", serde_json::to_string(&catalog)?);
+        return Ok(());
+    }
+
+    println!("Managed runtime providers (read-only catalog):");
+    for provider in catalog.providers {
+        let state = match provider.status {
+            RuntimeProviderStatus::Cataloged => "cataloged",
+            RuntimeProviderStatus::Installable => "installable",
+            RuntimeProviderStatus::Deprecated => "deprecated",
+        };
+        let default = if provider.default { " [default]" } else { "" };
+        println!(
+            "  {}: {} via {} ({state}){default}",
+            provider.runtime, provider.display_name, provider.manager
+        );
+    }
+    println!("Installation is not implemented; environment.apply.v1 remains planned.");
     Ok(())
 }
 
@@ -86,7 +130,20 @@ fn print_doctor(json: bool) -> Result<(), Box<dyn Error>> {
 
     if json {
         let tools = [
-            "rust", "python", "samtools", "bcftools", "bedtools", "docker",
+            "rust",
+            "uv",
+            "pixi",
+            "conda",
+            "miniforge",
+            "python",
+            "r",
+            "java",
+            "samtools",
+            "bcftools",
+            "bedtools",
+            "wsl",
+            "docker",
+            "podman",
         ]
         .iter()
         .filter_map(|tool_id| audit.tools.iter().find(|tool| tool.id == *tool_id))
@@ -223,5 +280,5 @@ fn print_stats_json(stats: &SequenceStats) -> Result<(), Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--json]\n  linxira-bio sequence stats <input.fasta> [--json]"
+    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--json]\n  linxira-bio runtime catalog [--json]\n  linxira-bio sequence stats <input.fasta> [--json]"
 }

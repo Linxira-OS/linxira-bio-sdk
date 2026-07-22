@@ -10,8 +10,9 @@ the agent skills that select and validate them.
   browser execution must be selected.
 - Read `skills/analyze-sequence-statistics/SKILL.md` for the implemented
   `sequence.stats.v1` capability.
-- Read `skills/configure-bio-environment/SKILL.md` to audit Python, R, BLAST,
-  DIAMOND, native command-line tools, WSL Debian, or GPU prerequisites.
+- Read `skills/configure-bio-environment/SKILL.md` to audit managed Python, R,
+  Java, Conda/Bioconda, BLAST, DIAMOND, native command-line tools, WSL Debian,
+  Docker, Podman, or GPU prerequisites.
 - Do not use a capability marked `planned` as though it were available.
 
 ## Repository Rules

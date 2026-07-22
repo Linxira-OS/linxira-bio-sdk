@@ -9,6 +9,32 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+ENGLISH_CAPABILITY_SECTIONS = (
+    "Purpose",
+    "Inputs",
+    "Parameters",
+    "Outputs",
+    "Examples",
+    "Interpretation",
+    "Caveats",
+    "Runtime Dependencies",
+    "Citations",
+    "Troubleshooting",
+)
+
+CHINESE_CAPABILITY_SECTIONS = (
+    "用途",
+    "输入",
+    "参数",
+    "输出",
+    "示例",
+    "结果解读",
+    "注意事项",
+    "运行时依赖",
+    "引用",
+    "故障排除",
+)
+
 
 def load_json(relative_path: str) -> object:
     path = ROOT / relative_path
@@ -34,15 +60,49 @@ def parse_skill_frontmatter(path: Path) -> dict[str, str]:
     return fields
 
 
+def validate_capability_documentation(capability: dict[str, object]) -> None:
+    capability_id = capability["id"]
+    command = capability.get("command")
+    assert isinstance(capability_id, str)
+    assert isinstance(command, str)
+
+    for locale, sections in (
+        ("en-US", ENGLISH_CAPABILITY_SECTIONS),
+        ("zh-CN", CHINESE_CAPABILITY_SECTIONS),
+    ):
+        path = ROOT / "docs" / "capabilities" / capability_id / f"{locale}.md"
+        if not path.is_file():
+            raise ValueError(
+                f"available capability lacks {locale} documentation: {capability_id}"
+            )
+        text = path.read_text(encoding="utf-8")
+        for section in sections:
+            if f"## {section}\n" not in text:
+                raise ValueError(
+                    f"{locale} documentation lacks section {section}: {capability_id}"
+                )
+
+        command_prefix = " ".join(command.split()[:2])
+        if command_prefix not in text:
+            raise ValueError(
+                f"{locale} documentation lacks command example: {capability_id}"
+            )
+
+
 def validate() -> None:
     catalog = load_json("capabilities/catalog.json")
     tool_catalog = load_json("tools/catalog.json")
+    runtime_catalog = load_json("runtimes/catalog.json")
+    bundle_manifest = load_json("packaging/bundle-manifest.json")
     pack = load_json("skill-pack.json")
     profile = load_json("profiles/local-core.json")
     load_json("schemas/capability.schema.json")
     load_json("schemas/job-request.schema.json")
     load_json("schemas/analysis-result.schema.json")
     load_json("schemas/tool-catalog.schema.json")
+    load_json("schemas/runtime-catalog.schema.json")
+    load_json("schemas/runtime-lock.schema.json")
+    load_json("schemas/bundle-manifest.schema.json")
 
     license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
     if "GNU AFFERO GENERAL PUBLIC LICENSE" not in license_text:
@@ -58,6 +118,14 @@ def validate() -> None:
         raise ValueError("invalid capability catalog header")
     if not isinstance(tool_catalog, dict) or tool_catalog.get("schema_version") != "1":
         raise ValueError("invalid tool catalog header")
+    if not isinstance(runtime_catalog, dict) or runtime_catalog.get("schema_version") != "1":
+        raise ValueError("invalid runtime catalog header")
+    if runtime_catalog.get("default_scope") != "user":
+        raise ValueError("managed runtimes must default to user scope")
+    if not isinstance(bundle_manifest, dict) or bundle_manifest.get("schema_version") != "1":
+        raise ValueError("invalid release bundle manifest")
+    if "docs" not in bundle_manifest.get("include_trees", []):
+        raise ValueError("release bundle does not include canonical documentation")
     if not isinstance(pack, dict) or pack.get("schema_version") != "1":
         raise ValueError("invalid skill-pack header")
     if pack.get("license") != "AGPL-3.0-or-later":
@@ -82,8 +150,47 @@ def validate() -> None:
         if capability_id in capability_ids:
             raise ValueError(f"duplicate capability id: {capability_id}")
         capability_ids.add(capability_id)
-        if capability.get("status") == "available" and not capability.get("command"):
-            raise ValueError(f"available capability lacks a command: {capability_id}")
+        if capability.get("status") == "available":
+            if not capability.get("command"):
+                raise ValueError(f"available capability lacks a command: {capability_id}")
+            validate_capability_documentation(capability)
+
+    providers = runtime_catalog.get("providers")
+    if not isinstance(providers, list) or not providers:
+        raise ValueError("runtime catalog requires providers")
+
+    provider_ids: set[str] = set()
+    default_runtimes: set[str] = set()
+    for provider in providers:
+        if not isinstance(provider, dict):
+            raise ValueError("runtime provider entries must be objects")
+        provider_id = provider.get("id")
+        runtime = provider.get("runtime")
+        platforms = provider.get("platforms")
+        if not isinstance(provider_id, str) or not provider_id:
+            raise ValueError("runtime provider id is required")
+        if provider_id in provider_ids:
+            raise ValueError(f"duplicate runtime provider: {provider_id}")
+        if not isinstance(runtime, str) or not runtime:
+            raise ValueError(f"runtime provider lacks runtime: {provider_id}")
+        if provider.get("user_scoped") is not True:
+            raise ValueError(f"runtime provider is not user-scoped: {provider_id}")
+        if provider.get("status") not in {"cataloged", "installable", "deprecated"}:
+            raise ValueError(f"invalid runtime provider status: {provider_id}")
+        if not isinstance(platforms, list) or not set(platforms) <= {
+            "windows",
+            "debian",
+            "arch",
+        }:
+            raise ValueError(f"invalid runtime provider platforms: {provider_id}")
+        if provider.get("default") is True:
+            if runtime in default_runtimes:
+                raise ValueError(f"multiple default providers for runtime: {runtime}")
+            default_runtimes.add(runtime)
+        provider_ids.add(provider_id)
+
+    if not {"python", "r", "java"} <= default_runtimes:
+        raise ValueError("default Python, R, and Java runtime providers are required")
 
     tools = tool_catalog.get("tools")
     tool_profiles = tool_catalog.get("profiles")
@@ -97,6 +204,7 @@ def validate() -> None:
         tool_id = tool.get("id")
         probes = tool.get("probes")
         install = tool.get("install")
+        platforms = tool.get("platforms", ["windows", "debian", "arch"])
         if not isinstance(tool_id, str) or not tool_id:
             raise ValueError("tool id is required")
         if tool_id in tool_ids:
@@ -109,6 +217,12 @@ def validate() -> None:
             "arch",
         }:
             raise ValueError(f"invalid install platform for tool: {tool_id}")
+        if (
+            not isinstance(platforms, list)
+            or not platforms
+            or not set(platforms) <= {"windows", "debian", "arch"}
+        ):
+            raise ValueError(f"invalid applicable platforms for tool: {tool_id}")
         tool_ids.add(tool_id)
 
     environment_profile_ids: set[str] = set()
@@ -174,7 +288,7 @@ def validate() -> None:
     print(
         f"validated {len(capability_ids)} capabilities, "
         f"{len(skill_ids)} skills, {len(tool_ids)} tools, "
-        f"and profile {profile.get('id')}"
+        f"{len(provider_ids)} runtime providers, and profile {profile.get('id')}"
     )
 
 

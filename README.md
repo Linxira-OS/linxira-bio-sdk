@@ -33,6 +33,7 @@ deterministic FASTA sequence and assembly statistics:
 ```bash
 cargo run -p linxira-bio-cli -- environment audit --json
 cargo run -p linxira-bio-cli -- environment plan sequence-search --json
+cargo run -p linxira-bio-cli -- runtime catalog --json
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
 ```
@@ -51,6 +52,12 @@ cargo run -p linxira-bio-worker -- tests/fixtures/jobs/sequence-stats.json
 cargo run -p linxira-bio-ui
 ```
 
+Release bundles are staged from `packaging/bundle-manifest.json`, which always
+includes the canonical bilingual `docs/` tree, schemas, catalogs, skills, and
+license notices. Validate those inputs with
+`python scripts/stage-release.py --check`; platform packaging calls the same
+script with its compiled binary directory.
+
 ## Execution Model
 
 Local execution is the default. Move work to a local GPU, an institutional
@@ -61,9 +68,10 @@ Browser-only services are connectors, not compute kernels. They require an
 explicit user action gate, human-controlled authentication, and compliance with
 the service terms. The project never stores or auto-fills account credentials.
 
-See `docs/PROJECT_CHARTER.md`, `docs/EXECUTION_POLICY.md`,
-`docs/CAPABILITY_ROADMAP.md`, and `docs/TOOLCHAIN.md` for the project boundary,
-staged scope, and non-Visual-Studio build direction.
+See `docs/ARCHITECTURE.md`, `docs/RUNTIME_MANAGEMENT.md`,
+`docs/AI_AND_SDK.md`, `docs/DOCUMENTATION_POLICY.md`, and the existing policy
+documents for the product boundary, staged scope, and non-Visual-Studio build
+direction.
 
 ## Source Policy
 

@@ -21,7 +21,11 @@
       "id": "configure-bio-environment",
       "path": "skills/configure-bio-environment",
       "kind": "executable",
-      "capabilities": ["environment.audit.v1", "environment.plan.v1"]
+      "capabilities": [
+        "environment.audit.v1",
+        "environment.plan.v1",
+        "runtime.catalog.v1"
+      ]
     },
     {
       "id": "analyze-sequence-statistics",

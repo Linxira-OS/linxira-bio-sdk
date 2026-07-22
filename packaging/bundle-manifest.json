@@ -1,0 +1,35 @@
+{
+  "schema_version": "1",
+  "artifact_root": "linxira-bio-sdk",
+  "include_files": [
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY.md",
+    "AGENTS.md",
+    "skill-pack.json",
+    "capabilities/catalog.json",
+    "runtimes/catalog.json"
+  ],
+  "include_trees": [
+    "docs",
+    "schemas",
+    "skills"
+  ],
+  "binaries": {
+    "windows": [
+      "linxira-bio.exe",
+      "linxira-bio-worker.exe",
+      "linxira-bio-ui.exe"
+    ],
+    "debian": [
+      "linxira-bio",
+      "linxira-bio-worker",
+      "linxira-bio-ui"
+    ],
+    "arch": [
+      "linxira-bio",
+      "linxira-bio-worker",
+      "linxira-bio-ui"
+    ]
+  }
+}

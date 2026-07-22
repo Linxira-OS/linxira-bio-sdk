@@ -80,6 +80,36 @@ fn plans_sequence_search_environment_as_json() {
 }
 
 #[test]
+fn lists_cataloged_managed_runtimes_as_json() {
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["runtime", "catalog", "--json"])
+        .output()
+        .expect("run runtime catalog");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("UTF-8 output");
+    let catalog: serde_json::Value = serde_json::from_str(&stdout).expect("valid catalog JSON");
+    let providers = catalog["providers"].as_array().expect("runtime providers");
+
+    assert_eq!(catalog["default_scope"], "user");
+    assert!(
+        providers
+            .iter()
+            .any(|provider| provider["id"] == "python-uv")
+    );
+    assert!(
+        providers
+            .iter()
+            .any(|provider| provider["id"] == "java-temurin-21")
+    );
+    assert!(
+        providers
+            .iter()
+            .all(|provider| provider["status"] == "cataloged")
+    );
+}
+
+#[test]
 fn preserves_doctor_v1_json_shape() {
     let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
         .args(["doctor", "--json"])

@@ -1,4 +1,4 @@
 interface:
   display_name: "Configure Bio Environment"
-  short_description: "Audit and plan local bioinformatics tool environments"
-  default_prompt: "Use $configure-bio-environment to audit this machine and prepare a safe bioinformatics environment installation plan."
+  short_description: "Audit and plan Python, R, Java, and bio tools"
+  default_prompt: "Use $configure-bio-environment to audit this machine and prepare a safe, user-scoped runtime and bioinformatics tool plan."

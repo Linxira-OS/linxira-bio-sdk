@@ -4,6 +4,7 @@ use std::env;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const TOOL_CATALOG: &str = include_str!("../../../../tools/catalog.json");
@@ -24,6 +25,7 @@ pub struct ToolCheck {
     pub available: bool,
     pub command: Option<String>,
     pub version: Option<String>,
+    pub discovered_outside_path: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -36,8 +38,31 @@ pub struct AuditSummary {
 pub struct EnvironmentAudit {
     pub platform: PlatformInfo,
     pub tools: Vec<ToolCheck>,
+    pub execution_backends: ExecutionBackendAudit,
+    pub conda: Option<CondaAudit>,
     pub summary: AuditSummary,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ExecutionBackendAudit {
+    pub policy: String,
+    pub required_any_of: Vec<String>,
+    pub available: Vec<String>,
+    pub ready: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CondaAudit {
+    pub command: String,
+    pub distribution: String,
+    pub version: Option<String>,
+    pub root_prefix: Option<String>,
+    pub channels: Vec<String>,
+    pub bioconda_configured: bool,
+    pub bioconda_native_supported: bool,
+    pub channel_order_valid: bool,
+    pub strict_channel_priority: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -101,6 +126,8 @@ struct ToolDefinition {
     id: String,
     display_name: String,
     category: String,
+    #[serde(default)]
+    platforms: Vec<String>,
     probes: Vec<ToolProbe>,
     install: BTreeMap<String, InstallSpec>,
 }
@@ -123,8 +150,16 @@ struct InstallSpec {
 pub fn audit_environment() -> Result<EnvironmentAudit, EnvironmentError> {
     let catalog = load_catalog()?;
     let platform = current_platform();
-    let tools = catalog.tools.iter().map(probe_tool).collect::<Vec<_>>();
+    let mut tools = catalog
+        .tools
+        .iter()
+        .filter(|tool| tool_applies_to_platform(tool, &platform.family))
+        .map(|tool| probe_tool(tool, &platform))
+        .collect::<Vec<_>>();
+    let conda = inspect_conda(&tools, &platform);
+    apply_conda_distribution(&mut tools, conda.as_ref());
     let available = tools.iter().filter(|tool| tool.available).count();
+    let execution_backends = summarize_execution_backends(&platform, &tools);
     let mut warnings = Vec::new();
     if !platform.supported {
         warnings.push(format!(
@@ -132,9 +167,45 @@ pub fn audit_environment() -> Result<EnvironmentAudit, EnvironmentError> {
             platform.family
         ));
     }
+    for tool in tools
+        .iter()
+        .filter(|tool| tool.available && tool.discovered_outside_path)
+    {
+        warnings.push(format!(
+            "{} was discovered at {} but is not available through the current PATH",
+            tool.display_name,
+            tool.command.as_deref().unwrap_or("an unknown path")
+        ));
+    }
+    if !execution_backends.ready {
+        warnings.push(format!(
+            "no supported execution backend was found; install or configure one of: {}",
+            execution_backends.required_any_of.join(", ")
+        ));
+    }
+    if conda.as_ref().is_some_and(|configuration| {
+        !configuration.bioconda_configured
+            || !configuration.channel_order_valid
+            || !configuration.strict_channel_priority
+    }) {
+        warnings.push(
+            "Conda/Bioconda configuration is incomplete; keep conda-forge ahead of bioconda and use strict channel priority"
+                .to_owned(),
+        );
+    }
+    if conda.as_ref().is_some_and(|configuration| {
+        configuration.bioconda_configured && !configuration.bioconda_native_supported
+    }) {
+        warnings.push(
+            "Bioconda does not publish native Windows packages; run Bioconda environments through WSL Debian or another supported Linux backend"
+                .to_owned(),
+        );
+    }
 
     Ok(EnvironmentAudit {
         platform,
+        execution_backends,
+        conda,
         summary: AuditSummary {
             available,
             missing: tools.len().saturating_sub(available),
@@ -177,6 +248,9 @@ pub fn plan_environment(
                 "profile {profile_id} references unknown tool {tool_id}"
             ))
         })?;
+        if !tool_applies_to_platform(definition, &audit.platform.family) {
+            continue;
+        }
         let available = checks
             .get(tool_id.as_str())
             .is_some_and(|tool| tool.available);
@@ -288,42 +362,52 @@ fn linux_family() -> String {
         .unwrap_or_else(|| "linux".to_owned())
 }
 
-fn probe_tool(definition: &ToolDefinition) -> ToolCheck {
+fn probe_tool(definition: &ToolDefinition, platform: &PlatformInfo) -> ToolCheck {
+    if definition.id == "miniforge" {
+        return unavailable_tool(definition);
+    }
     for probe in &definition.probes {
-        let Ok(output) = Command::new(&probe.program).args(&probe.args).output() else {
-            continue;
-        };
-        if !output.status.success() {
-            continue;
+        for (program, discovered_outside_path) in program_candidates(definition, probe, platform) {
+            let Ok(output) = Command::new(&program).args(&probe.args).output() else {
+                continue;
+            };
+            if !output.status.success() {
+                continue;
+            }
+            let stdout = decode_output(&output.stdout);
+            let stderr = decode_output(&output.stderr);
+            if let Some(required) = &probe.output_contains
+                && !format!("{stdout}\n{stderr}")
+                    .to_lowercase()
+                    .contains(&required.to_lowercase())
+            {
+                continue;
+            }
+            let version = probe
+                .output_contains
+                .as_deref()
+                .and_then(|required| {
+                    first_matching_output_line(&stdout, required)
+                        .or_else(|| first_matching_output_line(&stderr, required))
+                })
+                .or_else(|| first_output_line(&stdout))
+                .or_else(|| first_output_line(&stderr));
+            return ToolCheck {
+                id: definition.id.clone(),
+                display_name: definition.display_name.clone(),
+                category: definition.category.clone(),
+                available: true,
+                command: Some(program.to_string_lossy().into_owned()),
+                version,
+                discovered_outside_path,
+            };
         }
-        let stdout = decode_output(&output.stdout);
-        let stderr = decode_output(&output.stderr);
-        if let Some(required) = &probe.output_contains
-            && !format!("{stdout}\n{stderr}")
-                .to_lowercase()
-                .contains(&required.to_lowercase())
-        {
-            continue;
-        }
-        let version = probe
-            .output_contains
-            .as_deref()
-            .and_then(|required| {
-                first_matching_output_line(&stdout, required)
-                    .or_else(|| first_matching_output_line(&stderr, required))
-            })
-            .or_else(|| first_output_line(&stdout))
-            .or_else(|| first_output_line(&stderr));
-        return ToolCheck {
-            id: definition.id.clone(),
-            display_name: definition.display_name.clone(),
-            category: definition.category.clone(),
-            available: true,
-            command: Some(probe.program.clone()),
-            version,
-        };
     }
 
+    unavailable_tool(definition)
+}
+
+fn unavailable_tool(definition: &ToolDefinition) -> ToolCheck {
     ToolCheck {
         id: definition.id.clone(),
         display_name: definition.display_name.clone(),
@@ -331,7 +415,203 @@ fn probe_tool(definition: &ToolDefinition) -> ToolCheck {
         available: false,
         command: None,
         version: None,
+        discovered_outside_path: false,
     }
+}
+
+fn apply_conda_distribution(tools: &mut [ToolCheck], conda: Option<&CondaAudit>) {
+    let Some(conda) = conda.filter(|configuration| configuration.distribution == "miniforge")
+    else {
+        return;
+    };
+    if let Some(tool) = tools.iter_mut().find(|tool| tool.id == "miniforge") {
+        tool.available = true;
+        tool.command = Some(conda.command.clone());
+        tool.version = conda.version.clone();
+        tool.discovered_outside_path = Path::new(&conda.command).is_absolute();
+    }
+}
+
+fn tool_applies_to_platform(definition: &ToolDefinition, family: &str) -> bool {
+    definition.platforms.is_empty() || definition.platforms.iter().any(|item| item == family)
+}
+
+fn program_candidates(
+    definition: &ToolDefinition,
+    probe: &ToolProbe,
+    platform: &PlatformInfo,
+) -> Vec<(PathBuf, bool)> {
+    let mut candidates = vec![(PathBuf::from(&probe.program), false)];
+    if platform.family != "windows" {
+        return candidates;
+    }
+
+    if definition.id == "r"
+        && let Some(root) = windows_r_install_root()
+    {
+        candidates.push((
+            root.join("bin").join(format!("{}.exe", probe.program)),
+            true,
+        ));
+    }
+    if matches!(definition.id.as_str(), "conda" | "miniforge") {
+        for root in windows_conda_roots() {
+            candidates.push((root.join("Scripts").join("conda.exe"), true));
+            candidates.push((root.join("condabin").join("conda.bat"), true));
+        }
+    }
+    candidates
+}
+
+fn windows_r_install_root() -> Option<PathBuf> {
+    for key in [
+        r"HKLM\SOFTWARE\R-core\R",
+        r"HKLM\SOFTWARE\WOW6432Node\R-core\R",
+        r"HKCU\SOFTWARE\R-core\R",
+    ] {
+        let Ok(output) = Command::new("reg.exe")
+            .args(["query", key, "/v", "InstallPath"])
+            .output()
+        else {
+            continue;
+        };
+        if !output.status.success() {
+            continue;
+        }
+        let stdout = decode_output(&output.stdout);
+        if let Some(path) = stdout.lines().find_map(|line| {
+            line.split_once("REG_SZ")
+                .map(|(_, value)| value.trim())
+                .filter(|value| !value.is_empty())
+        }) {
+            return Some(PathBuf::from(path));
+        }
+    }
+    None
+}
+
+fn windows_conda_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    for variable in ["CONDA_ROOT", "CONDA_PREFIX"] {
+        if let Ok(value) = env::var(variable)
+            && !value.trim().is_empty()
+        {
+            roots.push(PathBuf::from(value));
+        }
+    }
+    if let Ok(profile) = env::var("USERPROFILE") {
+        roots.push(Path::new(&profile).join("miniforge3"));
+        roots.push(Path::new(&profile).join("miniconda3"));
+    }
+    roots
+}
+
+fn summarize_execution_backends(
+    platform: &PlatformInfo,
+    tools: &[ToolCheck],
+) -> ExecutionBackendAudit {
+    let (policy, required_any_of) = match platform.family.as_str() {
+        "windows" => (
+            "Windows requires either WSL Debian or Docker for Unix/container workflows",
+            vec!["wsl", "docker"],
+        ),
+        "debian" | "arch" => (
+            "Linux checks both Docker and Podman; either provides a local container backend",
+            vec!["docker", "podman"],
+        ),
+        _ => ("No execution backend policy is registered", Vec::new()),
+    };
+    let available = required_any_of
+        .iter()
+        .filter(|id| tools.iter().any(|tool| tool.id == **id && tool.available))
+        .map(|id| (*id).to_owned())
+        .collect::<Vec<_>>();
+    let ready = required_any_of.is_empty() || !available.is_empty();
+    ExecutionBackendAudit {
+        policy: policy.to_owned(),
+        required_any_of: required_any_of.into_iter().map(str::to_owned).collect(),
+        available,
+        ready,
+    }
+}
+
+fn inspect_conda(tools: &[ToolCheck], platform: &PlatformInfo) -> Option<CondaAudit> {
+    let command = tools
+        .iter()
+        .find(|tool| tool.id == "conda" && tool.available)?
+        .command
+        .as_deref()?;
+    let output = Command::new(command)
+        .args(["info", "--json"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let info: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+    let root_prefix = info
+        .get("root_prefix")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned);
+    let channels = info
+        .get("channels")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(serde_json::Value::as_str)
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let priority = Command::new(command)
+        .args(["config", "--show", "channel_priority", "--json"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| serde_json::from_slice::<serde_json::Value>(&output.stdout).ok())
+        .and_then(|value| {
+            value
+                .get("channel_priority")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+        });
+    let distribution = if root_prefix
+        .as_deref()
+        .is_some_and(|path| path.to_lowercase().contains("miniforge"))
+    {
+        "miniforge"
+    } else {
+        "conda"
+    };
+
+    let bioconda_position = channels
+        .iter()
+        .position(|channel| channel.to_lowercase().contains("bioconda"));
+
+    Some(CondaAudit {
+        command: command.to_owned(),
+        distribution: distribution.to_owned(),
+        version: info
+            .get("conda_version")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
+        root_prefix,
+        bioconda_configured: bioconda_position.is_some(),
+        bioconda_native_supported: matches!(platform.family.as_str(), "debian" | "arch"),
+        channel_order_valid: conda_channel_order_valid(&channels),
+        channels,
+        strict_channel_priority: priority.as_deref() == Some("strict"),
+    })
+}
+
+fn conda_channel_order_valid(channels: &[String]) -> bool {
+    let conda_forge = channels
+        .iter()
+        .position(|channel| channel.to_lowercase().contains("conda-forge"));
+    let bioconda = channels
+        .iter()
+        .position(|channel| channel.to_lowercase().contains("bioconda"));
+    conda_forge
+        .zip(bioconda)
+        .is_some_and(|(conda_forge, bioconda)| conda_forge < bioconda)
 }
 
 fn first_output_line(output: &str) -> Option<String> {
@@ -367,9 +647,9 @@ fn decode_output(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        AuditSummary, EnvironmentAudit, PlanActionState, PlatformInfo, ToolCheck,
-        apply_github_proxy, decode_output, first_matching_output_line, load_catalog,
-        plan_environment,
+        AuditSummary, EnvironmentAudit, ExecutionBackendAudit, PlanActionState, PlatformInfo,
+        ToolCheck, apply_github_proxy, conda_channel_order_valid, decode_output,
+        first_matching_output_line, load_catalog, plan_environment, summarize_execution_backends,
     };
 
     #[test]
@@ -389,6 +669,40 @@ mod tests {
     }
 
     #[test]
+    fn platform_specific_tools_are_filtered() {
+        let catalog = load_catalog().expect("valid embedded catalog");
+        let wsl = catalog
+            .tools
+            .iter()
+            .find(|tool| tool.id == "wsl")
+            .expect("WSL tool");
+        let podman = catalog
+            .tools
+            .iter()
+            .find(|tool| tool.id == "podman")
+            .expect("Podman tool");
+
+        assert!(super::tool_applies_to_platform(wsl, "windows"));
+        assert!(!super::tool_applies_to_platform(wsl, "debian"));
+        assert!(!super::tool_applies_to_platform(podman, "windows"));
+        assert!(super::tool_applies_to_platform(podman, "debian"));
+        assert!(super::tool_applies_to_platform(podman, "arch"));
+    }
+
+    #[test]
+    fn validates_bioconda_channel_order() {
+        let correct = vec![
+            "https://conda.anaconda.org/conda-forge/win-64".to_owned(),
+            "https://conda.anaconda.org/bioconda/win-64".to_owned(),
+        ];
+        let reversed = vec![correct[1].clone(), correct[0].clone()];
+
+        assert!(conda_channel_order_valid(&correct));
+        assert!(!conda_channel_order_valid(&reversed));
+        assert!(!conda_channel_order_valid(&correct[..1]));
+    }
+
+    #[test]
     fn plans_missing_windows_sequence_search_tools() {
         let audit = EnvironmentAudit {
             platform: PlatformInfo {
@@ -404,7 +718,15 @@ mod tests {
                 available: false,
                 command: None,
                 version: None,
+                discovered_outside_path: false,
             }],
+            execution_backends: ExecutionBackendAudit {
+                policy: "test".to_owned(),
+                required_any_of: vec!["wsl".to_owned(), "docker".to_owned()],
+                available: Vec::new(),
+                ready: false,
+            },
+            conda: None,
             summary: AuditSummary {
                 available: 0,
                 missing: 1,
@@ -452,5 +774,43 @@ mod tests {
             first_matching_output_line(output, "debian"),
             Some("Debian".to_owned())
         );
+    }
+
+    #[test]
+    fn windows_accepts_either_wsl_or_docker_backend() {
+        let platform = PlatformInfo {
+            os: "windows".to_owned(),
+            family: "windows".to_owned(),
+            arch: "x86_64".to_owned(),
+            supported: true,
+        };
+        let tools = vec![ToolCheck {
+            id: "docker".to_owned(),
+            display_name: "Docker".to_owned(),
+            category: "execution".to_owned(),
+            available: true,
+            command: Some("docker".to_owned()),
+            version: Some("Docker version test".to_owned()),
+            discovered_outside_path: false,
+        }];
+
+        let summary = summarize_execution_backends(&platform, &tools);
+        assert!(summary.ready);
+        assert_eq!(summary.available, ["docker"]);
+        assert_eq!(summary.required_any_of, ["wsl", "docker"]);
+    }
+
+    #[test]
+    fn linux_policy_checks_docker_and_podman() {
+        let platform = PlatformInfo {
+            os: "linux".to_owned(),
+            family: "debian".to_owned(),
+            arch: "x86_64".to_owned(),
+            supported: true,
+        };
+
+        let summary = summarize_execution_backends(&platform, &[]);
+        assert!(!summary.ready);
+        assert_eq!(summary.required_any_of, ["docker", "podman"]);
     }
 }
