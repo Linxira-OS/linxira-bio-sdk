@@ -32,6 +32,7 @@
           "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
           "display_name": { "type": "string", "minLength": 1 },
           "category": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["active", "planned"] },
           "platforms": {
             "type": "array",
             "items": { "enum": ["windows", "debian", "arch"] },

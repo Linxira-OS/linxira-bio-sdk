@@ -30,10 +30,12 @@ linxira-bio environment audit --json
 
 A tool is available only when its probe exits successfully and passes any
 configured output match.
-Windows is backend-ready when either WSL or Docker is available. Debian and
-Arch check Docker and Podman separately and accept either backend.
+Windows is backend-ready when WSL Arch, WSL Debian, or Docker is available.
+The two WSL distributions are reported separately. Debian and Arch hosts check
+Docker and Podman separately and accept either backend.
 Bioconda does not publish native Windows packages. On Windows, a configured
-channel still requires WSL Debian or another supported Linux backend for execution.
+channel still requires WSL Arch, WSL Debian, or another supported Linux backend
+for execution.
 
 ## Caveats
 
@@ -44,8 +46,8 @@ PATH probe fails, and marks that discovery explicitly.
 
 ## Runtime Dependencies
 
-Uses the built-in Rust auditor. WSL Debian may provide Unix tools on Windows,
-but this command does not create a WSL distribution.
+Uses the built-in Rust auditor. WSL Arch and WSL Debian may provide Unix tools
+on Windows, but this command does not create a WSL distribution.
 
 ## Citations
 
@@ -54,5 +56,7 @@ Tool probes come from `tools/catalog.json`; safety boundaries are in
 
 ## Troubleshooting
 
-If WSL is installed but missing, verify that `wsl.exe --list --quiet` includes
-a distribution whose name contains `Debian`.
+If WSL is enabled but both providers are missing, verify that
+`wsl.exe --list --quiet` includes a distribution whose name contains `Arch` or
+`Debian`. An empty list means that the Windows feature exists but no supported
+distribution has been registered.

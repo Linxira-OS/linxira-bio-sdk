@@ -19,7 +19,7 @@
     {
       "id": "containers",
       "description": "Platform-appropriate local container and Unix execution backends",
-      "tools": ["wsl", "docker", "podman"]
+      "tools": ["wsl-arch", "wsl-debian", "docker", "podman"]
     },
     {
       "id": "sequence-search",
@@ -326,9 +326,9 @@
       ],
       "install": {
         "windows": {
-          "strategy": "wsl-debian",
+          "strategy": "wsl-provider",
           "package": "samtools",
-          "source_url": "https://packages.debian.org/stable/samtools",
+          "source_url": "https://learn.microsoft.com/windows/wsl/install",
           "requires_admin": true
         },
         "debian": {
@@ -354,9 +354,9 @@
       ],
       "install": {
         "windows": {
-          "strategy": "wsl-debian",
+          "strategy": "wsl-provider",
           "package": "bcftools",
-          "source_url": "https://packages.debian.org/stable/bcftools",
+          "source_url": "https://learn.microsoft.com/windows/wsl/install",
           "requires_admin": true
         },
         "debian": {
@@ -382,9 +382,9 @@
       ],
       "install": {
         "windows": {
-          "strategy": "wsl-debian",
+          "strategy": "wsl-provider",
           "package": "bedtools",
-          "source_url": "https://packages.debian.org/stable/bedtools",
+          "source_url": "https://learn.microsoft.com/windows/wsl/install",
           "requires_admin": true
         },
         "debian": {
@@ -410,9 +410,9 @@
       ],
       "install": {
         "windows": {
-          "strategy": "wsl-debian",
+          "strategy": "wsl-provider",
           "package": "minimap2",
-          "source_url": "https://packages.debian.org/stable/minimap2",
+          "source_url": "https://learn.microsoft.com/windows/wsl/install",
           "requires_admin": true
         },
         "debian": {
@@ -430,7 +430,28 @@
       }
     },
     {
-      "id": "wsl",
+      "id": "wsl-arch",
+      "display_name": "WSL Arch Linux",
+      "category": "execution",
+      "platforms": ["windows"],
+      "probes": [
+        {
+          "program": "wsl.exe",
+          "args": ["--list", "--quiet"],
+          "output_contains": "arch"
+        }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "wsl-distribution",
+          "package": "Arch Linux WSL distribution",
+          "source_url": "https://learn.microsoft.com/windows/wsl/install",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "wsl-debian",
       "display_name": "WSL Debian",
       "category": "execution",
       "platforms": ["windows"],
@@ -443,12 +464,27 @@
       ],
       "install": {
         "windows": {
-          "strategy": "windows-feature",
-          "package": "WSL with Debian",
+          "strategy": "wsl-distribution",
+          "package": "Debian WSL distribution",
           "source_url": "https://learn.microsoft.com/windows/wsl/install",
           "requires_admin": true
         }
       }
+    },
+    {
+      "id": "wsl-linxira",
+      "display_name": "Linxira WSL",
+      "category": "execution",
+      "status": "planned",
+      "platforms": ["windows"],
+      "probes": [
+        {
+          "program": "wsl.exe",
+          "args": ["--list", "--quiet"],
+          "output_contains": "linxira"
+        }
+      ],
+      "install": {}
     },
     {
       "id": "nvidia-gpu",

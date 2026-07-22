@@ -16,8 +16,9 @@ No data files are required. The command performs an environment audit internally
 
 ## Outputs
 
-Each tool reports its current state, installation strategy, package or runtime,
-canonical and proxy-resolved sources, and administrator requirement.
+Each tool reports its current state, selected execution provider, installation
+strategy, package or runtime, canonical and proxy-resolved sources, and
+administrator requirement.
 
 ## Examples
 
@@ -31,6 +32,10 @@ For example: `linxira-bio environment plan managed-runtimes --json`.
 
 `install` means that the catalog has a strategy for the platform. It does not
 mean that the installer has been implemented.
+
+On Windows, Unix-native genomics actions reuse an existing WSL Arch or WSL
+Debian provider and expose that choice as `execution_provider`. The `containers`
+profile lists alternatives when no backend exists; choose one, not all of them.
 
 ## Caveats
 

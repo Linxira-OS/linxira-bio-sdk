@@ -25,8 +25,8 @@ linxira-bio environment audit --json
 ## 结果解读
 
 工具只有在探测进程成功退出并满足可选文本匹配时才标记为可用。
-Windows 以 WSL 或 Docker 任一可用为后端就绪；Debian/Arch 分别检查 Docker 和 Podman，任一可用即可。
-Bioconda 不提供原生 Windows 包；Windows 上即使通道已经配置，也必须通过 WSL Debian 等 Linux 后端运行 Bioconda 环境。
+Windows 以 WSL Arch、WSL Debian 或 Docker 任一可用为后端就绪，并分别报告两个 WSL provider；Debian/Arch 主机分别检查 Docker 和 Podman，任一可用即可。
+Bioconda 不提供原生 Windows 包；Windows 上即使通道已经配置，也必须通过 WSL Arch、WSL Debian 等 Linux 后端运行 Bioconda 环境。
 
 ## 注意事项
 
@@ -34,7 +34,7 @@ Bioconda 不提供原生 Windows 包；Windows 上即使通道已经配置，也
 
 ## 运行时依赖
 
-内置 Rust 审计器。Windows 上的 Unix 工具可由 WSL Debian 提供，但本命令不会创建 WSL。
+内置 Rust 审计器。Windows 上的 Unix 工具可由 WSL Arch 或 WSL Debian 提供，但本命令不会创建 WSL 发行版。
 
 ## 引用
 
@@ -42,4 +42,4 @@ Bioconda 不提供原生 Windows 包；Windows 上即使通道已经配置，也
 
 ## 故障排除
 
-若 WSL 已存在但未识别，请确认 `wsl.exe --list --quiet` 中确实有名称包含 `Debian` 的发行版。
+若已启用 WSL 但两个 provider 都未识别，请确认 `wsl.exe --list --quiet` 中有名称包含 `Arch` 或 `Debian` 的发行版。空列表表示只有 WSL 功能，没有已注册的受支持发行版。

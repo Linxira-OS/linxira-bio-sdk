@@ -205,10 +205,13 @@ def validate() -> None:
         probes = tool.get("probes")
         install = tool.get("install")
         platforms = tool.get("platforms", ["windows", "debian", "arch"])
+        status = tool.get("status", "active")
         if not isinstance(tool_id, str) or not tool_id:
             raise ValueError("tool id is required")
         if tool_id in tool_ids:
             raise ValueError(f"duplicate tool id: {tool_id}")
+        if status not in {"active", "planned"}:
+            raise ValueError(f"invalid tool status: {tool_id}")
         if not isinstance(probes, list) or not probes:
             raise ValueError(f"tool requires at least one probe: {tool_id}")
         if not isinstance(install, dict) or not set(install) <= {
@@ -226,6 +229,9 @@ def validate() -> None:
         tool_ids.add(tool_id)
 
     environment_profile_ids: set[str] = set()
+    active_tool_ids = {
+        tool["id"] for tool in tools if tool.get("status", "active") == "active"
+    }
     for environment_profile in tool_profiles:
         if not isinstance(environment_profile, dict):
             raise ValueError("environment profile entries must be objects")
@@ -235,7 +241,7 @@ def validate() -> None:
             raise ValueError("environment profile id is required")
         if profile_id in environment_profile_ids:
             raise ValueError(f"duplicate environment profile: {profile_id}")
-        if not isinstance(profile_tools, list) or not set(profile_tools) <= tool_ids:
+        if not isinstance(profile_tools, list) or not set(profile_tools) <= active_tool_ids:
             raise ValueError(f"environment profile references unknown tool: {profile_id}")
         environment_profile_ids.add(profile_id)
 

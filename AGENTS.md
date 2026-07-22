@@ -12,7 +12,7 @@ the agent skills that select and validate them.
   `sequence.stats.v1` capability.
 - Read `skills/configure-bio-environment/SKILL.md` to audit managed Python, R,
   Java, Conda/Bioconda, BLAST, DIAMOND, native command-line tools, WSL Debian,
-  Docker, Podman, or GPU prerequisites.
+  WSL Arch, Docker, Podman, or GPU prerequisites.
 - Do not use a capability marked `planned` as though it were available.
 
 ## Repository Rules

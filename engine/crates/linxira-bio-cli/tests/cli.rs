@@ -53,6 +53,10 @@ fn audits_registered_environment_tools_as_json() {
     assert!(tools.iter().any(|tool| tool["id"] == "r"));
     assert!(tools.iter().any(|tool| tool["id"] == "ncbi-blast"));
     assert!(tools.iter().any(|tool| tool["id"] == "diamond"));
+    if cfg!(target_os = "windows") {
+        assert!(tools.iter().any(|tool| tool["id"] == "wsl-arch"));
+        assert!(tools.iter().any(|tool| tool["id"] == "wsl-debian"));
+    }
 }
 
 #[test]

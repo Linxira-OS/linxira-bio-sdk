@@ -141,7 +141,8 @@ fn print_doctor(json: bool) -> Result<(), Box<dyn Error>> {
             "samtools",
             "bcftools",
             "bedtools",
-            "wsl",
+            "wsl-arch",
+            "wsl-debian",
             "docker",
             "podman",
         ]

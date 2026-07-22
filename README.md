@@ -9,6 +9,11 @@ Windows is the primary desktop and beginner-facing platform. Debian and Arch
 are the supported Linux families for workstation, server, and HPC use. macOS is
 not currently a tested or packaged target.
 
+On Windows, WSL Debian is the compatibility provider for older bioinformatics
+components, while WSL Arch is the current-platform provider and the future
+Linxira WSL foundation. Linxira WSL installation remains planned until a
+versioned rootfs and upgrade contract are published.
+
 The repository is the canonical home of executable bioinformatics skills and
 their shared runtime. It does not replace `linxira-skills`, which remains the
 cross-discipline skill router and installer for research, Linux, HPC, cloud,

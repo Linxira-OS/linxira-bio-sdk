@@ -15,7 +15,7 @@
 
 ## 输出
 
-每项工具返回当前状态、安装策略、包或运行时、规范来源、代理解析来源和管理员权限要求。
+每项工具返回当前状态、选定的执行 provider、安装策略、包或运行时、规范来源、代理解析来源和管理员权限要求。
 
 ## 示例
 
@@ -28,6 +28,8 @@ linxira-bio environment plan <profile> --json
 ## 结果解读
 
 `install` 表示目录中存在适用于当前平台的策略；它不表示安装器已经实现。
+
+Windows 上的 Unix 原生 genomics 操作会复用现有 WSL Arch 或 WSL Debian，并通过 `execution_provider` 返回选择结果。若尚无后端，`containers` 配置列出的是备选项，只选择其中一个，不是全部安装。
 
 ## 注意事项
 

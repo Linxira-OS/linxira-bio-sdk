@@ -23,15 +23,22 @@ not an implemented installer.
 | Java compatibility | Eclipse Temurin 17 LTS | Tools that do not yet support Java 21 |
 
 Windows native archives are preferred when maintained and verifiable.
-Unix-native genomics tools run through managed WSL Debian on Windows. Debian
-uses `apt` and Arch uses `pacman` only after showing the exact privileged plan.
-Windows execution readiness requires WSL or Docker. Linux never probes WSL and
+Unix-native genomics tools run through WSL Arch or WSL Debian on Windows. Arch
+is the default current-platform provider; Debian remains the compatibility
+provider for older or Debian-only components. An existing compatible provider
+is reused before another distribution is proposed. Debian uses `apt` and Arch
+uses `pacman` only after showing the exact privileged plan. Windows execution
+readiness requires WSL Arch, WSL Debian, or Docker. Linux never probes WSL and
 instead reports Docker and Podman separately, accepting either container backend.
 
 Bioconda does not publish native Windows packages. A Windows Miniforge channel
 configuration may be audited for compatibility, but Bioconda environments run
-inside WSL Debian or another supported Linux backend. The UI must distinguish a
-configured channel from native platform support.
+inside WSL Arch, WSL Debian, or another supported Linux backend. The UI must
+distinguish a configured channel from native platform support.
+
+Linxira WSL follows the Arch provider path but is not installable yet. Publishing
+it requires a versioned minimal rootfs, checksums and provenance, an upgrade and
+rollback contract, and explicit integration with `environment.apply.v1`.
 
 ## Transaction Model
 

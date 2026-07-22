@@ -608,7 +608,7 @@ fn show_environment_audit(ui: &mut egui::Ui, audit: &Value, language: Language) 
         });
         ui.small(match language {
             Language::ZhCn if cfg!(target_os = "windows") => {
-                "Windows 需要 WSL Debian 或 Docker 中的任意一个"
+                "Windows 需要 WSL Arch、WSL Debian 或 Docker 中的任意一个"
             }
             Language::ZhCn => "Linux 分别检查 Docker 和 Podman，任意一个可作为本地容器后端",
             Language::EnUs => backends
@@ -682,8 +682,8 @@ fn show_environment_audit(ui: &mut egui::Ui, audit: &Value, language: Language) 
             ui.colored_label(
                 egui::Color32::from_rgb(160, 90, 0),
                 language.text(
-                    "Bioconda 不提供原生 Windows 包；请通过 WSL Debian 运行 Bioconda 环境。",
-                    "Bioconda does not publish native Windows packages; use WSL Debian for Bioconda environments.",
+                    "Bioconda 不提供原生 Windows 包；请通过 WSL Arch 或 WSL Debian 运行。",
+                    "Bioconda does not publish native Windows packages; use WSL Arch or WSL Debian.",
                 ),
             );
         }
@@ -749,6 +749,7 @@ fn show_environment_plan(ui: &mut egui::Ui, plan: &Value, language: Language) {
         .show(ui, |ui| {
             ui.strong(language.text("工具", "Tool"));
             ui.strong(language.text("操作", "Action"));
+            ui.strong(language.text("执行后端", "Provider"));
             ui.strong(language.text("方式", "Method"));
             ui.strong(language.text("包/运行时", "Package"));
             ui.end_row();
@@ -759,6 +760,12 @@ fn show_environment_plan(ui: &mut egui::Ui, plan: &Value, language: Language) {
                             .get("display_name")
                             .and_then(Value::as_str)
                             .unwrap_or("unknown"),
+                    );
+                    ui.label(
+                        action
+                            .get("execution_provider")
+                            .and_then(Value::as_str)
+                            .unwrap_or("-"),
                     );
                     ui.label(
                         match action

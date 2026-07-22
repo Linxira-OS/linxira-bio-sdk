@@ -78,6 +78,7 @@ pub struct InstallAction {
     pub tool_id: String,
     pub display_name: String,
     pub state: PlanActionState,
+    pub execution_provider: Option<String>,
     pub strategy: Option<String>,
     pub package: Option<String>,
     pub source_url: Option<String>,
@@ -127,9 +128,19 @@ struct ToolDefinition {
     display_name: String,
     category: String,
     #[serde(default)]
+    status: ToolStatus,
+    #[serde(default)]
     platforms: Vec<String>,
     probes: Vec<ToolProbe>,
     install: BTreeMap<String, InstallSpec>,
+}
+
+#[derive(Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+enum ToolStatus {
+    #[default]
+    Active,
+    Planned,
 }
 
 #[derive(Debug, Deserialize)]
@@ -150,11 +161,17 @@ struct InstallSpec {
 pub fn audit_environment() -> Result<EnvironmentAudit, EnvironmentError> {
     let catalog = load_catalog()?;
     let platform = current_platform();
+    let wsl_distributions = if platform.family == "windows" {
+        probe_wsl_distributions()
+    } else {
+        None
+    };
     let mut tools = catalog
         .tools
         .iter()
+        .filter(|tool| tool.status == ToolStatus::Active)
         .filter(|tool| tool_applies_to_platform(tool, &platform.family))
-        .map(|tool| probe_tool(tool, &platform))
+        .map(|tool| probe_tool(tool, &platform, wsl_distributions.as_deref()))
         .collect::<Vec<_>>();
     let conda = inspect_conda(&tools, &platform);
     apply_conda_distribution(&mut tools, conda.as_ref());
@@ -197,7 +214,7 @@ pub fn audit_environment() -> Result<EnvironmentAudit, EnvironmentError> {
         configuration.bioconda_configured && !configuration.bioconda_native_supported
     }) {
         warnings.push(
-            "Bioconda does not publish native Windows packages; run Bioconda environments through WSL Debian or another supported Linux backend"
+            "Bioconda does not publish native Windows packages; run Bioconda environments through WSL Arch, WSL Debian, or another supported Linux backend"
                 .to_owned(),
         );
     }
@@ -254,10 +271,12 @@ pub fn plan_environment(
         let available = checks
             .get(tool_id.as_str())
             .is_some_and(|tool| tool.available);
-        let install = definition.install.get(&audit.platform.family);
+        let platform_install = definition.install.get(&audit.platform.family);
+        let (install, execution_provider) =
+            resolve_install_spec(definition, platform_install, audit);
         let state = if available {
             PlanActionState::Available
-        } else if install.is_some() {
+        } else if platform_install.is_some() {
             PlanActionState::Install
         } else {
             PlanActionState::Unsupported
@@ -267,7 +286,7 @@ pub fn plan_environment(
             .as_deref()
             .map(|url| apply_github_proxy(url, github_proxy.as_deref()));
 
-        if state == PlanActionState::Unsupported {
+        if state == PlanActionState::Unsupported && profile.id != "containers" {
             warnings.push(format!(
                 "{} has no registered installation strategy for {}",
                 definition.display_name, audit.platform.family
@@ -278,7 +297,12 @@ pub fn plan_environment(
             tool_id: definition.id.clone(),
             display_name: definition.display_name.clone(),
             state,
-            strategy: install.map(|spec| spec.strategy.clone()),
+            strategy: install.map(|spec| {
+                execution_provider
+                    .map(|provider| format!("{provider}/{}", spec.strategy))
+                    .unwrap_or_else(|| spec.strategy.clone())
+            }),
+            execution_provider: execution_provider.map(str::to_owned),
             package: install.map(|spec| spec.package.clone()),
             source_url,
             resolved_source_url,
@@ -288,13 +312,26 @@ pub fn plan_environment(
 
     let uses_wsl = actions
         .iter()
-        .any(|action| action.strategy.as_deref() == Some("wsl-debian"));
-    let wsl_available = checks.get("wsl").is_some_and(|tool| tool.available);
-    if uses_wsl && !wsl_available {
+        .any(|action| action.strategy.as_deref() == Some("wsl-provider"));
+    if uses_wsl {
         warnings.push(
-            "the Windows plan requires a configured WSL Debian environment for Unix-native tools"
+            "the Windows plan requires a configured WSL Arch or WSL Debian provider for Unix-native tools"
                 .to_owned(),
         );
+    }
+
+    if profile.id == "containers" {
+        if audit.execution_backends.ready {
+            actions.retain(|action| {
+                action.state == PlanActionState::Available
+                    && audit.execution_backends.available.contains(&action.tool_id)
+            });
+        } else {
+            warnings.push(
+                "execution backend actions are alternatives; choose one provider rather than installing every listed option"
+                    .to_owned(),
+            );
+        }
     }
 
     let required_tools = profile.tools.iter().cloned().collect::<BTreeSet<_>>();
@@ -362,7 +399,14 @@ fn linux_family() -> String {
         .unwrap_or_else(|| "linux".to_owned())
 }
 
-fn probe_tool(definition: &ToolDefinition, platform: &PlatformInfo) -> ToolCheck {
+fn probe_tool(
+    definition: &ToolDefinition,
+    platform: &PlatformInfo,
+    wsl_distributions: Option<&str>,
+) -> ToolCheck {
+    if definition.id.starts_with("wsl-") {
+        return probe_wsl_provider(definition, wsl_distributions);
+    }
     if definition.id == "miniforge" {
         return unavailable_tool(definition);
     }
@@ -407,6 +451,42 @@ fn probe_tool(definition: &ToolDefinition, platform: &PlatformInfo) -> ToolCheck
     unavailable_tool(definition)
 }
 
+fn probe_wsl_distributions() -> Option<String> {
+    let output = Command::new("wsl.exe")
+        .args(["--list", "--quiet"])
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| decode_output(&output.stdout))
+}
+
+fn probe_wsl_provider(definition: &ToolDefinition, distributions: Option<&str>) -> ToolCheck {
+    let Some(required) = definition
+        .probes
+        .first()
+        .and_then(|probe| probe.output_contains.as_deref())
+    else {
+        return unavailable_tool(definition);
+    };
+    let Some(distribution) =
+        distributions.and_then(|output| first_matching_output_line(output, required))
+    else {
+        return unavailable_tool(definition);
+    };
+
+    ToolCheck {
+        id: definition.id.clone(),
+        display_name: definition.display_name.clone(),
+        category: definition.category.clone(),
+        available: true,
+        command: Some("wsl.exe".to_owned()),
+        version: Some(distribution),
+        discovered_outside_path: false,
+    }
+}
+
 fn unavailable_tool(definition: &ToolDefinition) -> ToolCheck {
     ToolCheck {
         id: definition.id.clone(),
@@ -434,6 +514,31 @@ fn apply_conda_distribution(tools: &mut [ToolCheck], conda: Option<&CondaAudit>)
 
 fn tool_applies_to_platform(definition: &ToolDefinition, family: &str) -> bool {
     definition.platforms.is_empty() || definition.platforms.iter().any(|item| item == family)
+}
+
+fn resolve_install_spec<'a>(
+    definition: &'a ToolDefinition,
+    platform_install: Option<&'a InstallSpec>,
+    audit: &EnvironmentAudit,
+) -> (Option<&'a InstallSpec>, Option<&'static str>) {
+    if audit.platform.family != "windows"
+        || !platform_install.is_some_and(|install| install.strategy == "wsl-provider")
+    {
+        return (platform_install, None);
+    }
+
+    for (provider, family) in [("wsl-arch", "arch"), ("wsl-debian", "debian")] {
+        if audit
+            .tools
+            .iter()
+            .any(|tool| tool.id == provider && tool.available)
+            && let Some(install) = definition.install.get(family)
+        {
+            return (Some(install), Some(provider));
+        }
+    }
+
+    (platform_install, None)
 }
 
 fn program_candidates(
@@ -512,8 +617,8 @@ fn summarize_execution_backends(
 ) -> ExecutionBackendAudit {
     let (policy, required_any_of) = match platform.family.as_str() {
         "windows" => (
-            "Windows requires either WSL Debian or Docker for Unix/container workflows",
-            vec!["wsl", "docker"],
+            "Windows requires WSL Arch, WSL Debian, or Docker for Unix/container workflows",
+            vec!["wsl-arch", "wsl-debian", "docker"],
         ),
         "debian" | "arch" => (
             "Linux checks both Docker and Podman; either provides a local container backend",
@@ -649,7 +754,8 @@ mod tests {
     use super::{
         AuditSummary, EnvironmentAudit, ExecutionBackendAudit, PlanActionState, PlatformInfo,
         ToolCheck, apply_github_proxy, conda_channel_order_valid, decode_output,
-        first_matching_output_line, load_catalog, plan_environment, summarize_execution_backends,
+        first_matching_output_line, load_catalog, plan_environment, probe_wsl_provider,
+        summarize_execution_backends,
     };
 
     #[test]
@@ -664,26 +770,60 @@ mod tests {
         for profile in catalog.profiles {
             for tool in profile.tools {
                 assert!(tool_ids.contains(tool.as_str()), "unknown tool {tool}");
+                assert_eq!(
+                    catalog
+                        .tools
+                        .iter()
+                        .find(|definition| definition.id == tool)
+                        .map(|definition| &definition.status),
+                    Some(&super::ToolStatus::Active),
+                    "planned tool {tool} must not appear in an executable profile"
+                );
             }
         }
     }
 
     #[test]
-    fn platform_specific_tools_are_filtered() {
+    fn linxira_wsl_is_reserved_but_not_audited_as_active() {
         let catalog = load_catalog().expect("valid embedded catalog");
-        let wsl = catalog
+        let linxira = catalog
             .tools
             .iter()
-            .find(|tool| tool.id == "wsl")
-            .expect("WSL tool");
+            .find(|tool| tool.id == "wsl-linxira")
+            .expect("planned Linxira WSL provider");
+
+        assert_eq!(linxira.status, super::ToolStatus::Planned);
+        assert!(linxira.install.is_empty());
+        assert!(
+            catalog
+                .profiles
+                .iter()
+                .all(|profile| !profile.tools.contains(&linxira.id))
+        );
+    }
+
+    #[test]
+    fn platform_specific_tools_are_filtered() {
+        let catalog = load_catalog().expect("valid embedded catalog");
+        let wsl_arch = catalog
+            .tools
+            .iter()
+            .find(|tool| tool.id == "wsl-arch")
+            .expect("WSL Arch tool");
+        let wsl_debian = catalog
+            .tools
+            .iter()
+            .find(|tool| tool.id == "wsl-debian")
+            .expect("WSL Debian tool");
         let podman = catalog
             .tools
             .iter()
             .find(|tool| tool.id == "podman")
             .expect("Podman tool");
 
-        assert!(super::tool_applies_to_platform(wsl, "windows"));
-        assert!(!super::tool_applies_to_platform(wsl, "debian"));
+        assert!(super::tool_applies_to_platform(wsl_arch, "windows"));
+        assert!(super::tool_applies_to_platform(wsl_debian, "windows"));
+        assert!(!super::tool_applies_to_platform(wsl_arch, "debian"));
         assert!(!super::tool_applies_to_platform(podman, "windows"));
         assert!(super::tool_applies_to_platform(podman, "debian"));
         assert!(super::tool_applies_to_platform(podman, "arch"));
@@ -712,8 +852,8 @@ mod tests {
                 supported: true,
             },
             tools: vec![ToolCheck {
-                id: "wsl".to_owned(),
-                display_name: "WSL".to_owned(),
+                id: "wsl-debian".to_owned(),
+                display_name: "WSL Debian".to_owned(),
                 category: "execution".to_owned(),
                 available: false,
                 command: None,
@@ -722,7 +862,11 @@ mod tests {
             }],
             execution_backends: ExecutionBackendAudit {
                 policy: "test".to_owned(),
-                required_any_of: vec!["wsl".to_owned(), "docker".to_owned()],
+                required_any_of: vec![
+                    "wsl-arch".to_owned(),
+                    "wsl-debian".to_owned(),
+                    "docker".to_owned(),
+                ],
                 available: Vec::new(),
                 ready: false,
             },
@@ -777,6 +921,79 @@ mod tests {
     }
 
     #[test]
+    fn detects_debian_and_arch_from_one_wsl_listing() {
+        let catalog = load_catalog().expect("valid embedded catalog");
+        let output = "arch-linux-current\r\ndebian-bookworm\r\n";
+        let arch = probe_wsl_provider(
+            catalog
+                .tools
+                .iter()
+                .find(|tool| tool.id == "wsl-arch")
+                .expect("WSL Arch tool"),
+            Some(output),
+        );
+        let debian = probe_wsl_provider(
+            catalog
+                .tools
+                .iter()
+                .find(|tool| tool.id == "wsl-debian")
+                .expect("WSL Debian tool"),
+            Some(output),
+        );
+
+        assert!(arch.available);
+        assert_eq!(arch.version.as_deref(), Some("arch-linux-current"));
+        assert!(debian.available);
+        assert_eq!(debian.version.as_deref(), Some("debian-bookworm"));
+    }
+
+    #[test]
+    fn windows_genomics_plan_uses_an_existing_arch_provider() {
+        let audit = windows_audit_with_tools(vec![available_tool("wsl-arch")]);
+        let plan = plan_environment("genomics-cli", &audit).expect("valid plan");
+
+        assert!(plan.actions.iter().all(|action| {
+            action.execution_provider.as_deref() == Some("wsl-arch")
+                && action
+                    .strategy
+                    .as_deref()
+                    .is_some_and(|strategy| strategy == "wsl-arch/pacman")
+        }));
+        assert!(plan.actions.iter().all(|action| {
+            action
+                .source_url
+                .as_deref()
+                .is_some_and(|url| url.contains("archlinux.org"))
+        }));
+    }
+
+    #[test]
+    fn windows_genomics_plan_falls_back_to_existing_debian_provider() {
+        let audit = windows_audit_with_tools(vec![available_tool("wsl-debian")]);
+        let plan = plan_environment("genomics-cli", &audit).expect("valid plan");
+
+        assert!(plan.actions.iter().all(|action| {
+            action.execution_provider.as_deref() == Some("wsl-debian")
+                && action
+                    .strategy
+                    .as_deref()
+                    .is_some_and(|strategy| strategy == "wsl-debian/apt")
+        }));
+    }
+
+    #[test]
+    fn containers_plan_does_not_propose_extra_backends_when_one_is_ready() {
+        let audit = windows_audit_with_tools(vec![available_tool("wsl-debian")]);
+        let plan = plan_environment("containers", &audit).expect("valid plan");
+
+        assert_eq!(plan.actions.len(), 1);
+        assert_eq!(plan.actions[0].tool_id, "wsl-debian");
+        assert_eq!(plan.actions[0].state, PlanActionState::Available);
+        assert!(!plan.requires_confirmation);
+        assert!(plan.warnings.is_empty());
+    }
+
+    #[test]
     fn windows_accepts_either_wsl_or_docker_backend() {
         let platform = PlatformInfo {
             os: "windows".to_owned(),
@@ -797,7 +1014,10 @@ mod tests {
         let summary = summarize_execution_backends(&platform, &tools);
         assert!(summary.ready);
         assert_eq!(summary.available, ["docker"]);
-        assert_eq!(summary.required_any_of, ["wsl", "docker"]);
+        assert_eq!(
+            summary.required_any_of,
+            ["wsl-arch", "wsl-debian", "docker"]
+        );
     }
 
     #[test]
@@ -812,5 +1032,45 @@ mod tests {
         let summary = summarize_execution_backends(&platform, &[]);
         assert!(!summary.ready);
         assert_eq!(summary.required_any_of, ["docker", "podman"]);
+    }
+
+    fn available_tool(id: &str) -> ToolCheck {
+        ToolCheck {
+            id: id.to_owned(),
+            display_name: id.to_owned(),
+            category: "execution".to_owned(),
+            available: true,
+            command: Some("test".to_owned()),
+            version: Some("test".to_owned()),
+            discovered_outside_path: false,
+        }
+    }
+
+    fn windows_audit_with_tools(tools: Vec<ToolCheck>) -> EnvironmentAudit {
+        let execution_backends = summarize_execution_backends(
+            &PlatformInfo {
+                os: "windows".to_owned(),
+                family: "windows".to_owned(),
+                arch: "x86_64".to_owned(),
+                supported: true,
+            },
+            &tools,
+        );
+        EnvironmentAudit {
+            platform: PlatformInfo {
+                os: "windows".to_owned(),
+                family: "windows".to_owned(),
+                arch: "x86_64".to_owned(),
+                supported: true,
+            },
+            summary: AuditSummary {
+                available: tools.len(),
+                missing: 0,
+            },
+            tools,
+            execution_backends,
+            conda: None,
+            warnings: Vec::new(),
+        }
     }
 }
