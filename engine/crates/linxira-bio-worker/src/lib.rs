@@ -2,7 +2,10 @@
 
 //! Execute versioned Linxira Bio jobs through one shared local worker API.
 
-use linxira_bio_core::environment::{audit_environment, plan_environment};
+use linxira_bio_core::environment::{
+    EnvironmentMode, EnvironmentPlanOptions, audit_environment, parse_environment_mode,
+    plan_environment_with_options,
+};
 use linxira_bio_core::sequence::fasta_stats;
 use linxira_bio_protocol::{AnalysisResult, ExecutionMode, JobRequest, SCHEMA_VERSION};
 use std::error::Error;
@@ -32,7 +35,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
 
     match request.capability.as_str() {
         "environment.audit.v1" => run_environment_audit(request),
-        "environment.plan.v1" => run_environment_plan(request),
+        "environment.plan.v1" => run_environment_plan(base_directory, request),
         "sequence.stats.v1" => run_sequence_stats(base_directory, request),
         capability => Err(format!("unsupported capability: {capability}").into()),
     }
@@ -49,14 +52,39 @@ fn run_environment_audit(request: JobRequest) -> WorkerResult<String> {
     Ok(serde_json::to_string(&result)?)
 }
 
-fn run_environment_plan(request: JobRequest) -> WorkerResult<String> {
-    let profile = request
-        .parameters
-        .get("profile")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("full-local");
+fn run_environment_plan(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    let profile = match request.parameters.get("profile") {
+        Some(value) => value
+            .as_str()
+            .ok_or("environment plan profile must be a string")?,
+        None => "full-local",
+    };
+    let mode = match request.parameters.get("mode") {
+        Some(value) => parse_environment_mode(
+            value
+                .as_str()
+                .ok_or("environment plan mode must be a string")?,
+        )?,
+        None => EnvironmentMode::ManagedUser,
+    };
+    let project_root = match request.parameters.get("project_root") {
+        Some(value) => Some(resolve_input(
+            base_directory,
+            value
+                .as_str()
+                .ok_or("environment plan project_root must be a string")?,
+        )),
+        None => None,
+    };
+    if mode != EnvironmentMode::ProjectIsolated && project_root.is_some() {
+        return Err("project_root is only valid in project-isolated mode".into());
+    }
     let audit = audit_environment()?;
-    let plan = plan_environment(profile, &audit)?;
+    let plan = plan_environment_with_options(
+        profile,
+        &audit,
+        &EnvironmentPlanOptions { mode, project_root },
+    )?;
     let result = AnalysisResult::ok(
         request.job_id,
         request.capability,
@@ -88,5 +116,51 @@ fn resolve_input(base_directory: &Path, input: &str) -> PathBuf {
         input_path
     } else {
         base_directory.join(input_path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::execute_request;
+    use linxira_bio_protocol::{ExecutionMode, ExecutionRequest, JobRequest, SCHEMA_VERSION};
+    use std::collections::BTreeMap;
+    use std::path::Path;
+
+    #[test]
+    fn rejects_non_string_environment_mode() {
+        let error = execute_request(
+            environment_plan_request(serde_json::json!({"mode": 42})),
+            Path::new("."),
+        )
+        .expect_err("invalid mode must fail");
+
+        assert!(error.to_string().contains("mode must be a string"));
+    }
+
+    #[test]
+    fn rejects_project_root_outside_project_mode() {
+        let error = execute_request(
+            environment_plan_request(serde_json::json!({
+                "mode": "managed-user",
+                "project_root": "."
+            })),
+            Path::new("."),
+        )
+        .expect_err("unexpected project root must fail");
+
+        assert!(error.to_string().contains("only valid in project-isolated"));
+    }
+
+    fn environment_plan_request(parameters: serde_json::Value) -> JobRequest {
+        JobRequest {
+            schema_version: SCHEMA_VERSION.to_owned(),
+            job_id: "environment-plan-test".to_owned(),
+            capability: "environment.plan.v1".to_owned(),
+            inputs: BTreeMap::new(),
+            execution: ExecutionRequest {
+                mode: ExecutionMode::LocalCpu,
+            },
+            parameters,
+        }
     }
 }

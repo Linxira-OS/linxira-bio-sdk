@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/environment-plan.v1.json",
+  "title": "Linxira Bio environment plan result",
+  "type": "object",
+  "required": [
+    "profile", "description", "mode", "target_root", "platform",
+    "github_proxy", "actions", "transaction", "requires_confirmation", "warnings"
+  ],
+  "properties": {
+    "profile": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "mode": {
+      "enum": [
+        "use-existing", "managed-user", "project-isolated", "system-missing-only"
+      ]
+    },
+    "target_root": { "type": ["string", "null"] },
+    "platform": { "$ref": "#/$defs/platform" },
+    "github_proxy": { "type": ["string", "null"] },
+    "actions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/action" }
+    },
+    "transaction": { "$ref": "#/$defs/transaction" },
+    "requires_confirmation": { "type": "boolean" },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "platform": {
+      "type": "object",
+      "required": ["os", "family", "arch", "supported"],
+      "properties": {
+        "os": { "type": "string", "minLength": 1 },
+        "family": { "type": "string", "minLength": 1 },
+        "arch": { "type": "string", "minLength": 1 },
+        "supported": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "required": [
+        "tool_id", "display_name", "state", "execution_provider", "strategy",
+        "package", "source_url", "resolved_source_url", "requires_admin"
+      ],
+      "properties": {
+        "tool_id": { "type": "string", "minLength": 1 },
+        "display_name": { "type": "string", "minLength": 1 },
+        "state": {
+          "enum": ["available", "install", "alternative", "missing", "unsupported"]
+        },
+        "execution_provider": { "type": ["string", "null"] },
+        "strategy": { "type": ["string", "null"] },
+        "package": { "type": ["string", "null"] },
+        "source_url": { "type": ["string", "null"] },
+        "resolved_source_url": { "type": ["string", "null"] },
+        "requires_admin": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "transaction": {
+      "type": "object",
+      "required": [
+        "dry_run", "apply_capability", "apply_available", "ready_to_apply",
+        "target_root", "cache_root", "lock_path", "preserves_existing",
+        "checksum_policy", "license_policy", "activation_policy",
+        "system_mutation", "requires_admin", "stages", "blockers"
+      ],
+      "properties": {
+        "dry_run": { "const": true },
+        "apply_capability": { "const": "environment.apply.v1" },
+        "apply_available": { "const": false },
+        "ready_to_apply": { "const": false },
+        "target_root": { "type": ["string", "null"] },
+        "cache_root": { "type": ["string", "null"] },
+        "lock_path": { "type": ["string", "null"] },
+        "preserves_existing": { "const": true },
+        "checksum_policy": { "const": "sha256-required-before-staging" },
+        "license_policy": { "const": "allowlist-and-notice-review-required" },
+        "activation_policy": { "const": "atomic-with-rollback" },
+        "system_mutation": { "type": "boolean" },
+        "requires_admin": { "type": "boolean" },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "description"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "description": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

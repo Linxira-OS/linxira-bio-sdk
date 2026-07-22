@@ -44,7 +44,9 @@ The native Rust and egui desktop application has two density modes over the
 same capabilities:
 
 - Guided mode exposes file selection, safe defaults, interpretation, and the
-  minimum required parameters.
+  minimum required parameters. Environment setup separates workload selection
+  from use-existing, managed-user, project-isolated, and system-missing-only
+  transaction previews.
 - Expert mode exposes full parameters, command previews, batch inputs, runtime
   locks, and structured outputs.
 

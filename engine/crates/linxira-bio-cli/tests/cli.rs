@@ -81,6 +81,44 @@ fn plans_sequence_search_environment_as_json() {
             .any(|action| action["tool_id"] == "ncbi-blast")
     );
     assert!(actions.iter().any(|action| action["tool_id"] == "diamond"));
+    assert_eq!(result["result"]["mode"], "managed-user");
+    assert_eq!(result["result"]["transaction"]["dry_run"], true);
+    assert_eq!(result["result"]["transaction"]["apply_available"], false);
+}
+
+#[test]
+fn previews_a_project_isolated_environment_as_json() {
+    let project_root = workspace_root();
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args([
+            "environment",
+            "plan",
+            "sequence-search",
+            "--mode",
+            "project-isolated",
+            "--project-root",
+        ])
+        .arg(&project_root)
+        .arg("--json")
+        .output()
+        .expect("run project environment plan");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("UTF-8 output");
+    let result: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON result");
+
+    assert_eq!(result["result"]["mode"], "project-isolated");
+    assert!(
+        result["result"]["target_root"]
+            .as_str()
+            .is_some_and(|root| root.contains(".linxira-bio"))
+    );
+    assert!(
+        result["result"]["transaction"]["lock_path"]
+            .as_str()
+            .is_some_and(|path| path.contains("runtime-lock.json"))
+    );
+    assert_eq!(result["result"]["transaction"]["preserves_existing"], true);
 }
 
 #[test]

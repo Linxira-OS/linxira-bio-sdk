@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 
 use linxira_bio_core::environment::{
-    EnvironmentAudit, EnvironmentPlan, PlanActionState, audit_environment, plan_environment,
+    EnvironmentAudit, EnvironmentMode, EnvironmentPlan, EnvironmentPlanOptions, PlanActionState,
+    audit_environment, parse_environment_mode, plan_environment_with_options,
 };
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
 use linxira_bio_core::sequence::{SequenceStats, fasta_stats};
@@ -10,7 +11,7 @@ use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const CAPABILITY_CATALOG: &str = include_str!("../../../../capabilities/catalog.json");
@@ -41,21 +42,8 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         {
             print_environment_audit(true)
         }
-        [environment, plan] if environment == "environment" && plan == "plan" => {
-            print_environment_plan("full-local", false)
-        }
-        [environment, plan, json]
-            if environment == "environment" && plan == "plan" && json == "--json" =>
-        {
-            print_environment_plan("full-local", true)
-        }
-        [environment, plan, profile] if environment == "environment" && plan == "plan" => {
-            print_environment_plan(profile, false)
-        }
-        [environment, plan, profile, json]
-            if environment == "environment" && plan == "plan" && json == "--json" =>
-        {
-            print_environment_plan(profile, true)
+        [environment, plan, arguments @ ..] if environment == "environment" && plan == "plan" => {
+            print_environment_plan(arguments)
         }
         [runtime, catalog] if runtime == "runtime" && catalog == "catalog" => {
             print_runtime_catalog(false)
@@ -183,15 +171,60 @@ fn print_environment_audit(json: bool) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn print_environment_plan(profile: &str, json: bool) -> Result<(), Box<dyn Error>> {
+fn print_environment_plan(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let (profile, options, json) = parse_environment_plan_arguments(arguments)?;
     let audit = audit_environment()?;
-    let plan = plan_environment(profile, &audit)?;
+    let plan = plan_environment_with_options(&profile, &audit, &options)?;
     if json {
         print_analysis_json("environment-plan", "environment.plan.v1", plan)?;
     } else {
         print_plan_text(&plan);
     }
     Ok(())
+}
+
+fn parse_environment_plan_arguments(
+    arguments: &[String],
+) -> Result<(String, EnvironmentPlanOptions, bool), Box<dyn Error>> {
+    let mut profile = None;
+    let mut mode = EnvironmentMode::ManagedUser;
+    let mut project_root = None;
+    let mut json = false;
+    let mut index = 0;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--json" => json = true,
+            "--mode" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--mode requires a value")?;
+                mode = parse_environment_mode(value)?;
+            }
+            "--project-root" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--project-root requires a path")?;
+                project_root = Some(PathBuf::from(value));
+            }
+            value if value.starts_with('-') => {
+                return Err(format!("unknown environment plan option: {value}").into());
+            }
+            value if profile.is_none() => profile = Some(value.to_owned()),
+            value => return Err(format!("unexpected environment plan argument: {value}").into()),
+        }
+        index += 1;
+    }
+
+    if mode != EnvironmentMode::ProjectIsolated && project_root.is_some() {
+        return Err("--project-root is only valid with --mode project-isolated".into());
+    }
+
+    Ok((
+        profile.unwrap_or_else(|| "full-local".to_owned()),
+        EnvironmentPlanOptions { mode, project_root },
+        json,
+    ))
 }
 
 fn print_analysis_json<T>(job_id: &str, capability: &str, result: T) -> Result<(), Box<dyn Error>>
@@ -226,11 +259,17 @@ fn print_audit_text(title: &str, audit: &EnvironmentAudit) {
 
 fn print_plan_text(plan: &EnvironmentPlan) {
     println!("Environment profile: {}", plan.profile);
+    println!("mode: {}", plan.mode.as_str());
+    if let Some(target_root) = &plan.target_root {
+        println!("target: {target_root}");
+    }
     println!("{}", plan.description);
     for action in &plan.actions {
         let state = match action.state {
             PlanActionState::Available => "available",
             PlanActionState::Install => "install",
+            PlanActionState::Alternative => "alternative",
+            PlanActionState::Missing => "missing",
             PlanActionState::Unsupported => "unsupported",
         };
         let method = action
@@ -243,8 +282,11 @@ fn print_plan_text(plan: &EnvironmentPlan) {
     for warning in &plan.warnings {
         println!("warning: {warning}");
     }
+    for blocker in &plan.transaction.blockers {
+        println!("blocked: {blocker}");
+    }
     if plan.requires_confirmation {
-        println!("No changes were applied. Installation requires explicit confirmation.");
+        println!("No changes were applied. This is a transaction preview only.");
     }
 }
 
@@ -281,5 +323,5 @@ fn print_stats_json(stats: &SequenceStats) -> Result<(), Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--json]\n  linxira-bio runtime catalog [--json]\n  linxira-bio sequence stats <input.fasta> [--json]"
+    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n  linxira-bio runtime catalog [--json]\n  linxira-bio sequence stats <input.fasta> [--json]"
 }

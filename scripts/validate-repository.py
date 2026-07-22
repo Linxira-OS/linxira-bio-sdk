@@ -99,6 +99,7 @@ def validate() -> None:
     load_json("schemas/capability.schema.json")
     load_json("schemas/job-request.schema.json")
     load_json("schemas/analysis-result.schema.json")
+    load_json("schemas/environment-plan.schema.json")
     load_json("schemas/tool-catalog.schema.json")
     load_json("schemas/runtime-catalog.schema.json")
     load_json("schemas/runtime-lock.schema.json")

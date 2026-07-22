@@ -56,6 +56,34 @@ enum EnvironmentJob {
     Plan,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum EnvironmentPlanMode {
+    UseExisting,
+    ManagedUser,
+    ProjectIsolated,
+    SystemMissingOnly,
+}
+
+impl EnvironmentPlanMode {
+    fn id(self) -> &'static str {
+        match self {
+            Self::UseExisting => "use-existing",
+            Self::ManagedUser => "managed-user",
+            Self::ProjectIsolated => "project-isolated",
+            Self::SystemMissingOnly => "system-missing-only",
+        }
+    }
+
+    fn label(self, language: Language) -> &'static str {
+        match self {
+            Self::UseExisting => language.text("仅使用现有", "Use existing"),
+            Self::ManagedUser => language.text("用户隔离", "Managed user"),
+            Self::ProjectIsolated => language.text("项目隔离", "Project isolated"),
+            Self::SystemMissingOnly => language.text("系统缺失项", "System missing only"),
+        }
+    }
+}
+
 type UiJobResult = Result<String, String>;
 
 const DOCUMENTED_CAPABILITIES: &[&str] = &[
@@ -81,6 +109,8 @@ struct BioApp {
     environment_receiver: Option<Receiver<(EnvironmentJob, UiJobResult)>>,
     environment_running: bool,
     environment_profile: String,
+    environment_mode: EnvironmentPlanMode,
+    environment_project_root: String,
     document_capability: String,
 }
 
@@ -102,6 +132,8 @@ impl BioApp {
             environment_receiver: None,
             environment_running: false,
             environment_profile: "full-local".to_owned(),
+            environment_mode: EnvironmentPlanMode::ManagedUser,
+            environment_project_root: String::new(),
             document_capability: "sequence.stats.v1".to_owned(),
         };
         app.start_environment_job(EnvironmentJob::Audit);
@@ -154,12 +186,20 @@ impl BioApp {
         }
 
         let profile = self.environment_profile.clone();
+        let mode = self.environment_mode;
+        let project_root = self.environment_project_root.trim().to_owned();
         let (capability, parameters) = match kind {
             EnvironmentJob::Audit => ("environment.audit.v1", serde_json::json!({})),
-            EnvironmentJob::Plan => (
-                "environment.plan.v1",
-                serde_json::json!({"profile": profile}),
-            ),
+            EnvironmentJob::Plan => {
+                let mut parameters = serde_json::json!({
+                    "profile": profile,
+                    "mode": mode.id(),
+                });
+                if mode == EnvironmentPlanMode::ProjectIsolated {
+                    parameters["project_root"] = Value::String(project_root);
+                }
+                ("environment.plan.v1", parameters)
+            }
         };
         let (sender, receiver) = mpsc::channel();
         self.environment_receiver = Some(receiver);
@@ -170,7 +210,7 @@ impl BioApp {
                 self.text("正在审计本地环境...", "Auditing the local environment...")
             }
             EnvironmentJob::Plan => {
-                self.text("正在生成安装计划...", "Building an installation plan...")
+                self.text("正在生成事务预览...", "Building a transaction preview...")
             }
         }
         .to_owned();
@@ -246,8 +286,8 @@ impl BioApp {
                             self.text("环境审计已完成。", "Environment audit completed.")
                         }
                         EnvironmentJob::Plan => self.text(
-                            "安装计划已生成，未对系统进行任何更改。",
-                            "Installation plan completed. No changes applied.",
+                            "事务预览已生成，未对系统进行任何更改。",
+                            "Transaction preview completed. No changes applied.",
                         ),
                     }
                     .to_owned();
@@ -341,20 +381,20 @@ impl BioApp {
     fn show_environment(&mut self, ui: &mut egui::Ui) {
         ui.heading(self.text("本地运行环境", "Local environment"));
         ui.label(self.text(
-            "检查本机工具并生成只读安装计划。安装功能尚未开放。",
-            "Audit local tools and build a read-only installation plan. Installation is not yet enabled.",
+            "审计本机工具并生成可复核的事务预览。执行安装仍未开放。",
+            "Audit local tools and build a reviewable transaction preview. Installation remains disabled.",
         ));
         ui.add_space(8.0);
 
-        let mut run_audit = false;
-        let mut build_plan = false;
+        let run_audit = ui
+            .add_enabled(
+                !self.environment_running,
+                egui::Button::new(self.language.text("重新审计", "Refresh audit")),
+            )
+            .clicked();
+        ui.add_space(10.0);
+        ui.strong(self.text("工作负载", "Workload"));
         ui.horizontal_wrapped(|ui| {
-            run_audit = ui
-                .add_enabled(
-                    !self.environment_running,
-                    egui::Button::new(self.language.text("重新审计", "Refresh audit")),
-                )
-                .clicked();
             egui::ComboBox::from_id_salt("environment-profile")
                 .selected_text(&self.environment_profile)
                 .show_ui(ui, |ui| {
@@ -394,13 +434,44 @@ impl BioApp {
                         "full-local",
                     );
                 });
-            build_plan = ui
-                .add_enabled(
-                    !self.environment_running,
-                    egui::Button::new(self.language.text("生成安装计划", "Build install plan")),
-                )
-                .clicked();
         });
+        ui.add_space(8.0);
+        ui.strong(self.text("环境模式", "Environment mode"));
+        ui.horizontal_wrapped(|ui| {
+            for mode in [
+                EnvironmentPlanMode::UseExisting,
+                EnvironmentPlanMode::ManagedUser,
+                EnvironmentPlanMode::ProjectIsolated,
+                EnvironmentPlanMode::SystemMissingOnly,
+            ] {
+                ui.selectable_value(&mut self.environment_mode, mode, mode.label(self.language));
+            }
+        });
+        ui.small(environment_mode_description(
+            self.environment_mode,
+            self.language,
+        ));
+        if self.environment_mode == EnvironmentPlanMode::ProjectIsolated {
+            ui.add_space(6.0);
+            ui.label(self.text("项目根目录", "Project root"));
+            ui.add(
+                egui::TextEdit::singleline(&mut self.environment_project_root)
+                    .desired_width(f32::INFINITY)
+                    .hint_text("C:\\work\\project or /work/project"),
+            );
+        }
+        ui.add_space(8.0);
+        let project_root_ready = self.environment_mode != EnvironmentPlanMode::ProjectIsolated
+            || !self.environment_project_root.trim().is_empty();
+        let build_plan = ui
+            .add_enabled(
+                !self.environment_running && project_root_ready,
+                egui::Button::new(
+                    self.language
+                        .text("生成事务预览", "Build transaction preview"),
+                ),
+            )
+            .clicked();
         if run_audit {
             self.start_environment_job(EnvironmentJob::Audit);
         }
@@ -737,64 +808,199 @@ fn show_environment_plan(ui: &mut egui::Ui, plan: &Value, language: Language) {
         .get("profile")
         .and_then(Value::as_str)
         .unwrap_or_default();
+    let mode = plan
+        .get("mode")
+        .and_then(Value::as_str)
+        .unwrap_or("managed-user");
+    ui.horizontal_wrapped(|ui| {
+        ui.strong(language.text("工作负载", "Workload"));
+        ui.monospace(profile);
+        ui.separator();
+        ui.strong(language.text("模式", "Mode"));
+        ui.label(localized_environment_mode(mode, language));
+        ui.separator();
+        ui.label(language.text("只读预览", "Read-only preview"));
+    });
     if let Some(description) = localized_profile_description(profile, language)
         .or_else(|| plan.get("description").and_then(Value::as_str))
     {
         ui.label(description);
     }
     ui.add_space(6.0);
-    egui::Grid::new("environment-plan-actions")
-        .striped(true)
-        .min_col_width(120.0)
+    egui::ScrollArea::horizontal()
+        .id_salt("environment-plan-actions-scroll")
         .show(ui, |ui| {
-            ui.strong(language.text("工具", "Tool"));
-            ui.strong(language.text("操作", "Action"));
-            ui.strong(language.text("执行后端", "Provider"));
-            ui.strong(language.text("方式", "Method"));
-            ui.strong(language.text("包/运行时", "Package"));
-            ui.end_row();
-            if let Some(actions) = plan.get("actions").and_then(Value::as_array) {
-                for action in actions {
-                    ui.label(
-                        action
-                            .get("display_name")
-                            .and_then(Value::as_str)
-                            .unwrap_or("unknown"),
-                    );
-                    ui.label(
-                        action
-                            .get("execution_provider")
-                            .and_then(Value::as_str)
-                            .unwrap_or("-"),
-                    );
-                    ui.label(
-                        match action
-                            .get("state")
-                            .and_then(Value::as_str)
-                            .unwrap_or("unknown")
-                        {
-                            "available" => language.text("已可用", "available"),
-                            "install" => language.text("需安装", "install"),
-                            "unsupported" => language.text("不支持", "unsupported"),
-                            _ => language.text("未知", "unknown"),
-                        },
-                    );
-                    ui.label(
-                        action
-                            .get("strategy")
-                            .and_then(Value::as_str)
-                            .unwrap_or("-"),
-                    );
-                    ui.monospace(action.get("package").and_then(Value::as_str).unwrap_or("-"));
+            egui::Grid::new("environment-plan-actions")
+                .striped(true)
+                .min_col_width(120.0)
+                .show(ui, |ui| {
+                    ui.strong(language.text("工具", "Tool"));
+                    ui.strong(language.text("操作", "Action"));
+                    ui.strong(language.text("执行后端", "Provider"));
+                    ui.strong(language.text("方式", "Method"));
+                    ui.strong(language.text("包/运行时", "Package"));
                     ui.end_row();
-                }
-            }
+                    if let Some(actions) = plan.get("actions").and_then(Value::as_array) {
+                        for action in actions {
+                            ui.label(
+                                action
+                                    .get("display_name")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("unknown"),
+                            );
+                            ui.label(
+                                match action
+                                    .get("state")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("unknown")
+                                {
+                                    "available" => language.text("已可用", "available"),
+                                    "install" => language.text("需安装", "install"),
+                                    "alternative" => language.text("备选后端", "backend option"),
+                                    "missing" => {
+                                        language.text("缺失（不安装）", "missing (no install)")
+                                    }
+                                    "unsupported" => language.text("不支持", "unsupported"),
+                                    _ => language.text("未知", "unknown"),
+                                },
+                            );
+                            ui.label(
+                                action
+                                    .get("execution_provider")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("-"),
+                            );
+                            ui.label(
+                                action
+                                    .get("strategy")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("-"),
+                            );
+                            ui.monospace(
+                                action.get("package").and_then(Value::as_str).unwrap_or("-"),
+                            );
+                            ui.end_row();
+                        }
+                    }
+                });
         });
+
+    if let Some(transaction) = plan.get("transaction") {
+        ui.add_space(10.0);
+        ui.separator();
+        ui.strong(language.text("事务边界", "Transaction boundary"));
+        egui::ScrollArea::horizontal()
+            .id_salt("environment-transaction-boundary-scroll")
+            .show(ui, |ui| {
+                egui::Grid::new("environment-transaction-boundary")
+                    .num_columns(2)
+                    .min_col_width(150.0)
+                    .show(ui, |ui| {
+                        for (label_zh, label_en, key) in [
+                            ("目标目录", "Target root", "target_root"),
+                            ("共享缓存", "Shared cache", "cache_root"),
+                            ("运行时锁", "Runtime lock", "lock_path"),
+                            ("校验策略", "Checksum policy", "checksum_policy"),
+                            ("许可证策略", "License policy", "license_policy"),
+                            ("激活策略", "Activation policy", "activation_policy"),
+                        ] {
+                            ui.label(language.text(label_zh, label_en));
+                            ui.monospace(
+                                transaction.get(key).and_then(Value::as_str).unwrap_or("-"),
+                            );
+                            ui.end_row();
+                        }
+                        ui.label(language.text("保留现有环境", "Preserve existing"));
+                        ui.label(localized_boolean(
+                            transaction
+                                .get("preserves_existing")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(false),
+                            language,
+                        ));
+                        ui.end_row();
+                        ui.label(language.text("系统级变更", "System mutation"));
+                        ui.label(localized_boolean(
+                            transaction
+                                .get("system_mutation")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(false),
+                            language,
+                        ));
+                        ui.end_row();
+                        ui.label(language.text("需要管理员权限", "Administrator required"));
+                        ui.label(localized_boolean(
+                            transaction
+                                .get("requires_admin")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(false),
+                            language,
+                        ));
+                        ui.end_row();
+                    });
+            });
+
+        if let Some(stages) = transaction.get("stages").and_then(Value::as_array)
+            && !stages.is_empty()
+        {
+            ui.add_space(6.0);
+            ui.strong(language.text("计划阶段", "Planned stages"));
+            ui.horizontal_wrapped(|ui| {
+                for stage in stages {
+                    ui.monospace(stage.get("id").and_then(Value::as_str).unwrap_or("unknown"));
+                }
+            });
+        }
+        if let Some(blockers) = transaction.get("blockers").and_then(Value::as_array) {
+            for blocker in blockers.iter().filter_map(Value::as_str) {
+                ui.colored_label(egui::Color32::from_rgb(160, 70, 40), blocker);
+            }
+        }
+    }
 
     if let Some(warnings) = plan.get("warnings").and_then(Value::as_array) {
         for warning in warnings.iter().filter_map(Value::as_str) {
             ui.colored_label(egui::Color32::from_rgb(160, 90, 0), warning);
         }
+    }
+}
+
+fn environment_mode_description(mode: EnvironmentPlanMode, language: Language) -> &'static str {
+    match mode {
+        EnvironmentPlanMode::UseExisting => language.text(
+            "只报告现有工具和缺失项，不提出安装。",
+            "Report existing and missing tools without proposing installation.",
+        ),
+        EnvironmentPlanMode::ManagedUser => language.text(
+            "默认模式；缺失组件进入用户目录，不覆盖现有工具。",
+            "Default; place missing components under the user directory and preserve existing tools.",
+        ),
+        EnvironmentPlanMode::ProjectIsolated => language.text(
+            "为当前项目生成独立目录和运行时锁。",
+            "Create an isolated directory and runtime lock for this project.",
+        ),
+        EnvironmentPlanMode::SystemMissingOnly => language.text(
+            "仅规划系统中缺失的组件；需要明确确认和相应权限。",
+            "Plan only components missing from the system; explicit approval and privileges are required.",
+        ),
+    }
+}
+
+fn localized_environment_mode(mode: &str, language: Language) -> &'static str {
+    match mode {
+        "use-existing" => language.text("仅使用现有", "Use existing"),
+        "managed-user" => language.text("用户隔离", "Managed user"),
+        "project-isolated" => language.text("项目隔离", "Project isolated"),
+        "system-missing-only" => language.text("系统缺失项", "System missing only"),
+        _ => language.text("未知", "Unknown"),
+    }
+}
+
+fn localized_boolean(value: bool, language: Language) -> &'static str {
+    if value {
+        language.text("是", "yes")
+    } else {
+        language.text("否", "no")
     }
 }
 

@@ -70,7 +70,34 @@ pub struct CondaAudit {
 pub enum PlanActionState {
     Available,
     Install,
+    Alternative,
+    Missing,
     Unsupported,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum EnvironmentMode {
+    UseExisting,
+    #[default]
+    ManagedUser,
+    ProjectIsolated,
+    SystemMissingOnly,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnvironmentPlanOptions {
+    pub mode: EnvironmentMode,
+    pub project_root: Option<PathBuf>,
+}
+
+impl Default for EnvironmentPlanOptions {
+    fn default() -> Self {
+        Self {
+            mode: EnvironmentMode::ManagedUser,
+            project_root: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -90,11 +117,39 @@ pub struct InstallAction {
 pub struct EnvironmentPlan {
     pub profile: String,
     pub description: String,
+    pub mode: EnvironmentMode,
+    pub target_root: Option<String>,
     pub platform: PlatformInfo,
     pub github_proxy: Option<String>,
     pub actions: Vec<InstallAction>,
+    pub transaction: TransactionPreview,
     pub requires_confirmation: bool,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct TransactionPreview {
+    pub dry_run: bool,
+    pub apply_capability: String,
+    pub apply_available: bool,
+    pub ready_to_apply: bool,
+    pub target_root: Option<String>,
+    pub cache_root: Option<String>,
+    pub lock_path: Option<String>,
+    pub preserves_existing: bool,
+    pub checksum_policy: String,
+    pub license_policy: String,
+    pub activation_policy: String,
+    pub system_mutation: bool,
+    pub requires_admin: bool,
+    pub stages: Vec<TransactionStage>,
+    pub blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct TransactionStage {
+    pub id: String,
+    pub description: String,
 }
 
 #[derive(Debug)]
@@ -107,6 +162,29 @@ impl Display for EnvironmentError {
 }
 
 impl Error for EnvironmentError {}
+
+impl EnvironmentMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::UseExisting => "use-existing",
+            Self::ManagedUser => "managed-user",
+            Self::ProjectIsolated => "project-isolated",
+            Self::SystemMissingOnly => "system-missing-only",
+        }
+    }
+}
+
+pub fn parse_environment_mode(value: &str) -> Result<EnvironmentMode, EnvironmentError> {
+    match value {
+        "use-existing" => Ok(EnvironmentMode::UseExisting),
+        "managed-user" => Ok(EnvironmentMode::ManagedUser),
+        "project-isolated" => Ok(EnvironmentMode::ProjectIsolated),
+        "system-missing-only" => Ok(EnvironmentMode::SystemMissingOnly),
+        _ => Err(EnvironmentError(format!(
+            "unknown environment mode: {value}; expected use-existing, managed-user, project-isolated, or system-missing-only"
+        ))),
+    }
+}
 
 #[derive(Debug, Deserialize)]
 struct ToolCatalog {
@@ -236,6 +314,14 @@ pub fn plan_environment(
     profile_id: &str,
     audit: &EnvironmentAudit,
 ) -> Result<EnvironmentPlan, EnvironmentError> {
+    plan_environment_with_options(profile_id, audit, &EnvironmentPlanOptions::default())
+}
+
+pub fn plan_environment_with_options(
+    profile_id: &str,
+    audit: &EnvironmentAudit,
+    options: &EnvironmentPlanOptions,
+) -> Result<EnvironmentPlan, EnvironmentError> {
     let catalog = load_catalog()?;
     let profile = catalog
         .profiles
@@ -274,10 +360,18 @@ pub fn plan_environment(
         let platform_install = definition.install.get(&audit.platform.family);
         let (install, execution_provider) =
             resolve_install_spec(definition, platform_install, audit);
+        let install_allowed = install
+            .is_some_and(|spec| installation_allowed_in_mode(options.mode, spec.requires_admin));
         let state = if available {
             PlanActionState::Available
+        } else if options.mode == EnvironmentMode::UseExisting {
+            PlanActionState::Missing
         } else if platform_install.is_some() {
-            PlanActionState::Install
+            if install_allowed {
+                PlanActionState::Install
+            } else {
+                PlanActionState::Unsupported
+            }
         } else {
             PlanActionState::Unsupported
         };
@@ -287,10 +381,18 @@ pub fn plan_environment(
             .map(|url| apply_github_proxy(url, github_proxy.as_deref()));
 
         if state == PlanActionState::Unsupported && profile.id != "containers" {
-            warnings.push(format!(
-                "{} has no registered installation strategy for {}",
-                definition.display_name, audit.platform.family
-            ));
+            if platform_install.is_none() {
+                warnings.push(format!(
+                    "{} has no registered installation strategy for {}",
+                    definition.display_name, audit.platform.family
+                ));
+            } else {
+                warnings.push(format!(
+                    "{} requires a privileged installation strategy and is excluded from {} mode",
+                    definition.display_name,
+                    options.mode.as_str()
+                ));
+            }
         }
 
         actions.push(InstallAction {
@@ -306,7 +408,9 @@ pub fn plan_environment(
             package: install.map(|spec| spec.package.clone()),
             source_url,
             resolved_source_url,
-            requires_admin: install.is_some_and(|spec| spec.requires_admin),
+            requires_admin: state == PlanActionState::Install
+                && (options.mode == EnvironmentMode::SystemMissingOnly
+                    || install.is_some_and(|spec| spec.requires_admin)),
         });
     }
 
@@ -327,11 +431,37 @@ pub fn plan_environment(
                     && audit.execution_backends.available.contains(&action.tool_id)
             });
         } else {
-            warnings.push(
-                "execution backend actions are alternatives; choose one provider rather than installing every listed option"
-                    .to_owned(),
-            );
+            if actions
+                .iter()
+                .any(|action| action.state == PlanActionState::Install)
+            {
+                for action in &mut actions {
+                    if action.state == PlanActionState::Install {
+                        action.state = PlanActionState::Alternative;
+                    }
+                }
+                warnings.push(
+                    "execution backend actions are alternatives; choose one provider rather than installing every listed option"
+                        .to_owned(),
+                );
+            }
         }
+    }
+
+    if options.mode == EnvironmentMode::UseExisting
+        && actions
+            .iter()
+            .any(|action| action.state == PlanActionState::Missing)
+    {
+        warnings.push(
+            "use-existing mode reports missing tools but never proposes installation".to_owned(),
+        );
+    }
+    if options.mode == EnvironmentMode::SystemMissingOnly {
+        warnings.push(
+            "system-missing-only mode preserves every detected tool and proposes only missing items"
+                .to_owned(),
+        );
     }
 
     let required_tools = profile.tools.iter().cloned().collect::<BTreeSet<_>>();
@@ -339,17 +469,224 @@ pub fn plan_environment(
         warnings.push("the selected profile contains duplicate tool identifiers".to_owned());
     }
 
+    let requires_confirmation = actions
+        .iter()
+        .any(|action| action.state == PlanActionState::Install);
+    let transaction = build_transaction_preview(profile_id, &audit.platform, options, &actions)?;
+
     Ok(EnvironmentPlan {
         profile: profile.id.clone(),
         description: profile.description.clone(),
+        mode: options.mode,
+        target_root: transaction.target_root.clone(),
         platform: audit.platform.clone(),
         github_proxy,
-        requires_confirmation: actions
-            .iter()
-            .any(|action| action.state == PlanActionState::Install),
+        transaction,
+        requires_confirmation,
         actions,
         warnings,
     })
+}
+
+fn installation_allowed_in_mode(mode: EnvironmentMode, requires_admin: bool) -> bool {
+    match mode {
+        EnvironmentMode::UseExisting => false,
+        EnvironmentMode::ManagedUser | EnvironmentMode::ProjectIsolated => !requires_admin,
+        EnvironmentMode::SystemMissingOnly => true,
+    }
+}
+
+fn build_transaction_preview(
+    profile_id: &str,
+    platform: &PlatformInfo,
+    options: &EnvironmentPlanOptions,
+    actions: &[InstallAction],
+) -> Result<TransactionPreview, EnvironmentError> {
+    let (target_root, cache_root) = plan_roots(profile_id, platform, options)?;
+    let lock_path = target_root
+        .as_ref()
+        .map(|root| root.join("runtime-lock.json"));
+    let install_count = actions
+        .iter()
+        .filter(|action| action.state == PlanActionState::Install)
+        .count();
+    let unsupported_count = actions
+        .iter()
+        .filter(|action| action.state == PlanActionState::Unsupported)
+        .count();
+    let alternative_count = actions
+        .iter()
+        .filter(|action| action.state == PlanActionState::Alternative)
+        .count();
+    let mut blockers = Vec::new();
+    if install_count > 0 {
+        blockers.push(
+            "environment.apply.v1 is planned; this transaction cannot be executed".to_owned(),
+        );
+        blockers.push(
+            "immutable versions, SHA-256 checksums, and license evidence are unresolved in this preview"
+                .to_owned(),
+        );
+    }
+    if unsupported_count > 0 {
+        blockers.push(format!(
+            "{unsupported_count} action(s) lack a strategy compatible with the selected mode"
+        ));
+    }
+    if alternative_count > 0 {
+        blockers.push(
+            "select exactly one execution backend before building an install transaction"
+                .to_owned(),
+        );
+    }
+    if actions
+        .iter()
+        .any(|action| action.strategy.as_deref() == Some("wsl-provider"))
+    {
+        blockers
+            .push("select WSL Arch or WSL Debian before resolving Unix-native packages".to_owned());
+    }
+
+    let stages = if install_count == 0 {
+        Vec::new()
+    } else {
+        [
+            (
+                "resolve",
+                "Resolve immutable versions and canonical sources",
+            ),
+            ("download", "Download into the content-addressed cache"),
+            (
+                "verify",
+                "Verify checksums, publishers, and license metadata",
+            ),
+            ("stage", "Extract into an inactive staging directory"),
+            ("health-check", "Run provider and runtime health checks"),
+            ("lock", "Write the versioned runtime lock"),
+            ("activate", "Atomically activate the staged environment"),
+            (
+                "rollback",
+                "Retain the previous activation target for rollback",
+            ),
+        ]
+        .into_iter()
+        .map(|(id, description)| TransactionStage {
+            id: id.to_owned(),
+            description: description.to_owned(),
+        })
+        .collect()
+    };
+    let requires_admin = actions
+        .iter()
+        .any(|action| action.state == PlanActionState::Install && action.requires_admin);
+
+    Ok(TransactionPreview {
+        dry_run: true,
+        apply_capability: "environment.apply.v1".to_owned(),
+        apply_available: false,
+        ready_to_apply: false,
+        target_root: target_root.as_deref().map(path_to_string),
+        cache_root: cache_root.as_deref().map(path_to_string),
+        lock_path: lock_path.as_deref().map(path_to_string),
+        preserves_existing: true,
+        checksum_policy: "sha256-required-before-staging".to_owned(),
+        license_policy: "allowlist-and-notice-review-required".to_owned(),
+        activation_policy: "atomic-with-rollback".to_owned(),
+        system_mutation: options.mode == EnvironmentMode::SystemMissingOnly && install_count > 0,
+        requires_admin,
+        stages,
+        blockers,
+    })
+}
+
+fn plan_roots(
+    profile_id: &str,
+    platform: &PlatformInfo,
+    options: &EnvironmentPlanOptions,
+) -> Result<(Option<PathBuf>, Option<PathBuf>), EnvironmentError> {
+    if options.mode == EnvironmentMode::UseExisting {
+        return Ok((None, None));
+    }
+
+    let user_root = user_data_root(platform);
+    let cache_root = user_root.join("cache");
+    let target_root = match options.mode {
+        EnvironmentMode::UseExisting => unreachable!(),
+        EnvironmentMode::ManagedUser => user_root.join("profiles").join(profile_id),
+        EnvironmentMode::ProjectIsolated => options
+            .project_root
+            .as_ref()
+            .filter(|root| !root.as_os_str().is_empty())
+            .ok_or_else(|| {
+                EnvironmentError(
+                    "project-isolated mode requires an explicit project root".to_owned(),
+                )
+            })
+            .and_then(absolute_path)?
+            .join(".linxira-bio"),
+        EnvironmentMode::SystemMissingOnly => {
+            system_data_root(platform).join("profiles").join(profile_id)
+        }
+    };
+
+    Ok((Some(target_root), Some(cache_root)))
+}
+
+fn absolute_path(path: &PathBuf) -> Result<PathBuf, EnvironmentError> {
+    if path.is_absolute() {
+        return Ok(path.clone());
+    }
+    env::current_dir()
+        .map(|current| current.join(path))
+        .map_err(|error| EnvironmentError(format!("cannot resolve project root: {error}")))
+}
+
+fn user_data_root(platform: &PlatformInfo) -> PathBuf {
+    if platform.family == "windows" {
+        if let Ok(local_app_data) = env::var("LOCALAPPDATA")
+            && !local_app_data.trim().is_empty()
+        {
+            return PathBuf::from(local_app_data).join("Linxira").join("Bio");
+        }
+        if let Ok(profile) = env::var("USERPROFILE")
+            && !profile.trim().is_empty()
+        {
+            return PathBuf::from(profile)
+                .join("AppData")
+                .join("Local")
+                .join("Linxira")
+                .join("Bio");
+        }
+        return PathBuf::from(r"%LOCALAPPDATA%\Linxira\Bio");
+    }
+
+    if let Ok(xdg_data_home) = env::var("XDG_DATA_HOME")
+        && !xdg_data_home.trim().is_empty()
+    {
+        return PathBuf::from(xdg_data_home).join("linxira-bio");
+    }
+    env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("$HOME"))
+        .join(".local")
+        .join("share")
+        .join("linxira-bio")
+}
+
+fn system_data_root(platform: &PlatformInfo) -> PathBuf {
+    if platform.family == "windows" {
+        env::var("ProgramData")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from(r"C:\ProgramData"))
+            .join("Linxira")
+            .join("Bio")
+    } else {
+        PathBuf::from("/opt/linxira-bio")
+    }
+}
+
+fn path_to_string(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
 }
 
 pub fn apply_github_proxy(url: &str, proxy: Option<&str>) -> String {
@@ -752,11 +1089,13 @@ fn decode_output(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        AuditSummary, EnvironmentAudit, ExecutionBackendAudit, PlanActionState, PlatformInfo,
-        ToolCheck, apply_github_proxy, conda_channel_order_valid, decode_output,
-        first_matching_output_line, load_catalog, plan_environment, probe_wsl_provider,
-        summarize_execution_backends,
+        AuditSummary, EnvironmentAudit, EnvironmentMode, EnvironmentPlanOptions,
+        ExecutionBackendAudit, PlanActionState, PlatformInfo, ToolCheck, apply_github_proxy,
+        conda_channel_order_valid, decode_output, first_matching_output_line, load_catalog,
+        parse_environment_mode, plan_environment, plan_environment_with_options,
+        probe_wsl_provider, summarize_execution_backends,
     };
+    use std::path::PathBuf;
 
     #[test]
     fn catalog_profiles_reference_registered_tools() {
@@ -886,6 +1225,159 @@ mod tests {
                 .all(|action| action.state == PlanActionState::Install)
         );
         assert!(plan.requires_confirmation);
+    }
+
+    #[test]
+    fn parses_all_environment_modes() {
+        assert_eq!(
+            parse_environment_mode("use-existing").expect("mode"),
+            EnvironmentMode::UseExisting
+        );
+        assert_eq!(
+            parse_environment_mode("managed-user").expect("mode"),
+            EnvironmentMode::ManagedUser
+        );
+        assert_eq!(
+            parse_environment_mode("project-isolated").expect("mode"),
+            EnvironmentMode::ProjectIsolated
+        );
+        assert_eq!(
+            parse_environment_mode("system-missing-only").expect("mode"),
+            EnvironmentMode::SystemMissingOnly
+        );
+        assert!(parse_environment_mode("global").is_err());
+    }
+
+    #[test]
+    fn use_existing_mode_never_proposes_installation() {
+        let audit = windows_audit_with_tools(Vec::new());
+        let plan = plan_environment_with_options(
+            "sequence-search",
+            &audit,
+            &EnvironmentPlanOptions {
+                mode: EnvironmentMode::UseExisting,
+                project_root: None,
+            },
+        )
+        .expect("valid plan");
+
+        assert!(
+            plan.actions
+                .iter()
+                .all(|action| action.state == PlanActionState::Missing)
+        );
+        assert!(!plan.requires_confirmation);
+        assert!(plan.target_root.is_none());
+        assert!(plan.transaction.stages.is_empty());
+        assert!(!plan.transaction.system_mutation);
+    }
+
+    #[test]
+    fn project_isolated_mode_requires_an_explicit_root() {
+        let audit = windows_audit_with_tools(Vec::new());
+        let error = plan_environment_with_options(
+            "sequence-search",
+            &audit,
+            &EnvironmentPlanOptions {
+                mode: EnvironmentMode::ProjectIsolated,
+                project_root: None,
+            },
+        )
+        .expect_err("missing project root must fail");
+
+        assert!(error.to_string().contains("explicit project root"));
+    }
+
+    #[test]
+    fn project_isolated_mode_previews_a_local_lock_and_stages() {
+        let audit = windows_audit_with_tools(Vec::new());
+        let plan = plan_environment_with_options(
+            "sequence-search",
+            &audit,
+            &EnvironmentPlanOptions {
+                mode: EnvironmentMode::ProjectIsolated,
+                project_root: Some(PathBuf::from("example-project")),
+            },
+        )
+        .expect("valid plan");
+
+        assert!(
+            plan.target_root
+                .as_deref()
+                .is_some_and(|root| root.contains(".linxira-bio"))
+        );
+        assert!(
+            plan.target_root
+                .as_deref()
+                .is_some_and(|root| std::path::Path::new(root).is_absolute())
+        );
+        assert!(
+            plan.transaction
+                .lock_path
+                .as_deref()
+                .is_some_and(|path| path.contains("runtime-lock.json"))
+        );
+        assert_eq!(plan.transaction.stages.len(), 8);
+        assert!(
+            plan.transaction
+                .blockers
+                .iter()
+                .any(|blocker| blocker.contains("environment.apply.v1"))
+        );
+    }
+
+    #[test]
+    fn containers_require_one_backend_before_building_a_transaction() {
+        let audit = windows_audit_with_tools(Vec::new());
+        let plan = plan_environment_with_options(
+            "containers",
+            &audit,
+            &EnvironmentPlanOptions {
+                mode: EnvironmentMode::SystemMissingOnly,
+                project_root: None,
+            },
+        )
+        .expect("valid plan");
+
+        assert!(
+            plan.actions
+                .iter()
+                .filter(|action| action.tool_id.starts_with("wsl-"))
+                .all(|action| action.state == PlanActionState::Alternative)
+        );
+        assert!(!plan.requires_confirmation);
+        assert!(!plan.transaction.system_mutation);
+        assert!(!plan.transaction.apply_available);
+        assert!(!plan.transaction.ready_to_apply);
+        assert!(
+            plan.transaction
+                .blockers
+                .iter()
+                .any(|blocker| blocker.contains("select exactly one execution backend"))
+        );
+    }
+
+    #[test]
+    fn system_missing_only_mode_previews_privileged_debian_packages() {
+        let audit = debian_audit_with_tools(Vec::new());
+        let plan = plan_environment_with_options(
+            "sequence-search",
+            &audit,
+            &EnvironmentPlanOptions {
+                mode: EnvironmentMode::SystemMissingOnly,
+                project_root: None,
+            },
+        )
+        .expect("valid plan");
+
+        assert!(
+            plan.actions
+                .iter()
+                .all(|action| action.state == PlanActionState::Install && action.requires_admin)
+        );
+        assert!(plan.requires_confirmation);
+        assert!(plan.transaction.system_mutation);
+        assert!(plan.transaction.requires_admin);
     }
 
     #[test]
@@ -1063,6 +1555,27 @@ mod tests {
                 arch: "x86_64".to_owned(),
                 supported: true,
             },
+            summary: AuditSummary {
+                available: tools.len(),
+                missing: 0,
+            },
+            tools,
+            execution_backends,
+            conda: None,
+            warnings: Vec::new(),
+        }
+    }
+
+    fn debian_audit_with_tools(tools: Vec<ToolCheck>) -> EnvironmentAudit {
+        let platform = PlatformInfo {
+            os: "linux".to_owned(),
+            family: "debian".to_owned(),
+            arch: "x86_64".to_owned(),
+            supported: true,
+        };
+        let execution_backends = summarize_execution_backends(&platform, &tools);
+        EnvironmentAudit {
+            platform,
             summary: AuditSummary {
                 available: tools.len(),
                 missing: 0,

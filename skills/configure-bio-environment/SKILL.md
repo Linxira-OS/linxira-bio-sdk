@@ -1,6 +1,6 @@
 ---
 name: configure-bio-environment
-description: Audit and prepare a local bioinformatics software environment with Linxira Bio environment capabilities. Use when an agent must check or configure managed Python, R, Java, uv, Pixi, rig, Miniforge, Conda/Bioconda, NCBI BLAST+, DIAMOND, samtools, bcftools, bedtools, minimap2, WSL Debian, WSL Arch, Docker, Podman, Rust, or local GPU availability on Windows, Debian, or Arch Linux.
+description: Audit and prepare a local bioinformatics software environment with Linxira Bio environment capabilities. Use when an agent must check tools, select a workload and installation scope, review a transaction preview, or configure managed Python, R, Java, uv, Pixi, rig, Miniforge, Conda/Bioconda, NCBI BLAST+, DIAMOND, samtools, bcftools, bedtools, minimap2, WSL Debian, WSL Arch, Docker, Podman, Rust, or local GPU availability on Windows, Debian, or Arch Linux.
 ---
 
 # Configure Bio Environment
@@ -32,8 +32,26 @@ an installer, directory name, or PATH entry alone.
 Generate a plan without changing the machine:
 
 ```bash
-linxira-bio environment plan PROFILE --json
+linxira-bio environment plan PROFILE --mode MODE --json
 ```
+
+Select one mode:
+
+- `use-existing`: report missing tools without proposing installation.
+- `managed-user`: preserve detected tools and stage missing unprivileged tools
+  below the user data root. Use this by default.
+- `project-isolated`: require `--project-root PATH` and target
+  `PATH/.linxira-bio` with a project runtime lock.
+- `system-missing-only`: preserve detected tools and preview only missing
+  system packages. Treat every proposed change as privileged.
+
+Inspect `transaction.target_root`, `cache_root`, `lock_path`, `stages`,
+`checksum_policy`, `license_policy`, `activation_policy`, `requires_admin`,
+`system_mutation`, and `blockers`. Do not interpret a transaction preview as
+executable approval.
+
+Treat actions marked `alternative` as mutually exclusive. Require a provider
+choice before building a transaction; never install every backend option.
 
 Inspect the supported user-scoped providers separately:
 
@@ -74,7 +92,7 @@ URL.
 ## Installation Boundary
 
 Treat `environment.apply.v1` as unavailable until the capability catalog marks
-it available. Do not translate an installation plan into shell commands and
+it available. Do not translate a transaction preview into shell commands and
 execute them silently.
 
 Before any installation, present the tool, version or source, strategy,

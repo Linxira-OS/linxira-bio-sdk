@@ -11,6 +11,18 @@ The provider registry is `runtimes/catalog.json`. `runtime.catalog.v1` exposes
 that registry read-only. A provider marked `cataloged` is a design commitment,
 not an implemented installer.
 
+Environment planning has four explicit modes:
+
+| Mode | Target | Existing tools | Privileged actions |
+| --- | --- | --- | --- |
+| `use-existing` | None | Reuse | Never proposed |
+| `managed-user` | User data root | Preserve | Excluded |
+| `project-isolated` | `<project>/.linxira-bio` | Preserve | Excluded |
+| `system-missing-only` | System data root | Preserve | Missing items only |
+
+`audit-only` remains the separate `environment audit` operation. Project mode
+requires an explicit root. A system plan is not authority to execute it.
+
 ## Providers
 
 | Runtime need | Default provider | Purpose |
@@ -57,6 +69,11 @@ available:
 Cancel, failure, or a failed health check must leave the previous runtime
 usable. Repair replays the locked transaction. Remove deletes only application
 owned paths after displaying them and receiving confirmation.
+
+`environment.plan.v1` exposes these stages as a dry-run transaction preview,
+including target, shared cache, lock path, administrator requirement, system
+mutation flag, and blockers. `apply_available` and `ready_to_apply` remain
+false until the apply capability satisfies every stage above.
 
 ## Job Reproducibility
 

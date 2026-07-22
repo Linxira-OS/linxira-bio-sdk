@@ -37,16 +37,21 @@ deterministic FASTA sequence and assembly statistics:
 
 ```bash
 cargo run -p linxira-bio-cli -- environment audit --json
-cargo run -p linxira-bio-cli -- environment plan sequence-search --json
+cargo run -p linxira-bio-cli -- environment plan sequence-search --mode managed-user --json
 cargo run -p linxira-bio-cli -- runtime catalog --json
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
 ```
 
-Environment plans support `local-core`, `scripting`, `sequence-search`,
-`genomics-cli`, and `full-local`. They are read-only. Installation remains a
-separate, explicitly approved capability. Set `GITHUB_PROXY` to resolve
-canonical GitHub release URLs through a trusted download proxy.
+Environment plans support `local-core`, `scripting`, `managed-runtimes`,
+`containers`, `sequence-search`, `genomics-cli`, and `full-local`. They are
+read-only. Installation remains a separate, explicitly approved capability.
+Set `GITHUB_PROXY` to resolve canonical GitHub release URLs through a trusted
+download proxy.
+
+Planning modes are `use-existing`, `managed-user`, `project-isolated`, and
+`system-missing-only`. Every plan includes a dry-run transaction boundary;
+`environment.apply.v1` remains planned and cannot execute that preview.
 
 Inspect the runtime and capability catalog:
 
