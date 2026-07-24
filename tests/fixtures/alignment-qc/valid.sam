@@ -1,0 +1,8 @@
+@HD	VN:1.6	SO:coordinate
+@SQ	SN:chr1	LN:1000
+@SQ	SN:chr2	LN:500
+pair1	99	chr1	10	60	6M	=	30	26	ACGTAC	IIIIII
+pair1	147	chr1	30	45	6M	=	10	-26	GTACGT	IIIIII
+read2	0	chr2	5	20	4M	*	0	0	GGGG	IIII
+read3	4	*	0	0	*	*	0	0	NNNN	!!!!
+read4	1024	chr1	80	0	4M	*	0	0	AAAA	IIII

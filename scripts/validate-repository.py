@@ -7,6 +7,13 @@ import hashlib
 import json
 from pathlib import Path
 
+from generate_third_party_notices import (
+    JSON_OUTPUT_NAME,
+    TEXT_OUTPUT_NAME,
+    load_bundle_notice_configuration,
+    validate_override_configuration,
+)
+
 try:
     from jsonschema import Draft202012Validator, FormatChecker
 except ImportError as error:
@@ -29,6 +36,7 @@ except KeyError as error:
     ) from error
 
 SCHEMA_FILES = (
+    "schemas/alignment-qc.schema.json",
     "schemas/analysis-result-v2.schema.json",
     "schemas/analysis-result.schema.json",
     "schemas/artifact.schema.json",
@@ -36,10 +44,14 @@ SCHEMA_FILES = (
     "schemas/capability.schema.json",
     "schemas/dataset-manifest.schema.json",
     "schemas/environment-plan.schema.json",
+    "schemas/expression-matrix-qc.schema.json",
+    "schemas/interval-intersect.schema.json",
     "schemas/job-request-v2.schema.json",
     "schemas/job-request.schema.json",
     "schemas/runtime-catalog.schema.json",
     "schemas/runtime-lock.schema.json",
+    "schemas/structure-pdb-summary.schema.json",
+    "schemas/third-party-dependencies.schema.json",
     "schemas/tool-catalog.schema.json",
     "schemas/workflow-pack-catalog.schema.json",
     "schemas/workflow-pack-manifest.schema.json",
@@ -50,6 +62,7 @@ CATALOG_AND_MANIFEST_CONTRACTS = (
     ("tools/catalog.json", "schemas/tool-catalog.schema.json"),
     ("runtimes/catalog.json", "schemas/runtime-catalog.schema.json"),
     ("packaging/bundle-manifest.json", "schemas/bundle-manifest.schema.json"),
+    ("tests/fixtures/notices/minimal.json", "schemas/third-party-dependencies.schema.json"),
     ("workflows/catalog.json", "schemas/workflow-pack-catalog.schema.json"),
 )
 
@@ -315,6 +328,8 @@ def validate() -> None:
     pack = load_json("skill-pack.json")
     profile = load_json("profiles/local-core.json")
     workflow_catalog = load_json("workflows/catalog.json")
+    dependency_notice_configuration = load_bundle_notice_configuration()
+    dependency_notice_overrides = validate_override_configuration()
 
     license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
     if "GNU AFFERO GENERAL PUBLIC LICENSE" not in license_text:
@@ -343,10 +358,15 @@ def validate() -> None:
         raise ValueError("release bundle does not include canonical documentation")
     if "workflows" not in bundle_manifest.get("include_trees", []):
         raise ValueError("release bundle does not include the workflow catalog")
+    if "licenses/cargo-overrides" not in bundle_manifest.get("include_trees", []):
+        raise ValueError("release bundle does not include pinned override texts")
     bundle_files = bundle_manifest.get("include_files", [])
     required_bundle_files = {
+        "LICENSE",
+        "THIRD_PARTY.md",
         "Cargo.lock",
         "deny.toml",
+        "licenses/cargo-overrides.json",
         "licenses/NotoSansCJK-OFL.txt",
         "tools/catalog.json",
         "profiles/local-core.json",
@@ -355,6 +375,15 @@ def validate() -> None:
         bundle_files
     ):
         raise ValueError("release bundle lacks required tool or profile catalogs")
+    if bundle_manifest.get("dependency_notices") != dependency_notice_configuration:
+        raise ValueError("release bundle dependency notice configuration is invalid")
+    if dependency_notice_configuration.get("outputs") != {
+        "json": JSON_OUTPUT_NAME,
+        "text": TEXT_OUTPUT_NAME,
+    }:
+        raise ValueError("release dependency notice output names are invalid")
+    if not dependency_notice_overrides:
+        raise ValueError("release dependency notice overrides are empty")
     if not isinstance(pack, dict) or pack.get("schema_version") != "1":
         raise ValueError("invalid skill-pack header")
     if pack.get("license") != "AGPL-3.0-or-later":
@@ -546,7 +575,9 @@ def validate() -> None:
         f"{format_check_count} format checks; "
         f"{len(capability_ids)} capabilities, "
         f"{len(skill_ids)} skills, {len(tool_ids)} tools, "
-        f"{len(provider_ids)} runtime providers, and profile {profile.get('id')}"
+        f"{len(provider_ids)} runtime providers, "
+        f"{len(dependency_notice_overrides)} license overrides, "
+        f"and profile {profile.get('id')}"
     )
 
 

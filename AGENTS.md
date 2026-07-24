@@ -12,8 +12,16 @@ the agent skills that select and validate them.
   `sequence.stats.v1` capability.
 - Read `skills/analyze-fastq-quality/SKILL.md` for the implemented
   `fastq.qc.v1` capability.
+- Read `skills/analyze-sam-quality/SKILL.md` for the implemented SAM-text
+  `alignment.qc.v1` capability; BAM and CRAM still require native tools.
+- Read `skills/intersect-genomic-intervals/SKILL.md` for the implemented BED
+  `interval.intersect.v1` capability.
+- Read `skills/analyze-expression-matrix/SKILL.md` for the implemented CSV/TSV
+  `expression.matrix.qc.v1` capability.
 - Read `skills/analyze-variant-statistics/SKILL.md` for the implemented
   `variant.stats.v1` capability.
+- Read `skills/analyze-pdb-structure/SKILL.md` for the implemented
+  `structure.pdb.summary.v1` capability and explicit AlphaFold pLDDT handling.
 - Read `skills/inspect-bio-dataset/SKILL.md` before analyzing imported data.
 - Read `skills/export-bio-table/SKILL.md` to export supported result tables.
 - Read `skills/configure-bio-environment/SKILL.md` to audit managed Python, R,

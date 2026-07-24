@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/workflows/sequence-conversion-biopython/input.v1.json",
+  "type": "object",
+  "required": ["schema_version", "job_id", "capability", "inputs", "execution", "parameters"],
+  "properties": {
+    "schema_version": { "const": "2" },
+    "job_id": { "type": "string", "minLength": 1 },
+    "capability": { "const": "sequence.convert.biopython.v1" },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["artifact_id", "role", "cardinality", "files"],
+        "properties": {
+          "artifact_id": { "type": "string", "minLength": 1 },
+          "role": { "const": "sequences" },
+          "cardinality": { "const": "single" },
+          "files": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["file_id", "path", "format", "compression", "size_bytes"],
+              "properties": {
+                "file_id": { "type": "string", "minLength": 1 },
+                "path": { "type": "string", "minLength": 1 },
+                "format": { "enum": ["fasta", "fastq", "genbank", "embl"] },
+                "compression": { "const": "none" },
+                "size_bytes": { "type": "integer", "minimum": 0 },
+                "sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": { "mode": { "const": "local-cpu" } },
+      "additionalProperties": false
+    },
+    "parameters": {
+      "type": "object",
+      "required": ["output_directory", "output_filename", "output_format"],
+      "properties": {
+        "output_directory": { "type": "string", "minLength": 1 },
+        "output_filename": {
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "^[^<>:\"/\\\\|?*\\u0000-\\u001F\\u007F]+$"
+            },
+            {
+              "not": { "pattern": "[ .]$" }
+            },
+            {
+              "not": {
+                "pattern": "^(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Ll][Oo][Cc][Kk]\\$|[Cc][Oo][Nn][Ii][Nn]\\$|[Cc][Oo][Nn][Oo][Uu][Tt]\\$|[Cc][Oo][Mm](?:[1-9]|\\u00B9|\\u00B2|\\u00B3)|[Ll][Pp][Tt](?:[1-9]|\\u00B9|\\u00B2|\\u00B3))[ ]*(?:\\..*)?$"
+              }
+            },
+            {
+              "not": { "pattern": "^[Rr][Ee][Ss][Uu][Ll][Tt]\\.[Jj][Ss][Oo][Nn]$" }
+            }
+          ]
+        },
+        "output_format": { "enum": ["fasta", "fastq", "genbank", "embl"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

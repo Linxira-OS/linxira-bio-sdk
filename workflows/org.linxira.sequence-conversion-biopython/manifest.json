@@ -1,0 +1,72 @@
+{
+  "schema_version": "1",
+  "id": "org.linxira.sequence-conversion-biopython",
+  "version": "0.1.0",
+  "publisher": {
+    "name": "Linxira OS",
+    "url": "https://github.com/Linxira-OS"
+  },
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
+  "entrypoint": {
+    "path": "src/convert_sequences.py",
+    "arguments": ["--request", "{request}", "--result", "{result}"]
+  },
+  "runtime": {
+    "kind": "python",
+    "version": "3.12.x",
+    "dependency_lock": {
+      "path": "requirements.lock",
+      "sha256": "0ea6b41b225032c446fee70fe942ba664602d023f7d932fef8dfb4396915bbf7"
+    }
+  },
+  "input_schema": {
+    "type": "object",
+    "$ref": "schemas/input.schema.json"
+  },
+  "output_schema": {
+    "type": "object",
+    "$ref": "schemas/output.schema.json"
+  },
+  "platforms": ["windows-gnu", "debian", "arch"],
+  "network": {
+    "access": "none",
+    "allowed_hosts": []
+  },
+  "resources": {
+    "minimum_memory_mb": 256,
+    "minimum_disk_mb": 200,
+    "recommended_threads": 1,
+    "gpu": "none"
+  },
+  "files": [
+    {
+      "path": "NOTICE.md",
+      "sha256": "3af272bdff63c10a63330750ffcd1483d9eca265f7fddebd640afa9d69f5480c"
+    },
+    {
+      "path": "README.md",
+      "sha256": "5d45a134c0610be4164da585853d9cba6f5d495664550389f6e11e9be9ae3362"
+    },
+    {
+      "path": "requirements.lock",
+      "sha256": "0ea6b41b225032c446fee70fe942ba664602d023f7d932fef8dfb4396915bbf7"
+    },
+    {
+      "path": "schemas/input.schema.json",
+      "sha256": "07c5c47099fd248861752b41787e2f6da557af05d1faa250bc0d859e99bfb683"
+    },
+    {
+      "path": "schemas/output.schema.json",
+      "sha256": "956482424d0980634fce7b68208e62e373789186af63b0601f9969a6eb3a44db"
+    },
+    {
+      "path": "src/convert_sequences.py",
+      "sha256": "ebe81a7923e06f3bb17475eeb94a88a0801a80162f930b2b29e4c76f06cd9b31"
+    },
+    {
+      "path": "tests/test_convert_sequences.py",
+      "sha256": "5cc9bbee1a6005c45227785b52dafadf06bac00b168a08d1459ce0357c2565c1"
+    }
+  ]
+}

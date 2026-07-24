@@ -28,7 +28,12 @@
 - environment audit and platform-specific installation planning;
 - FASTA sequence statistics;
 - FASTQ quality control;
+- SAM text alignment quality control;
+- BED interval intersection summaries;
 - VCF descriptive statistics;
+- rectangular CSV/TSV expression-matrix quality control;
+- render-ready PDB summaries with explicit AlphaFold pLDDT interpretation;
+- native result charts, bounded PDB/mmCIF 3D viewing, and PNG snapshots;
 - content-aware previews for BED, GFF3, GTF, SAM, and tabular data;
 - signature-only recognition for BAM and other planned binary formats;
 - local execution and provenance contracts.

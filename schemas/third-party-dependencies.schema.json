@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/third-party-dependencies.v1.json",
+  "title": "Linxira Bio target-specific Cargo dependency notices",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schema_version",
+    "generator_version",
+    "cargo_version",
+    "platform",
+    "target_triple",
+    "cargo_lock_sha256",
+    "override_manifest_sha256",
+    "release_roots",
+    "dependency_count",
+    "dependencies",
+    "license_texts"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://linxira.org/schemas/bio/third-party-dependencies.v1.json"
+    },
+    "schema_version": { "const": "1" },
+    "generator_version": { "const": "1" },
+    "cargo_version": { "type": "string", "pattern": "^cargo [0-9]+\\.[0-9]+\\.[0-9]+" },
+    "platform": { "enum": ["windows", "debian", "arch"] },
+    "target_triple": {
+      "enum": ["x86_64-pc-windows-gnu", "x86_64-unknown-linux-gnu"]
+    },
+    "cargo_lock_sha256": { "$ref": "#/$defs/sha256" },
+    "override_manifest_sha256": { "$ref": "#/$defs/sha256" },
+    "release_roots": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/packageIdentity" }
+    },
+    "dependency_count": { "type": "integer", "minimum": 0 },
+    "dependencies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dependency" }
+    },
+    "license_texts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sha256", "text"],
+        "properties": {
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "text": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "packageIdentity": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "document": {
+      "type": "object",
+      "required": ["origin", "path", "sha256", "source_url"],
+      "properties": {
+        "origin": { "enum": ["crate-package", "verified-override"] },
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "source_url": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": false
+    },
+    "vcs": {
+      "type": "object",
+      "required": ["revision"],
+      "properties": {
+        "revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "path": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "dependency": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "source",
+        "repository",
+        "license_expression",
+        "active_features",
+        "documents"
+      ],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "repository": {
+          "oneOf": [
+            { "type": "string", "format": "uri" },
+            { "type": "null" }
+          ]
+        },
+        "license_expression": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "null" }
+          ]
+        },
+        "active_features": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "documents": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/document" }
+        },
+        "vcs": { "$ref": "#/$defs/vcs" },
+        "override_reason": { "type": "string", "minLength": 1 },
+        "replaced_package_pointers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

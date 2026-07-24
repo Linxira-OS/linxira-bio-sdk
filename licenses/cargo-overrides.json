@@ -1,0 +1,669 @@
+{
+  "schema_version": "1",
+  "entries": [
+    {
+      "package": "accesskit",
+      "version": "0.24.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published crate omits the repository-level license files; these texts are pinned to the crate's Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-APACHE.txt",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-MIT.txt",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "accesskit_atspi_common",
+      "version": "0.18.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "f40dfc01a0c0e76de535969f82fb35e19513737d",
+      "platforms": [
+        "debian",
+        "arch"
+      ],
+      "reason": "The published crate omits the repository-level license files; these texts are pinned to the crate's Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-APACHE.txt",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/f40dfc01a0c0e76de535969f82fb35e19513737d/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-MIT.txt",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/f40dfc01a0c0e76de535969f82fb35e19513737d/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "accesskit_consumer",
+      "version": "0.35.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "1bbcf100942bac96c2c3a4a91cb67b0b20201a24",
+      "platforms": [
+        "windows"
+      ],
+      "reason": "The published crate omits the repository-level license files; these texts are pinned to the crate's Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-APACHE.txt",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/1bbcf100942bac96c2c3a4a91cb67b0b20201a24/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-MIT.txt",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/1bbcf100942bac96c2c3a4a91cb67b0b20201a24/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "accesskit_consumer",
+      "version": "0.36.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "f40dfc01a0c0e76de535969f82fb35e19513737d",
+      "platforms": [
+        "debian",
+        "arch"
+      ],
+      "reason": "The published crate omits the repository-level license files; these texts are pinned to the crate's Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-APACHE.txt",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/f40dfc01a0c0e76de535969f82fb35e19513737d/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-MIT.txt",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/f40dfc01a0c0e76de535969f82fb35e19513737d/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "accesskit_unix",
+      "version": "0.21.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "f40dfc01a0c0e76de535969f82fb35e19513737d",
+      "platforms": [
+        "debian",
+        "arch"
+      ],
+      "reason": "The published crate omits the repository-level license files; these texts are pinned to the crate's Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-APACHE.txt",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/f40dfc01a0c0e76de535969f82fb35e19513737d/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-MIT.txt",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/f40dfc01a0c0e76de535969f82fb35e19513737d/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "accesskit_windows",
+      "version": "0.32.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "1bbcf100942bac96c2c3a4a91cb67b0b20201a24",
+      "platforms": [
+        "windows"
+      ],
+      "reason": "The published crate omits the repository-level license files; these texts are pinned to the crate's Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-APACHE.txt",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/1bbcf100942bac96c2c3a4a91cb67b0b20201a24/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-MIT.txt",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/1bbcf100942bac96c2c3a4a91cb67b0b20201a24/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "accesskit_winit",
+      "version": "0.32.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "Apache-2.0",
+      "vcs_revision": "1bbcf100942bac96c2c3a4a91cb67b0b20201a24",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published crate omits the repository-level license files; these texts are pinned to the crate's Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/accesskit/LICENSE-APACHE.txt",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "source_url": "https://github.com/AccessKit/accesskit/blob/1bbcf100942bac96c2c3a4a91cb67b0b20201a24/LICENSE-APACHE"
+        }
+      ]
+    },
+    {
+      "package": "profiling",
+      "version": "1.0.18",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "8271551172eb6fa4cba47369aedd93790c623df9",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published crate omits its workspace license files; both files are pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/profiling/LICENSE-APACHE.txt",
+          "sha256": "10d30a673cd5e9349bdc02aeb48f14b3386d27d0da32df8f0a555d4aa16aa551",
+          "source_url": "https://github.com/aclysma/profiling/blob/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/profiling/LICENSE-MIT.txt",
+          "sha256": "c8167fdeeed46d3f244d3f85c5bf998ce889343691c32be2c61a8bc4b5c08333",
+          "source_url": "https://github.com/aclysma/profiling/blob/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "gl_generator",
+      "version": "0.14.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "Apache-2.0",
+      "vcs_revision": "ea503e8d5fb6d73c6030e6191ce738cd3bf3433e",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published crate omits the repository license; the Apache text is pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/gl-rs/LICENSE-APACHE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source_url": "https://github.com/brendanzab/gl-rs/blob/ea503e8d5fb6d73c6030e6191ce738cd3bf3433e/LICENSE"
+        }
+      ]
+    },
+    {
+      "package": "khronos_api",
+      "version": "3.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "Apache-2.0",
+      "vcs_revision": "f150967b1c44ae888e6676f93f639ebc82771bdc",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published crate omits the repository license; the Apache text is pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/gl-rs/LICENSE-APACHE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source_url": "https://github.com/brendanzab/gl-rs/blob/f150967b1c44ae888e6676f93f639ebc82771bdc/LICENSE"
+        }
+      ]
+    },
+    {
+      "package": "clipboard-win",
+      "version": "5.4.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "BSL-1.0",
+      "vcs_revision": "3b27cf2bfd1adcfa6e0264eb51c1025ddaf0f342",
+      "platforms": [
+        "windows"
+      ],
+      "reason": "The published crate omits the repository license; the Boost Software License text is pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/clipboard-win/LICENSE-BSL-1.0.txt",
+          "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+          "source_url": "https://github.com/DoumanAsh/clipboard-win/blob/3b27cf2bfd1adcfa6e0264eb51c1025ddaf0f342/LICENSE"
+        }
+      ]
+    },
+    {
+      "package": "ecolor",
+      "version": "0.35.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published workspace crate omits the repository-level MIT and Apache files; both are pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-APACHE.txt",
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-MIT.txt",
+          "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "egui",
+      "version": "0.35.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published workspace crate omits the repository-level MIT and Apache files; both are pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-APACHE.txt",
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-MIT.txt",
+          "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "eframe",
+      "version": "0.35.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published workspace crate omits the repository-level MIT and Apache files; both are pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-APACHE.txt",
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-MIT.txt",
+          "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "egui_glow",
+      "version": "0.35.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published workspace crate omits the repository-level MIT and Apache files; both are pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-APACHE.txt",
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-MIT.txt",
+          "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "egui-wgpu",
+      "version": "0.35.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published workspace crate omits the repository-level MIT and Apache files; both are pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-APACHE.txt",
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-MIT.txt",
+          "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "egui-winit",
+      "version": "0.35.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published workspace crate omits the repository-level MIT and Apache files; both are pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-APACHE.txt",
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-MIT.txt",
+          "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "emath",
+      "version": "0.35.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published workspace crate omits the repository-level MIT and Apache files; both are pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-APACHE.txt",
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-MIT.txt",
+          "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "epaint",
+      "version": "0.35.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published workspace crate omits the repository-level MIT and Apache files; both are pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-APACHE.txt",
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-MIT.txt",
+          "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "epaint_default_fonts",
+      "version": "0.35.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0",
+      "vcs_revision": "6f15dc0e16b26edce1fc2a05212eaf7e749c1d05",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published workspace crate contains its font notices but omits the repository-level MIT and Apache files; both are pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-APACHE.txt",
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/egui/LICENSE-MIT.txt",
+          "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+          "source_url": "https://github.com/emilk/egui/blob/6f15dc0e16b26edce1fc2a05212eaf7e749c1d05/LICENSE-MIT"
+        }
+      ]
+    },
+    {
+      "package": "spirv",
+      "version": "0.4.0+sdk-1.4.341.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "Apache-2.0",
+      "vcs_revision": "8afc3d0ac8e158128cd1410bb2e4b4c26ab11bb4",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published crate omits the repository license; the Apache text is pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/rspirv/LICENSE-APACHE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source_url": "https://github.com/gfx-rs/rspirv/blob/8afc3d0ac8e158128cd1410bb2e4b4c26ab11bb4/LICENSE"
+        }
+      ]
+    },
+    {
+      "package": "hexf-parse",
+      "version": "0.2.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "CC0-1.0",
+      "vcs_revision": "4225763d744183d720f575ae96d04161b4d08ea0",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "Neither the published crate nor its recorded upstream revision contains license text. CC0-1.0 is retained from the pinned SPDX License List v3.28.0 canonical text; this exception must be re-reviewed on upgrade.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/spdx/CC0-1.0.txt",
+          "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+          "source_url": "https://github.com/spdx/license-list-data/blob/c4a7237ec8f4654e867546f9f409749300f1bf4c/text/CC0-1.0.txt"
+        }
+      ]
+    },
+    {
+      "package": "gpu-descriptor",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published workspace crate omits the repository COPYING and license directory, whose Apache file is only a short reference. Upstream notices are pinned to the Cargo VCS revision and the canonical full Apache-2.0 text to SPDX License List v3.28.0.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/gpu-descriptor/COPYING.txt",
+          "sha256": "f72143f7e9d9fb8bd336b139fa22f825a299591c29f2f7338c5566347b137613",
+          "source_url": "https://github.com/zakarumych/gpu-descriptor/blob/bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a/COPYING"
+        },
+        {
+          "path": "licenses/cargo-overrides/gpu-descriptor/LICENSE-APACHE.txt",
+          "sha256": "6bec8c944a6d4251be50ac86bb4ca360bcce5aea472505dee2800e160bf1cdbf",
+          "source_url": "https://github.com/zakarumych/gpu-descriptor/blob/bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a/license/APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/gpu-descriptor/LICENSE-MIT.txt",
+          "sha256": "5226e27d5fbc683db56c52853cdb9d15b69abadb525a60f95c862c2dbd77cdc8",
+          "source_url": "https://github.com/zakarumych/gpu-descriptor/blob/bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a/license/MIT"
+        },
+        {
+          "path": "licenses/cargo-overrides/spdx/Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+          "source_url": "https://github.com/spdx/license-list-data/blob/c4a7237ec8f4654e867546f9f409749300f1bf4c/text/Apache-2.0.txt"
+        }
+      ]
+    },
+    {
+      "package": "gpu-descriptor-types",
+      "version": "0.2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "9f2fb9546591322e7b77ee1e79385e01effd85e4",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published workspace crate omits the repository COPYING and license directory, whose Apache file is only a short reference. Upstream notices are pinned to the Cargo VCS revision and the canonical full Apache-2.0 text to SPDX License List v3.28.0.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/gpu-descriptor/COPYING.txt",
+          "sha256": "f72143f7e9d9fb8bd336b139fa22f825a299591c29f2f7338c5566347b137613",
+          "source_url": "https://github.com/zakarumych/gpu-descriptor/blob/9f2fb9546591322e7b77ee1e79385e01effd85e4/COPYING"
+        },
+        {
+          "path": "licenses/cargo-overrides/gpu-descriptor/LICENSE-APACHE.txt",
+          "sha256": "6bec8c944a6d4251be50ac86bb4ca360bcce5aea472505dee2800e160bf1cdbf",
+          "source_url": "https://github.com/zakarumych/gpu-descriptor/blob/9f2fb9546591322e7b77ee1e79385e01effd85e4/license/APACHE"
+        },
+        {
+          "path": "licenses/cargo-overrides/gpu-descriptor/LICENSE-MIT.txt",
+          "sha256": "5226e27d5fbc683db56c52853cdb9d15b69abadb525a60f95c862c2dbd77cdc8",
+          "source_url": "https://github.com/zakarumych/gpu-descriptor/blob/9f2fb9546591322e7b77ee1e79385e01effd85e4/license/MIT"
+        },
+        {
+          "path": "licenses/cargo-overrides/spdx/Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+          "source_url": "https://github.com/spdx/license-list-data/blob/c4a7237ec8f4654e867546f9f409749300f1bf4c/text/Apache-2.0.txt"
+        }
+      ]
+    },
+    {
+      "package": "harfrust",
+      "version": "0.7.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT",
+      "vcs_revision": "10b48dd84651c126e8f42457a8f400b38da347ea",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The published crate contains only an unresolved ../LICENSE pointer; the repository-root MIT text is pinned to the Cargo VCS revision.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/harfrust/LICENSE-MIT.txt",
+          "sha256": "3a7c3f0b887abb7c638faf022d29257418458614c6724b120ceeffb279f9c7d2",
+          "source_url": "https://github.com/harfbuzz/harfrust/blob/10b48dd84651c126e8f42457a8f400b38da347ea/LICENSE"
+        }
+      ]
+    },
+    {
+      "package": "siphasher",
+      "version": "1.0.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT/Apache-2.0",
+      "vcs_revision": "451f67d73a772cba325728109bbfa247750ed076",
+      "platforms": [
+        "debian",
+        "arch"
+      ],
+      "reason": "The published crate and Cargo VCS revision contain attribution and license references but omit both full texts. Canonical Apache-2.0 and MIT texts are pinned to SPDX License List v3.28.0; this exception must be re-reviewed on upgrade.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/spdx/Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+          "source_url": "https://github.com/spdx/license-list-data/blob/c4a7237ec8f4654e867546f9f409749300f1bf4c/text/Apache-2.0.txt"
+        },
+        {
+          "path": "licenses/cargo-overrides/spdx/MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+          "source_url": "https://github.com/spdx/license-list-data/blob/c4a7237ec8f4654e867546f9f409749300f1bf4c/text/MIT.txt"
+        }
+      ]
+    },
+    {
+      "package": "guillotiere",
+      "version": "0.7.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT/Apache-2.0",
+      "vcs_revision": "11f558ba8a2c80c23e6adb5934d73b352d81eee8",
+      "platforms": [
+        "windows",
+        "debian",
+        "arch"
+      ],
+      "reason": "The crate Apache file is an attribution and short license reference rather than the complete terms. The canonical full Apache-2.0 text is pinned to SPDX License List v3.28.0; the crate's MIT text remains retained directly.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/spdx/Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+          "source_url": "https://github.com/spdx/license-list-data/blob/c4a7237ec8f4654e867546f9f409749300f1bf4c/text/Apache-2.0.txt"
+        }
+      ]
+    },
+    {
+      "package": "shlex",
+      "version": "2.0.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "license_expression": "MIT OR Apache-2.0",
+      "vcs_revision": "e82b1411beb7c92871c2c078c9ab415bbcf207ef",
+      "platforms": [
+        "debian",
+        "arch"
+      ],
+      "reason": "The crate Apache file is an attribution and short license reference rather than the complete terms. The canonical full Apache-2.0 text is pinned to SPDX License List v3.28.0; the crate's MIT text remains retained directly.",
+      "documents": [
+        {
+          "path": "licenses/cargo-overrides/spdx/Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+          "source_url": "https://github.com/spdx/license-list-data/blob/c4a7237ec8f4654e867546f9f409749300f1bf4c/text/Apache-2.0.txt"
+        }
+      ]
+    }
+  ]
+}

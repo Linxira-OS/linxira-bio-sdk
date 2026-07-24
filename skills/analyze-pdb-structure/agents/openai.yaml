@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze PDB Structure"
+  short_description: "Summarize local PDB coordinates and AlphaFold pLDDT"
+  default_prompt: "Use $analyze-pdb-structure to validate and summarize this local PDB structure."

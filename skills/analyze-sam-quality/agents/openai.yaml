@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze SAM Quality"
+  short_description: "Run deterministic local SAM alignment QC"
+  default_prompt: "Use $analyze-sam-quality to validate and summarize this SAM alignment file."

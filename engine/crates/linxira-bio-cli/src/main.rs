@@ -1,13 +1,17 @@
 #![forbid(unsafe_code)]
 
+use linxira_bio_core::alignment::{SamQcMetrics, sam_qc_path};
 use linxira_bio_core::dataset::{DatasetInspection, DatasetSupport, inspect_dataset};
 use linxira_bio_core::environment::{
     EnvironmentAudit, EnvironmentMode, EnvironmentPlan, EnvironmentPlanOptions, PlanActionState,
     audit_environment, parse_environment_mode, plan_environment_with_options,
 };
+use linxira_bio_core::expression::{ExpressionMatrixQc, expression_matrix_qc_path};
 use linxira_bio_core::fastq::{FastqQcMetrics, FastqQcOptions, QualityEncodingMode, fastq_qc_path};
+use linxira_bio_core::interval::{IntervalIntersectStats, bed_intersect_path};
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
 use linxira_bio_core::sequence::{SequenceStats, fasta_stats_path};
+use linxira_bio_core::structure::{PdbStructureSummary, PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::variant::{VcfStats, vcf_stats_path};
 use linxira_bio_export::export_json_file;
 use linxira_bio_protocol::{AnalysisResult, ExecutionMode};
@@ -52,6 +56,14 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             print_environment_plan(arguments)
         }
         [fastq, qc, arguments @ ..] if fastq == "fastq" && qc == "qc" => print_fastq_qc(arguments),
+        [alignment, qc, path] if alignment == "alignment" && qc == "qc" => {
+            print_alignment_qc(path, false)
+        }
+        [alignment, qc, path, json]
+            if alignment == "alignment" && qc == "qc" && json == "--json" =>
+        {
+            print_alignment_qc(path, true)
+        }
         [runtime, catalog] if runtime == "runtime" && catalog == "catalog" => {
             print_runtime_catalog(false)
         }
@@ -91,6 +103,27 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if variant == "variant" && stats == "stats" && json == "--json" =>
         {
             print_variant_stats(path, true)
+        }
+        [interval, intersect, left, right]
+            if interval == "interval" && intersect == "intersect" =>
+        {
+            print_interval_intersect(left, right, false)
+        }
+        [interval, intersect, left, right, json]
+            if interval == "interval" && intersect == "intersect" && json == "--json" =>
+        {
+            print_interval_intersect(left, right, true)
+        }
+        [expression, matrix_qc, path] if expression == "expression" && matrix_qc == "matrix-qc" => {
+            print_expression_matrix_qc(path, false)
+        }
+        [expression, matrix_qc, path, json]
+            if expression == "expression" && matrix_qc == "matrix-qc" && json == "--json" =>
+        {
+            print_expression_matrix_qc(path, true)
+        }
+        [structure, pdb, arguments @ ..] if structure == "structure" && pdb == "pdb" => {
+            print_pdb_summary(arguments)
         }
         _ => Err(usage().into()),
     }
@@ -421,6 +454,128 @@ fn print_variant_stats_text(stats: &VcfStats) {
     }
 }
 
+fn print_alignment_qc(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let metrics = sam_qc_path(Path::new(path))?;
+    if json {
+        print_analysis_json("alignment-qc", "alignment.qc.v1", metrics)?;
+    } else {
+        print_alignment_qc_text(&metrics);
+    }
+    Ok(())
+}
+
+fn print_alignment_qc_text(metrics: &SamQcMetrics) {
+    println!("record_count\t{}", metrics.record_count);
+    println!("primary_record_count\t{}", metrics.primary_record_count);
+    println!("mapped_record_count\t{}", metrics.mapped_record_count);
+    println!("unmapped_record_count\t{}", metrics.unmapped_record_count);
+    if let Some(percent) = metrics.mapped_percent {
+        println!("mapped_percent\t{percent:.6}");
+    }
+    println!("duplicate_record_count\t{}", metrics.duplicate_record_count);
+    println!("zero_mapq_record_count\t{}", metrics.zero_mapq_record_count);
+    if let Some(mean) = metrics.mean_mapq {
+        println!("mean_mapq\t{mean:.6}");
+    }
+    for warning in &metrics.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_interval_intersect(left: &str, right: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let stats = bed_intersect_path(Path::new(left), Path::new(right))?;
+    if json {
+        print_analysis_json("interval-intersect", "interval.intersect.v1", stats)?;
+    } else {
+        print_interval_intersect_text(&stats);
+    }
+    Ok(())
+}
+
+fn print_interval_intersect_text(stats: &IntervalIntersectStats) {
+    println!("left_interval_count\t{}", stats.left_interval_count);
+    println!("right_interval_count\t{}", stats.right_interval_count);
+    println!("overlap_pair_count\t{}", stats.overlap_pair_count);
+    println!("left_overlapped_count\t{}", stats.left_overlapped_count);
+    println!("right_overlapped_count\t{}", stats.right_overlapped_count);
+    println!("total_overlap_bases\t{}", stats.total_overlap_bases);
+    for warning in &stats.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_expression_matrix_qc(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let metrics = expression_matrix_qc_path(Path::new(path))?;
+    if json {
+        print_analysis_json("expression-matrix-qc", "expression.matrix.qc.v1", metrics)?;
+    } else {
+        print_expression_matrix_qc_text(&metrics);
+    }
+    Ok(())
+}
+
+fn print_expression_matrix_qc_text(metrics: &ExpressionMatrixQc) {
+    println!("feature_count\t{}", metrics.feature_count);
+    println!("sample_count\t{}", metrics.sample_count);
+    println!("numeric_value_count\t{}", metrics.numeric_value_count);
+    println!("missing_value_count\t{}", metrics.missing_value_count);
+    println!("zero_value_count\t{}", metrics.zero_value_count);
+    println!("negative_value_count\t{}", metrics.negative_value_count);
+    if let Some(percent) = metrics.zero_percent {
+        println!("zero_percent\t{percent:.6}");
+    }
+    for warning in &metrics.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_pdb_summary(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut path = None;
+    let mut json = false;
+    let mut options = PdbSummaryOptions::default();
+    for argument in arguments {
+        match argument.as_str() {
+            "--json" => json = true,
+            "--alphafold-plddt" => options.interpret_b_factors_as_plddt = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown PDB summary option: {value}").into());
+            }
+            value if path.is_none() => path = Some(value),
+            value => return Err(format!("unexpected PDB summary argument: {value}").into()),
+        }
+    }
+    let path = path.ok_or("structure pdb requires an input path")?;
+    let summary = pdb_summary_path(Path::new(path), options)?;
+    if json {
+        let mut result = AnalysisResult::ok(
+            "structure-pdb-summary",
+            "structure.pdb.summary.v1",
+            summary.clone(),
+            ExecutionMode::LocalCpu,
+        );
+        result.warnings = summary.warnings;
+        println!("{}", serde_json::to_string(&result)?);
+    } else {
+        print_pdb_summary_text(&summary);
+    }
+    Ok(())
+}
+
+fn print_pdb_summary_text(summary: &PdbStructureSummary) {
+    println!("model_count\t{}", summary.model_count);
+    println!("chain_count\t{}", summary.chain_count);
+    println!("residue_count\t{}", summary.residue_count);
+    println!("atom_count\t{}", summary.atom_count);
+    println!("polymer_atom_count\t{}", summary.polymer_atom_count);
+    println!("hetero_atom_count\t{}", summary.hetero_atom_count);
+    if let Some(confidence) = &summary.alphafold_confidence {
+        println!("mean_plddt\t{:.6}", confidence.mean_plddt);
+    }
+    for warning in &summary.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
 fn print_dataset_inspection(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
     let inspection = inspect_dataset(Path::new(path))?;
     if json {
@@ -485,5 +640,5 @@ fn print_stats_json(stats: &SequenceStats) -> Result<(), Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n  linxira-bio runtime catalog [--json]\n  linxira-bio dataset inspect <input> [--json]\n  linxira-bio sequence stats <input.fasta[.gz]> [--json]\n  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n  linxira-bio variant stats <input.vcf[.gz]> [--json]\n  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
+    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n  linxira-bio runtime catalog [--json]\n  linxira-bio dataset inspect <input> [--json]\n  linxira-bio sequence stats <input.fasta[.gz]> [--json]\n  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n  linxira-bio alignment qc <input.sam[.gz]> [--json]\n  linxira-bio variant stats <input.vcf[.gz]> [--json]\n  linxira-bio interval intersect <left.bed[.gz]> <right.bed[.gz]> [--json]\n  linxira-bio expression matrix-qc <matrix.csv|tsv[.gz]> [--json]\n  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
 }

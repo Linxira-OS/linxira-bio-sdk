@@ -767,7 +767,8 @@ fn support_for(format: DatasetFormat) -> DatasetSupport {
         | DatasetFormat::Gff3
         | DatasetFormat::Gtf
         | DatasetFormat::Vcf
-        | DatasetFormat::Sam => DatasetSupport::Supported,
+        | DatasetFormat::Sam
+        | DatasetFormat::Pdb => DatasetSupport::Supported,
         DatasetFormat::Bam
         | DatasetFormat::Zip
         | DatasetFormat::Bcf
@@ -776,7 +777,6 @@ fn support_for(format: DatasetFormat) -> DatasetSupport {
         | DatasetFormat::Loom
         | DatasetFormat::Hdf5
         | DatasetFormat::Rds
-        | DatasetFormat::Pdb
         | DatasetFormat::Mmcif => DatasetSupport::RecognizedUnsupported,
         DatasetFormat::Unknown => DatasetSupport::Unknown,
     }
@@ -1775,19 +1775,22 @@ mod tests {
     }
 
     #[test]
-    fn recognizes_structural_text_formats_but_does_not_claim_import_support() {
-        for (name, expected) in [
-            ("structure.pdb", DatasetFormat::Pdb),
-            ("structure.cif", DatasetFormat::Mmcif),
-        ] {
-            let inspection = inspect_dataset(fixture(name)).expect("inspect structure fixture");
-            assert_eq!(inspection.format, expected);
-            assert_eq!(inspection.support, DatasetSupport::RecognizedUnsupported);
-            assert_eq!(
-                inspection.preview.expect("text preview").kind,
-                PreviewKind::Text
-            );
-        }
+    fn recognizes_structural_text_formats_with_precise_support() {
+        let pdb = inspect_dataset(fixture("structure.pdb")).expect("inspect PDB fixture");
+        assert_eq!(pdb.format, DatasetFormat::Pdb);
+        assert_eq!(pdb.support, DatasetSupport::Supported);
+        assert_eq!(
+            pdb.preview.expect("PDB text preview").kind,
+            PreviewKind::Text
+        );
+
+        let mmcif = inspect_dataset(fixture("structure.cif")).expect("inspect mmCIF fixture");
+        assert_eq!(mmcif.format, DatasetFormat::Mmcif);
+        assert_eq!(mmcif.support, DatasetSupport::RecognizedUnsupported);
+        assert_eq!(
+            mmcif.preview.expect("mmCIF text preview").kind,
+            PreviewKind::Text
+        );
     }
 
     #[test]

@@ -18,6 +18,9 @@ jobs:
           msystem: UCRT64
           update: true
           install: mingw-w64-ucrt-x86_64-gcc
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.4.3'
       - run: >-
           rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
           --component rustfmt --component clippy
@@ -41,6 +44,11 @@ jobs:
       - run: cargo +stable-x86_64-pc-windows-gnu test --locked --workspace
       - run: cargo +stable-x86_64-pc-windows-gnu run --locked -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
       - run: .\.venv-ci\Scripts\python.exe scripts/validate-repository.py
+      - run: .\.venv-ci\Scripts\python.exe -m unittest discover -s tests/python -p "test_*.py"
+      - run: .\.venv-ci\Scripts\python.exe -m unittest discover -s workflows/tests -p "test_*.py"
+      - run: .\.venv-ci\Scripts\python.exe -m unittest discover -s workflows/org.linxira.sequence-conversion-biopython/tests -p "test_*.py"
+      - name: Validate R workflow request layer
+        run: Rscript workflows/org.linxira.bulk-expression-deseq2/tests/test_validation.R
       - run: .\.venv-ci\Scripts\python.exe scripts/stage-release.py --check
       - run: cargo +stable-x86_64-pc-windows-gnu build --locked --release --workspace
       - name: Stage Windows release
@@ -57,7 +65,7 @@ jobs:
       - run: >-
           apt-get install -y build-essential curl git libgl1-mesa-dev libwayland-dev
           libx11-dev libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev
-          libxrandr-dev pkg-config python3 python3-venv
+          libxrandr-dev pkg-config python3 python3-venv r-base
       - uses: actions/checkout@v7
       - name: Install pinned CI Python dependencies
         run: |
@@ -72,6 +80,11 @@ jobs:
       - run: cargo run --locked -p linxira-bio-worker -- tests/fixtures/jobs/sequence-stats.json
       - run: cargo run --locked -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
       - run: .venv-ci/bin/python scripts/validate-repository.py
+      - run: .venv-ci/bin/python -m unittest discover -s tests/python -p "test_*.py"
+      - run: .venv-ci/bin/python -m unittest discover -s workflows/tests -p "test_*.py"
+      - run: .venv-ci/bin/python -m unittest discover -s workflows/org.linxira.sequence-conversion-biopython/tests -p "test_*.py"
+      - name: Validate R workflow request layer
+        run: Rscript workflows/org.linxira.bulk-expression-deseq2/tests/test_validation.R
       - run: .venv-ci/bin/python scripts/stage-release.py --check
       - run: cargo build --locked --release --workspace
       - name: Stage Debian release
@@ -86,7 +99,7 @@ jobs:
     steps:
       - run: >-
           pacman -Syu --noconfirm base-devel curl git libx11 libxcursor libxi
-          libxinerama libxkbcommon libxrandr mesa pkgconf python python-pip rustup
+          libxinerama libxkbcommon libxrandr mesa pkgconf python python-pip r rustup
           wayland
       - uses: actions/checkout@v7
       - name: Install pinned CI Python dependencies
@@ -100,6 +113,11 @@ jobs:
       - run: cargo test --locked --workspace
       - run: cargo run --locked -p linxira-bio-cli -- doctor --json
       - run: .venv-ci/bin/python scripts/validate-repository.py
+      - run: .venv-ci/bin/python -m unittest discover -s tests/python -p "test_*.py"
+      - run: .venv-ci/bin/python -m unittest discover -s workflows/tests -p "test_*.py"
+      - run: .venv-ci/bin/python -m unittest discover -s workflows/org.linxira.sequence-conversion-biopython/tests -p "test_*.py"
+      - name: Validate R workflow request layer
+        run: Rscript workflows/org.linxira.bulk-expression-deseq2/tests/test_validation.R
       - run: .venv-ci/bin/python scripts/stage-release.py --check
       - run: cargo build --locked --release --workspace
       - name: Stage Arch release
@@ -112,6 +130,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Install pinned notice validation dependencies
+        run: |
+          python -m venv .venv-ci
+          .venv-ci/bin/python -m pip install --disable-pip-version-check --requirement requirements-ci.txt
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
+      - run: cargo fetch --locked --target x86_64-pc-windows-gnu
+      - run: cargo fetch --locked --target x86_64-unknown-linux-gnu
+      - run: .venv-ci/bin/python scripts/generate_third_party_notices.py --check-config
+      - run: .venv-ci/bin/python -m unittest discover -s tests/python -p "test_*.py"
+      - run: >-
+          .venv-ci/bin/python scripts/generate_third_party_notices.py --offline
+          --platform windows --output build/notices/windows
+      - run: >-
+          .venv-ci/bin/python scripts/generate_third_party_notices.py --offline
+          --platform debian --output build/notices/debian
+      - run: >-
+          .venv-ci/bin/python scripts/generate_third_party_notices.py --offline
+          --platform arch --output build/notices/arch

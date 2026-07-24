@@ -1,12 +1,15 @@
 #![forbid(unsafe_code)]
 
+mod structure_viewer;
+mod visualization;
+
 use eframe::egui;
 use linxira_bio_export::export_value;
 use linxira_bio_protocol::{ExecutionMode, ExecutionRequest, JobRequest, SCHEMA_VERSION};
 use linxira_bio_worker::execute_request;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{
@@ -16,19 +19,22 @@ use std::sync::{
 };
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use structure_viewer::StructureViewer;
 
 fn main() -> eframe::Result {
+    let startup_paths = std::env::args_os().skip(1).map(PathBuf::from).collect();
     let options = eframe::NativeOptions {
         renderer: preferred_renderer(),
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1_280.0, 800.0])
-            .with_min_inner_size([900.0, 600.0]),
+            .with_inner_size([1_100.0, 700.0])
+            .with_min_inner_size([760.0, 500.0])
+            .with_maximized(true),
         ..Default::default()
     };
     eframe::run_native(
         "Linxira Bio SDK",
         options,
-        Box::new(|context| Ok(Box::new(BioApp::new(context)))),
+        Box::new(move |context| Ok(Box::new(BioApp::new(context, startup_paths)))),
     )
 }
 
@@ -48,8 +54,10 @@ fn preferred_renderer() -> eframe::Renderer {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Page {
     Workspace,
+    Structure,
     Environment,
     Documentation,
+    Licenses,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -72,6 +80,14 @@ enum DatasetState {
     Ready,
     Warning,
     Invalid,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ImportPathIssue {
+    DriveRelative,
+    Directory,
+    NonUtf8,
+    Unreadable,
 }
 
 impl DatasetState {
@@ -169,6 +185,32 @@ enum Language {
     EnUs,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LegalDocument {
+    ProjectLicense,
+    ThirdPartyPolicy,
+    RustDependencies,
+    FontLicense,
+}
+
+impl LegalDocument {
+    fn label(self, language: Language) -> &'static str {
+        match self {
+            Self::ProjectLicense => language.text("项目 AGPL", "Project AGPL"),
+            Self::ThirdPartyPolicy => language.text("第三方组件", "Third-party components"),
+            Self::RustDependencies => language.text("Rust 依赖", "Rust dependencies"),
+            Self::FontLicense => language.text("字体协议", "Font license"),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct DependencyNotices {
+    lines: Vec<String>,
+    directory: PathBuf,
+    package_count: usize,
+}
+
 impl Language {
     fn text(self, zh_cn: &'static str, en_us: &'static str) -> &'static str {
         match self {
@@ -221,7 +263,11 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "table.export.v1",
     "sequence.stats.v1",
     "fastq.qc.v1",
+    "alignment.qc.v1",
+    "interval.intersect.v1",
+    "expression.matrix.qc.v1",
     "variant.stats.v1",
+    "structure.pdb.summary.v1",
     "environment.audit.v1",
     "environment.plan.v1",
     "runtime.catalog.v1",
@@ -240,12 +286,14 @@ struct BioApp {
     import_status: String,
     datasets: Vec<DatasetEntry>,
     selected_dataset: Option<usize>,
+    secondary_dataset: Option<usize>,
     project_generation: u64,
     inspection_sender: Sender<InspectionMessage>,
     inspection_receiver: Receiver<InspectionMessage>,
     inspection_queue: VecDeque<InspectionTask>,
     active_inspections: usize,
     selected_capability: String,
+    interpret_pdb_b_factors_as_plddt: bool,
     job_history: Vec<JobRecord>,
     analysis_job_id: Option<String>,
     export_status: String,
@@ -261,10 +309,13 @@ struct BioApp {
     environment_mode: EnvironmentPlanMode,
     environment_project_root: String,
     document_capability: String,
+    structure_viewer: StructureViewer,
+    legal_document: LegalDocument,
+    dependency_notices: Result<DependencyNotices, String>,
 }
 
 impl BioApp {
-    fn new(context: &eframe::CreationContext<'_>) -> Self {
+    fn new(context: &eframe::CreationContext<'_>, startup_paths: Vec<PathBuf>) -> Self {
         configure_style(&context.egui_ctx);
         install_cjk_font(&context.egui_ctx);
         let (inspection_sender, inspection_receiver) = mpsc::channel();
@@ -279,12 +330,14 @@ impl BioApp {
             import_status: "等待导入本地数据。".to_owned(),
             datasets: Vec::new(),
             selected_dataset: None,
+            secondary_dataset: None,
             project_generation: 0,
             inspection_sender,
             inspection_receiver,
             inspection_queue: VecDeque::new(),
             active_inspections: 0,
             selected_capability: "sequence.stats.v1".to_owned(),
+            interpret_pdb_b_factors_as_plddt: false,
             job_history: Vec::new(),
             analysis_job_id: None,
             export_status: String::new(),
@@ -300,7 +353,11 @@ impl BioApp {
             environment_mode: EnvironmentPlanMode::ManagedUser,
             environment_project_root: String::new(),
             document_capability: "sequence.stats.v1".to_owned(),
+            structure_viewer: StructureViewer::default(),
+            legal_document: LegalDocument::ProjectLicense,
+            dependency_notices: load_packaged_dependency_notices(),
         };
+        app.queue_paths(startup_paths);
         app.start_environment_job(EnvironmentJob::Audit);
         app
     }
@@ -324,19 +381,19 @@ impl BioApp {
         }
     }
 
-    fn queue_path(&mut self, path: PathBuf) {
-        let path = fs::canonicalize(&path).unwrap_or(path);
-        if !path.is_file() {
-            self.import_status = match self.language {
-                Language::ZhCn => format!("无法导入：{} 不是可读取文件。", path.display()),
-                Language::EnUs => {
-                    format!("Cannot import: {} is not a readable file.", path.display())
-                }
-            };
-            return;
-        }
+    fn queue_path(&mut self, path: PathBuf) -> bool {
+        let path = match importable_file_path(path) {
+            Ok(path) => path,
+            Err((path, issue)) => {
+                self.import_status = import_path_error(&path, issue, self.language);
+                return false;
+            }
+        };
 
-        let normalized = path.to_string_lossy().into_owned();
+        let normalized = path
+            .to_str()
+            .expect("importable_file_path rejects non-UTF-8 paths")
+            .to_owned();
         if let Some(index) = self
             .datasets
             .iter()
@@ -351,7 +408,7 @@ impl BioApp {
                     "The file is already in this project.",
                 )
                 .to_owned();
-            return;
+            return true;
         }
 
         let dataset_id = new_dataset_id(self.datasets.len());
@@ -389,6 +446,7 @@ impl BioApp {
             path: normalized,
         });
         self.pump_inspection_queue();
+        true
     }
 
     fn pump_inspection_queue(&mut self) {
@@ -547,6 +605,7 @@ impl BioApp {
                 self.project_name = project.name;
                 self.datasets.clear();
                 self.selected_dataset = None;
+                self.secondary_dataset = None;
                 self.analysis_job_id = None;
                 self.analysis_receiver = None;
                 self.analysis_running = false;
@@ -610,7 +669,38 @@ impl BioApp {
         }
 
         let job_id = new_job_id();
-        let request = build_analysis_request(&job_id, route, &dataset_path);
+        let mut request = build_analysis_request(&job_id, route, &dataset_path);
+        let mut dataset_name = dataset_name;
+        if route.capability == "interval.intersect.v1" {
+            let Some(secondary_index) = self.secondary_dataset else {
+                return;
+            };
+            let Some(secondary) = self.datasets.get(secondary_index) else {
+                return;
+            };
+            let secondary_runnable = dataset_detected_format(secondary) == "bed"
+                && secondary
+                    .inspection
+                    .as_ref()
+                    .is_some_and(inspection_is_runnable)
+                && !matches!(
+                    secondary.state,
+                    DatasetState::Inspecting | DatasetState::Invalid
+                )
+                && secondary.path != dataset_path;
+            if !secondary_runnable {
+                return;
+            }
+            request
+                .inputs
+                .insert("right-bed".to_owned(), secondary.path.clone());
+            dataset_name = format!("{dataset_name} + {}", secondary.name);
+        }
+        if route.capability == "structure.pdb.summary.v1" {
+            request.parameters = serde_json::json!({
+                "interpret_b_factors_as_plddt": self.interpret_pdb_b_factors_as_plddt,
+            });
+        }
         let capability = route.capability.to_owned();
         let generation = self.project_generation;
         let (sender, receiver) = mpsc::channel();
@@ -872,6 +962,12 @@ impl BioApp {
         nav_button(
             ui,
             &mut self.page,
+            Page::Structure,
+            language.text("结构查看器", "Structure viewer"),
+        );
+        nav_button(
+            ui,
+            &mut self.page,
             Page::Environment,
             language.text("运行环境", "Environment"),
         );
@@ -880,6 +976,12 @@ impl BioApp {
             &mut self.page,
             Page::Documentation,
             language.text("离线文档", "Offline docs"),
+        );
+        nav_button(
+            ui,
+            &mut self.page,
+            Page::Licenses,
+            language.text("许可证", "Licenses"),
         );
 
         ui.add_space(18.0);
@@ -1097,7 +1199,8 @@ impl BioApp {
                                 "Bioinformatics",
                                 &[
                                     "fa", "fasta", "fna", "faa", "fq", "fastq", "csv", "tsv",
-                                    "bed", "gff", "gff3", "gtf", "vcf", "sam", "bam", "gz",
+                                    "bed", "gff", "gff3", "gtf", "vcf", "sam", "bam", "pdb", "cif",
+                                    "mmcif", "gz",
                                 ],
                             )
                             .pick_files()
@@ -1126,8 +1229,9 @@ impl BioApp {
         });
         if add_path {
             let path = PathBuf::from(self.import_path.trim());
-            self.queue_path(path);
-            self.import_path.clear();
+            if self.queue_path(path) {
+                self.import_path.clear();
+            }
         }
         ui.colored_label(egui::Color32::from_rgb(73, 88, 83), &self.import_status);
 
@@ -1145,14 +1249,14 @@ impl BioApp {
                     DatasetState::Ready.color(),
                     self.text("可检查", "Inspect now"),
                 );
-                ui.label("FASTA, FASTQ, CSV/TSV, BED, GFF3/GTF, VCF, SAM");
+                ui.label("FASTA, FASTQ, CSV/TSV, BED, GFF3/GTF, VCF, SAM, PDB");
                 ui.label(".gz / BGZF");
                 ui.end_row();
                 ui.colored_label(
                     DatasetState::Warning.color(),
                     self.text("识别但暂不分析", "Recognize only"),
                 );
-                ui.label("BAM, BCF, CRAM, HDF5/H5AD, LOOM, RDS, PDB/mmCIF");
+                ui.label("BAM, BCF, CRAM, HDF5/H5AD, LOOM, RDS, mmCIF");
                 ui.label(self.text("保持原文件", "Preserved"));
                 ui.end_row();
                 ui.colored_label(
@@ -1350,29 +1454,83 @@ impl BioApp {
             .selected_text(capability_title(&self.selected_capability, self.language))
             .width(360.0)
             .show_ui(ui, |ui| {
-                for capability in ["sequence.stats.v1", "fastq.qc.v1", "variant.stats.v1"] {
+                for capability in [
+                    "sequence.stats.v1",
+                    "fastq.qc.v1",
+                    "alignment.qc.v1",
+                    "variant.stats.v1",
+                    "interval.intersect.v1",
+                    "expression.matrix.qc.v1",
+                    "structure.pdb.summary.v1",
+                ] {
                     ui.selectable_value(
                         &mut self.selected_capability,
                         capability.to_owned(),
                         capability_title(capability, self.language),
                     );
                 }
-                ui.separator();
-                for capability in [
-                    "interval.intersect.v1",
-                    "alignment.qc.v1",
-                    "expression.matrix.qc.v1",
-                ] {
-                    ui.add_enabled(
-                        false,
-                        egui::Button::new(format!(
-                            "{}  [{}]",
-                            capability_title(capability, self.language),
-                            self.text("计划中", "planned")
-                        )),
-                    );
-                }
             });
+
+        let requires_secondary = self.selected_capability == "interval.intersect.v1";
+        let primary_index = self.selected_dataset;
+        let bed_candidates = self
+            .datasets
+            .iter()
+            .enumerate()
+            .filter(|(index, dataset)| {
+                Some(*index) != primary_index
+                    && dataset_detected_format(dataset) == "bed"
+                    && dataset
+                        .inspection
+                        .as_ref()
+                        .is_some_and(inspection_is_runnable)
+                    && !matches!(
+                        dataset.state,
+                        DatasetState::Inspecting | DatasetState::Invalid
+                    )
+            })
+            .map(|(index, dataset)| (index, dataset.name.clone()))
+            .collect::<Vec<_>>();
+        if requires_secondary
+            && !self
+                .secondary_dataset
+                .is_some_and(|selected| bed_candidates.iter().any(|(index, _)| *index == selected))
+        {
+            self.secondary_dataset = bed_candidates.first().map(|(index, _)| *index);
+        }
+        if requires_secondary {
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                ui.label(self.text("右侧 BED", "Right BED"));
+                egui::ComboBox::from_id_salt("secondary-bed-dataset")
+                    .selected_text(
+                        self.secondary_dataset
+                            .and_then(|selected| {
+                                bed_candidates
+                                    .iter()
+                                    .find(|(index, _)| *index == selected)
+                                    .map(|(_, name)| name.as_str())
+                            })
+                            .unwrap_or_else(|| self.text("没有其他 BED", "No other BED")),
+                    )
+                    .width(300.0)
+                    .show_ui(ui, |ui| {
+                        for (index, name) in &bed_candidates {
+                            ui.selectable_value(&mut self.secondary_dataset, Some(*index), name);
+                        }
+                    });
+            });
+        }
+        if self.selected_capability == "structure.pdb.summary.v1" {
+            ui.add_space(8.0);
+            ui.checkbox(
+                &mut self.interpret_pdb_b_factors_as_plddt,
+                self.language.text(
+                    "明确将 B-factor 解释为 AlphaFold pLDDT",
+                    "Explicitly interpret B-factor as AlphaFold pLDDT",
+                ),
+            );
+        }
 
         ui.add_space(10.0);
         egui::Grid::new("analysis-settings")
@@ -1390,12 +1548,19 @@ impl BioApp {
                 ui.end_row();
             });
 
-        if !dataset_ready || !capability_matches {
+        let secondary_ready = !requires_secondary || self.secondary_dataset.is_some();
+        if !dataset_ready || !capability_matches || !secondary_ready {
             ui.add_space(8.0);
             let message = if !dataset_ready {
                 self.text(
                     "只有检查通过的数据才能运行本地分析。",
                     "Local analysis requires a dataset that passed inspection.",
+                )
+                .to_owned()
+            } else if !secondary_ready {
+                self.text(
+                    "区间相交需要再导入一个检查通过的 BED 文件。",
+                    "Interval intersection requires another validated BED file.",
                 )
                 .to_owned()
             } else if let Some(route) = route {
@@ -1421,7 +1586,8 @@ impl BioApp {
             ui.colored_label(DatasetState::Warning.color(), message);
         }
         ui.add_space(12.0);
-        let can_run = dataset_ready && capability_matches && !self.analysis_running;
+        let can_run =
+            dataset_ready && capability_matches && secondary_ready && !self.analysis_running;
         if ui
             .add_enabled(
                 can_run,
@@ -1453,6 +1619,21 @@ impl BioApp {
         ui.add_space(12.0);
         section_title(ui, self.text("统计摘要", "Statistics summary"));
         render_metrics(ui, payload, self.language);
+
+        ui.add_space(14.0);
+        section_title(ui, self.text("图表预览", "Chart preview"));
+        let capability = result.get("capability").and_then(Value::as_str);
+        if !visualization::show_analysis_charts(
+            ui,
+            payload,
+            capability,
+            self.language == Language::ZhCn,
+        ) {
+            ui.small(self.text(
+                "当前结果没有可绘制的数值序列。",
+                "This result has no plottable numeric series.",
+            ));
+        }
 
         ui.add_space(14.0);
         section_title(ui, self.text("导出", "Export"));
@@ -1558,9 +1739,10 @@ impl BioApp {
 
     fn export_analysis(&mut self, result: &Value, format: ExportFormat) {
         let extension = format.extension();
+        let basename = analysis_export_basename(result);
         let Some(path) = rfd::FileDialog::new()
             .set_title(self.text("导出分析结果", "Export analysis result"))
-            .set_file_name(format!("sequence-statistics.{extension}"))
+            .set_file_name(format!("{basename}.{extension}"))
             .add_filter(format.label(), &[extension])
             .save_file()
         else {
@@ -1576,6 +1758,73 @@ impl BioApp {
                 Language::EnUs => format!("Export failed: {error}"),
             },
         };
+    }
+
+    fn show_structure_viewer(&mut self, ui: &mut egui::Ui) {
+        ui.heading(self.text("蛋白质结构查看器", "Protein structure viewer"));
+        ui.label(self.text(
+            "在本机解析并显示 PDB 或 mmCIF 坐标；文件不会上传。",
+            "Parse and display PDB or mmCIF coordinates locally; files are never uploaded.",
+        ));
+        ui.add_space(8.0);
+
+        let selected_structure = self.selected_dataset().and_then(|dataset| {
+            matches!(dataset.format_hint.as_str(), "pdb" | "mmcif")
+                .then(|| (dataset.name.clone(), PathBuf::from(&dataset.path)))
+        });
+        let mut selected_to_open = None;
+        let mut picked_to_open = None;
+        let mut snapshot_to_save = None;
+        let structure_loading = self.structure_viewer.is_loading();
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .add_enabled(
+                    !structure_loading,
+                    egui::Button::new(self.text("打开结构文件…", "Open structure file…")),
+                )
+                .clicked()
+            {
+                picked_to_open = rfd::FileDialog::new()
+                    .set_title(self.text("打开蛋白质结构", "Open protein structure"))
+                    .add_filter("Protein structure", &["pdb", "cif", "mmcif", "gz", "bgz"])
+                    .pick_file();
+            }
+            if let Some((name, path)) = &selected_structure
+                && ui
+                    .add_enabled(
+                        !structure_loading,
+                        egui::Button::new(match self.language {
+                            Language::ZhCn => format!("查看已选文件：{name}"),
+                            Language::EnUs => format!("View selected: {name}"),
+                        }),
+                    )
+                    .clicked()
+            {
+                selected_to_open = Some(path.clone());
+            }
+            if ui
+                .add_enabled(
+                    self.structure_viewer.has_model(),
+                    egui::Button::new(self.text("导出 PNG", "Export PNG")),
+                )
+                .clicked()
+            {
+                snapshot_to_save = rfd::FileDialog::new()
+                    .set_title(self.text("导出结构视图", "Export structure view"))
+                    .set_file_name(self.structure_viewer.suggested_snapshot_name())
+                    .add_filter("PNG image", &["png"])
+                    .save_file();
+            }
+        });
+        let zh_cn = self.language == Language::ZhCn;
+        if let Some(path) = picked_to_open.or(selected_to_open) {
+            self.structure_viewer.load_path(path, zh_cn);
+        }
+        if let Some(path) = snapshot_to_save {
+            self.structure_viewer.save_png(&path, zh_cn);
+        }
+        ui.add_space(6.0);
+        self.structure_viewer.show(ui, zh_cn);
     }
 
     fn show_environment(&mut self, ui: &mut egui::Ui) {
@@ -1739,6 +1988,70 @@ impl BioApp {
             );
         }
     }
+
+    fn show_licenses(&mut self, ui: &mut egui::Ui) {
+        ui.heading(self.text("许可证与第三方组件", "Licenses and third-party components"));
+        ui.label(self.text(
+            "以下文本属于当前安装包，可离线审查。",
+            "These texts belong to the current installation and are available offline.",
+        ));
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            for document in [
+                LegalDocument::ProjectLicense,
+                LegalDocument::ThirdPartyPolicy,
+                LegalDocument::RustDependencies,
+                LegalDocument::FontLicense,
+            ] {
+                ui.selectable_value(
+                    &mut self.legal_document,
+                    document,
+                    document.label(self.language),
+                );
+            }
+        });
+        ui.separator();
+
+        match self.legal_document {
+            LegalDocument::ProjectLicense => {
+                render_plain_document(ui, include_str!("../../../LICENSE"))
+            }
+            LegalDocument::ThirdPartyPolicy => {
+                render_markdown_document(ui, include_str!("../../../THIRD_PARTY.md"))
+            }
+            LegalDocument::FontLicense => {
+                render_plain_document(ui, include_str!("../../../licenses/NotoSansCJK-OFL.txt"))
+            }
+            LegalDocument::RustDependencies => match &self.dependency_notices {
+                Ok(notices) => {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(match self.language {
+                            Language::ZhCn => {
+                                format!("当前平台发行闭包：{} 个第三方包", notices.package_count)
+                            }
+                            Language::EnUs => format!(
+                                "Current platform release closure: {} third-party packages",
+                                notices.package_count
+                            ),
+                        });
+                        ui.monospace(notices.directory.display().to_string());
+                    });
+                    ui.add_space(6.0);
+                    render_dependency_notices(ui, &notices.lines);
+                }
+                Err(error) => {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(176, 104, 24),
+                        self.text(
+                            "开发构建旁未找到平台依赖 NOTICE；正式发行包会在 staging 时生成。",
+                            "No platform dependency NOTICE was found beside this development build; release staging generates it.",
+                        ),
+                    );
+                    ui.monospace(error);
+                }
+            },
+        }
+    }
 }
 
 impl eframe::App for BioApp {
@@ -1790,6 +2103,11 @@ impl eframe::App for BioApp {
                         egui::Layout::top_down(egui::Align::LEFT),
                         |ui| match self.page {
                             Page::Workspace => self.show_workspace(ui),
+                            Page::Structure => {
+                                egui::ScrollArea::vertical()
+                                    .auto_shrink([false, false])
+                                    .show(ui, |ui| self.show_structure_viewer(ui));
+                            }
                             Page::Environment => {
                                 egui::ScrollArea::vertical()
                                     .auto_shrink([false, false])
@@ -1799,6 +2117,11 @@ impl eframe::App for BioApp {
                                 egui::ScrollArea::vertical()
                                     .auto_shrink([false, false])
                                     .show(ui, |ui| self.show_documentation(ui));
+                            }
+                            Page::Licenses => {
+                                egui::ScrollArea::vertical()
+                                    .auto_shrink([false, false])
+                                    .show(ui, |ui| self.show_licenses(ui));
                             }
                         },
                     );
@@ -1818,9 +2141,25 @@ fn analysis_route_for_format(format: &str) -> Option<AnalysisRoute> {
             capability: "fastq.qc.v1",
             input_role: "fastq",
         }),
+        "sam" => Some(AnalysisRoute {
+            capability: "alignment.qc.v1",
+            input_role: "sam",
+        }),
+        "bed" => Some(AnalysisRoute {
+            capability: "interval.intersect.v1",
+            input_role: "left-bed",
+        }),
+        "csv" | "tsv" => Some(AnalysisRoute {
+            capability: "expression.matrix.qc.v1",
+            input_role: "matrix",
+        }),
         "vcf" => Some(AnalysisRoute {
             capability: "variant.stats.v1",
             input_role: "vcf",
+        }),
+        "pdb" => Some(AnalysisRoute {
+            capability: "structure.pdb.summary.v1",
+            input_role: "pdb",
         }),
         _ => None,
     }
@@ -2309,6 +2648,68 @@ fn format_bytes(bytes: u64) -> String {
     }
 }
 
+fn importable_file_path(path: PathBuf) -> Result<PathBuf, (PathBuf, ImportPathIssue)> {
+    let drive_relative = looks_like_drive_relative_path(&path);
+    let resolved = fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+    if resolved.is_file() {
+        if resolved.to_str().is_none() {
+            Err((resolved, ImportPathIssue::NonUtf8))
+        } else {
+            Ok(resolved)
+        }
+    } else if resolved.is_dir() {
+        Err((resolved, ImportPathIssue::Directory))
+    } else if drive_relative {
+        Err((path, ImportPathIssue::DriveRelative))
+    } else {
+        Err((path, ImportPathIssue::Unreadable))
+    }
+}
+
+fn looks_like_drive_relative_path(path: &Path) -> bool {
+    let value = path.as_os_str().to_string_lossy();
+    let bytes = value.as_bytes();
+    bytes.len() > 2
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && !matches!(bytes[2], b'\\' | b'/')
+}
+
+fn import_path_error(path: &Path, issue: ImportPathIssue, language: Language) -> String {
+    match (language, issue) {
+        (Language::ZhCn, ImportPathIssue::DriveRelative) => format!(
+            "无法导入：路径 {} 缺少盘符后的分隔符，或反斜杠已被 shell 转义。请使用“选择文件”，或用双引号包住完整 Windows 路径。",
+            path.display()
+        ),
+        (Language::EnUs, ImportPathIssue::DriveRelative) => format!(
+            "Cannot import: {} is missing the separator after its drive letter, or its backslashes were consumed by the shell. Use Choose files, or quote the complete Windows path.",
+            path.display()
+        ),
+        (Language::ZhCn, ImportPathIssue::Directory) => format!(
+            "无法导入：{} 是目录；请选择 tests\\fixtures 下的具体数据文件。",
+            path.display()
+        ),
+        (Language::EnUs, ImportPathIssue::Directory) => format!(
+            "Cannot import: {} is a directory; select a specific data file under tests\\fixtures.",
+            path.display()
+        ),
+        (Language::ZhCn, ImportPathIssue::NonUtf8) => format!(
+            "无法导入：路径 {} 不是有效的 UTF-8。当前项目和执行协议使用 JSON 路径；请先将文件重命名或移动到 UTF-8 路径。",
+            path.display()
+        ),
+        (Language::EnUs, ImportPathIssue::NonUtf8) => format!(
+            "Cannot import: {} is not valid UTF-8. Project files and the execution protocol use JSON paths; rename or move the file to a UTF-8 path first.",
+            path.display()
+        ),
+        (Language::ZhCn, ImportPathIssue::Unreadable) => {
+            format!("无法导入：{} 不是可读取文件。", path.display())
+        }
+        (Language::EnUs, ImportPathIssue::Unreadable) => {
+            format!("Cannot import: {} is not a readable file.", path.display())
+        }
+    }
+}
+
 fn format_hint(path: &Path) -> &'static str {
     let name = path
         .file_name()
@@ -2355,6 +2756,7 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "variant.stats.v1" => language.text("变异统计", "Variant statistics"),
         "alignment.qc.v1" => language.text("比对质量控制", "Alignment quality control"),
         "expression.matrix.qc.v1" => language.text("表达矩阵", "Expression matrix"),
+        "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
         _ => language.text("未知能力", "Unknown capability"),
     }
 }
@@ -2774,7 +3176,46 @@ fn metric_label(key: &str, language: Language) -> &str {
         "per_cycle" => "逐循环指标",
         "warnings" => "警告",
         "record_count" => "记录数",
+        "header_line_count" => "表头行数",
+        "primary_record_count" => "主要比对记录数",
+        "secondary_record_count" => "次要比对记录数",
+        "supplementary_record_count" => "补充比对记录数",
+        "mapped_record_count" => "已比对记录数",
+        "unmapped_record_count" => "未比对记录数",
+        "mapped_percent" => "比对百分比",
+        "paired_record_count" => "配对记录数",
+        "proper_pair_record_count" => "正确配对记录数",
+        "read1_record_count" => "Read 1 记录数",
+        "read2_record_count" => "Read 2 记录数",
+        "duplicate_record_count" => "重复记录数",
+        "qc_fail_record_count" => "QC 失败记录数",
+        "zero_mapq_record_count" => "零 MAPQ 记录数",
+        "mean_mapq" => "平均 MAPQ",
+        "reference_counts" => "各参考序列记录数",
         "sample_count" => "样本数",
+        "feature_count" => "特征数",
+        "total_value_count" => "总单元格数",
+        "numeric_value_count" => "数值单元格数",
+        "missing_value_count" => "缺失值数",
+        "zero_value_count" => "零值数",
+        "negative_value_count" => "负值数",
+        "zero_percent" => "零值百分比",
+        "duplicate_feature_id_count" => "重复特征标识数",
+        "samples" => "各样本指标",
+        "left_interval_count" => "左侧区间数",
+        "right_interval_count" => "右侧区间数",
+        "overlap_pair_count" => "重叠对数",
+        "left_overlapped_count" => "左侧已重叠区间数",
+        "right_overlapped_count" => "右侧已重叠区间数",
+        "total_overlap_bases" => "累计重叠碱基数",
+        "contigs" => "各区域统计",
+        "model_count" => "模型数",
+        "chain_count" => "链数",
+        "residue_count" => "残基数",
+        "atom_count" => "原子数",
+        "polymer_atom_count" => "聚合物原子数",
+        "hetero_atom_count" => "异质原子数",
+        "alphafold_confidence" => "AlphaFold 置信度",
         "pass_record_count" => "PASS 记录数",
         "filtered_record_count" => "过滤记录数",
         "snp_count" => "SNP 等位基因数",
@@ -2799,7 +3240,13 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "table.export.v1" => language.text("表格导出", "Table export"),
         "sequence.stats.v1" => language.text("FASTA 序列统计", "FASTA sequence statistics"),
         "fastq.qc.v1" => language.text("FASTQ 质量控制", "FASTQ quality control"),
+        "alignment.qc.v1" => language.text("SAM 比对质量控制", "SAM alignment quality control"),
+        "interval.intersect.v1" => language.text("BED 区间相交", "BED interval intersection"),
+        "expression.matrix.qc.v1" => {
+            language.text("表达矩阵质量控制", "Expression matrix quality control")
+        }
         "variant.stats.v1" => language.text("VCF 变异统计", "VCF variant statistics"),
+        "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
         "environment.audit.v1" => language.text("环境审计", "Environment audit"),
         "environment.plan.v1" => language.text("环境计划", "Environment plan"),
         "runtime.catalog.v1" => language.text("运行时目录", "Runtime catalog"),
@@ -2835,11 +3282,35 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         ("fastq.qc.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/fastq.qc.v1/en-US.md"
         )),
+        ("alignment.qc.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/alignment.qc.v1/zh-CN.md"
+        )),
+        ("alignment.qc.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/alignment.qc.v1/en-US.md"
+        )),
+        ("interval.intersect.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/interval.intersect.v1/zh-CN.md"
+        )),
+        ("interval.intersect.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/interval.intersect.v1/en-US.md"
+        )),
+        ("expression.matrix.qc.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/expression.matrix.qc.v1/zh-CN.md"
+        )),
+        ("expression.matrix.qc.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/expression.matrix.qc.v1/en-US.md"
+        )),
         ("variant.stats.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/variant.stats.v1/zh-CN.md"
         )),
         ("variant.stats.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/variant.stats.v1/en-US.md"
+        )),
+        ("structure.pdb.summary.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/structure.pdb.summary.v1/zh-CN.md"
+        )),
+        ("structure.pdb.summary.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/structure.pdb.summary.v1/en-US.md"
         )),
         ("environment.audit.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/environment.audit.v1/zh-CN.md"
@@ -2875,6 +3346,324 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
     }
 }
 
+fn analysis_export_basename(result: &Value) -> String {
+    const MAX_BASENAME_LENGTH: usize = 80;
+    let Some(capability) = result.get("capability").and_then(Value::as_str) else {
+        return "analysis-result".to_owned();
+    };
+    let mut basename = String::with_capacity(capability.len().min(MAX_BASENAME_LENGTH));
+    let mut separator_pending = false;
+    for byte in capability.bytes() {
+        if byte.is_ascii_alphanumeric() {
+            if separator_pending && !basename.is_empty() && basename.len() + 1 < MAX_BASENAME_LENGTH
+            {
+                basename.push('-');
+            }
+            separator_pending = false;
+            if basename.len() < MAX_BASENAME_LENGTH {
+                basename.push(char::from(byte.to_ascii_lowercase()));
+            }
+        } else if !basename.is_empty() {
+            separator_pending = true;
+        }
+    }
+    if basename.is_empty() {
+        return "analysis-result".to_owned();
+    }
+    if matches!(
+        basename.as_str(),
+        "con"
+            | "prn"
+            | "aux"
+            | "nul"
+            | "com1"
+            | "com2"
+            | "com3"
+            | "com4"
+            | "com5"
+            | "com6"
+            | "com7"
+            | "com8"
+            | "com9"
+            | "lpt1"
+            | "lpt2"
+            | "lpt3"
+            | "lpt4"
+            | "lpt5"
+            | "lpt6"
+            | "lpt7"
+            | "lpt8"
+            | "lpt9"
+    ) {
+        basename.insert_str(0, "analysis-");
+    }
+    basename
+}
+
+fn load_packaged_dependency_notices() -> Result<DependencyNotices, String> {
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("cannot locate the running executable: {error}"))?;
+    let directory = executable.parent().ok_or_else(|| {
+        format!(
+            "executable has no parent directory: {}",
+            executable.display()
+        )
+    })?;
+    load_dependency_notices_from(directory)
+}
+
+fn load_dependency_notices_from(directory: &Path) -> Result<DependencyNotices, String> {
+    const TEXT_NAME: &str = "THIRD_PARTY_DEPENDENCIES.txt";
+    const JSON_NAME: &str = "THIRD_PARTY_DEPENDENCIES.json";
+    let text_path = directory.join(TEXT_NAME);
+    let json_path = directory.join(JSON_NAME);
+    let text = fs::read_to_string(&text_path)
+        .map_err(|error| format!("{}: {error}", text_path.display()))?;
+    if text.trim().is_empty() {
+        return Err(format!("{} is empty", text_path.display()));
+    }
+    let report_text = fs::read_to_string(&json_path)
+        .map_err(|error| format!("{}: {error}", json_path.display()))?;
+    let report: Value = serde_json::from_str(&report_text)
+        .map_err(|error| format!("{}: {error}", json_path.display()))?;
+    if report.get("schema_version").and_then(Value::as_str) != Some("1") {
+        return Err(format!("{} has an unsupported schema", json_path.display()));
+    }
+    let platform = report_string(&report, "platform")
+        .map_err(|error| format!("{}: {error}", json_path.display()))?;
+    let target_triple = report_string(&report, "target_triple")
+        .map_err(|error| format!("{}: {error}", json_path.display()))?;
+    if !notice_platform_target_pair_is_valid(platform, target_triple) {
+        return Err(format!(
+            "{} has an invalid platform/target_triple pair: {platform}/{target_triple}",
+            json_path.display()
+        ));
+    }
+    if !notice_target_matches_current_build(platform, target_triple) {
+        return Err(format!(
+            "{} targets {platform}/{target_triple}, not this application build",
+            json_path.display()
+        ));
+    }
+    let package_count = report
+        .get("dependency_count")
+        .and_then(Value::as_u64)
+        .and_then(|count| usize::try_from(count).ok())
+        .ok_or_else(|| format!("{} lacks dependency_count", json_path.display()))?;
+    let dependency_count = report
+        .get("dependencies")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .ok_or_else(|| format!("{} lacks dependencies", json_path.display()))?;
+    if package_count != dependency_count {
+        return Err(format!(
+            "{} dependency_count does not match dependencies",
+            json_path.display()
+        ));
+    }
+    // The generator's text report is deterministic, so rebuilding it binds both staged files.
+    let expected_text = render_dependency_notice_report(&report)
+        .map_err(|error| format!("{}: {error}", json_path.display()))?;
+    if text != expected_text {
+        return Err(format!(
+            "{} does not match the report in {}",
+            text_path.display(),
+            json_path.display()
+        ));
+    }
+    let lines = text.lines().map(str::to_owned).collect::<Vec<_>>();
+    Ok(DependencyNotices {
+        lines,
+        directory: directory.to_owned(),
+        package_count,
+    })
+}
+
+fn notice_platform_target_pair_is_valid(platform: &str, target_triple: &str) -> bool {
+    matches!(
+        (platform, target_triple),
+        ("windows", "x86_64-pc-windows-gnu") | ("debian" | "arch", "x86_64-unknown-linux-gnu")
+    )
+}
+
+#[cfg(all(target_os = "windows", target_arch = "x86_64", target_env = "gnu"))]
+fn notice_target_matches_current_build(platform: &str, target_triple: &str) -> bool {
+    platform == "windows" && target_triple == "x86_64-pc-windows-gnu"
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu"))]
+fn notice_target_matches_current_build(platform: &str, target_triple: &str) -> bool {
+    matches!(platform, "debian" | "arch") && target_triple == "x86_64-unknown-linux-gnu"
+}
+
+#[cfg(not(any(
+    all(target_os = "windows", target_arch = "x86_64", target_env = "gnu"),
+    all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")
+)))]
+fn notice_target_matches_current_build(_platform: &str, _target_triple: &str) -> bool {
+    false
+}
+
+fn render_dependency_notice_report(report: &Value) -> Result<String, String> {
+    let platform = report_string(report, "platform")?;
+    let target_triple = report_string(report, "target_triple")?;
+    let cargo_version = report_string(report, "cargo_version")?;
+    let cargo_lock_sha256 = report_string(report, "cargo_lock_sha256")?;
+    let dependency_count = report
+        .get("dependency_count")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| "dependency notice report lacks dependency_count".to_owned())?;
+    let release_roots = report_array(report, "release_roots")?;
+    let dependencies = report_array(report, "dependencies")?;
+    let license_texts = report_array(report, "license_texts")?;
+    let mut lines = vec![
+        "Linxira Bio SDK Third-Party Cargo Dependency Notices".to_owned(),
+        "====================================================".to_owned(),
+        String::new(),
+        format!("Release platform: {platform}"),
+        format!("Rust target: {target_triple}"),
+        format!("Cargo: {cargo_version}"),
+        format!("Cargo.lock SHA-256: {cargo_lock_sha256}"),
+        format!("External dependency count: {dependency_count}"),
+        String::new(),
+        "This file is generated deterministically from the locked, target-filtered".to_owned(),
+        "Cargo release dependency graph. Project-owned code remains licensed under".to_owned(),
+        "AGPL-3.0-or-later. Third-party terms below are not replaced or relicensed.".to_owned(),
+        String::new(),
+        "Release roots".to_owned(),
+        "-------------".to_owned(),
+    ];
+    for root in release_roots {
+        lines.push(format!(
+            "- {} {}",
+            report_string(root, "name")?,
+            report_string(root, "version")?
+        ));
+    }
+    lines.extend([
+        String::new(),
+        "Dependencies".to_owned(),
+        "------------".to_owned(),
+    ]);
+
+    let mut users = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut sources = BTreeMap::<String, BTreeSet<String>>::new();
+    for dependency in dependencies {
+        let name = report_string(dependency, "name")?;
+        let version = report_string(dependency, "version")?;
+        let source = report_string(dependency, "source")?;
+        let expression = optional_report_string(dependency, "license_expression")?
+            .filter(|value| !value.is_empty())
+            .unwrap_or("license_file");
+        lines.push(format!("- {name} {version} [{expression}]"));
+        lines.push(format!("  Source: {source}"));
+        if let Some(repository) = optional_report_string(dependency, "repository")? {
+            lines.push(format!("  Repository: {repository}"));
+        }
+        if let Some(vcs) = dependency.get("vcs") {
+            lines.push(format!(
+                "  VCS revision: {}",
+                report_string(vcs, "revision")?
+            ));
+        }
+        if let Some(reason) = optional_report_string(dependency, "override_reason")? {
+            lines.push(format!("  Verified override: {reason}"));
+        }
+        if let Some(pointers) = optional_report_array(dependency, "replaced_package_pointers")? {
+            let pointers = pointers
+                .iter()
+                .map(|pointer| {
+                    pointer.as_str().ok_or_else(|| {
+                        "dependency notice report has a non-string replaced pointer".to_owned()
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            lines.push(format!(
+                "  Replaced package pointer(s): {}",
+                pointers.join(", ")
+            ));
+        }
+        let package_name = format!("{name} {version}");
+        for document in report_array(dependency, "documents")? {
+            let origin = report_string(document, "origin")?;
+            let path = report_string(document, "path")?;
+            let digest = report_string(document, "sha256")?;
+            lines.push(format!("  Notice: {origin}:{path} sha256:{digest}"));
+            users
+                .entry(digest.to_owned())
+                .or_default()
+                .insert(package_name.clone());
+            sources
+                .entry(digest.to_owned())
+                .or_default()
+                .insert(format!("{origin}:{path}"));
+        }
+    }
+
+    lines.extend([
+        String::new(),
+        "Retained license and notice texts".to_owned(),
+        "=================================".to_owned(),
+    ]);
+    for license_text in license_texts {
+        let digest = report_string(license_text, "sha256")?;
+        let retained_text = report_string(license_text, "text")?.trim_end_matches(['\r', '\n']);
+        let used_by = users
+            .get(digest)
+            .map(|items| items.iter().cloned().collect::<Vec<_>>().join(", "))
+            .unwrap_or_default();
+        let documents = sources
+            .get(digest)
+            .map(|items| items.iter().cloned().collect::<Vec<_>>().join(", "))
+            .unwrap_or_default();
+        lines.extend([
+            String::new(),
+            format!("SHA-256: {digest}"),
+            format!("Used by: {used_by}"),
+            format!("Documents: {documents}"),
+            "------------------------------------------------------------------------".to_owned(),
+            retained_text.to_owned(),
+            "------------------------------------------------------------------------".to_owned(),
+        ]);
+    }
+    Ok(lines.join("\n") + "\n")
+}
+
+fn report_string<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("dependency notice report lacks string field {key}"))
+}
+
+fn optional_report_string<'a>(value: &'a Value, key: &str) -> Result<Option<&'a str>, String> {
+    match value.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(item)) => Ok(Some(item)),
+        Some(_) => Err(format!(
+            "dependency notice report field {key} is not a string or null"
+        )),
+    }
+}
+
+fn report_array<'a>(value: &'a Value, key: &str) -> Result<&'a [Value], String> {
+    value
+        .get(key)
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .ok_or_else(|| format!("dependency notice report lacks array field {key}"))
+}
+
+fn optional_report_array<'a>(value: &'a Value, key: &str) -> Result<Option<&'a [Value]>, String> {
+    match value.get(key) {
+        None => Ok(None),
+        Some(Value::Array(items)) => Ok(Some(items.as_slice())),
+        Some(_) => Err(format!(
+            "dependency notice report field {key} is not an array"
+        )),
+    }
+}
+
 fn render_markdown_document(ui: &mut egui::Ui, document: &str) {
     let mut in_code_block = false;
     for line in document.lines() {
@@ -2895,6 +3684,32 @@ fn render_markdown_document(ui: &mut egui::Ui, document: &str) {
             ui.label(line);
         }
     }
+}
+
+fn render_plain_document(ui: &mut egui::Ui, document: &str) {
+    ui.add(
+        egui::Label::new(egui::RichText::new(document).monospace())
+            .wrap()
+            .selectable(true),
+    );
+}
+
+fn render_dependency_notices(ui: &mut egui::Ui, lines: &[String]) {
+    let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
+    egui::ScrollArea::both()
+        .id_salt("dependency-license-texts")
+        .max_height(620.0)
+        .auto_shrink([false, false])
+        .show_rows(ui, row_height, lines.len(), |ui, visible| {
+            for line in &lines[visible] {
+                let line = if line.is_empty() { " " } else { line };
+                ui.add(
+                    egui::Label::new(egui::RichText::new(line).monospace())
+                        .extend()
+                        .selectable(true),
+                );
+            }
+        });
 }
 
 fn install_cjk_font(context: &egui::Context) {
@@ -2932,13 +3747,58 @@ fn new_job_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        AnalysisRoute, DOCUMENTED_CAPABILITIES, DatasetState, Language, analysis_result_matches,
-        analysis_route_for_format, build_analysis_request, capability_document, generation_matches,
-        inspection_is_runnable, inspection_state, new_job_id,
+        AnalysisRoute, DOCUMENTED_CAPABILITIES, DatasetState, ImportPathIssue, Language,
+        analysis_export_basename, analysis_result_matches, analysis_route_for_format,
+        build_analysis_request, capability_document, generation_matches, importable_file_path,
+        inspection_is_runnable, inspection_state, load_dependency_notices_from,
+        looks_like_drive_relative_path, new_job_id, notice_platform_target_pair_is_valid,
+        render_dependency_notice_report,
     };
     use linxira_bio_protocol::ExecutionMode;
     use serde_json::json;
-    use std::collections::HashSet;
+    use std::{collections::HashSet, fs, path::PathBuf};
+
+    #[test]
+    fn detects_windows_paths_with_consumed_separators() {
+        assert!(looks_like_drive_relative_path(&PathBuf::from(
+            "C:UsersETPauDocumentsGITHUBbio-codingtestsfixtures"
+        )));
+        assert!(!looks_like_drive_relative_path(&PathBuf::from(
+            r"C:\Users\ETPau\Documents\GITHUB\bio-coding\tests\fixtures"
+        )));
+        assert!(!looks_like_drive_relative_path(&PathBuf::from(
+            "C:/Users/ETPau/Documents/GITHUB/bio-coding/tests/fixtures"
+        )));
+    }
+
+    #[test]
+    fn import_path_rejects_directories_separately_from_missing_files() {
+        let directory = std::env::temp_dir();
+        let (_, directory_issue) =
+            importable_file_path(directory).expect_err("directory must not import");
+        assert_eq!(directory_issue, ImportPathIssue::Directory);
+
+        let missing = std::env::temp_dir().join(format!("missing-{}", new_job_id()));
+        let (_, missing_issue) =
+            importable_file_path(missing).expect_err("missing path must not import");
+        assert_eq!(missing_issue, ImportPathIssue::Unreadable);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn import_path_rejects_non_utf8_before_the_json_boundary() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let mut name = format!("linxira-non-utf8-{}-", new_job_id()).into_bytes();
+        name.push(0xff);
+        let path = std::env::temp_dir().join(std::ffi::OsString::from_vec(name));
+        fs::write(&path, b"test").expect("write non-UTF-8 fixture");
+
+        let (_, issue) = importable_file_path(path.clone()).expect_err("path must be rejected");
+
+        assert_eq!(issue, ImportPathIssue::NonUtf8);
+        fs::remove_file(path).expect("remove non-UTF-8 fixture");
+    }
 
     #[test]
     fn supported_formats_route_to_their_native_capabilities() {
@@ -2961,6 +3821,34 @@ mod tests {
             Some(AnalysisRoute {
                 capability: "variant.stats.v1",
                 input_role: "vcf",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_format("sam"),
+            Some(AnalysisRoute {
+                capability: "alignment.qc.v1",
+                input_role: "sam",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_format("bed"),
+            Some(AnalysisRoute {
+                capability: "interval.intersect.v1",
+                input_role: "left-bed",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_format("tsv"),
+            Some(AnalysisRoute {
+                capability: "expression.matrix.qc.v1",
+                input_role: "matrix",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_format("pdb"),
+            Some(AnalysisRoute {
+                capability: "structure.pdb.summary.v1",
+                input_role: "pdb",
             })
         );
         assert_eq!(analysis_route_for_format("bam"), None);
@@ -3002,6 +3890,49 @@ mod tests {
             &result,
             "ui-job-other",
             "variant.stats.v1"
+        ));
+    }
+
+    #[test]
+    fn analysis_export_names_follow_and_sanitize_the_capability() {
+        assert_eq!(
+            analysis_export_basename(&json!({"capability": "sequence.stats.v1"})),
+            "sequence-stats-v1"
+        );
+        assert_eq!(
+            analysis_export_basename(&json!({
+                "capability": "../../Structure.PDB Summary.v1\\result"
+            })),
+            "structure-pdb-summary-v1-result"
+        );
+        assert_eq!(
+            analysis_export_basename(&json!({"capability": "CON"})),
+            "analysis-con"
+        );
+        assert_eq!(analysis_export_basename(&json!({})), "analysis-result");
+    }
+
+    #[test]
+    fn dependency_notice_platforms_map_to_their_release_targets() {
+        assert!(notice_platform_target_pair_is_valid(
+            "windows",
+            "x86_64-pc-windows-gnu"
+        ));
+        assert!(notice_platform_target_pair_is_valid(
+            "debian",
+            "x86_64-unknown-linux-gnu"
+        ));
+        assert!(notice_platform_target_pair_is_valid(
+            "arch",
+            "x86_64-unknown-linux-gnu"
+        ));
+        assert!(!notice_platform_target_pair_is_valid(
+            "windows",
+            "x86_64-unknown-linux-gnu"
+        ));
+        assert!(!notice_platform_target_pair_is_valid(
+            "debian",
+            "x86_64-pc-windows-gnu"
         ));
     }
 
@@ -3059,5 +3990,147 @@ mod tests {
 
         assert_eq!(inspection_state(&result), DatasetState::Warning);
         assert!(inspection_is_runnable(&result));
+    }
+
+    #[cfg(any(
+        all(target_os = "windows", target_arch = "x86_64", target_env = "gnu"),
+        all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")
+    ))]
+    #[test]
+    fn loads_a_matching_packaged_dependency_notice_pair() {
+        let root = notice_test_directory();
+        fs::create_dir_all(&root).expect("notice directory");
+        let (platform, target_triple) = current_notice_identity();
+        let report = sample_notice_report(platform, target_triple);
+        let text = render_dependency_notice_report(&report).expect("render notice report");
+        fs::write(root.join("THIRD_PARTY_DEPENDENCIES.txt"), text).expect("text notice");
+        fs::write(
+            root.join("THIRD_PARTY_DEPENDENCIES.json"),
+            serde_json::to_vec(&report).expect("JSON notice"),
+        )
+        .expect("write JSON notice");
+
+        let notices = load_dependency_notices_from(&root).expect("notice pair");
+
+        assert_eq!(notices.package_count, 1);
+        assert!(
+            notices
+                .lines
+                .iter()
+                .any(|line| line.contains("Third-Party Cargo Dependency Notices"))
+        );
+        fs::remove_dir_all(root).expect("remove notice directory");
+    }
+
+    #[cfg(any(
+        all(target_os = "windows", target_arch = "x86_64", target_env = "gnu"),
+        all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")
+    ))]
+    #[test]
+    fn rejects_dependency_notice_text_from_a_different_report() {
+        let root = notice_test_directory();
+        fs::create_dir_all(&root).expect("notice directory");
+        let (platform, target_triple) = current_notice_identity();
+        let mut report = sample_notice_report(platform, target_triple);
+        let text = render_dependency_notice_report(&report).expect("render notice report");
+        report["cargo_version"] = json!("cargo 9.99.0 (different report)");
+        fs::write(root.join("THIRD_PARTY_DEPENDENCIES.txt"), text).expect("text notice");
+        fs::write(
+            root.join("THIRD_PARTY_DEPENDENCIES.json"),
+            serde_json::to_vec(&report).expect("JSON notice"),
+        )
+        .expect("write JSON notice");
+
+        let error = load_dependency_notices_from(&root).expect_err("unbound pair must fail");
+
+        assert!(error.contains("does not match the report"));
+        fs::remove_dir_all(root).expect("remove notice directory");
+    }
+
+    #[cfg(any(
+        all(target_os = "windows", target_arch = "x86_64", target_env = "gnu"),
+        all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")
+    ))]
+    #[test]
+    fn rejects_dependency_notice_for_another_build_target() {
+        let root = notice_test_directory();
+        fs::create_dir_all(&root).expect("notice directory");
+        let (platform, target_triple) = if cfg!(target_os = "windows") {
+            ("debian", "x86_64-unknown-linux-gnu")
+        } else {
+            ("windows", "x86_64-pc-windows-gnu")
+        };
+        let report = sample_notice_report(platform, target_triple);
+        let text = render_dependency_notice_report(&report).expect("render notice report");
+        fs::write(root.join("THIRD_PARTY_DEPENDENCIES.txt"), text).expect("text notice");
+        fs::write(
+            root.join("THIRD_PARTY_DEPENDENCIES.json"),
+            serde_json::to_vec(&report).expect("JSON notice"),
+        )
+        .expect("write JSON notice");
+
+        let error = load_dependency_notices_from(&root).expect_err("wrong target must fail");
+
+        assert!(error.contains("not this application build"));
+        fs::remove_dir_all(root).expect("remove notice directory");
+    }
+
+    #[cfg(any(
+        all(target_os = "windows", target_arch = "x86_64", target_env = "gnu"),
+        all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")
+    ))]
+    fn notice_test_directory() -> PathBuf {
+        std::env::temp_dir().join(format!("linxira-bio-ui-notices-{}", new_job_id()))
+    }
+
+    #[cfg(all(target_os = "windows", target_arch = "x86_64", target_env = "gnu"))]
+    fn current_notice_identity() -> (&'static str, &'static str) {
+        ("windows", "x86_64-pc-windows-gnu")
+    }
+
+    #[cfg(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu"))]
+    fn current_notice_identity() -> (&'static str, &'static str) {
+        ("debian", "x86_64-unknown-linux-gnu")
+    }
+
+    #[cfg(any(
+        all(target_os = "windows", target_arch = "x86_64", target_env = "gnu"),
+        all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")
+    ))]
+    fn sample_notice_report(platform: &str, target_triple: &str) -> serde_json::Value {
+        json!({
+            "$schema": "https://linxira.org/schemas/bio/third-party-dependencies.v1.json",
+            "schema_version": "1",
+            "generator_version": "1",
+            "cargo_version": "cargo 1.92.0 (000000000 2026-01-01)",
+            "platform": platform,
+            "target_triple": target_triple,
+            "cargo_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "override_manifest_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "release_roots": [{"name": "linxira-bio-ui", "version": "0.1.0"}],
+            "dependency_count": 1,
+            "dependencies": [{
+                "name": "example",
+                "version": "1.0.0",
+                "source": "registry+https://github.com/rust-lang/crates.io-index",
+                "repository": "https://example.invalid/example",
+                "license_expression": "MIT",
+                "active_features": ["default"],
+                "documents": [{
+                    "origin": "crate-package",
+                    "path": "LICENSE-MIT",
+                    "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                    "source_url": "https://crates.io/crates/example/1.0.0"
+                }],
+                "vcs": {
+                    "revision": "3333333333333333333333333333333333333333",
+                    "path": "crates/example"
+                }
+            }],
+            "license_texts": [{
+                "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "text": "Example license text\n"
+            }]
+        })
     }
 }

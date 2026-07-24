@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/alignment-qc.v1.json",
+  "title": "Linxira Bio SAM alignment QC result",
+  "type": "object",
+  "required": [
+    "header_line_count", "record_count", "primary_record_count",
+    "secondary_record_count", "supplementary_record_count",
+    "mapped_record_count", "unmapped_record_count", "mapped_percent",
+    "paired_record_count", "proper_pair_record_count", "read1_record_count",
+    "read2_record_count", "duplicate_record_count", "qc_fail_record_count",
+    "zero_mapq_record_count", "mean_mapq", "reference_counts", "warnings"
+  ],
+  "properties": {
+    "header_line_count": { "$ref": "#/$defs/count" },
+    "record_count": { "$ref": "#/$defs/count" },
+    "primary_record_count": { "$ref": "#/$defs/count" },
+    "secondary_record_count": { "$ref": "#/$defs/count" },
+    "supplementary_record_count": { "$ref": "#/$defs/count" },
+    "mapped_record_count": { "$ref": "#/$defs/count" },
+    "unmapped_record_count": { "$ref": "#/$defs/count" },
+    "mapped_percent": { "$ref": "#/$defs/optionalPercent" },
+    "paired_record_count": { "$ref": "#/$defs/count" },
+    "proper_pair_record_count": { "$ref": "#/$defs/count" },
+    "read1_record_count": { "$ref": "#/$defs/count" },
+    "read2_record_count": { "$ref": "#/$defs/count" },
+    "duplicate_record_count": { "$ref": "#/$defs/count" },
+    "qc_fail_record_count": { "$ref": "#/$defs/count" },
+    "zero_mapq_record_count": { "$ref": "#/$defs/count" },
+    "mean_mapq": {
+      "oneOf": [
+        { "type": "number", "minimum": 0, "maximum": 255 },
+        { "type": "null" }
+      ]
+    },
+    "reference_counts": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/count" }
+    },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "count": { "type": "integer", "minimum": 0 },
+    "optionalPercent": {
+      "oneOf": [
+        { "type": "number", "minimum": 0, "maximum": 100 },
+        { "type": "null" }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

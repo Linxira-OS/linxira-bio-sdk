@@ -1,0 +1,42 @@
+{
+  "$schema": "https://linxira.org/schemas/bio/third-party-dependencies.v1.json",
+  "schema_version": "1",
+  "generator_version": "1",
+  "cargo_version": "cargo 1.92.0 (000000000 2026-01-01)",
+  "platform": "windows",
+  "target_triple": "x86_64-pc-windows-gnu",
+  "cargo_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "override_manifest_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "release_roots": [
+    { "name": "linxira-bio-ui", "version": "0.1.0" }
+  ],
+  "dependency_count": 1,
+  "dependencies": [
+    {
+      "name": "example",
+      "version": "1.0.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://example.invalid/example",
+      "license_expression": "MIT",
+      "active_features": ["default"],
+      "documents": [
+        {
+          "origin": "crate-package",
+          "path": "LICENSE-MIT",
+          "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "source_url": "https://crates.io/crates/example/1.0.0"
+        }
+      ],
+      "vcs": {
+        "revision": "3333333333333333333333333333333333333333",
+        "path": "crates/example"
+      }
+    }
+  ],
+  "license_texts": [
+    {
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "text": "Example license text\n"
+    }
+  ]
+}

@@ -131,6 +131,24 @@ fn reports_variant_statistics_as_json() {
 }
 
 #[test]
+fn reports_render_ready_pdb_summary_as_json() {
+    let fixture = workspace_root().join("tests/fixtures/structure-pdb-summary/alphafold-style.pdb");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["structure", "pdb"])
+        .arg(fixture)
+        .args(["--alphafold-plddt", "--json"])
+        .output()
+        .expect("run PDB summary");
+
+    assert!(output.status.success());
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    assert_eq!(result["capability"], "structure.pdb.summary.v1");
+    assert_eq!(result["result"]["atom_count"], 4);
+    assert_eq!(result["result"]["atoms"][0]["position"]["x"], 11.104);
+    assert_eq!(result["result"]["alphafold_confidence"]["mean_plddt"], 70.0);
+}
+
+#[test]
 fn audits_registered_environment_tools_as_json() {
     let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
         .args(["environment", "audit", "--json"])
@@ -260,6 +278,62 @@ fn preserves_doctor_v1_json_shape() {
     assert_eq!(doctor["product"], "linxira-bio-sdk");
     assert!(doctor.get("capability").is_none());
     assert!(doctor["tools"].is_array());
+}
+
+#[test]
+fn summarizes_sam_alignment_quality_as_json() {
+    let input = workspace_root().join("tests/fixtures/alignment-qc/valid.sam");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["alignment", "qc"])
+        .arg(input)
+        .arg("--json")
+        .output()
+        .expect("run alignment QC");
+
+    assert!(output.status.success());
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid alignment result");
+    assert_eq!(result["capability"], "alignment.qc.v1");
+    assert_eq!(result["result"]["record_count"], 5);
+    assert_eq!(result["result"]["mapped_record_count"], 4);
+}
+
+#[test]
+fn intersects_bed_intervals_as_json() {
+    let root = workspace_root();
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["interval", "intersect"])
+        .arg(root.join("tests/fixtures/interval-intersect/left.bed"))
+        .arg(root.join("tests/fixtures/interval-intersect/right.bed"))
+        .arg("--json")
+        .output()
+        .expect("run BED intersection");
+
+    assert!(output.status.success());
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid intersection result");
+    assert_eq!(result["capability"], "interval.intersect.v1");
+    assert_eq!(result["result"]["overlap_pair_count"], 3);
+    assert_eq!(result["result"]["total_overlap_bases"], 12);
+}
+
+#[test]
+fn summarizes_expression_matrix_as_json() {
+    let input = workspace_root().join("tests/fixtures/expression-matrix/counts.tsv");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["expression", "matrix-qc"])
+        .arg(input)
+        .arg("--json")
+        .output()
+        .expect("run expression matrix QC");
+
+    assert!(output.status.success());
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid expression result");
+    assert_eq!(result["capability"], "expression.matrix.qc.v1");
+    assert_eq!(result["result"]["feature_count"], 4);
+    assert_eq!(result["result"]["sample_count"], 3);
+    assert_eq!(result["result"]["missing_value_count"], 1);
 }
 
 fn workspace_root() -> PathBuf {

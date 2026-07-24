@@ -1,0 +1,72 @@
+{
+  "schema_version": "1",
+  "id": "org.linxira.bulk-expression-deseq2",
+  "version": "0.1.0",
+  "publisher": {
+    "name": "Linxira OS",
+    "url": "https://github.com/Linxira-OS"
+  },
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
+  "entrypoint": {
+    "path": "src/run_deseq2.R",
+    "arguments": ["--request", "{request}", "--result", "{result}"]
+  },
+  "runtime": {
+    "kind": "r",
+    "version": "4.4.3",
+    "dependency_lock": {
+      "path": "dependencies.lock.json",
+      "sha256": "280a01c859ab60b30bf8ebf66403ae77734c6a18ed34c25bb8ee7e8975c32918"
+    }
+  },
+  "input_schema": {
+    "type": "object",
+    "$ref": "schemas/input.schema.json"
+  },
+  "output_schema": {
+    "type": "object",
+    "$ref": "schemas/output.schema.json"
+  },
+  "platforms": ["windows-gnu", "debian", "arch"],
+  "network": {
+    "access": "none",
+    "allowed_hosts": []
+  },
+  "resources": {
+    "minimum_memory_mb": 2048,
+    "minimum_disk_mb": 4096,
+    "recommended_threads": 1,
+    "gpu": "none"
+  },
+  "files": [
+    {
+      "path": "NOTICE.md",
+      "sha256": "20386d9ee50ba0c73a333636774455f0805bf6ff3eb04fee82b25d287bc848a0"
+    },
+    {
+      "path": "README.md",
+      "sha256": "d35c698486cf69898de3a42b18b90956cb1bd06620fcfec1a37eae19c39e7de7"
+    },
+    {
+      "path": "dependencies.lock.json",
+      "sha256": "280a01c859ab60b30bf8ebf66403ae77734c6a18ed34c25bb8ee7e8975c32918"
+    },
+    {
+      "path": "schemas/input.schema.json",
+      "sha256": "c923df3689d9ade6f9b7a790ba977ed12d00eccb87e127c78b8d639b18207139"
+    },
+    {
+      "path": "schemas/output.schema.json",
+      "sha256": "2efdb7e9403df1e0e9ebb1bd1acaf8a70903ef36be310d937290e06de4a66376"
+    },
+    {
+      "path": "src/run_deseq2.R",
+      "sha256": "5749f6380fecfbd2fda31a9b50306790338006d61187084f079edbae553d5652"
+    },
+    {
+      "path": "tests/test_validation.R",
+      "sha256": "8f6068a4ea60528285fc072596249a3eed754f5a08a7b02503fd0eee1305417a"
+    }
+  ]
+}

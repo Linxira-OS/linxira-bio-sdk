@@ -1,0 +1,33 @@
+{
+  "schema_version": "1",
+  "runtime": {
+    "name": "R",
+    "version": "4.4.3",
+    "bioconductor_release": "3.20"
+  },
+  "repositories": [
+    "https://bioconductor.org/packages/3.20/bioc",
+    "https://cloud.r-project.org"
+  ],
+  "packages": [
+    {
+      "name": "DESeq2",
+      "version": "1.46.0",
+      "source": "https://bioconductor.org/packages/3.20/bioc/src/contrib/DESeq2_1.46.0.tar.gz"
+    },
+    {
+      "name": "jsonlite",
+      "version": "1.8.9",
+      "source": "https://cloud.r-project.org/src/contrib/Archive/jsonlite/jsonlite_1.8.9.tar.gz"
+    },
+    {
+      "name": "digest",
+      "version": "0.6.37",
+      "source": "https://cloud.r-project.org/src/contrib/Archive/digest/digest_0.6.37.tar.gz"
+    }
+  ],
+  "lock_completeness": "direct-dependencies-only",
+  "execution_policy": "reject-runtime-and-declared-package-version-drift",
+  "installable": false,
+  "install_blocker": "A signed resolver must add exact versions and source checksums for the complete transitive Bioconductor dependency graph."
+}

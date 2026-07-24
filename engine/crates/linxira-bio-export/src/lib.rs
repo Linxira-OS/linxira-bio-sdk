@@ -222,6 +222,25 @@ pub fn export_value(value: &Value, output: &Path) -> ExportResult<ExportReceipt>
     })
 }
 
+/// Atomically writes an opaque artifact next to its final destination.
+///
+/// Renderers and workflow adapters use this for non-tabular outputs such as
+/// PNG previews while retaining the same no-partial-output guarantee as table
+/// exports.
+pub fn write_atomic_bytes(output: &Path, bytes: &[u8]) -> ExportResult<u64> {
+    let output_directory = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let mut temporary = NamedTempFile::new_in(output_directory)?;
+    temporary.write_all(bytes)?;
+    temporary.flush()?;
+    let persisted = temporary
+        .persist(output)
+        .map_err(|error| ExportError::Io(error.error))?;
+    Ok(persisted.metadata()?.len())
+}
+
 fn write_jsonl<W: Write>(value: &Value, output: W) -> ExportResult<()> {
     let value = value.get("result").unwrap_or(value);
     let objects = match value {
@@ -360,7 +379,9 @@ fn cell_text(value: &Value) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{ExportFormat, Table, XlsxNumericCell, export_value, xlsx_numeric_cell};
+    use super::{
+        ExportFormat, Table, XlsxNumericCell, export_value, write_atomic_bytes, xlsx_numeric_cell,
+    };
     use serde_json::json;
     use std::fs;
     use std::path::Path;
@@ -566,5 +587,21 @@ mod tests {
                 .expect("replacement is valid JSON");
         assert_eq!(exported, json!({"status": "fresh"}));
         fs::remove_file(output).expect("remove replaced output");
+    }
+
+    #[test]
+    fn opaque_artifacts_atomically_replace_existing_outputs() {
+        let output = std::env::temp_dir().join(format!(
+            "linxira-bio-export-existing-artifact-{}.bin",
+            std::process::id()
+        ));
+        fs::write(&output, b"stale").expect("write stale artifact");
+
+        let size = write_atomic_bytes(&output, b"fresh artifact")
+            .expect("opaque artifact replacement succeeds");
+
+        assert_eq!(size, 14);
+        assert_eq!(fs::read(&output).expect("read artifact"), b"fresh artifact");
+        fs::remove_file(output).expect("remove artifact");
     }
 }

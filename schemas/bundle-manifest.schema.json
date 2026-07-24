@@ -4,7 +4,8 @@
   "title": "Linxira Bio release bundle manifest",
   "type": "object",
   "required": [
-    "schema_version", "artifact_root", "include_files", "include_trees", "binaries"
+    "schema_version", "artifact_root", "include_files", "include_trees", "binaries",
+    "dependency_notices"
   ],
   "properties": {
     "schema_version": { "const": "1" },
@@ -26,6 +27,39 @@
         "windows": { "$ref": "#/$defs/binaryList" },
         "debian": { "$ref": "#/$defs/binaryList" },
         "arch": { "$ref": "#/$defs/binaryList" }
+      },
+      "additionalProperties": false
+    },
+    "dependency_notices": {
+      "type": "object",
+      "required": ["roots", "targets", "overrides", "outputs"],
+      "properties": {
+        "roots": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "targets": {
+          "type": "object",
+          "required": ["windows", "debian", "arch"],
+          "properties": {
+            "windows": { "const": "x86_64-pc-windows-gnu" },
+            "debian": { "const": "x86_64-unknown-linux-gnu" },
+            "arch": { "const": "x86_64-unknown-linux-gnu" }
+          },
+          "additionalProperties": false
+        },
+        "overrides": { "const": "licenses/cargo-overrides.json" },
+        "outputs": {
+          "type": "object",
+          "required": ["json", "text"],
+          "properties": {
+            "json": { "const": "THIRD_PARTY_DEPENDENCIES.json" },
+            "text": { "const": "THIRD_PARTY_DEPENDENCIES.txt" }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     }

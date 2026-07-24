@@ -51,10 +51,10 @@
       "default_execution": "local-cpu",
       "command": "linxira-bio dataset inspect <input> --json",
       "input_formats": [
-        "fasta", "fastq", "csv", "tsv", "bed", "gff3", "gtf", "vcf", "sam"
+        "fasta", "fastq", "csv", "tsv", "bed", "gff3", "gtf", "vcf", "sam", "pdb"
       ],
       "recognized_formats": [
-        "bam", "zip", "bcf", "cram", "h5ad", "loom", "hdf5", "rds", "pdb", "mmcif"
+        "bam", "zip", "bcf", "cram", "h5ad", "loom", "hdf5", "rds", "mmcif"
       ],
       "output_formats": ["json"]
     },
@@ -92,15 +92,22 @@
     },
     {
       "id": "interval.intersect.v1",
-      "status": "planned",
+      "status": "available",
       "category": "genome-intervals",
-      "default_execution": "local-cpu"
+      "default_execution": "local-cpu",
+      "command": "linxira-bio interval intersect <left.bed> <right.bed> --json",
+      "input_formats": ["bed"],
+      "output_formats": ["json"]
     },
     {
       "id": "alignment.qc.v1",
-      "status": "planned",
+      "status": "available",
       "category": "alignment-files",
-      "default_execution": "local-cpu"
+      "default_execution": "local-cpu",
+      "command": "linxira-bio alignment qc <input.sam> --json",
+      "input_formats": ["sam"],
+      "recognized_formats": ["bam", "cram"],
+      "output_formats": ["json"]
     },
     {
       "id": "variant.stats.v1",
@@ -109,6 +116,15 @@
       "default_execution": "local-cpu",
       "command": "linxira-bio variant stats <input.vcf> --json",
       "input_formats": ["vcf"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "structure.pdb.summary.v1",
+      "status": "available",
+      "category": "structural-biology",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio structure pdb <input.pdb> --json",
+      "input_formats": ["pdb"],
       "output_formats": ["json"]
     },
     {
@@ -125,9 +141,12 @@
     },
     {
       "id": "expression.matrix.qc.v1",
-      "status": "planned",
+      "status": "available",
       "category": "expression",
-      "default_execution": "local-cpu"
+      "default_execution": "local-cpu",
+      "command": "linxira-bio expression matrix-qc <matrix.csv|tsv> --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["json"]
     },
     {
       "id": "protein.af2.predict.v1",

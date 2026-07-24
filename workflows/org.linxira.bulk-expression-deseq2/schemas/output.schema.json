@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/workflows/bulk-expression-deseq2/output.v1.json",
+  "type": "object",
+  "required": ["schema_version", "job_id", "capability", "status", "result", "artifacts", "provenance", "diagnostics"],
+  "properties": {
+    "schema_version": { "const": "2" },
+    "job_id": { "type": "string", "minLength": 1 },
+    "capability": { "const": "expression.deseq2.v1" },
+    "status": { "enum": ["ok", "error"] },
+    "result": {
+      "type": "object",
+      "properties": {
+        "input_features": { "type": "integer", "minimum": 0 },
+        "analyzed_features": { "type": "integer", "minimum": 0 },
+        "filtered_features": { "type": "integer", "minimum": 0 },
+        "samples": { "type": "integer", "minimum": 0 },
+        "significant_features": { "type": "integer", "minimum": 0 },
+        "alpha": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "min_total_count": { "type": "integer", "minimum": 0 },
+        "contrast": {
+          "type": "object",
+          "required": ["level", "reference"],
+          "properties": {
+            "level": { "type": "string", "minLength": 1 },
+            "reference": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        "effective_parameters": {
+          "type": "object",
+          "required": [
+            "feature_id_column", "sample_id_column", "condition_column",
+            "reference_level", "contrast_level", "alpha", "min_total_count"
+          ],
+          "properties": {
+            "feature_id_column": { "type": "string", "minLength": 1 },
+            "sample_id_column": { "type": "string", "minLength": 1 },
+            "condition_column": { "type": "string", "minLength": 1 },
+            "reference_level": { "type": "string", "minLength": 1 },
+            "contrast_level": { "type": "string", "minLength": 1 },
+            "alpha": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "min_total_count": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["artifact_id", "role", "kind", "path", "format", "media_type", "size_bytes", "sha256"],
+        "properties": {
+          "artifact_id": { "type": "string", "minLength": 1 },
+          "role": { "type": "string", "minLength": 1 },
+          "kind": { "const": "table" },
+          "path": { "type": "string", "minLength": 1 },
+          "format": { "const": "csv" },
+          "media_type": { "const": "text/csv" },
+          "size_bytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "provenance": { "type": "object" },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "severity", "message"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1 },
+          "severity": { "enum": ["info", "warning", "error"] },
+          "message": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "ok" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "result": {
+            "required": [
+              "input_features", "analyzed_features", "filtered_features", "samples",
+              "significant_features", "alpha", "min_total_count", "contrast",
+              "effective_parameters"
+            ]
+          },
+          "artifacts": { "minItems": 2, "maxItems": 2 },
+          "diagnostics": { "maxItems": 0 }
+        }
+      },
+      "else": {
+        "properties": {
+          "result": { "maxProperties": 0 },
+          "artifacts": { "maxItems": 0 },
+          "diagnostics": { "minItems": 1 }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

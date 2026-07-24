@@ -1,0 +1,5 @@
+gene_id	sample_a	sample_b	sample_c
+gene_1	10	0	4
+gene_2	20	5	0
+gene_3	0	NA	8
+gene_4	2	3	1

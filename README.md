@@ -33,9 +33,9 @@ browser, and delivery workflows.
 ## Current Capabilities
 
 The current local core audits bioinformatics prerequisites, identifies and
-previews common biological files, calculates deterministic FASTA, FASTQ, and
-VCF statistics, and exports structured result tables as CSV, TSV, JSON, JSONL,
-or XLSX:
+previews common biological files, calculates deterministic FASTA, FASTQ, SAM,
+VCF, BED-intersection, expression-matrix, and PDB metrics, and exports
+structured result tables as CSV, TSV, JSON, JSONL, or XLSX:
 
 ```bash
 cargo run -p linxira-bio-cli -- environment audit --json
@@ -45,7 +45,11 @@ cargo run -p linxira-bio-cli -- dataset inspect tests/fixtures/data-inspection/v
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
 cargo run -p linxira-bio-cli -- fastq qc tests/fixtures/fastq-qc/valid.fastq --json
+cargo run -p linxira-bio-cli -- alignment qc tests/fixtures/alignment-qc/valid.sam --json
 cargo run -p linxira-bio-cli -- variant stats tests/fixtures/variant-stats/mixed.vcf --json
+cargo run -p linxira-bio-cli -- interval intersect tests/fixtures/interval-intersect/left.bed tests/fixtures/interval-intersect/right.bed --json
+cargo run -p linxira-bio-cli -- expression matrix-qc tests/fixtures/expression-matrix/counts.tsv --json
+cargo run -p linxira-bio-cli -- structure pdb tests/fixtures/structure-pdb-summary/alphafold-style.pdb --alphafold-plddt --json
 cargo run -p linxira-bio-cli -- export table result.json result.xlsx
 ```
 
@@ -67,7 +71,18 @@ cargo run -p linxira-bio-cli -- capabilities --json
 cargo run -p linxira-bio-worker -- tests/fixtures/jobs/sequence-stats.json
 cargo run -p linxira-bio-worker -- tests/fixtures/jobs/dataset-inspect.json
 cargo run -p linxira-bio-ui
+cargo run -p linxira-bio-ui -- tests/fixtures/structure-pdb-summary/alphafold-style.pdb
 ```
+
+The native GUI provides capability-aware result charts for FASTA, FASTQ, SAM,
+BED intersections, expression matrices, VCF, and PDB summaries. It renders
+local plain or gzip-compressed PDB/mmCIF coordinates as backbone,
+ball-and-stick, or space-filling representations. Structure files stay local
+and are bounded to 128 MiB after decompression and 100,000 atoms. The current
+view can be exported atomically as a 1600 by 1000 PNG. PDB analysis and
+optional explicit AlphaFold pLDDT handling use
+`structure.pdb.summary.v1`; mmCIF is currently a viewer input, not an available
+analysis capability.
 
 Release bundles are staged from `packaging/bundle-manifest.json`, which always
 includes the canonical bilingual `docs/` tree, schemas, catalogs, skills, and
@@ -79,11 +94,16 @@ python -m venv .venv-ci
 # Activate .venv-ci, then run:
 python -m pip install --requirement requirements-ci.txt
 python scripts/validate-repository.py
+python scripts/generate_third_party_notices.py --check-config
+python -m unittest discover -s tests/python -p "test_*.py"
 python scripts/stage-release.py --check
 ```
 
 Platform packaging calls the same release staging script with its compiled
-binary directory.
+binary directory. Staging resolves the locked target-specific release graph
+and generates `THIRD_PARTY_DEPENDENCIES.json` plus
+`THIRD_PARTY_DEPENDENCIES.txt`; missing, ambiguous, stale, or modified license
+text fails the release. See `docs/DEPENDENCY_NOTICES.md`.
 
 ## Execution Model
 

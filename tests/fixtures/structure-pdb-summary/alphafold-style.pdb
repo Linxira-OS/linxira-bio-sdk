@@ -1,0 +1,6 @@
+HEADER    ALPHAFOLD-STYLE TEST STRUCTURE
+ATOM      1  N   GLY A   1      11.104  13.207   9.657  1.00 95.00           N
+ATOM      2  CA  GLY A   1      12.204  13.707   9.157  1.00 95.00           C
+ATOM      3  N   ALA A   2      13.104  14.207   8.657  1.00 45.00           N
+HETATM    4  O   HOH B 101      14.104  15.207   7.657  1.00 20.00           O
+END

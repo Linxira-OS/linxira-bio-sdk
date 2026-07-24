@@ -1,0 +1,4 @@
+track name="left"
+chr1	0	10	left-a
+chr1	10	20	left-b
+chr2	5	12	left-c

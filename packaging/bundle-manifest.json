@@ -13,13 +13,15 @@
     "runtimes/catalog.json",
     "tools/catalog.json",
     "profiles/local-core.json",
+    "licenses/cargo-overrides.json",
     "licenses/NotoSansCJK-OFL.txt"
   ],
   "include_trees": [
     "docs",
     "schemas",
     "skills",
-    "workflows"
+    "workflows",
+    "licenses/cargo-overrides"
   ],
   "binaries": {
     "windows": [
@@ -37,5 +39,22 @@
       "linxira-bio-worker",
       "linxira-bio-ui"
     ]
+  },
+  "dependency_notices": {
+    "roots": [
+      "linxira-bio-cli",
+      "linxira-bio-worker",
+      "linxira-bio-ui"
+    ],
+    "targets": {
+      "windows": "x86_64-pc-windows-gnu",
+      "debian": "x86_64-unknown-linux-gnu",
+      "arch": "x86_64-unknown-linux-gnu"
+    },
+    "overrides": "licenses/cargo-overrides.json",
+    "outputs": {
+      "json": "THIRD_PARTY_DEPENDENCIES.json",
+      "text": "THIRD_PARTY_DEPENDENCIES.txt"
+    }
   }
 }

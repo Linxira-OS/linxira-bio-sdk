@@ -1887,9 +1887,11 @@ name = "linxira-bio-ui"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "flate2",
  "linxira-bio-export",
  "linxira-bio-protocol",
  "linxira-bio-worker",
+ "png",
  "rfd",
  "serde",
  "serde_json",

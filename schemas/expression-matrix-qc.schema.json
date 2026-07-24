@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/expression-matrix-qc.v1.json",
+  "title": "Linxira Bio expression matrix QC result",
+  "type": "object",
+  "required": [
+    "delimiter", "feature_id_column", "feature_count", "sample_count",
+    "total_value_count", "numeric_value_count", "missing_value_count",
+    "zero_value_count", "negative_value_count", "zero_percent",
+    "duplicate_feature_id_count", "samples", "warnings"
+  ],
+  "properties": {
+    "delimiter": { "enum": ["comma", "tab"] },
+    "feature_id_column": { "type": "string", "minLength": 1 },
+    "feature_count": { "$ref": "#/$defs/count" },
+    "sample_count": { "$ref": "#/$defs/count" },
+    "total_value_count": { "$ref": "#/$defs/count" },
+    "numeric_value_count": { "$ref": "#/$defs/count" },
+    "missing_value_count": { "$ref": "#/$defs/count" },
+    "zero_value_count": { "$ref": "#/$defs/count" },
+    "negative_value_count": { "$ref": "#/$defs/count" },
+    "zero_percent": {
+      "oneOf": [
+        { "type": "number", "minimum": 0, "maximum": 100 },
+        { "type": "null" }
+      ]
+    },
+    "duplicate_feature_id_count": { "$ref": "#/$defs/count" },
+    "samples": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sample" }
+    },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "count": { "type": "integer", "minimum": 0 },
+    "sample": {
+      "type": "object",
+      "required": [
+        "sample", "numeric_value_count", "missing_value_count",
+        "detected_feature_count", "total", "mean"
+      ],
+      "properties": {
+        "sample": { "type": "string", "minLength": 1 },
+        "numeric_value_count": { "$ref": "#/$defs/count" },
+        "missing_value_count": { "$ref": "#/$defs/count" },
+        "detected_feature_count": { "$ref": "#/$defs/count" },
+        "total": { "type": "number" },
+        "mean": { "type": ["number", "null"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

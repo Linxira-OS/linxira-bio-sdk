@@ -13,21 +13,27 @@ changes global Python, R, Java, `PATH`, or package libraries by default.
 
 ## Trust Levels
 
-- Official packs are reviewed in this repository, signed, fixture-tested, and
-  gated on Windows GNU, Debian, and Arch when their platform list includes
-  those targets.
+- Before becoming installable, official packs must be reviewed in this
+  repository, signed, fixture-tested, and gated on Windows GNU, Debian, and
+  Arch when their platform list includes those targets.
 - Community packs come from a separate signed index that is disabled by
   default. Installation always displays publisher, license, source, checksum,
   dependencies, requested network access, and the exact entry point.
 - Trust affects presentation and approval requirements, not filesystem or
   network isolation. Both levels are verified before activation.
 
-Pack installation and execution remain unavailable until
+Application-managed pack installation and execution remain unavailable until
 `environment.apply.v1` implements download verification, staging, health
 checks, atomic activation, runtime locks, and rollback. Entries marked
 `planned` in `workflows/catalog.json` are product commitments, not runnable
-workflows.
+workflows. Entries marked `cataloged` have reviewable first-party source,
+contracts, locks, and manifests, but are not installable or dispatchable.
 
-The first planned official adapters are Biopython sequence conversion and an R
-DESeq2 bulk-expression workflow. Their implementation must be scientifically
-validated before either status changes from `planned`.
+The first cataloged official adapters are Biopython sequence conversion and an
+R DESeq2 bulk-expression workflow. Their pack directories include strict CLI
+entry points, artifact-aware schemas, atomic output handling, offline tests,
+dependency and source notices, and exact file checksums. A developer may invoke
+them manually in the locked runtime for review. Product availability still
+requires the managed installer, signed transitive artifact resolution,
+cross-platform fixture runs, and an executor that validates the manifest before
+launch.

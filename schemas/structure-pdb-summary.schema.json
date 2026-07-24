@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/structure-pdb-summary.v1.json",
+  "title": "Linxira Bio render-ready PDB structure summary",
+  "type": "object",
+  "required": [
+    "format", "coordinate_units", "model_count", "chain_count", "residue_count",
+    "atom_count", "polymer_atom_count", "hetero_atom_count", "element_counts",
+    "bounds", "b_factor_summary", "alphafold_confidence", "models", "residues",
+    "atoms", "warnings"
+  ],
+  "properties": {
+    "format": { "const": "pdb" },
+    "coordinate_units": { "const": "angstrom" },
+    "model_count": { "$ref": "#/$defs/count" },
+    "chain_count": { "$ref": "#/$defs/count" },
+    "residue_count": { "$ref": "#/$defs/count" },
+    "atom_count": { "$ref": "#/$defs/count" },
+    "polymer_atom_count": { "$ref": "#/$defs/count" },
+    "hetero_atom_count": { "$ref": "#/$defs/count" },
+    "element_counts": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/count" }
+    },
+    "bounds": { "$ref": "#/$defs/bounds" },
+    "b_factor_summary": {
+      "oneOf": [{ "$ref": "#/$defs/numeric_summary" }, { "type": "null" }]
+    },
+    "alphafold_confidence": {
+      "oneOf": [{ "$ref": "#/$defs/alphafold_confidence" }, { "type": "null" }]
+    },
+    "models": { "type": "array", "items": { "$ref": "#/$defs/model" } },
+    "residues": { "type": "array", "items": { "$ref": "#/$defs/residue" } },
+    "atoms": { "type": "array", "items": { "$ref": "#/$defs/atom" } },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "count": { "type": "integer", "minimum": 0 },
+    "point": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "bounds": {
+      "type": "object",
+      "required": ["min", "max", "center", "span"],
+      "properties": {
+        "min": { "$ref": "#/$defs/point" },
+        "max": { "$ref": "#/$defs/point" },
+        "center": { "$ref": "#/$defs/point" },
+        "span": { "$ref": "#/$defs/point" }
+      },
+      "additionalProperties": false
+    },
+    "numeric_summary": {
+      "type": "object",
+      "required": ["count", "min", "max", "mean"],
+      "properties": {
+        "count": { "$ref": "#/$defs/count" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "mean": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "alphafold_confidence": {
+      "type": "object",
+      "required": [
+        "source", "residue_count", "min_plddt", "max_plddt", "mean_plddt", "bands"
+      ],
+      "properties": {
+        "source": { "const": "pdb-b-factor-explicit" },
+        "residue_count": { "$ref": "#/$defs/count" },
+        "min_plddt": { "type": "number", "minimum": 0, "maximum": 100 },
+        "max_plddt": { "type": "number", "minimum": 0, "maximum": 100 },
+        "mean_plddt": { "type": "number", "minimum": 0, "maximum": 100 },
+        "bands": {
+          "type": "object",
+          "required": ["very_high_count", "confident_count", "low_count", "very_low_count"],
+          "properties": {
+            "very_high_count": { "$ref": "#/$defs/count" },
+            "confident_count": { "$ref": "#/$defs/count" },
+            "low_count": { "$ref": "#/$defs/count" },
+            "very_low_count": { "$ref": "#/$defs/count" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "chain": {
+      "type": "object",
+      "required": [
+        "chain_id", "atom_count", "residue_count", "polymer_residue_count",
+        "hetero_residue_count"
+      ],
+      "properties": {
+        "chain_id": { "type": "string" },
+        "atom_count": { "$ref": "#/$defs/count" },
+        "residue_count": { "$ref": "#/$defs/count" },
+        "polymer_residue_count": { "$ref": "#/$defs/count" },
+        "hetero_residue_count": { "$ref": "#/$defs/count" }
+      },
+      "additionalProperties": false
+    },
+    "model": {
+      "type": "object",
+      "required": ["model_id", "atom_count", "residue_count", "chains"],
+      "properties": {
+        "model_id": { "type": "string", "minLength": 1 },
+        "atom_count": { "$ref": "#/$defs/count" },
+        "residue_count": { "$ref": "#/$defs/count" },
+        "chains": { "type": "array", "items": { "$ref": "#/$defs/chain" } }
+      },
+      "additionalProperties": false
+    },
+    "residue": {
+      "type": "object",
+      "required": [
+        "index", "model_id", "chain_id", "sequence_number", "insertion_code", "name",
+        "is_hetero", "atom_count", "plddt"
+      ],
+      "properties": {
+        "index": { "$ref": "#/$defs/count" },
+        "model_id": { "type": "string", "minLength": 1 },
+        "chain_id": { "type": "string" },
+        "sequence_number": { "type": "string", "minLength": 1 },
+        "insertion_code": { "type": ["string", "null"] },
+        "name": { "type": "string", "minLength": 1 },
+        "is_hetero": { "type": "boolean" },
+        "atom_count": { "$ref": "#/$defs/count" },
+        "plddt": { "type": ["number", "null"], "minimum": 0, "maximum": 100 }
+      },
+      "additionalProperties": false
+    },
+    "atom": {
+      "type": "object",
+      "required": [
+        "index", "serial", "record", "model_id", "residue_index", "name",
+        "alternate_location", "residue_name", "chain_id", "residue_sequence_number",
+        "insertion_code", "position", "occupancy", "b_factor", "element", "formal_charge"
+      ],
+      "properties": {
+        "index": { "$ref": "#/$defs/count" },
+        "serial": { "type": "string", "minLength": 1 },
+        "record": { "enum": ["atom", "hetatm"] },
+        "model_id": { "type": "string", "minLength": 1 },
+        "residue_index": { "$ref": "#/$defs/count" },
+        "name": { "type": "string", "minLength": 1 },
+        "alternate_location": { "type": ["string", "null"] },
+        "residue_name": { "type": "string", "minLength": 1 },
+        "chain_id": { "type": "string" },
+        "residue_sequence_number": { "type": "string", "minLength": 1 },
+        "insertion_code": { "type": ["string", "null"] },
+        "position": { "$ref": "#/$defs/point" },
+        "occupancy": { "type": ["number", "null"] },
+        "b_factor": { "type": ["number", "null"] },
+        "element": { "type": ["string", "null"] },
+        "formal_charge": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

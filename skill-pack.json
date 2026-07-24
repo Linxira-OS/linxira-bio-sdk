@@ -40,10 +40,34 @@
       "capabilities": ["fastq.qc.v1"]
     },
     {
+      "id": "analyze-sam-quality",
+      "path": "skills/analyze-sam-quality",
+      "kind": "executable",
+      "capabilities": ["alignment.qc.v1"]
+    },
+    {
+      "id": "intersect-genomic-intervals",
+      "path": "skills/intersect-genomic-intervals",
+      "kind": "executable",
+      "capabilities": ["interval.intersect.v1"]
+    },
+    {
+      "id": "analyze-expression-matrix",
+      "path": "skills/analyze-expression-matrix",
+      "kind": "executable",
+      "capabilities": ["expression.matrix.qc.v1"]
+    },
+    {
       "id": "analyze-variant-statistics",
       "path": "skills/analyze-variant-statistics",
       "kind": "executable",
       "capabilities": ["variant.stats.v1"]
+    },
+    {
+      "id": "analyze-pdb-structure",
+      "path": "skills/analyze-pdb-structure",
+      "kind": "executable",
+      "capabilities": ["structure.pdb.summary.v1"]
     },
     {
       "id": "inspect-bio-dataset",

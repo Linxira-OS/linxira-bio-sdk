@@ -22,16 +22,18 @@
     {
       "id": "org.linxira.sequence-conversion-biopython",
       "capability": "sequence.convert.biopython.v1",
-      "status": "planned",
+      "status": "cataloged",
       "trust": "official",
-      "runtime": "python"
+      "runtime": "python",
+      "manifest": "workflows/org.linxira.sequence-conversion-biopython/manifest.json"
     },
     {
       "id": "org.linxira.bulk-expression-deseq2",
       "capability": "expression.deseq2.v1",
-      "status": "planned",
+      "status": "cataloged",
       "trust": "official",
-      "runtime": "r"
+      "runtime": "r",
+      "manifest": "workflows/org.linxira.bulk-expression-deseq2/manifest.json"
     }
   ]
 }

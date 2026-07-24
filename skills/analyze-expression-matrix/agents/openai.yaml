@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Expression Matrix"
+  short_description: "Run local QC on a CSV or TSV expression matrix"
+  default_prompt: "Use $analyze-expression-matrix to validate and summarize this expression matrix."

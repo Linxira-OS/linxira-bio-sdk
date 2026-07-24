@@ -1,0 +1,13 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-interval-intersect",
+  "capability": "interval.intersect.v1",
+  "inputs": {
+    "left-bed": "../interval-intersect/left.bed",
+    "right-bed": "../interval-intersect/right.bed"
+  },
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {}
+}

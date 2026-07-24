@@ -9,6 +9,14 @@ import json
 import shutil
 from pathlib import Path
 
+from generate_third_party_notices import (
+    JSON_OUTPUT_NAME,
+    TEXT_OUTPUT_NAME,
+    generate_notice_bundle,
+    load_bundle_notice_configuration,
+    validate_override_configuration,
+)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "packaging" / "bundle-manifest.json"
@@ -55,15 +63,29 @@ def validate_sources(manifest: dict[str, object]) -> None:
     required_files = {
         "Cargo.lock",
         "deny.toml",
+        "licenses/cargo-overrides.json",
         "licenses/NotoSansCJK-OFL.txt",
         "tools/catalog.json",
         "profiles/local-core.json",
     }
     if not required_files <= set(include_files):
         raise ValueError("release bundle lacks a required catalog, policy, or license file")
-    required_trees = {"docs", "schemas", "skills", "workflows"}
+    required_trees = {
+        "docs",
+        "schemas",
+        "skills",
+        "workflows",
+        "licenses/cargo-overrides",
+    }
     if not required_trees <= set(include_trees):
-        raise ValueError("release bundle requires docs, schemas, skills, and workflows")
+        raise ValueError(
+            "release bundle requires docs, schemas, skills, workflows, and license texts"
+        )
+
+    notice_configuration = load_bundle_notice_configuration()
+    if notice_configuration != manifest.get("dependency_notices"):
+        raise ValueError("release bundle dependency notice configuration is invalid")
+    validate_override_configuration()
 
     for relative_path in include_files:
         if not isinstance(relative_path, str) or not repository_path(relative_path).is_file():
@@ -123,6 +145,11 @@ def main() -> None:
     staging_root.mkdir(parents=True)
     copy_sources(manifest, staging_root)
     copy_binaries(manifest, arguments.platform, arguments.binary_dir.resolve(), staging_root)
+    json_notice, text_notice = generate_notice_bundle(
+        arguments.platform, staging_root, offline=True
+    )
+    if json_notice.name != JSON_OUTPUT_NAME or text_notice.name != TEXT_OUTPUT_NAME:
+        raise ValueError("dependency notice generator returned unexpected filenames")
     write_lock(staging_root, arguments.platform)
     print(staging_root)
 

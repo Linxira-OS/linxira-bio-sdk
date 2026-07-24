@@ -1,0 +1,5 @@
+# Exact direct and transitive Python package pins for pack 0.1.0.
+# Runtime: CPython 3.12.x. Installation is intentionally unavailable while
+# environment.apply.v1 and signed artifact resolution are not implemented.
+biopython==1.85
+numpy==2.2.4

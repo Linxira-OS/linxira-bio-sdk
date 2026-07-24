@@ -182,6 +182,67 @@ fn executes_variant_statistics_job() {
     assert_eq!(result["result"]["sample_count"], 2);
 }
 
+#[test]
+fn executes_pdb_structure_summary_job() {
+    let request = workspace_root().join("tests/fixtures/jobs/structure-pdb-summary.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(request)
+        .output()
+        .expect("run PDB structure summary job");
+
+    assert!(output.status.success());
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid result");
+    assert_eq!(result["capability"], "structure.pdb.summary.v1");
+    assert_eq!(result["result"]["model_count"], 1);
+    assert_eq!(result["result"]["alphafold_confidence"]["residue_count"], 2);
+    assert_eq!(result["result"]["atoms"][3]["record"], "hetatm");
+}
+
+#[test]
+fn executes_alignment_qc_job() {
+    let request = workspace_root().join("tests/fixtures/jobs/alignment-qc.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(request)
+        .output()
+        .expect("run alignment QC job");
+
+    assert!(output.status.success());
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid result");
+    assert_eq!(result["capability"], "alignment.qc.v1");
+    assert_eq!(result["result"]["record_count"], 5);
+    assert_eq!(result["result"]["mapped_record_count"], 4);
+}
+
+#[test]
+fn executes_interval_intersection_job() {
+    let request = workspace_root().join("tests/fixtures/jobs/interval-intersect.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(request)
+        .output()
+        .expect("run interval intersection job");
+
+    assert!(output.status.success());
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid result");
+    assert_eq!(result["capability"], "interval.intersect.v1");
+    assert_eq!(result["result"]["overlap_pair_count"], 3);
+    assert_eq!(result["result"]["right_overlapped_count"], 2);
+}
+
+#[test]
+fn executes_expression_matrix_qc_job() {
+    let request = workspace_root().join("tests/fixtures/jobs/expression-matrix-qc.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(request)
+        .output()
+        .expect("run expression matrix QC job");
+
+    assert!(output.status.success());
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid result");
+    assert_eq!(result["capability"], "expression.matrix.qc.v1");
+    assert_eq!(result["result"]["feature_count"], 4);
+    assert_eq!(result["result"]["sample_count"], 3);
+}
+
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")

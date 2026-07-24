@@ -2,6 +2,7 @@
 
 //! Execute versioned Linxira Bio jobs through one shared local worker API.
 
+use linxira_bio_core::alignment::sam_qc_path;
 use linxira_bio_core::dataset::{
     DatasetCompression, DatasetFormat, DatasetInspectionOptions, DetectionConfidence,
     inspect_dataset_with_options,
@@ -10,10 +11,13 @@ use linxira_bio_core::environment::{
     EnvironmentMode, EnvironmentPlanOptions, audit_environment, parse_environment_mode,
     plan_environment_with_options,
 };
+use linxira_bio_core::expression::expression_matrix_qc_path;
 use linxira_bio_core::fastq::{
     DEFAULT_MAX_CYCLES, FastqQcOptions, QualityEncodingMode, fastq_qc_path,
 };
+use linxira_bio_core::interval::bed_intersect_path;
 use linxira_bio_core::sequence::fasta_stats_path;
+use linxira_bio_core::structure::{PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::variant::vcf_stats_path;
 use linxira_bio_export::{ExportFormat, ensure_distinct_input_output, export_json_file};
 use linxira_bio_protocol::{
@@ -60,12 +64,16 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
     }
 
     match request.capability.as_str() {
+        "alignment.qc.v1" => run_alignment_qc(base_directory, request),
         "environment.audit.v1" => run_environment_audit(request),
         "environment.plan.v1" => run_environment_plan(base_directory, request),
         "dataset.inspect.v1" => run_dataset_inspection(base_directory, request),
         "fastq.qc.v1" => run_fastq_qc(base_directory, request),
+        "expression.matrix.qc.v1" => run_expression_matrix_qc(base_directory, request),
+        "interval.intersect.v1" => run_interval_intersect(base_directory, request),
         "table.export.v1" => run_table_export(base_directory, request),
         "sequence.stats.v1" => run_sequence_stats(base_directory, request),
+        "structure.pdb.summary.v1" => run_pdb_summary(base_directory, request),
         "variant.stats.v1" => run_variant_stats(base_directory, request),
         capability => Err(format!("unsupported capability: {capability}").into()),
     }
@@ -97,6 +105,7 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
     if request.execution.mode != ExecutionMode::LocalCpu {
         return Err("the current worker supports local-cpu execution only".into());
     }
+    validate_v2_contract(&request)?;
     for input in &request.inputs {
         if !input.has_valid_cardinality() {
             return Err(format!(
@@ -109,6 +118,29 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
     let verified_inputs = validate_v2_inputs(&request, base_directory)?;
 
     match request.capability.as_str() {
+        "alignment.qc.v1" => {
+            let path = resolve_v2_single_input(base_directory, &request, "sam")?;
+            let metrics = sam_qc_path(path)?;
+            let mut result = AnalysisResultV2::ok(
+                request.job_id.clone(),
+                request.capability.clone(),
+                metrics.clone(),
+                ExecutionMode::LocalCpu,
+            );
+            result
+                .diagnostics
+                .extend(metrics.warnings.iter().map(|message| Diagnostic {
+                    code: "alignment-qc-warning".to_owned(),
+                    severity: DiagnosticSeverity::Warning,
+                    message: message.clone(),
+                    artifact_id: None,
+                    line: None,
+                    record: None,
+                    hint: None,
+                }));
+            finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
+            Ok(serde_json::to_string(&result)?)
+        }
         "environment.audit.v1" => {
             let audit = audit_environment()?;
             serialize_v2_result(&request, base_directory, &verified_inputs, audit)
@@ -209,6 +241,53 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
             finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
             Ok(serde_json::to_string(&result)?)
         }
+        "expression.matrix.qc.v1" => {
+            let path = resolve_v2_single_input(base_directory, &request, "matrix")?;
+            let metrics = expression_matrix_qc_path(path)?;
+            let mut result = AnalysisResultV2::ok(
+                request.job_id.clone(),
+                request.capability.clone(),
+                metrics.clone(),
+                ExecutionMode::LocalCpu,
+            );
+            result
+                .diagnostics
+                .extend(metrics.warnings.iter().map(|message| Diagnostic {
+                    code: "expression-matrix-qc-warning".to_owned(),
+                    severity: DiagnosticSeverity::Warning,
+                    message: message.clone(),
+                    artifact_id: None,
+                    line: None,
+                    record: None,
+                    hint: None,
+                }));
+            finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
+            Ok(serde_json::to_string(&result)?)
+        }
+        "interval.intersect.v1" => {
+            let left = resolve_v2_single_input(base_directory, &request, "left-bed")?;
+            let right = resolve_v2_single_input(base_directory, &request, "right-bed")?;
+            let stats = bed_intersect_path(left, right)?;
+            let mut result = AnalysisResultV2::ok(
+                request.job_id.clone(),
+                request.capability.clone(),
+                stats.clone(),
+                ExecutionMode::LocalCpu,
+            );
+            result
+                .diagnostics
+                .extend(stats.warnings.iter().map(|message| Diagnostic {
+                    code: "interval-intersect-warning".to_owned(),
+                    severity: DiagnosticSeverity::Warning,
+                    message: message.clone(),
+                    artifact_id: None,
+                    line: None,
+                    record: None,
+                    hint: None,
+                }));
+            finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
+            Ok(serde_json::to_string(&result)?)
+        }
         "table.export.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "table")?;
             let output = required_v2_string_parameter(&request, "output")?;
@@ -244,6 +323,29 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 fasta_stats_path(path)?,
             )
         }
+        "structure.pdb.summary.v1" => {
+            let path = resolve_v2_single_input(base_directory, &request, "pdb")?;
+            let summary = pdb_summary_path(path, pdb_options(&request.parameters)?)?;
+            let mut result = AnalysisResultV2::ok(
+                request.job_id.clone(),
+                request.capability.clone(),
+                summary.clone(),
+                ExecutionMode::LocalCpu,
+            );
+            result
+                .diagnostics
+                .extend(summary.warnings.iter().map(|message| Diagnostic {
+                    code: "pdb-summary-warning".to_owned(),
+                    severity: DiagnosticSeverity::Warning,
+                    message: message.clone(),
+                    artifact_id: None,
+                    line: None,
+                    record: None,
+                    hint: None,
+                }));
+            finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
+            Ok(serde_json::to_string(&result)?)
+        }
         "variant.stats.v1" => {
             let path = resolve_v2_single_input(base_directory, &request, "vcf")?;
             let stats = vcf_stats_path(path)?;
@@ -269,6 +371,64 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
         }
         capability => Err(format!("unsupported capability: {capability}").into()),
     }
+}
+
+fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
+    let (required_roles, allowed_parameters): (&[&str], &[&str]) = match request.capability.as_str()
+    {
+        "alignment.qc.v1" => (&["sam"], &[]),
+        "environment.audit.v1" => (&[], &[]),
+        "environment.plan.v1" => (&[], &["profile", "mode", "project_root"]),
+        "dataset.inspect.v1" => (&["file"], &["max_preview_records", "max_preview_bytes"]),
+        "fastq.qc.v1" => (&["fastq"], &["max_cycles", "quality_encoding"]),
+        "expression.matrix.qc.v1" => (&["matrix"], &[]),
+        "interval.intersect.v1" => (&["left-bed", "right-bed"], &[]),
+        "table.export.v1" => (&["table"], &["output"]),
+        "sequence.stats.v1" => (&["fasta"], &[]),
+        "structure.pdb.summary.v1" => (&["pdb"], &["interpret_b_factors_as_plddt"]),
+        "variant.stats.v1" => (&["vcf"], &[]),
+        capability => return Err(format!("unsupported capability: {capability}").into()),
+    };
+
+    let mut artifact_ids = HashSet::new();
+    let mut roles = HashSet::new();
+    for artifact in &request.inputs {
+        if artifact.artifact_id.trim().is_empty() || artifact.role.trim().is_empty() {
+            return Err("v2 input artifacts require non-empty artifact_id and role".into());
+        }
+        if !artifact_ids.insert(artifact.artifact_id.as_str()) {
+            return Err(format!("duplicate input artifact_id: {}", artifact.artifact_id).into());
+        }
+        if !roles.insert(artifact.role.as_str()) {
+            return Err(format!("duplicate input role: {}", artifact.role).into());
+        }
+    }
+    for role in required_roles {
+        if !roles.contains(role) {
+            return Err(format!("{} requires input role {role}", request.capability).into());
+        }
+    }
+    for role in roles {
+        if !required_roles.contains(&role) {
+            return Err(format!("{} does not accept input role {role}", request.capability).into());
+        }
+    }
+
+    let parameters = match &request.parameters {
+        serde_json::Value::Null => return Ok(()),
+        serde_json::Value::Object(parameters) => parameters,
+        _ => return Err("v2 parameters must be an object".into()),
+    };
+    for parameter in parameters.keys() {
+        if !allowed_parameters.contains(&parameter.as_str()) {
+            return Err(format!(
+                "{} does not accept parameter {parameter}",
+                request.capability
+            )
+            .into());
+        }
+    }
+    Ok(())
 }
 
 fn serialize_v2_result<T>(
@@ -511,16 +671,19 @@ fn resolve_v2_single_input(
     request: &JobRequestV2,
     role: &str,
 ) -> WorkerResult<PathBuf> {
-    let artifact = request
+    let mut matching = request
         .inputs
         .iter()
-        .find(|artifact| artifact.role == role)
-        .ok_or_else(|| {
-            format!(
-                "{} requires an input artifact with role {role}",
-                request.capability
-            )
-        })?;
+        .filter(|artifact| artifact.role == role);
+    let artifact = matching.next().ok_or_else(|| {
+        format!(
+            "{} requires an input artifact with role {role}",
+            request.capability
+        )
+    })?;
+    if matching.next().is_some() {
+        return Err(format!("duplicate input role: {role}").into());
+    }
     if artifact.files.len() != 1 {
         return Err(format!("input role {role} requires exactly one file").into());
     }
@@ -648,6 +811,61 @@ fn run_fastq_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<Stri
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_alignment_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    let input = request
+        .inputs
+        .get("sam")
+        .ok_or("alignment.qc.v1 requires inputs.sam")?;
+    let metrics = sam_qc_path(resolve_input(base_directory, input))?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        metrics.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = metrics.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_expression_matrix_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    let input = request
+        .inputs
+        .get("matrix")
+        .ok_or("expression.matrix.qc.v1 requires inputs.matrix")?;
+    let metrics = expression_matrix_qc_path(resolve_input(base_directory, input))?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        metrics.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = metrics.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_interval_intersect(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    let left = request
+        .inputs
+        .get("left-bed")
+        .ok_or("interval.intersect.v1 requires inputs.left-bed")?;
+    let right = request
+        .inputs
+        .get("right-bed")
+        .ok_or("interval.intersect.v1 requires inputs.right-bed")?;
+    let stats = bed_intersect_path(
+        resolve_input(base_directory, left),
+        resolve_input(base_directory, right),
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        stats.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = stats.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_variant_stats(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -662,6 +880,37 @@ fn run_variant_stats(base_directory: &Path, request: JobRequest) -> WorkerResult
     );
     result.warnings = stats.warnings;
     Ok(serde_json::to_string(&result)?)
+}
+
+fn run_pdb_summary(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    let input = request
+        .inputs
+        .get("pdb")
+        .ok_or("structure.pdb.summary.v1 requires inputs.pdb")?;
+    let summary = pdb_summary_path(
+        resolve_input(base_directory, input),
+        pdb_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = summary.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn pdb_options(parameters: &serde_json::Value) -> WorkerResult<PdbSummaryOptions> {
+    let interpret_b_factors_as_plddt = match parameters.get("interpret_b_factors_as_plddt") {
+        Some(value) => value
+            .as_bool()
+            .ok_or("interpret_b_factors_as_plddt must be a boolean")?,
+        None => false,
+    };
+    Ok(PdbSummaryOptions {
+        interpret_b_factors_as_plddt,
+    })
 }
 
 fn fastq_options_v1(request: &JobRequest) -> WorkerResult<FastqQcOptions> {
@@ -1037,7 +1286,7 @@ mod tests {
     }
 
     #[test]
-    fn v2_table_export_refuses_to_replace_any_declared_input() {
+    fn v2_table_export_rejects_an_undeclared_extra_input_role() {
         let table = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../../tests/fixtures/results/metrics.json")
             .canonicalize()
@@ -1074,12 +1323,159 @@ mod tests {
             serde_json::from_str(&serialized).expect("valid v2 error result");
 
         assert_eq!(result.status, JobStatus::Error);
-        assert!(result.diagnostics[0].message.contains("must be different"));
+        assert!(
+            result.diagnostics[0]
+                .message
+                .contains("does not accept input role metadata")
+        );
         assert_eq!(
             fs::read_to_string(&protected).expect("declared input remains readable"),
             r#"{"protected":true}"#
         );
         fs::remove_file(protected).expect("remove protected input");
+    }
+
+    #[test]
+    fn v2_rejects_duplicate_roles_instead_of_selecting_the_first() {
+        let input = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../tests/fixtures/sequences/tiny.fa")
+            .canonicalize()
+            .expect("FASTA fixture");
+        let mut request = artifact_request(
+            &input,
+            BioDataFormat::Fasta,
+            CompressionFormat::None,
+            "sequence.stats.v1",
+            "fasta",
+        );
+        let mut duplicate = request.inputs[0].clone();
+        duplicate.artifact_id = "duplicate-artifact".to_owned();
+        duplicate.files[0].file_id = "duplicate-file".to_owned();
+        request.inputs.push(duplicate);
+
+        let serialized = execute_request_v2(request, Path::new("."))
+            .expect("worker returns a v2 error envelope");
+        let result: AnalysisResultV2<serde_json::Value> =
+            serde_json::from_str(&serialized).expect("valid v2 error result");
+
+        assert_eq!(result.status, JobStatus::Error);
+        assert!(
+            result.diagnostics[0]
+                .message
+                .contains("duplicate input role: fasta")
+        );
+    }
+
+    #[test]
+    fn v2_rejects_unknown_parameters() {
+        let input = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../tests/fixtures/sequences/tiny.fa")
+            .canonicalize()
+            .expect("FASTA fixture");
+        let mut request = artifact_request(
+            &input,
+            BioDataFormat::Fasta,
+            CompressionFormat::None,
+            "sequence.stats.v1",
+            "fasta",
+        );
+        request.parameters = serde_json::json!({"max_cylces": 100});
+
+        let serialized = execute_request_v2(request, Path::new("."))
+            .expect("worker returns a v2 error envelope");
+        let result: AnalysisResultV2<serde_json::Value> =
+            serde_json::from_str(&serialized).expect("valid v2 error result");
+
+        assert_eq!(result.status, JobStatus::Error);
+        assert!(
+            result.diagnostics[0]
+                .message
+                .contains("does not accept parameter max_cylces")
+        );
+    }
+
+    #[test]
+    fn v2_executes_new_single_input_qc_capabilities() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        let cases = [
+            (
+                root.join("tests/fixtures/alignment-qc/valid.sam"),
+                BioDataFormat::Sam,
+                "alignment.qc.v1",
+                "sam",
+                "record_count",
+                5,
+            ),
+            (
+                root.join("tests/fixtures/expression-matrix/counts.tsv"),
+                BioDataFormat::Tsv,
+                "expression.matrix.qc.v1",
+                "matrix",
+                "feature_count",
+                4,
+            ),
+        ];
+
+        for (path, format, capability, role, field, expected) in cases {
+            let request = artifact_request(
+                &path.canonicalize().expect("fixture path"),
+                format,
+                CompressionFormat::None,
+                capability,
+                role,
+            );
+            let serialized =
+                execute_request_v2(request, Path::new(".")).expect("execute v2 local capability");
+            let result: AnalysisResultV2<serde_json::Value> =
+                serde_json::from_str(&serialized).expect("valid v2 result");
+            assert_eq!(result.status, JobStatus::Ok, "{capability}");
+            assert_eq!(result.result[field], expected, "{capability}");
+            assert_eq!(result.provenance.input_sha256.len(), 1, "{capability}");
+        }
+    }
+
+    #[test]
+    fn v2_executes_interval_intersection_with_two_hashed_inputs() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        let left = root
+            .join("tests/fixtures/interval-intersect/left.bed")
+            .canonicalize()
+            .expect("left fixture");
+        let right = root
+            .join("tests/fixtures/interval-intersect/right.bed")
+            .canonicalize()
+            .expect("right fixture");
+        let mut request = artifact_request(
+            &left,
+            BioDataFormat::Bed,
+            CompressionFormat::None,
+            "interval.intersect.v1",
+            "left-bed",
+        );
+        request.inputs.push(InputArtifact {
+            artifact_id: "right-artifact".to_owned(),
+            role: "right-bed".to_owned(),
+            cardinality: InputCardinality::Single,
+            files: vec![ArtifactFile {
+                file_id: "right-file".to_owned(),
+                path: right.to_string_lossy().into_owned(),
+                role: None,
+                format: BioDataFormat::Bed,
+                compression: CompressionFormat::None,
+                size_bytes: fs::metadata(&right).expect("right metadata").len(),
+                modified_at: None,
+                sha256: None,
+            }],
+            dataset_id: None,
+        });
+
+        let serialized =
+            execute_request_v2(request, Path::new(".")).expect("execute v2 intersection");
+        let result: AnalysisResultV2<serde_json::Value> =
+            serde_json::from_str(&serialized).expect("valid v2 result");
+        assert_eq!(result.status, JobStatus::Ok);
+        assert_eq!(result.result["overlap_pair_count"], 3);
+        assert_eq!(result.provenance.input_sha256.len(), 2);
     }
 
     fn environment_plan_request(parameters: serde_json::Value) -> JobRequest {

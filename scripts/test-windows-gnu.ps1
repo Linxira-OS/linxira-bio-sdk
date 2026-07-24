@@ -113,3 +113,23 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     throw 'Repository contract validation failed.'
 }
+
+& $ciPython -m unittest discover -s tests/python -p 'test_*.py'
+if ($LASTEXITCODE -ne 0) {
+    throw 'Python release-pipeline tests failed.'
+}
+
+& $ciPython -m unittest discover -s workflows/tests -p 'test_*.py'
+if ($LASTEXITCODE -ne 0) {
+    throw 'Workflow pack manifest tests failed.'
+}
+
+& $ciPython -m unittest discover -s workflows/org.linxira.sequence-conversion-biopython/tests -p 'test_*.py'
+if ($LASTEXITCODE -ne 0) {
+    throw 'Biopython workflow validation tests failed.'
+}
+
+& $ciPython scripts/stage-release.py --check
+if ($LASTEXITCODE -ne 0) {
+    throw 'Release staging source validation failed.'
+}

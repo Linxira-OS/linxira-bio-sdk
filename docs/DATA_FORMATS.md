@@ -10,18 +10,19 @@ means that an analysis capability is available.
 | --- | --- | --- | --- | --- |
 | FASTA | Yes | Sequence records | `sequence.stats.v1` | Plain, gzip, and BGZF |
 | FASTQ | Yes | Read records | `fastq.qc.v1` | Plain, gzip, and BGZF |
-| CSV | Yes | Parsed table | None | Quoted and multiline fields supported |
-| TSV | Yes | Parsed table | None | Tab-delimited text |
-| BED | Yes | Interval rows | None | Inspection only; no interval operation yet |
+| CSV | Yes | Parsed table | `expression.matrix.qc.v1` | Rectangular expression matrices; quoted and multiline preview fields supported |
+| TSV | Yes | Parsed table | `expression.matrix.qc.v1` | Rectangular expression matrices |
+| BED | Yes | Interval rows | `interval.intersect.v1` | Pairwise half-open overlap summary |
 | GFF3 | Yes | Feature rows | None | Inspection only |
 | GTF | Yes | Feature rows | None | Inspection only |
 | VCF | Yes | Variant rows | `variant.stats.v1` | Plain, gzip, and BGZF; no BCF |
-| SAM | Yes | Alignment rows | None | Inspection only; no alignment QC yet |
+| SAM | Yes | Alignment rows | `alignment.qc.v1` | Text SAM flag and mapping QC; plain or gzip |
 | BAM | Magic bytes only | Binary metadata | None | `recognized-unsupported` |
 | BCF, CRAM | Magic bytes only | Binary metadata | None | `recognized-unsupported` |
 | HDF5, H5AD, LOOM | Signature plus extension hints | Binary metadata | None | Domain import is planned |
 | RDS | Magic bytes only | Binary metadata | None | `recognized-unsupported` |
-| PDB, mmCIF | Recognized text structure | Format metadata | None | Structure import is planned |
+| PDB | Recognized text structure | 3D GUI and PNG snapshot | `structure.pdb.summary.v1` | Plain or gzip; coordinates and optional explicit pLDDT; GUI infers display bonds only |
+| mmCIF | Recognized text structure | 3D GUI and PNG snapshot | None | Plain or gzip GUI coordinate viewing; analysis remains planned |
 | ZIP | Container signature | Archive metadata | None | Never extracted by inspection |
 
 Content takes precedence over a misleading filename extension. A supported
@@ -47,9 +48,11 @@ including the header.
 ## 中文说明
 
 “识别”“预览”“可执行分析”和“导出”是四种不同承诺。文件被识别并不代表已有可运行
-的生物学分析能力。FASTA、FASTQ 和 VCF 当前分别可运行序列统计、读段质量控制和
-变异描述统计；BED、GFF3、GTF 与 SAM 目前只做有界预览；BAM、BCF、CRAM、
-H5AD 等二进制格式仅识别，不会伪装成可用能力。
+的生物学分析能力。FASTA、FASTQ、SAM 和 VCF 当前分别可运行序列统计、读段质量
+控制、文本比对质控和变异描述统计；BED 可计算两组区间的半开重叠摘要，CSV/TSV
+可进行矩形表达矩阵质控，PDB 可生成结构摘要和供渲染使用的原子坐标。PDB/mmCIF
+均可在 GUI 中进行有界 3D 预览并导出当前视角 PNG，但 mmCIF 分析仍未实现。GFF3、GTF 目前只做有界
+预览；BAM、BCF、CRAM、H5AD 等二进制格式仅识别，不会伪装成可用能力。
 
 预览最多读取 200 条记录或 10 MiB 解压后内容。表格默认导出 CSV，也支持 TSV、
 JSON、逐行对象 JSONL 和 XLSX。需要保留 VCF、BED、GFF3 等领域语义时，应保留

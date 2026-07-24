@@ -32,18 +32,22 @@ a replacement script silently.
   `analyze-sequence-statistics` for supported FASTA and
   `analyze-fastq-quality` for supported FASTQ. Other sequence manipulation and
   assembly capabilities remain planned.
-- BED, GFF, GTF, coverage, and coordinate joins: built-in genome-interval
-  capabilities remain planned; use an approved external workflow or report the
-  gap.
-- SAM, BAM, CRAM, pileup, and mapping QC: built-in alignment capabilities
-  remain planned; use an approved external workflow or report the gap.
+- BED interval-set overlap summaries: use `intersect-genomic-intervals`.
+  GFF/GTF joins, coverage, strand rules, fractional overlaps, and emitted
+  records still require an approved external workflow.
+- SAM text mapping QC: use `analyze-sam-quality`. BAM, CRAM, pileup, coverage,
+  and advanced mapping reports still require a maintained native workflow.
 - VCF, BCF, variants, genotypes, and normalization: variant skills. Use
   `analyze-variant-statistics` only for supported VCF summaries; BCF remains
   recognized but unsupported.
-- Counts, expression, sparse matrices, RNA-seq, and single-cell data: built-in
-  expression capabilities remain planned.
-- PDB, mmCIF, PAE, pLDDT, structure comparison, and prediction: built-in
-  structural-biology capabilities remain planned.
+- Rectangular CSV/TSV expression matrix QC: use `analyze-expression-matrix`.
+  Differential expression, sparse containers, RNA-seq workflows, and
+  single-cell analysis remain external or planned.
+- PDB coordinate summaries and explicitly requested AlphaFold pLDDT from PDB
+  B-factors: use `analyze-pdb-structure`. The native GUI can preview PDB and
+  mmCIF coordinates in three representation modes and export the current view
+  as PNG; mmCIF analysis, PAE, structure comparison, and prediction remain
+  planned.
 - Missing Python, R, BLAST, DIAMOND, command-line tools, WSL, or GPU runtime:
   `configure-bio-environment` before the domain capability runs.
 - Scheduler, cloud, GPU, or authenticated web service: execution selection
