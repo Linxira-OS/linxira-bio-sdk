@@ -111,6 +111,104 @@ fn executes_v2_sequence_transform_with_relative_output_and_hashes() {
 }
 
 #[test]
+fn executes_v2_sequence_utility_fixtures() {
+    let root = workspace_root();
+    let cleanup_files = [
+        root.join("target/test-results/sequence-normalize-ids-v2.fa"),
+        root.join("target/test-results/sequence-merge-v2.fa"),
+        root.join("target/test-results/sequence-to-table-v2.tsv"),
+        root.join("target/test-results/sequence-from-table-v2.fa"),
+    ];
+    let cleanup_directories = [root.join("target/test-results/sequence-split-v2")];
+    for path in cleanup_files {
+        if path.exists() {
+            std::fs::remove_file(&path).expect("remove stale sequence utility output");
+        }
+    }
+    for path in cleanup_directories {
+        if path.exists() {
+            std::fs::remove_dir_all(&path).expect("remove stale sequence split output");
+        }
+    }
+
+    let cases = [
+        (
+            "sequence-normalize-ids-v2.json",
+            "sequence.id.normalize.v1",
+            "output_records",
+            3,
+        ),
+        (
+            "sequence-merge-v2.json",
+            "sequence.merge.v1",
+            "output_records",
+            3,
+        ),
+        (
+            "sequence-split-v2.json",
+            "sequence.split.v1",
+            "output_files",
+            2,
+        ),
+        (
+            "sequence-to-table-v2.json",
+            "sequence.to-table.v1",
+            "output_rows",
+            3,
+        ),
+        (
+            "sequence-from-table-v2.json",
+            "sequence.from-table.v1",
+            "output_records",
+            2,
+        ),
+    ];
+
+    for (fixture, capability, field, expected) in cases {
+        let request = root.join("tests/fixtures/jobs").join(fixture);
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(request)
+            .output()
+            .unwrap_or_else(|error| panic!("run {capability}: {error}"));
+
+        assert!(
+            output.status.success(),
+            "{capability}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid utility result");
+        assert_eq!(result["schema_version"], "2", "{capability}");
+        assert_eq!(result["status"], "ok", "{capability}");
+        assert_eq!(result["capability"], capability, "{capability}");
+        assert_eq!(result["result"][field], expected, "{capability}");
+        assert_eq!(
+            result["provenance"]["input_sha256"]
+                .as_object()
+                .map(|hashes| hashes.len()),
+            Some(1),
+            "{capability}"
+        );
+        assert_eq!(
+            result["artifacts"].as_array().map(Vec::len),
+            Some(1),
+            "{capability}"
+        );
+    }
+
+    for path in [
+        root.join("target/test-results/sequence-normalize-ids-v2.fa"),
+        root.join("target/test-results/sequence-merge-v2.fa"),
+        root.join("target/test-results/sequence-to-table-v2.tsv"),
+        root.join("target/test-results/sequence-from-table-v2.fa"),
+    ] {
+        std::fs::remove_file(path).expect("remove sequence utility output");
+    }
+    std::fs::remove_dir_all(root.join("target/test-results/sequence-split-v2"))
+        .expect("remove split output directory");
+}
+
+#[test]
 fn returns_structured_v2_validation_errors_from_the_binary() {
     let request = temporary_request_path("v2-validation-error");
     std::fs::write(

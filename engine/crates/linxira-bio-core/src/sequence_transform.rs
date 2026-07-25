@@ -15,6 +15,7 @@ const MAX_ORFS_PER_RECORD: usize = 1_000_000;
 #[derive(Debug)]
 pub enum SequenceTransformError {
     Io(io::Error),
+    Csv(csv::Error),
     EmptyIdentifier {
         line: usize,
     },
@@ -54,6 +55,7 @@ impl Display for SequenceTransformError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Io(error) => write!(formatter, "sequence operation failed: {error}"),
+            Self::Csv(error) => write!(formatter, "sequence table operation failed: {error}"),
             Self::EmptyIdentifier { line } => {
                 write!(formatter, "FASTA header at line {line} has no identifier")
             }
@@ -108,6 +110,7 @@ impl Error for SequenceTransformError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Io(error) => Some(error),
+            Self::Csv(error) => Some(error),
             _ => None,
         }
     }
@@ -116,6 +119,12 @@ impl Error for SequenceTransformError {
 impl From<io::Error> for SequenceTransformError {
     fn from(error: io::Error) -> Self {
         Self::Io(error)
+    }
+}
+
+impl From<csv::Error> for SequenceTransformError {
+    fn from(error: csv::Error) -> Self {
+        Self::Csv(error)
     }
 }
 
@@ -294,6 +303,174 @@ pub struct SequenceOrfSummary {
     pub longest_orf_amino_acids: u64,
     pub minimum_amino_acids: u64,
     pub reverse_strand_searched: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SequenceIdNormalizeOptions {
+    pub prefix: String,
+    pub start: u64,
+    pub width: Option<usize>,
+    pub keep_description: bool,
+}
+
+impl Default for SequenceIdNormalizeOptions {
+    fn default() -> Self {
+        Self {
+            prefix: "seq".to_owned(),
+            start: 1,
+            width: Some(6),
+            keep_description: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SequenceIdNormalizeSummary {
+    #[serde(flatten)]
+    pub rewrite: SequenceRewriteSummary,
+    pub prefix: String,
+    pub first_index: u64,
+    pub last_index: Option<u64>,
+    pub width: Option<usize>,
+    pub kept_description: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SequenceMergeOptions {
+    pub allow_duplicate_ids: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SequenceMergeSummary {
+    pub input_files: u64,
+    pub input_records: u64,
+    pub output_records: u64,
+    pub input_residues: u64,
+    pub output_residues: u64,
+    pub duplicate_identifier_count: u64,
+    pub duplicate_identifiers_allowed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SequenceSplitOptions {
+    pub records_per_file: usize,
+    pub prefix: String,
+}
+
+impl Default for SequenceSplitOptions {
+    fn default() -> Self {
+        Self {
+            records_per_file: 1_000,
+            prefix: "part".to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SequenceSplitSummary {
+    pub input_records: u64,
+    pub output_files: u64,
+    pub input_residues: u64,
+    pub output_residues: u64,
+    pub records_per_file: u64,
+    pub prefix: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SequenceTableDelimiter {
+    Csv,
+    Tsv,
+}
+
+impl SequenceTableDelimiter {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Csv => "csv",
+            Self::Tsv => "tsv",
+        }
+    }
+
+    pub fn byte(self) -> u8 {
+        match self {
+            Self::Csv => b',',
+            Self::Tsv => b'\t',
+        }
+    }
+
+    pub fn media_type(self) -> &'static str {
+        match self {
+            Self::Csv => "text/csv",
+            Self::Tsv => "text/tab-separated-values",
+        }
+    }
+
+    pub fn infer_from_path(path: &Path) -> Option<Self> {
+        match path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+        {
+            Some("csv") => Some(Self::Csv),
+            Some("tsv" | "tab") => Some(Self::Tsv),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SequenceToTableOptions {
+    pub delimiter: SequenceTableDelimiter,
+    pub include_header: bool,
+}
+
+impl Default for SequenceToTableOptions {
+    fn default() -> Self {
+        Self {
+            delimiter: SequenceTableDelimiter::Csv,
+            include_header: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SequenceToTableSummary {
+    pub input_records: u64,
+    pub output_rows: u64,
+    pub input_residues: u64,
+    pub delimiter: String,
+    pub included_header: bool,
+    pub columns: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SequenceFromTableOptions {
+    pub delimiter: SequenceTableDelimiter,
+    pub id_column: String,
+    pub sequence_column: String,
+    pub description_column: Option<String>,
+}
+
+impl Default for SequenceFromTableOptions {
+    fn default() -> Self {
+        Self {
+            delimiter: SequenceTableDelimiter::Csv,
+            id_column: "id".to_owned(),
+            sequence_column: "sequence".to_owned(),
+            description_column: Some("description".to_owned()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SequenceFromTableSummary {
+    pub input_rows: u64,
+    pub output_records: u64,
+    pub output_residues: u64,
+    pub delimiter: String,
+    pub id_column: String,
+    pub sequence_column: String,
+    pub description_column: Option<String>,
 }
 
 #[derive(Debug)]
@@ -584,6 +761,298 @@ pub fn find_orfs_fasta_path(
     })
 }
 
+pub fn normalize_fasta_ids_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &SequenceIdNormalizeOptions,
+) -> Result<SequenceIdNormalizeSummary, SequenceTransformError> {
+    validate_identifier_prefix(&options.prefix, "identifier prefix")?;
+    validate_optional_width(options.width)?;
+    if options.start == 0 {
+        return Err(SequenceTransformError::InvalidOption(
+            "start index must be at least 1".to_owned(),
+        ));
+    }
+
+    let mut rewrite = SequenceRewriteSummary::default();
+    let mut next_index = options.start;
+    with_new_output(output.as_ref(), |writer| {
+        visit_fasta_path(input.as_ref(), |record| {
+            rewrite.observe_input(record.sequence.len());
+            let new_identifier =
+                format_numbered_identifier(&options.prefix, next_index, options.width);
+            next_index = next_index.checked_add(1).ok_or_else(|| {
+                SequenceTransformError::InvalidOption(
+                    "identifier index overflowed u64 while normalizing FASTA IDs".to_owned(),
+                )
+            })?;
+            let header = if options.keep_description {
+                let description = record_description(&record);
+                if description.is_empty() {
+                    new_identifier
+                } else {
+                    format!("{new_identifier} {description}")
+                }
+            } else {
+                new_identifier
+            };
+            write_fasta_record(writer, &header, &record.sequence)?;
+            rewrite.observe_output(record.sequence.len());
+            Ok(())
+        })?;
+
+        let last_index = if rewrite.output_records == 0 {
+            None
+        } else {
+            Some(next_index - 1)
+        };
+        Ok(SequenceIdNormalizeSummary {
+            rewrite: rewrite.clone(),
+            prefix: options.prefix.clone(),
+            first_index: options.start,
+            last_index,
+            width: options.width,
+            kept_description: options.keep_description,
+        })
+    })
+}
+
+pub fn merge_fasta_paths<P: AsRef<Path>>(
+    inputs: &[P],
+    output: impl AsRef<Path>,
+    options: &SequenceMergeOptions,
+) -> Result<SequenceMergeSummary, SequenceTransformError> {
+    if inputs.is_empty() {
+        return Err(SequenceTransformError::InvalidOption(
+            "sequence merge requires at least one input FASTA".to_owned(),
+        ));
+    }
+
+    let mut seen = HashSet::new();
+    let mut summary = SequenceMergeSummary {
+        input_files: 0,
+        input_records: 0,
+        output_records: 0,
+        input_residues: 0,
+        output_residues: 0,
+        duplicate_identifier_count: 0,
+        duplicate_identifiers_allowed: options.allow_duplicate_ids,
+    };
+
+    with_new_output(output.as_ref(), |writer| {
+        for input in inputs {
+            summary.input_files += 1;
+            visit_fasta_path(input.as_ref(), |record| {
+                summary.input_records += 1;
+                summary.input_residues +=
+                    u64::try_from(record.sequence.len()).expect("record length fits in u64");
+                if !seen.insert(record.identifier.clone()) {
+                    summary.duplicate_identifier_count += 1;
+                    if !options.allow_duplicate_ids {
+                        return Err(SequenceTransformError::InvalidOption(format!(
+                            "duplicate FASTA identifier {:?}; pass --allow-duplicate-ids to keep duplicates",
+                            record.identifier
+                        )));
+                    }
+                }
+                write_fasta_record(writer, &record.header, &record.sequence)?;
+                summary.output_records += 1;
+                summary.output_residues +=
+                    u64::try_from(record.sequence.len()).expect("record length fits in u64");
+                Ok(())
+            })?;
+        }
+        Ok(summary.clone())
+    })
+}
+
+pub fn split_fasta_path(
+    input: impl AsRef<Path>,
+    output_directory: impl AsRef<Path>,
+    options: &SequenceSplitOptions,
+) -> Result<SequenceSplitSummary, SequenceTransformError> {
+    validate_split_options(options)?;
+    let output_directory = output_directory.as_ref();
+    let mut summary = SequenceSplitSummary {
+        input_records: 0,
+        output_files: 0,
+        input_residues: 0,
+        output_residues: 0,
+        records_per_file: u64::try_from(options.records_per_file)
+            .expect("records per file fits in u64"),
+        prefix: options.prefix.clone(),
+    };
+    let mut created = Vec::<PathBuf>::new();
+    let mut writer: Option<BufWriter<File>> = None;
+    let mut records_in_current_file = 0_usize;
+
+    let result = (|| {
+        if output_directory.exists() && !output_directory.is_dir() {
+            return Err(SequenceTransformError::InvalidOption(format!(
+                "split output path is not a directory: {}",
+                output_directory.display()
+            )));
+        }
+        fs::create_dir_all(output_directory)?;
+        visit_fasta_path(input.as_ref(), |record| {
+            if writer.is_none() || records_in_current_file == options.records_per_file {
+                if let Some(mut previous) = writer.take() {
+                    previous.flush()?;
+                }
+                let next_file_index = summary.output_files + 1;
+                let output_path =
+                    output_directory.join(format!("{}_{next_file_index:03}.fa", options.prefix));
+                let file = OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&output_path)?;
+                created.push(output_path);
+                writer = Some(BufWriter::new(file));
+                records_in_current_file = 0;
+                summary.output_files = next_file_index;
+            }
+
+            summary.input_records += 1;
+            summary.input_residues +=
+                u64::try_from(record.sequence.len()).expect("record length fits in u64");
+            let active = writer
+                .as_mut()
+                .expect("split writer is created before writing");
+            write_fasta_record(active, &record.header, &record.sequence)?;
+            records_in_current_file += 1;
+            summary.output_residues +=
+                u64::try_from(record.sequence.len()).expect("record length fits in u64");
+            Ok(())
+        })?;
+        if let Some(mut active) = writer.take() {
+            active.flush()?;
+        }
+        Ok(summary.clone())
+    })();
+
+    if result.is_err() {
+        drop(writer);
+        for path in created {
+            let _ = fs::remove_file(path);
+        }
+    }
+    result
+}
+
+pub fn fasta_to_table_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &SequenceToTableOptions,
+) -> Result<SequenceToTableSummary, SequenceTransformError> {
+    let columns = vec![
+        "id".to_owned(),
+        "description".to_owned(),
+        "length".to_owned(),
+        "sequence".to_owned(),
+    ];
+    let mut summary = SequenceToTableSummary {
+        input_records: 0,
+        output_rows: 0,
+        input_residues: 0,
+        delimiter: options.delimiter.name().to_owned(),
+        included_header: options.include_header,
+        columns: columns.clone(),
+    };
+
+    with_new_output(output.as_ref(), |writer| {
+        let mut table = csv::WriterBuilder::new()
+            .delimiter(options.delimiter.byte())
+            .has_headers(false)
+            .from_writer(writer);
+        if options.include_header {
+            table.write_record(columns.iter().map(String::as_str))?;
+        }
+        visit_fasta_path(input.as_ref(), |record| {
+            summary.input_records += 1;
+            summary.input_residues +=
+                u64::try_from(record.sequence.len()).expect("record length fits in u64");
+            let description = record_description(&record);
+            let length = record.sequence.len().to_string();
+            let sequence = sequence_text(&record.sequence, &record.identifier)?;
+            table.write_record([
+                record.identifier.as_str(),
+                description,
+                length.as_str(),
+                sequence.as_str(),
+            ])?;
+            summary.output_rows += 1;
+            Ok(())
+        })?;
+        table.flush()?;
+        Ok(summary.clone())
+    })
+}
+
+pub fn table_to_fasta_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &SequenceFromTableOptions,
+) -> Result<SequenceFromTableSummary, SequenceTransformError> {
+    validate_column_name(&options.id_column, "id column")?;
+    validate_column_name(&options.sequence_column, "sequence column")?;
+    if let Some(column) = &options.description_column {
+        validate_column_name(column, "description column")?;
+    }
+
+    let mut summary = SequenceFromTableSummary {
+        input_rows: 0,
+        output_records: 0,
+        output_residues: 0,
+        delimiter: options.delimiter.name().to_owned(),
+        id_column: options.id_column.clone(),
+        sequence_column: options.sequence_column.clone(),
+        description_column: options.description_column.clone(),
+    };
+
+    with_new_output(output.as_ref(), |writer| {
+        let reader = open_fasta(input.as_ref())?;
+        let mut table = csv::ReaderBuilder::new()
+            .delimiter(options.delimiter.byte())
+            .from_reader(reader);
+        let headers = table.headers()?.clone();
+        let id_index = find_table_column(&headers, &options.id_column)?;
+        let sequence_index = find_table_column(&headers, &options.sequence_column)?;
+        let description_index = options
+            .description_column
+            .as_deref()
+            .map(|column| find_table_column(&headers, column))
+            .transpose()?;
+
+        for row in table.records() {
+            let row = row?;
+            summary.input_rows += 1;
+            let identifier = row.get(id_index).unwrap_or_default().trim();
+            validate_sequence_identifier(identifier)?;
+            let raw_sequence = row.get(sequence_index).unwrap_or_default();
+            let sequence = raw_sequence
+                .bytes()
+                .filter(|byte| !byte.is_ascii_whitespace())
+                .collect::<Vec<_>>();
+            let header = match description_index
+                .and_then(|index| row.get(index))
+                .map(str::trim)
+                .filter(|description| !description.is_empty())
+            {
+                Some(description) => format!("{identifier} {description}"),
+                None => identifier.to_owned(),
+            };
+            write_fasta_record(writer, &header, &sequence)?;
+            summary.output_records += 1;
+            summary.output_residues +=
+                u64::try_from(sequence.len()).expect("sequence length fits in u64");
+        }
+        if summary.output_records == 0 {
+            return Err(SequenceTransformError::NoRecords);
+        }
+        Ok(summary.clone())
+    })
+}
+
 fn validate_extract_options(
     options: &SequenceExtractOptions,
 ) -> Result<BTreeSet<String>, SequenceTransformError> {
@@ -660,6 +1129,109 @@ fn validate_filter_options(options: &SequenceFilterOptions) -> Result<(), Sequen
         ));
     }
     Ok(())
+}
+
+fn validate_identifier_prefix(prefix: &str, label: &str) -> Result<(), SequenceTransformError> {
+    if prefix.is_empty() || prefix.bytes().any(|byte| byte.is_ascii_whitespace()) {
+        return Err(SequenceTransformError::InvalidOption(format!(
+            "{label} must be non-empty and cannot contain whitespace"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_sequence_identifier(identifier: &str) -> Result<(), SequenceTransformError> {
+    if identifier.is_empty() || identifier.bytes().any(|byte| byte.is_ascii_whitespace()) {
+        return Err(SequenceTransformError::InvalidOption(format!(
+            "invalid FASTA identifier in table row: {identifier:?}"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_optional_width(width: Option<usize>) -> Result<(), SequenceTransformError> {
+    if width.is_some_and(|width| width == 0 || width > 32) {
+        return Err(SequenceTransformError::InvalidOption(
+            "identifier width must be between 1 and 32".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_split_options(options: &SequenceSplitOptions) -> Result<(), SequenceTransformError> {
+    if options.records_per_file == 0 {
+        return Err(SequenceTransformError::InvalidOption(
+            "records-per-file must be at least 1".to_owned(),
+        ));
+    }
+    validate_path_prefix(&options.prefix)
+}
+
+fn validate_path_prefix(prefix: &str) -> Result<(), SequenceTransformError> {
+    if prefix.is_empty()
+        || prefix == "."
+        || prefix == ".."
+        || prefix.bytes().any(|byte| {
+            byte.is_ascii_whitespace()
+                || matches!(
+                    byte,
+                    b'/' | b'\\' | b':' | b'*' | b'?' | b'"' | b'<' | b'>' | b'|'
+                )
+        })
+    {
+        return Err(SequenceTransformError::InvalidOption(
+            "split prefix must be a non-empty safe filename fragment".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_column_name(column: &str, label: &str) -> Result<(), SequenceTransformError> {
+    if column.trim().is_empty() {
+        return Err(SequenceTransformError::InvalidOption(format!(
+            "{label} cannot be empty"
+        )));
+    }
+    Ok(())
+}
+
+fn format_numbered_identifier(prefix: &str, index: u64, width: Option<usize>) -> String {
+    match width {
+        Some(width) => format!("{prefix}{index:0width$}"),
+        None => format!("{prefix}{index}"),
+    }
+}
+
+fn record_description(record: &FastaRecord) -> &str {
+    record
+        .header
+        .get(record.identifier.len()..)
+        .unwrap_or_default()
+        .trim_start()
+}
+
+fn sequence_text(sequence: &[u8], identifier: &str) -> Result<String, SequenceTransformError> {
+    std::str::from_utf8(sequence)
+        .map(str::to_owned)
+        .map_err(|_| {
+            SequenceTransformError::InvalidOption(format!(
+                "FASTA record {identifier:?} sequence is not valid UTF-8 text"
+            ))
+        })
+}
+
+fn find_table_column(
+    headers: &csv::StringRecord,
+    column: &str,
+) -> Result<usize, SequenceTransformError> {
+    headers
+        .iter()
+        .position(|header| header == column)
+        .ok_or_else(|| {
+            SequenceTransformError::InvalidOption(format!(
+                "table is missing required column {column:?}"
+            ))
+        })
 }
 
 fn validate_frames(frames: &[i8]) -> Result<Vec<i8>, SequenceTransformError> {
@@ -1114,9 +1686,12 @@ fn add_orf(
 #[cfg(test)]
 mod tests {
     use super::{
-        SequenceExtractOptions, SequenceFilterOptions, SequenceOrfOptions, SequenceTransformError,
-        SequenceTranslateOptions, extract_fasta_path, filter_fasta_path, find_orfs_fasta_path,
-        reverse_complement_fasta_path, translate_fasta_path,
+        SequenceExtractOptions, SequenceFilterOptions, SequenceFromTableOptions,
+        SequenceIdNormalizeOptions, SequenceMergeOptions, SequenceOrfOptions, SequenceSplitOptions,
+        SequenceTableDelimiter, SequenceToTableOptions, SequenceTransformError,
+        SequenceTranslateOptions, extract_fasta_path, fasta_to_table_path, filter_fasta_path,
+        find_orfs_fasta_path, merge_fasta_paths, normalize_fasta_ids_path,
+        reverse_complement_fasta_path, split_fasta_path, table_to_fasta_path, translate_fasta_path,
     };
     use flate2::Compression;
     use flate2::write::GzEncoder;
@@ -1354,5 +1929,153 @@ mod tests {
         assert_eq!(fs::read(&output).unwrap(), b"keep");
         fs::remove_file(input).unwrap();
         fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn normalizes_fasta_identifiers_deterministically() {
+        let input = fixture_path("fa");
+        let output = fixture_path("out.fa");
+        fs::write(&input, b">geneA alpha desc\nACGT\n>geneB beta desc\nNN\n").unwrap();
+
+        let summary = normalize_fasta_ids_path(
+            &input,
+            &output,
+            &SequenceIdNormalizeOptions {
+                prefix: "lx".to_owned(),
+                start: 7,
+                width: Some(3),
+                keep_description: true,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(summary.rewrite.output_records, 2);
+        assert_eq!(summary.last_index, Some(8));
+        assert_eq!(
+            fs::read_to_string(&output).unwrap(),
+            ">lx007 alpha desc\nACGT\n>lx008 beta desc\nNN\n"
+        );
+        fs::remove_file(input).unwrap();
+        fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn merges_fasta_files_and_rejects_duplicate_ids_by_default() {
+        let first = fixture_path("a.fa");
+        let second = fixture_path("b.fa");
+        let output = fixture_path("merged.fa");
+        fs::write(&first, b">one\nACGT\n").unwrap();
+        fs::write(&second, b">one duplicate\nTT\n").unwrap();
+
+        let error = merge_fasta_paths(
+            &[first.clone(), second.clone()],
+            &output,
+            &SequenceMergeOptions::default(),
+        )
+        .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("duplicate FASTA identifier \"one\"")
+        );
+        assert!(!output.exists());
+
+        let allowed_output = fixture_path("merged-allowed.fa");
+        let summary = merge_fasta_paths(
+            &[first.clone(), second.clone()],
+            &allowed_output,
+            &SequenceMergeOptions {
+                allow_duplicate_ids: true,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(summary.input_files, 2);
+        assert_eq!(summary.duplicate_identifier_count, 1);
+        assert_eq!(
+            fs::read_to_string(&allowed_output).unwrap(),
+            ">one\nACGT\n>one duplicate\nTT\n"
+        );
+        fs::remove_file(first).unwrap();
+        fs::remove_file(second).unwrap();
+        fs::remove_file(allowed_output).unwrap();
+    }
+
+    #[test]
+    fn splits_fasta_into_deterministic_chunks() {
+        let input = fixture_path("fa");
+        let directory = std::env::temp_dir().join(format!(
+            "linxira-sequence-split-{}-{}",
+            std::process::id(),
+            NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::write(&input, b">one\nA\n>two\nCC\n>three\nGGG\n").unwrap();
+
+        let summary = split_fasta_path(
+            &input,
+            &directory,
+            &SequenceSplitOptions {
+                records_per_file: 2,
+                prefix: "chunk".to_owned(),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(summary.input_records, 3);
+        assert_eq!(summary.output_files, 2);
+        assert_eq!(
+            fs::read_to_string(directory.join("chunk_001.fa")).unwrap(),
+            ">one\nA\n>two\nCC\n"
+        );
+        assert_eq!(
+            fs::read_to_string(directory.join("chunk_002.fa")).unwrap(),
+            ">three\nGGG\n"
+        );
+        fs::remove_file(input).unwrap();
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn converts_fasta_to_table_and_back() {
+        let input = fixture_path("fa");
+        let table = fixture_path("tsv");
+        let roundtrip = fixture_path("roundtrip.fa");
+        fs::write(&input, b">one desc\nACGT\n>two\nNN\n").unwrap();
+
+        let to_table = fasta_to_table_path(
+            &input,
+            &table,
+            &SequenceToTableOptions {
+                delimiter: SequenceTableDelimiter::Tsv,
+                include_header: true,
+            },
+        )
+        .unwrap();
+        assert_eq!(to_table.output_rows, 2);
+        assert_eq!(
+            fs::read_to_string(&table).unwrap(),
+            "id\tdescription\tlength\tsequence\none\tdesc\t4\tACGT\ntwo\t\t2\tNN\n"
+        );
+
+        let from_table = table_to_fasta_path(
+            &table,
+            &roundtrip,
+            &SequenceFromTableOptions {
+                delimiter: SequenceTableDelimiter::Tsv,
+                id_column: "id".to_owned(),
+                sequence_column: "sequence".to_owned(),
+                description_column: Some("description".to_owned()),
+            },
+        )
+        .unwrap();
+        assert_eq!(from_table.output_records, 2);
+        assert_eq!(
+            fs::read_to_string(&roundtrip).unwrap(),
+            ">one desc\nACGT\n>two\nNN\n"
+        );
+        fs::remove_file(input).unwrap();
+        fs::remove_file(table).unwrap();
+        fs::remove_file(roundtrip).unwrap();
     }
 }

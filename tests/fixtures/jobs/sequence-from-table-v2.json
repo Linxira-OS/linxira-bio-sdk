@@ -1,0 +1,29 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-sequence-from-table-v2",
+  "capability": "sequence.from-table.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-table",
+      "role": "table",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-table-1",
+          "path": "../sequence-tables/records.tsv",
+          "format": "tsv",
+          "compression": "none",
+          "size_bytes": 58,
+          "sha256": "dfe2d460f2bd9dea1f98442175baff0f0148839e451061185b7ed865c4368eea"
+        }
+      ]
+    }
+  ],
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "output": "../../../target/test-results/sequence-from-table-v2.fa",
+    "delimiter": "tsv"
+  }
+}

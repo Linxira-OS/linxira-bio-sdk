@@ -12,9 +12,12 @@ use linxira_bio_core::interval::{IntervalIntersectStats, bed_intersect_path};
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
 use linxira_bio_core::sequence::{SequenceStats, fasta_stats_path};
 use linxira_bio_core::sequence_transform::{
-    SequenceExtractOptions, SequenceFilterOptions, SequenceOrfOptions, SequenceTranslateOptions,
-    extract_fasta_path, filter_fasta_path, find_orfs_fasta_path, parse_sequence_region_spec,
-    reverse_complement_fasta_path, translate_fasta_path,
+    SequenceExtractOptions, SequenceFilterOptions, SequenceFromTableOptions,
+    SequenceIdNormalizeOptions, SequenceMergeOptions, SequenceOrfOptions, SequenceSplitOptions,
+    SequenceTableDelimiter, SequenceToTableOptions, SequenceTranslateOptions, extract_fasta_path,
+    fasta_to_table_path, filter_fasta_path, find_orfs_fasta_path, merge_fasta_paths,
+    normalize_fasta_ids_path, parse_sequence_region_spec, reverse_complement_fasta_path,
+    split_fasta_path, table_to_fasta_path, translate_fasta_path,
 };
 use linxira_bio_core::structure::{PdbStructureSummary, PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::variant::{VcfStats, vcf_stats_path};
@@ -119,6 +122,27 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         [sequence, orf, arguments @ ..] if sequence == "sequence" && orf == "orf" => {
             print_sequence_orf(arguments)
+        }
+        [sequence, normalize_ids, arguments @ ..]
+            if sequence == "sequence" && normalize_ids == "normalize-ids" =>
+        {
+            print_sequence_normalize_ids(arguments)
+        }
+        [sequence, merge, arguments @ ..] if sequence == "sequence" && merge == "merge" => {
+            print_sequence_merge(arguments)
+        }
+        [sequence, split, arguments @ ..] if sequence == "sequence" && split == "split" => {
+            print_sequence_split(arguments)
+        }
+        [sequence, to_table, arguments @ ..]
+            if sequence == "sequence" && to_table == "to-table" =>
+        {
+            print_sequence_to_table(arguments)
+        }
+        [sequence, from_table, arguments @ ..]
+            if sequence == "sequence" && from_table == "from-table" =>
+        {
+            print_sequence_from_table(arguments)
         }
         [variant, stats, path] if variant == "variant" && stats == "stats" => {
             print_variant_stats(path, false)
@@ -617,6 +641,235 @@ fn print_sequence_orf(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     print_sequence_transform_result("sequence-orf", "sequence.orf.v1", output, summary, json)
 }
 
+fn print_sequence_normalize_ids(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = SequenceIdNormalizeOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--prefix" => {
+                index += 1;
+                options.prefix = arguments
+                    .get(index)
+                    .ok_or("--prefix requires a value")?
+                    .clone();
+            }
+            "--start" => {
+                index += 1;
+                options.start = parse_sequence_u64(arguments.get(index), "--start")?;
+                if options.start == 0 {
+                    return Err("--start must be at least 1".into());
+                }
+            }
+            "--width" => {
+                index += 1;
+                let width = parse_sequence_usize(arguments.get(index), "--width")?;
+                if width == 0 {
+                    return Err("--width must be at least 1".into());
+                }
+                options.width = Some(width);
+            }
+            "--no-padding" => options.width = None,
+            "--drop-description" => options.keep_description = false,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence normalize-ids option: {value}").into());
+            }
+            value => {
+                assign_sequence_path(&mut input, &mut output, value, "sequence normalize-ids")?
+            }
+        }
+        index += 1;
+    }
+    let (input, output) = require_sequence_paths(input, output, "sequence normalize-ids")?;
+    let summary = normalize_fasta_ids_path(input, output, &options)?;
+    print_sequence_transform_result(
+        "sequence-normalize-ids",
+        "sequence.id.normalize.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
+fn print_sequence_merge(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = SequenceMergeOptions::default();
+    let mut json = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--allow-duplicate-ids" => options.allow_duplicate_ids = true,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence merge option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+    }
+    if paths.len() < 2 {
+        return Err(
+            "sequence merge requires an output FASTA followed by at least one input FASTA".into(),
+        );
+    }
+    let output = paths.remove(0);
+    let summary = merge_fasta_paths(&paths, &output, &options)?;
+    print_sequence_transform_result(
+        "sequence-merge",
+        "sequence.merge.v1",
+        &output,
+        summary,
+        json,
+    )
+}
+
+fn print_sequence_split(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = SequenceSplitOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--records-per-file" => {
+                index += 1;
+                options.records_per_file =
+                    parse_sequence_usize(arguments.get(index), "--records-per-file")?;
+                if options.records_per_file == 0 {
+                    return Err("--records-per-file must be at least 1".into());
+                }
+            }
+            "--prefix" => {
+                index += 1;
+                options.prefix = arguments
+                    .get(index)
+                    .ok_or("--prefix requires a value")?
+                    .clone();
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence split option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "sequence split")?,
+        }
+        index += 1;
+    }
+    let input = input.ok_or("sequence split requires an input FASTA path")?;
+    let output = output.ok_or("sequence split requires an output directory")?;
+    let output = Path::new(output);
+    let summary = split_fasta_path(Path::new(input), output, &options)?;
+    print_sequence_transform_result("sequence-split", "sequence.split.v1", output, summary, json)
+}
+
+fn print_sequence_to_table(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut delimiter = None;
+    let mut include_header = true;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--delimiter" => {
+                index += 1;
+                delimiter = Some(parse_sequence_table_delimiter(
+                    arguments.get(index),
+                    "--delimiter",
+                )?);
+            }
+            "--no-header" => include_header = false,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence to-table option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "sequence to-table")?,
+        }
+        index += 1;
+    }
+    let (input, output) = require_sequence_paths(input, output, "sequence to-table")?;
+    let delimiter = delimiter.unwrap_or_else(|| {
+        SequenceTableDelimiter::infer_from_path(output).unwrap_or(SequenceTableDelimiter::Csv)
+    });
+    let summary = fasta_to_table_path(
+        input,
+        output,
+        &SequenceToTableOptions {
+            delimiter,
+            include_header,
+        },
+    )?;
+    print_sequence_transform_result(
+        "sequence-to-table",
+        "sequence.to-table.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
+fn print_sequence_from_table(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = SequenceFromTableOptions::default();
+    let mut delimiter = None;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--delimiter" => {
+                index += 1;
+                delimiter = Some(parse_sequence_table_delimiter(
+                    arguments.get(index),
+                    "--delimiter",
+                )?);
+            }
+            "--id-column" => {
+                index += 1;
+                options.id_column = arguments
+                    .get(index)
+                    .ok_or("--id-column requires a value")?
+                    .clone();
+            }
+            "--sequence-column" => {
+                index += 1;
+                options.sequence_column = arguments
+                    .get(index)
+                    .ok_or("--sequence-column requires a value")?
+                    .clone();
+            }
+            "--description-column" => {
+                index += 1;
+                options.description_column = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--description-column requires a value")?
+                        .clone(),
+                );
+            }
+            "--no-description-column" => options.description_column = None,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence from-table option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "sequence from-table")?,
+        }
+        index += 1;
+    }
+    let (input, output) = require_sequence_paths(input, output, "sequence from-table")?;
+    options.delimiter = delimiter.unwrap_or_else(|| {
+        SequenceTableDelimiter::infer_from_path(input).unwrap_or(SequenceTableDelimiter::Csv)
+    });
+    let summary = table_to_fasta_path(input, output, &options)?;
+    print_sequence_transform_result(
+        "sequence-from-table",
+        "sequence.from-table.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
 fn assign_sequence_path<'a>(
     input: &mut Option<&'a str>,
     output: &mut Option<&'a str>,
@@ -650,6 +903,13 @@ fn parse_sequence_u64(value: Option<&String>, option: &str) -> Result<u64, Box<d
         .map_err(|_| format!("{option} requires a non-negative integer, got {value:?}").into())
 }
 
+fn parse_sequence_usize(value: Option<&String>, option: &str) -> Result<usize, Box<dyn Error>> {
+    let value = value.ok_or_else(|| format!("{option} requires a value"))?;
+    value
+        .parse::<usize>()
+        .map_err(|_| format!("{option} requires a non-negative integer, got {value:?}").into())
+}
+
 fn parse_sequence_percentage(value: Option<&String>, option: &str) -> Result<f64, Box<dyn Error>> {
     let value = value.ok_or_else(|| format!("{option} requires a value"))?;
     let percent = value
@@ -659,6 +919,20 @@ fn parse_sequence_percentage(value: Option<&String>, option: &str) -> Result<f64
         return Err(format!("{option} must be between 0 and 100").into());
     }
     Ok(percent)
+}
+
+fn parse_sequence_table_delimiter(
+    value: Option<&String>,
+    option: &str,
+) -> Result<SequenceTableDelimiter, Box<dyn Error>> {
+    match value
+        .ok_or_else(|| format!("{option} requires a value"))?
+        .as_str()
+    {
+        "csv" => Ok(SequenceTableDelimiter::Csv),
+        "tsv" | "tab" => Ok(SequenceTableDelimiter::Tsv),
+        value => Err(format!("{option} must be csv or tsv, got {value:?}").into()),
+    }
 }
 
 fn print_sequence_transform_result<T>(
@@ -966,5 +1240,5 @@ fn print_stats_json(stats: &SequenceStats) -> Result<(), Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n  linxira-bio runtime catalog [--json]\n  linxira-bio dataset inspect <input> [--json]\n  linxira-bio sequence stats <input.fasta[.gz]> [--json]\n  linxira-bio sequence extract <input.fasta[.gz]> <output.fasta> [--id ID ...] [--region ID:START-END[:+|-] ...] [--strict] [--json]\n  linxira-bio sequence filter <input.fasta[.gz]> <output.fasta> [--min-length N] [--max-length N] [--min-gc-percent P] [--max-gc-percent P] [--max-n-percent P] [--json]\n  linxira-bio sequence reverse-complement <input.fasta[.gz]> <output.fasta> [--json]\n  linxira-bio sequence translate <input.fasta[.gz]> <output.fasta> [--frame FRAME ...] [--trim-terminal-stop] [--stop-at-first] [--json]\n  linxira-bio sequence orf <input.fasta[.gz]> <output.fasta> [--min-amino-acids N] [--forward-only] [--include-partial-3prime] [--json]\n  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n  linxira-bio alignment qc <input.sam[.gz]> [--json]\n  linxira-bio variant stats <input.vcf[.gz]> [--json]\n  linxira-bio interval intersect <left.bed[.gz]> <right.bed[.gz]> [--json]\n  linxira-bio expression matrix-qc <matrix.csv|tsv[.gz]> [--json]\n  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
+    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n  linxira-bio runtime catalog [--json]\n  linxira-bio dataset inspect <input> [--json]\n  linxira-bio sequence stats <input.fasta[.gz]> [--json]\n  linxira-bio sequence extract <input.fasta[.gz]> <output.fasta> [--id ID ...] [--region ID:START-END[:+|-] ...] [--strict] [--json]\n  linxira-bio sequence filter <input.fasta[.gz]> <output.fasta> [--min-length N] [--max-length N] [--min-gc-percent P] [--max-gc-percent P] [--max-n-percent P] [--json]\n  linxira-bio sequence reverse-complement <input.fasta[.gz]> <output.fasta> [--json]\n  linxira-bio sequence translate <input.fasta[.gz]> <output.fasta> [--frame FRAME ...] [--trim-terminal-stop] [--stop-at-first] [--json]\n  linxira-bio sequence orf <input.fasta[.gz]> <output.fasta> [--min-amino-acids N] [--forward-only] [--include-partial-3prime] [--json]\n  linxira-bio sequence normalize-ids <input.fasta[.gz]> <output.fasta> [--prefix PREFIX] [--start N] [--width N|--no-padding] [--drop-description] [--json]\n  linxira-bio sequence merge <output.fasta> <input.fasta[.gz]>... [--allow-duplicate-ids] [--json]\n  linxira-bio sequence split <input.fasta[.gz]> <output-dir> [--records-per-file N] [--prefix PREFIX] [--json]\n  linxira-bio sequence to-table <input.fasta[.gz]> <output.csv|tsv> [--delimiter csv|tsv] [--no-header] [--json]\n  linxira-bio sequence from-table <input.csv|tsv[.gz]> <output.fasta> [--delimiter csv|tsv] [--id-column NAME] [--sequence-column NAME] [--description-column NAME|--no-description-column] [--json]\n  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n  linxira-bio alignment qc <input.sam[.gz]> [--json]\n  linxira-bio variant stats <input.vcf[.gz]> [--json]\n  linxira-bio interval intersect <left.bed[.gz]> <right.bed[.gz]> [--json]\n  linxira-bio expression matrix-qc <matrix.csv|tsv[.gz]> [--json]\n  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
 }

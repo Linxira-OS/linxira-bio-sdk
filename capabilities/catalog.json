@@ -90,6 +90,51 @@
       "output_formats": ["fasta", "json"]
     },
     {
+      "id": "sequence.id.normalize.v1",
+      "status": "available",
+      "category": "sequence-io",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence normalize-ids <input.fasta> <output.fasta> --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
+      "id": "sequence.merge.v1",
+      "status": "available",
+      "category": "sequence-io",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence merge <output.fasta> <input.fasta>... --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
+      "id": "sequence.split.v1",
+      "status": "available",
+      "category": "sequence-io",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence split <input.fasta> <output-dir> --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
+      "id": "sequence.to-table.v1",
+      "status": "available",
+      "category": "sequence-io",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence to-table <input.fasta> <output.csv|tsv> --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["csv", "tsv", "json"]
+    },
+    {
+      "id": "sequence.from-table.v1",
+      "status": "available",
+      "category": "sequence-io",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence from-table <input.csv|tsv> <output.fasta> --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
       "id": "dataset.inspect.v1",
       "status": "available",
       "category": "data-management",
