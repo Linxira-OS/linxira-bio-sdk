@@ -265,6 +265,8 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "fastq.qc.v1",
     "alignment.qc.v1",
     "interval.intersect.v1",
+    "interval.merge.v1",
+    "interval.subtract.v1",
     "expression.matrix.qc.v1",
     "variant.stats.v1",
     "structure.pdb.summary.v1",
@@ -661,17 +663,17 @@ impl BioApp {
         else {
             return;
         };
-        let Some(route) = analysis_route_for_format(&format) else {
+        let Some(route) = analysis_route_for_capability(&self.selected_capability, &format) else {
             return;
         };
-        if self.analysis_running || !runnable || self.selected_capability != route.capability {
+        if self.analysis_running || !runnable {
             return;
         }
 
         let job_id = new_job_id();
         let mut request = build_analysis_request(&job_id, route, &dataset_path);
         let mut dataset_name = dataset_name;
-        if route.capability == "interval.intersect.v1" {
+        if capability_requires_secondary(route.capability) {
             let Some(secondary_index) = self.secondary_dataset else {
                 return;
             };
@@ -695,6 +697,12 @@ impl BioApp {
                 .inputs
                 .insert("right-bed".to_owned(), secondary.path.clone());
             dataset_name = format!("{dataset_name} + {}", secondary.name);
+        }
+        if let Some(extension) = capability_output_extension(route.capability) {
+            let output = derived_analysis_output_path(&dataset_path, route.capability, extension);
+            request.parameters = serde_json::json!({
+                "output": output.to_string_lossy(),
+            });
         }
         if route.capability == "structure.pdb.summary.v1" {
             request.parameters = serde_json::json!({
@@ -1440,7 +1448,7 @@ impl BioApp {
         let dataset_ready =
             supported && state != DatasetState::Inspecting && state != DatasetState::Invalid;
         let capability_matches =
-            route.is_some_and(|route| route.capability == self.selected_capability.as_str());
+            analysis_route_for_capability(&self.selected_capability, &format).is_some();
 
         ui.add_space(8.0);
         ui.horizontal_wrapped(|ui| {
@@ -1460,6 +1468,8 @@ impl BioApp {
                     "alignment.qc.v1",
                     "variant.stats.v1",
                     "interval.intersect.v1",
+                    "interval.merge.v1",
+                    "interval.subtract.v1",
                     "expression.matrix.qc.v1",
                     "structure.pdb.summary.v1",
                 ] {
@@ -1471,7 +1481,7 @@ impl BioApp {
                 }
             });
 
-        let requires_secondary = self.selected_capability == "interval.intersect.v1";
+        let requires_secondary = capability_requires_secondary(&self.selected_capability);
         let primary_index = self.selected_dataset;
         let bed_candidates = self
             .datasets
@@ -1546,6 +1556,14 @@ impl BioApp {
                 ui.label(self.text("结果契约", "Result contract"));
                 ui.monospace("AnalysisResult");
                 ui.end_row();
+                if capability_output_extension(&self.selected_capability).is_some() {
+                    ui.label(self.text("输出文件", "Output file"));
+                    ui.label(self.text(
+                        "自动写入输入文件同目录，不覆盖已有文件",
+                        "Auto-written next to the input without overwriting",
+                    ));
+                    ui.end_row();
+                }
             });
 
         let secondary_ready = !requires_secondary || self.secondary_dataset.is_some();
@@ -1559,8 +1577,8 @@ impl BioApp {
                 .to_owned()
             } else if !secondary_ready {
                 self.text(
-                    "区间相交需要再导入一个检查通过的 BED 文件。",
-                    "Interval intersection requires another validated BED file.",
+                    "区间相交或扣除需要再导入一个检查通过的 BED 文件。",
+                    "Interval intersection or subtraction requires another validated BED file.",
                 )
                 .to_owned()
             } else if let Some(route) = route {
@@ -2165,6 +2183,79 @@ fn analysis_route_for_format(format: &str) -> Option<AnalysisRoute> {
     }
 }
 
+fn analysis_route_for_capability(capability: &str, format: &str) -> Option<AnalysisRoute> {
+    let format = format.trim().to_ascii_lowercase();
+    match (capability, format.as_str()) {
+        ("sequence.stats.v1", "fasta") => Some(AnalysisRoute {
+            capability: "sequence.stats.v1",
+            input_role: "fasta",
+        }),
+        ("fastq.qc.v1", "fastq") => Some(AnalysisRoute {
+            capability: "fastq.qc.v1",
+            input_role: "fastq",
+        }),
+        ("alignment.qc.v1", "sam") => Some(AnalysisRoute {
+            capability: "alignment.qc.v1",
+            input_role: "sam",
+        }),
+        ("interval.intersect.v1", "bed") => Some(AnalysisRoute {
+            capability: "interval.intersect.v1",
+            input_role: "left-bed",
+        }),
+        ("interval.merge.v1", "bed") => Some(AnalysisRoute {
+            capability: "interval.merge.v1",
+            input_role: "bed",
+        }),
+        ("interval.subtract.v1", "bed") => Some(AnalysisRoute {
+            capability: "interval.subtract.v1",
+            input_role: "left-bed",
+        }),
+        ("expression.matrix.qc.v1", "csv" | "tsv") => Some(AnalysisRoute {
+            capability: "expression.matrix.qc.v1",
+            input_role: "matrix",
+        }),
+        ("variant.stats.v1", "vcf") => Some(AnalysisRoute {
+            capability: "variant.stats.v1",
+            input_role: "vcf",
+        }),
+        ("structure.pdb.summary.v1", "pdb") => Some(AnalysisRoute {
+            capability: "structure.pdb.summary.v1",
+            input_role: "pdb",
+        }),
+        _ => None,
+    }
+}
+
+fn capability_requires_secondary(capability: &str) -> bool {
+    matches!(capability, "interval.intersect.v1" | "interval.subtract.v1")
+}
+
+fn capability_output_extension(capability: &str) -> Option<&'static str> {
+    match capability {
+        "interval.merge.v1" | "interval.subtract.v1" => Some("bed"),
+        _ => None,
+    }
+}
+
+fn derived_analysis_output_path(input_path: &str, capability: &str, extension: &str) -> PathBuf {
+    let input = Path::new(input_path);
+    let parent = input.parent().unwrap_or_else(|| Path::new("."));
+    let stem = input
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .filter(|stem| !stem.trim().is_empty())
+        .unwrap_or("linxira-output");
+    let operation = capability
+        .strip_suffix(".v1")
+        .unwrap_or(capability)
+        .replace('.', "-");
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    parent.join(format!("{stem}.{operation}.{millis}.{extension}"))
+}
+
 fn build_analysis_request(job_id: &str, route: AnalysisRoute, input_path: &str) -> JobRequest {
     let mut inputs = BTreeMap::new();
     inputs.insert(route.input_role.to_owned(), input_path.to_owned());
@@ -2752,7 +2843,9 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
     match capability {
         "sequence.stats.v1" => language.text("FASTA 序列统计", "FASTA sequence statistics"),
         "fastq.qc.v1" => language.text("FASTQ 质量控制", "FASTQ quality control"),
-        "interval.intersect.v1" => language.text("基因组区间", "Genome intervals"),
+        "interval.intersect.v1" => language.text("BED 区间相交", "BED interval intersection"),
+        "interval.merge.v1" => language.text("BED 区间合并", "BED interval merge"),
+        "interval.subtract.v1" => language.text("BED 区间扣除", "BED interval subtraction"),
         "variant.stats.v1" => language.text("变异统计", "Variant statistics"),
         "alignment.qc.v1" => language.text("比对质量控制", "Alignment quality control"),
         "expression.matrix.qc.v1" => language.text("表达矩阵", "Expression matrix"),
@@ -3204,6 +3297,14 @@ fn metric_label(key: &str, language: Language) -> &str {
         "samples" => "各样本指标",
         "left_interval_count" => "左侧区间数",
         "right_interval_count" => "右侧区间数",
+        "input_interval_count" => "输入区间数",
+        "output_interval_count" => "输出区间数",
+        "merged_interval_count" => "被合并区间数",
+        "input_bases" => "输入碱基数",
+        "output_bases" => "输出碱基数",
+        "max_gap" => "最大间隔",
+        "affected_left_interval_count" => "受影响左侧区间数",
+        "removed_bases" => "被扣除碱基数",
         "overlap_pair_count" => "重叠对数",
         "left_overlapped_count" => "左侧已重叠区间数",
         "right_overlapped_count" => "右侧已重叠区间数",
@@ -3242,6 +3343,8 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "fastq.qc.v1" => language.text("FASTQ 质量控制", "FASTQ quality control"),
         "alignment.qc.v1" => language.text("SAM 比对质量控制", "SAM alignment quality control"),
         "interval.intersect.v1" => language.text("BED 区间相交", "BED interval intersection"),
+        "interval.merge.v1" => language.text("BED 区间合并", "BED interval merge"),
+        "interval.subtract.v1" => language.text("BED 区间扣除", "BED interval subtraction"),
         "expression.matrix.qc.v1" => {
             language.text("表达矩阵质量控制", "Expression matrix quality control")
         }
@@ -3293,6 +3396,18 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("interval.intersect.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/interval.intersect.v1/en-US.md"
+        )),
+        ("interval.merge.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/interval.merge.v1/zh-CN.md"
+        )),
+        ("interval.merge.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/interval.merge.v1/en-US.md"
+        )),
+        ("interval.subtract.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/interval.subtract.v1/zh-CN.md"
+        )),
+        ("interval.subtract.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/interval.subtract.v1/en-US.md"
         )),
         ("expression.matrix.qc.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/expression.matrix.qc.v1/zh-CN.md"
@@ -3748,11 +3863,12 @@ fn new_job_id() -> String {
 mod tests {
     use super::{
         AnalysisRoute, DOCUMENTED_CAPABILITIES, DatasetState, ImportPathIssue, Language,
-        analysis_export_basename, analysis_result_matches, analysis_route_for_format,
-        build_analysis_request, capability_document, generation_matches, importable_file_path,
-        inspection_is_runnable, inspection_state, load_dependency_notices_from,
-        looks_like_drive_relative_path, new_job_id, notice_platform_target_pair_is_valid,
-        render_dependency_notice_report,
+        analysis_export_basename, analysis_result_matches, analysis_route_for_capability,
+        analysis_route_for_format, build_analysis_request, capability_document,
+        capability_output_extension, capability_requires_secondary, derived_analysis_output_path,
+        generation_matches, importable_file_path, inspection_is_runnable, inspection_state,
+        load_dependency_notices_from, looks_like_drive_relative_path, new_job_id,
+        notice_platform_target_pair_is_valid, render_dependency_notice_report,
     };
     use linxira_bio_protocol::ExecutionMode;
     use serde_json::json;
@@ -3852,6 +3968,44 @@ mod tests {
             })
         );
         assert_eq!(analysis_route_for_format("bam"), None);
+    }
+
+    #[test]
+    fn bed_capability_routes_include_set_operations() {
+        assert_eq!(
+            analysis_route_for_capability("interval.merge.v1", "bed"),
+            Some(AnalysisRoute {
+                capability: "interval.merge.v1",
+                input_role: "bed",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_capability("interval.subtract.v1", "bed"),
+            Some(AnalysisRoute {
+                capability: "interval.subtract.v1",
+                input_role: "left-bed",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_capability("interval.merge.v1", "fasta"),
+            None
+        );
+        assert!(!capability_requires_secondary("interval.merge.v1"));
+        assert!(capability_requires_secondary("interval.subtract.v1"));
+        assert_eq!(
+            capability_output_extension("interval.merge.v1"),
+            Some("bed")
+        );
+        assert_eq!(capability_output_extension("sequence.stats.v1"), None);
+
+        let output =
+            derived_analysis_output_path("data/regions.bed", "interval.subtract.v1", "bed");
+        let output_name = output
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("derived output name");
+        assert!(output_name.starts_with("regions.interval-subtract."));
+        assert!(output_name.ends_with(".bed"));
     }
 
     #[test]

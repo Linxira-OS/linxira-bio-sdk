@@ -319,6 +319,57 @@ fn intersects_bed_intervals_as_json() {
     assert_eq!(result["capability"], "interval.intersect.v1");
     assert_eq!(result["result"]["overlap_pair_count"], 3);
     assert_eq!(result["result"]["total_overlap_bases"], 12);
+
+    let temp = temporary_directory("interval-ops");
+    let merge_input = temp.join("merge.bed");
+    let merge_output = temp.join("merged.bed");
+    fs::write(&merge_input, b"chr1\t0\t5\nchr1\t5\t10\nchr1\t12\t14\n").expect("write merge BED");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["interval", "merge"])
+        .arg(&merge_input)
+        .arg(&merge_output)
+        .arg("--json")
+        .output()
+        .expect("run BED merge");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid merge result");
+    assert_eq!(result["capability"], "interval.merge.v1");
+    assert_eq!(result["result"]["output_interval_count"], 2);
+    assert_eq!(
+        fs::read_to_string(&merge_output).expect("merged BED"),
+        "chr1\t0\t10\nchr1\t12\t14\n"
+    );
+
+    let subtract_output = temp.join("subtracted.bed");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["interval", "subtract"])
+        .arg(root.join("tests/fixtures/interval-intersect/left.bed"))
+        .arg(root.join("tests/fixtures/interval-intersect/right.bed"))
+        .arg(&subtract_output)
+        .arg("--json")
+        .output()
+        .expect("run BED subtraction");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid subtraction result");
+    assert_eq!(result["capability"], "interval.subtract.v1");
+    assert_eq!(result["result"]["output_interval_count"], 3);
+    assert!(
+        fs::metadata(&subtract_output)
+            .expect("subtracted BED")
+            .len()
+            > 0
+    );
+    fs::remove_dir_all(temp).expect("remove interval ops directory");
 }
 
 #[test]

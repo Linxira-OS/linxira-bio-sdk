@@ -35,9 +35,10 @@ a replacement script silently.
   coordinate extraction, filtering, reverse-complement generation,
   translation, ORF finding, ID normalization, merge/split, and FASTA-table
   conversion.
-- BED interval-set overlap summaries: use `intersect-genomic-intervals`.
-  GFF/GTF joins, coverage, strand rules, fractional overlaps, and emitted
-  records still require an approved external workflow.
+- BED interval operations: use `intersect-genomic-intervals` for overlap
+  summaries, BED3 merge, and BED3 subtraction. GFF/GTF joins, coverage, closest
+  feature lookup, strand rules, fractional overlaps, and record-preserving
+  outputs still require an approved external workflow.
 - SAM text mapping QC: use `analyze-sam-quality`. BAM, CRAM, pileup, coverage,
   and advanced mapping reports still require a maintained native workflow.
 - VCF, BCF, variants, genotypes, and normalization: variant skills. Use

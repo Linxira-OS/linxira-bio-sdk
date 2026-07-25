@@ -12,7 +12,7 @@ means that an analysis capability is available.
 | FASTQ | Yes | Read records | `fastq.qc.v1` | Plain, gzip, and BGZF |
 | CSV | Yes | Parsed table | `expression.matrix.qc.v1` | Rectangular expression matrices; quoted and multiline preview fields supported |
 | TSV | Yes | Parsed table | `expression.matrix.qc.v1` | Rectangular expression matrices |
-| BED | Yes | Interval rows | `interval.intersect.v1` | Pairwise half-open overlap summary |
+| BED | Yes | Interval rows | `interval.intersect.v1`, `interval.merge.v1`, `interval.subtract.v1` | Pairwise half-open overlap summary plus BED3 merge/subtract outputs |
 | GFF3 | Yes | Feature rows | None | Inspection only |
 | GTF | Yes | Feature rows | None | Inspection only |
 | VCF | Yes | Variant rows | `variant.stats.v1` | Plain, gzip, and BGZF; no BCF |

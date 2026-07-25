@@ -8,7 +8,10 @@ use linxira_bio_core::environment::{
 };
 use linxira_bio_core::expression::{ExpressionMatrixQc, expression_matrix_qc_path};
 use linxira_bio_core::fastq::{FastqQcMetrics, FastqQcOptions, QualityEncodingMode, fastq_qc_path};
-use linxira_bio_core::interval::{IntervalIntersectStats, bed_intersect_path};
+use linxira_bio_core::interval::{
+    IntervalIntersectStats, IntervalMergeOptions, bed_intersect_path, bed_merge_path,
+    bed_subtract_path,
+};
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
 use linxira_bio_core::sequence::{SequenceStats, fasta_stats_path};
 use linxira_bio_core::sequence_transform::{
@@ -161,6 +164,14 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if interval == "interval" && intersect == "intersect" && json == "--json" =>
         {
             print_interval_intersect(left, right, true)
+        }
+        [interval, merge, arguments @ ..] if interval == "interval" && merge == "merge" => {
+            print_interval_merge(arguments)
+        }
+        [interval, subtract, arguments @ ..]
+            if interval == "interval" && subtract == "subtract" =>
+        {
+            print_interval_subtract(arguments)
         }
         [expression, matrix_qc, path] if expression == "expression" && matrix_qc == "matrix-qc" => {
             print_expression_matrix_qc(path, false)
@@ -1104,6 +1115,58 @@ fn print_interval_intersect_text(stats: &IntervalIntersectStats) {
     }
 }
 
+fn print_interval_merge(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = IntervalMergeOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--max-gap" => {
+                index += 1;
+                options.max_gap = parse_sequence_u64(arguments.get(index), "--max-gap")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown interval merge option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "interval merge")?,
+        }
+        index += 1;
+    }
+    let input = input.ok_or("interval merge requires an input BED path")?;
+    let output = output.ok_or("interval merge requires an output BED path")?;
+    let output = Path::new(output);
+    let stats = bed_merge_path(Path::new(input), output, options)?;
+    print_sequence_transform_result("interval-merge", "interval.merge.v1", output, stats, json)
+}
+
+fn print_interval_subtract(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut json = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown interval subtract option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+    }
+    if paths.len() != 3 {
+        return Err("interval subtract requires <left.bed> <right.bed> <output.bed>".into());
+    }
+    let stats = bed_subtract_path(&paths[0], &paths[1], &paths[2])?;
+    print_sequence_transform_result(
+        "interval-subtract",
+        "interval.subtract.v1",
+        &paths[2],
+        stats,
+        json,
+    )
+}
+
 fn print_expression_matrix_qc(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
     let metrics = expression_matrix_qc_path(Path::new(path))?;
     if json {
@@ -1240,5 +1303,33 @@ fn print_stats_json(stats: &SequenceStats) -> Result<(), Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n  linxira-bio runtime catalog [--json]\n  linxira-bio dataset inspect <input> [--json]\n  linxira-bio sequence stats <input.fasta[.gz]> [--json]\n  linxira-bio sequence extract <input.fasta[.gz]> <output.fasta> [--id ID ...] [--region ID:START-END[:+|-] ...] [--strict] [--json]\n  linxira-bio sequence filter <input.fasta[.gz]> <output.fasta> [--min-length N] [--max-length N] [--min-gc-percent P] [--max-gc-percent P] [--max-n-percent P] [--json]\n  linxira-bio sequence reverse-complement <input.fasta[.gz]> <output.fasta> [--json]\n  linxira-bio sequence translate <input.fasta[.gz]> <output.fasta> [--frame FRAME ...] [--trim-terminal-stop] [--stop-at-first] [--json]\n  linxira-bio sequence orf <input.fasta[.gz]> <output.fasta> [--min-amino-acids N] [--forward-only] [--include-partial-3prime] [--json]\n  linxira-bio sequence normalize-ids <input.fasta[.gz]> <output.fasta> [--prefix PREFIX] [--start N] [--width N|--no-padding] [--drop-description] [--json]\n  linxira-bio sequence merge <output.fasta> <input.fasta[.gz]>... [--allow-duplicate-ids] [--json]\n  linxira-bio sequence split <input.fasta[.gz]> <output-dir> [--records-per-file N] [--prefix PREFIX] [--json]\n  linxira-bio sequence to-table <input.fasta[.gz]> <output.csv|tsv> [--delimiter csv|tsv] [--no-header] [--json]\n  linxira-bio sequence from-table <input.csv|tsv[.gz]> <output.fasta> [--delimiter csv|tsv] [--id-column NAME] [--sequence-column NAME] [--description-column NAME|--no-description-column] [--json]\n  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n  linxira-bio alignment qc <input.sam[.gz]> [--json]\n  linxira-bio variant stats <input.vcf[.gz]> [--json]\n  linxira-bio interval intersect <left.bed[.gz]> <right.bed[.gz]> [--json]\n  linxira-bio expression matrix-qc <matrix.csv|tsv[.gz]> [--json]\n  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
+    concat!(
+        "usage:\n",
+        "  linxira-bio capabilities [--json]\n",
+        "  linxira-bio doctor [--json]\n",
+        "  linxira-bio environment audit [--json]\n",
+        "  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n",
+        "  linxira-bio runtime catalog [--json]\n",
+        "  linxira-bio dataset inspect <input> [--json]\n",
+        "  linxira-bio sequence stats <input.fasta[.gz]> [--json]\n",
+        "  linxira-bio sequence extract <input.fasta[.gz]> <output.fasta> [--id ID ...] [--region ID:START-END[:+|-] ...] [--strict] [--json]\n",
+        "  linxira-bio sequence filter <input.fasta[.gz]> <output.fasta> [--min-length N] [--max-length N] [--min-gc-percent P] [--max-gc-percent P] [--max-n-percent P] [--json]\n",
+        "  linxira-bio sequence reverse-complement <input.fasta[.gz]> <output.fasta> [--json]\n",
+        "  linxira-bio sequence translate <input.fasta[.gz]> <output.fasta> [--frame FRAME ...] [--trim-terminal-stop] [--stop-at-first] [--json]\n",
+        "  linxira-bio sequence orf <input.fasta[.gz]> <output.fasta> [--min-amino-acids N] [--forward-only] [--include-partial-3prime] [--json]\n",
+        "  linxira-bio sequence normalize-ids <input.fasta[.gz]> <output.fasta> [--prefix PREFIX] [--start N] [--width N|--no-padding] [--drop-description] [--json]\n",
+        "  linxira-bio sequence merge <output.fasta> <input.fasta[.gz]>... [--allow-duplicate-ids] [--json]\n",
+        "  linxira-bio sequence split <input.fasta[.gz]> <output-dir> [--records-per-file N] [--prefix PREFIX] [--json]\n",
+        "  linxira-bio sequence to-table <input.fasta[.gz]> <output.csv|tsv> [--delimiter csv|tsv] [--no-header] [--json]\n",
+        "  linxira-bio sequence from-table <input.csv|tsv[.gz]> <output.fasta> [--delimiter csv|tsv] [--id-column NAME] [--sequence-column NAME] [--description-column NAME|--no-description-column] [--json]\n",
+        "  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n",
+        "  linxira-bio alignment qc <input.sam[.gz]> [--json]\n",
+        "  linxira-bio variant stats <input.vcf[.gz]> [--json]\n",
+        "  linxira-bio interval intersect <left.bed[.gz]> <right.bed[.gz]> [--json]\n",
+        "  linxira-bio interval merge <input.bed[.gz]> <output.bed> [--max-gap N] [--json]\n",
+        "  linxira-bio interval subtract <left.bed[.gz]> <right.bed[.gz]> <output.bed> [--json]\n",
+        "  linxira-bio expression matrix-qc <matrix.csv|tsv[.gz]> [--json]\n",
+        "  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n",
+        "  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
+    )
 }

@@ -66,7 +66,11 @@
       "id": "intersect-genomic-intervals",
       "path": "skills/intersect-genomic-intervals",
       "kind": "executable",
-      "capabilities": ["interval.intersect.v1"]
+      "capabilities": [
+        "interval.intersect.v1",
+        "interval.merge.v1",
+        "interval.subtract.v1"
+      ]
     },
     {
       "id": "analyze-expression-matrix",

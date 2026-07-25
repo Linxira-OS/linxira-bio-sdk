@@ -1,4 +1,4 @@
 interface:
-  display_name: "Intersect Genomic Intervals"
-  short_description: "Measure overlaps between two local BED files"
-  default_prompt: "Use $intersect-genomic-intervals to validate and compare these two BED interval sets."
+  display_name: "Genomic Interval Operations"
+  short_description: "Intersect, merge, and subtract local BED intervals"
+  default_prompt: "Use $intersect-genomic-intervals to inspect and run the correct local BED interval operation."

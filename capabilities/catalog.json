@@ -190,6 +190,24 @@
       "output_formats": ["json"]
     },
     {
+      "id": "interval.merge.v1",
+      "status": "available",
+      "category": "genome-intervals",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio interval merge <input.bed> <output.bed> --json",
+      "input_formats": ["bed"],
+      "output_formats": ["bed", "json"]
+    },
+    {
+      "id": "interval.subtract.v1",
+      "status": "available",
+      "category": "genome-intervals",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio interval subtract <left.bed> <right.bed> <output.bed> --json",
+      "input_formats": ["bed"],
+      "output_formats": ["bed", "json"]
+    },
+    {
       "id": "alignment.qc.v1",
       "status": "available",
       "category": "alignment-files",

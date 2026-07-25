@@ -3,9 +3,9 @@ use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::fs::File;
-use std::io::{self, BufRead, BufReader, Read};
-use std::path::Path;
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
+use std::path::{Path, PathBuf};
 
 /// Maximum deterministic work units for one intersection call. One unit is
 /// charged per sweep event and active-pair comparison; sorting is budgeted as
@@ -56,9 +56,58 @@ pub struct IntervalIntersectStats {
     pub warnings: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct IntervalMergeOptions {
+    pub max_gap: u64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct IntervalMergeStats {
+    pub input_interval_count: u64,
+    pub output_interval_count: u64,
+    pub merged_interval_count: u64,
+    pub input_bases: u64,
+    pub output_bases: u64,
+    pub max_gap: u64,
+    pub contigs: BTreeMap<String, IntervalMergeContigStats>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct IntervalMergeContigStats {
+    pub input_interval_count: u64,
+    pub output_interval_count: u64,
+    pub merged_interval_count: u64,
+    pub input_bases: u64,
+    pub output_bases: u64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct IntervalSubtractStats {
+    pub left_interval_count: u64,
+    pub right_interval_count: u64,
+    pub output_interval_count: u64,
+    pub affected_left_interval_count: u64,
+    pub removed_bases: u64,
+    pub output_bases: u64,
+    pub contigs: BTreeMap<String, IntervalSubtractContigStats>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct IntervalSubtractContigStats {
+    pub left_interval_count: u64,
+    pub right_interval_count: u64,
+    pub output_interval_count: u64,
+    pub affected_left_interval_count: u64,
+    pub removed_bases: u64,
+    pub output_bases: u64,
+}
+
 #[derive(Debug)]
 pub enum BedError {
     Io(io::Error),
+    OutputAlreadyExists(PathBuf),
     ReadLine { line: usize, source: io::Error },
     MalformedRecord { line: usize, message: String },
     LimitExceeded { resource: &'static str, limit: u64 },
@@ -69,6 +118,11 @@ impl Display for BedError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Io(error) => write!(formatter, "failed to read BED: {error}"),
+            Self::OutputAlreadyExists(path) => write!(
+                formatter,
+                "refusing to overwrite existing output: {}",
+                path.display()
+            ),
             Self::ReadLine { line, source } => {
                 write!(formatter, "failed to read BED at line {line}: {source}")
             }
@@ -89,7 +143,10 @@ impl Error for BedError {
         match self {
             Self::Io(error) => Some(error),
             Self::ReadLine { source, .. } => Some(source),
-            Self::MalformedRecord { .. } | Self::LimitExceeded { .. } | Self::Overflow => None,
+            Self::OutputAlreadyExists(_)
+            | Self::MalformedRecord { .. }
+            | Self::LimitExceeded { .. }
+            | Self::Overflow => None,
         }
     }
 }
@@ -104,6 +161,12 @@ impl From<io::Error> for BedError {
 struct Interval {
     start: u64,
     end: u64,
+}
+
+impl Interval {
+    fn length(self) -> u64 {
+        self.end - self.start
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -284,6 +347,74 @@ pub fn bed_intersect_path(
     let left = read_bed_path(left.as_ref(), &mut read_budget, &mut work_budget)?;
     let right = read_bed_path(right.as_ref(), &mut read_budget, &mut work_budget)?;
     intersect_interval_sets_with_budget(left, right, &mut work_budget)
+}
+
+pub fn bed_merge_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: IntervalMergeOptions,
+) -> Result<IntervalMergeStats, BedError> {
+    let mut work_budget = IntersectionBudget::production();
+    let mut read_budget = BedReadBudget::production();
+    let intervals = read_bed_path(input.as_ref(), &mut read_budget, &mut work_budget)?;
+    let mut stats = IntervalMergeStats {
+        max_gap: options.max_gap,
+        ..Default::default()
+    };
+
+    with_new_output(output.as_ref(), |writer| {
+        for (contig, mut contig_intervals) in intervals {
+            contig_intervals.sort_unstable_by_key(|interval| (interval.start, interval.end));
+            let contig_stats = merge_contig(writer, &contig, &contig_intervals, options.max_gap)?;
+            add_merge_stats(&mut stats, &contig_stats)?;
+            stats.contigs.insert(contig, contig_stats);
+        }
+        if stats.input_interval_count == 0 {
+            stats
+                .warnings
+                .push("BED input contains no intervals".to_owned());
+        }
+        Ok(stats.clone())
+    })
+}
+
+pub fn bed_subtract_path(
+    left: impl AsRef<Path>,
+    right: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+) -> Result<IntervalSubtractStats, BedError> {
+    let mut work_budget = IntersectionBudget::production();
+    let mut read_budget = BedReadBudget::production();
+    let mut left = read_bed_path(left.as_ref(), &mut read_budget, &mut work_budget)?;
+    let mut right = read_bed_path(right.as_ref(), &mut read_budget, &mut work_budget)?;
+    let contigs = left
+        .keys()
+        .chain(right.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut stats = IntervalSubtractStats::default();
+
+    with_new_output(output.as_ref(), |writer| {
+        for contig in contigs {
+            let left_intervals = left.entry(contig.clone()).or_default();
+            let right_intervals = right.entry(contig.clone()).or_default();
+            left_intervals.sort_unstable_by_key(|interval| (interval.start, interval.end));
+            right_intervals.sort_unstable_by_key(|interval| (interval.start, interval.end));
+            let contig_stats = subtract_contig(writer, &contig, left_intervals, right_intervals)?;
+            add_subtract_stats(&mut stats, &contig_stats)?;
+            stats.contigs.insert(contig, contig_stats);
+        }
+        if stats.left_interval_count == 0 {
+            stats
+                .warnings
+                .push("left BED input contains no intervals".to_owned());
+        } else if stats.right_interval_count == 0 {
+            stats.warnings.push(
+                "right BED input contains no intervals; left intervals are unchanged".to_owned(),
+            );
+        }
+        Ok(stats.clone())
+    })
 }
 
 fn read_bed_path(
@@ -598,6 +729,175 @@ fn record_overlap(
     Ok(())
 }
 
+fn merge_contig(
+    writer: &mut impl Write,
+    contig: &str,
+    intervals: &[Interval],
+    max_gap: u64,
+) -> Result<IntervalMergeContigStats, BedError> {
+    let mut stats = IntervalMergeContigStats {
+        input_interval_count: u64::try_from(intervals.len()).expect("interval count fits in u64"),
+        ..Default::default()
+    };
+    let mut active: Option<Interval> = None;
+
+    for interval in intervals {
+        stats.input_bases = stats
+            .input_bases
+            .checked_add(interval.length())
+            .ok_or(BedError::Overflow)?;
+        match active {
+            None => active = Some(*interval),
+            Some(current) if intervals_can_merge(current, *interval, max_gap) => {
+                active = Some(Interval {
+                    start: current.start,
+                    end: current.end.max(interval.end),
+                });
+            }
+            Some(current) => {
+                write_interval(writer, contig, current)?;
+                stats.output_interval_count += 1;
+                stats.output_bases = stats
+                    .output_bases
+                    .checked_add(current.length())
+                    .ok_or(BedError::Overflow)?;
+                active = Some(*interval);
+            }
+        }
+    }
+
+    if let Some(current) = active {
+        write_interval(writer, contig, current)?;
+        stats.output_interval_count += 1;
+        stats.output_bases = stats
+            .output_bases
+            .checked_add(current.length())
+            .ok_or(BedError::Overflow)?;
+    }
+    stats.merged_interval_count = stats
+        .input_interval_count
+        .saturating_sub(stats.output_interval_count);
+    Ok(stats)
+}
+
+fn intervals_can_merge(current: Interval, next: Interval, max_gap: u64) -> bool {
+    if next.start <= current.end {
+        true
+    } else {
+        next.start - current.end <= max_gap
+    }
+}
+
+fn subtract_contig(
+    writer: &mut impl Write,
+    contig: &str,
+    left: &[Interval],
+    right: &[Interval],
+) -> Result<IntervalSubtractContigStats, BedError> {
+    let mut stats = IntervalSubtractContigStats {
+        left_interval_count: u64::try_from(left.len()).expect("interval count fits in u64"),
+        right_interval_count: u64::try_from(right.len()).expect("interval count fits in u64"),
+        ..Default::default()
+    };
+    let mut first_relevant_right = 0_usize;
+
+    for left_interval in left {
+        while first_relevant_right < right.len()
+            && right[first_relevant_right].end <= left_interval.start
+        {
+            first_relevant_right += 1;
+        }
+
+        let mut cursor = left_interval.start;
+        let mut removed_for_left = 0_u64;
+        let mut right_index = first_relevant_right;
+        while right_index < right.len() && right[right_index].start < left_interval.end {
+            let right_interval = right[right_index];
+            if right_interval.start > cursor {
+                let fragment = Interval {
+                    start: cursor,
+                    end: right_interval.start.min(left_interval.end),
+                };
+                write_interval(writer, contig, fragment)?;
+                stats.output_interval_count += 1;
+                stats.output_bases = stats
+                    .output_bases
+                    .checked_add(fragment.length())
+                    .ok_or(BedError::Overflow)?;
+            }
+
+            let removal_start = cursor.max(right_interval.start);
+            let removal_end = left_interval.end.min(right_interval.end);
+            if removal_end > removal_start {
+                removed_for_left = removed_for_left
+                    .checked_add(removal_end - removal_start)
+                    .ok_or(BedError::Overflow)?;
+            }
+            cursor = cursor.max(right_interval.end);
+            if cursor >= left_interval.end {
+                break;
+            }
+            right_index += 1;
+        }
+
+        if cursor < left_interval.end {
+            let fragment = Interval {
+                start: cursor,
+                end: left_interval.end,
+            };
+            write_interval(writer, contig, fragment)?;
+            stats.output_interval_count += 1;
+            stats.output_bases = stats
+                .output_bases
+                .checked_add(fragment.length())
+                .ok_or(BedError::Overflow)?;
+        }
+        if removed_for_left > 0 {
+            stats.affected_left_interval_count += 1;
+            stats.removed_bases = stats
+                .removed_bases
+                .checked_add(removed_for_left)
+                .ok_or(BedError::Overflow)?;
+        }
+    }
+
+    Ok(stats)
+}
+
+fn write_interval(
+    writer: &mut impl Write,
+    contig: &str,
+    interval: Interval,
+) -> Result<(), BedError> {
+    writeln!(writer, "{contig}	{}	{}", interval.start, interval.end)?;
+    Ok(())
+}
+
+fn with_new_output<T>(
+    output: &Path,
+    operation: impl FnOnce(&mut BufWriter<File>) -> Result<T, BedError>,
+) -> Result<T, BedError> {
+    if output.exists() {
+        return Err(BedError::OutputAlreadyExists(output.to_owned()));
+    }
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(output)?;
+    let mut writer = BufWriter::new(file);
+    match operation(&mut writer).and_then(|value| {
+        writer.flush()?;
+        Ok(value)
+    }) {
+        Ok(value) => Ok(value),
+        Err(error) => {
+            drop(writer);
+            let _ = fs::remove_file(output);
+            Err(error)
+        }
+    }
+}
+
 fn add_stats(
     total: &mut IntervalIntersectStats,
     contig: &IntervalContigStats,
@@ -629,6 +929,64 @@ fn add_stats(
     Ok(())
 }
 
+fn add_merge_stats(
+    total: &mut IntervalMergeStats,
+    contig: &IntervalMergeContigStats,
+) -> Result<(), BedError> {
+    total.input_interval_count = total
+        .input_interval_count
+        .checked_add(contig.input_interval_count)
+        .ok_or(BedError::Overflow)?;
+    total.output_interval_count = total
+        .output_interval_count
+        .checked_add(contig.output_interval_count)
+        .ok_or(BedError::Overflow)?;
+    total.merged_interval_count = total
+        .merged_interval_count
+        .checked_add(contig.merged_interval_count)
+        .ok_or(BedError::Overflow)?;
+    total.input_bases = total
+        .input_bases
+        .checked_add(contig.input_bases)
+        .ok_or(BedError::Overflow)?;
+    total.output_bases = total
+        .output_bases
+        .checked_add(contig.output_bases)
+        .ok_or(BedError::Overflow)?;
+    Ok(())
+}
+
+fn add_subtract_stats(
+    total: &mut IntervalSubtractStats,
+    contig: &IntervalSubtractContigStats,
+) -> Result<(), BedError> {
+    total.left_interval_count = total
+        .left_interval_count
+        .checked_add(contig.left_interval_count)
+        .ok_or(BedError::Overflow)?;
+    total.right_interval_count = total
+        .right_interval_count
+        .checked_add(contig.right_interval_count)
+        .ok_or(BedError::Overflow)?;
+    total.output_interval_count = total
+        .output_interval_count
+        .checked_add(contig.output_interval_count)
+        .ok_or(BedError::Overflow)?;
+    total.affected_left_interval_count = total
+        .affected_left_interval_count
+        .checked_add(contig.affected_left_interval_count)
+        .ok_or(BedError::Overflow)?;
+    total.removed_bases = total
+        .removed_bases
+        .checked_add(contig.removed_bases)
+        .ok_or(BedError::Overflow)?;
+    total.output_bases = total
+        .output_bases
+        .checked_add(contig.output_bases)
+        .ok_or(BedError::Overflow)?;
+    Ok(())
+}
+
 fn malformed<T>(line: usize, message: impl Into<String>) -> Result<T, BedError> {
     Err(BedError::MalformedRecord {
         line,
@@ -639,13 +997,27 @@ fn malformed<T>(line: usize, message: impl Into<String>) -> Result<T, BedError> 
 #[cfg(test)]
 mod tests {
     use super::{
-        BedError, BedReadBudget, IntersectionBudget, Interval, intersect_contig,
-        intersect_interval_sets, read_bed, read_bed_with_limits,
+        BedError, BedReadBudget, IntersectionBudget, Interval, IntervalMergeOptions,
+        bed_merge_path, bed_subtract_path, intersect_contig, intersect_interval_sets, read_bed,
+        read_bed_with_limits,
     };
     use flate2::Compression;
     use flate2::read::MultiGzDecoder;
     use flate2::write::GzEncoder;
+    use std::fs;
     use std::io::{BufReader, Cursor, Write};
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
+
+    fn fixture_path(suffix: &str) -> PathBuf {
+        let ordinal = NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!(
+            "linxira-interval-{}-{ordinal}.{suffix}",
+            std::process::id()
+        ))
+    }
 
     #[test]
     fn intersects_half_open_bed_intervals() {
@@ -803,5 +1175,52 @@ mod tests {
             }
         ));
         assert_eq!(budget.overlap_pairs, 3);
+    }
+
+    #[test]
+    fn merges_overlapping_and_bookended_bed_intervals() {
+        let input = fixture_path("bed");
+        let output = fixture_path("merged.bed");
+        fs::write(
+            &input,
+            b"chr1\t0\t5\nchr1\t5\t10\nchr1\t12\t14\nchr2\t1\t3\n",
+        )
+        .unwrap();
+
+        let stats = bed_merge_path(&input, &output, IntervalMergeOptions { max_gap: 0 }).unwrap();
+
+        assert_eq!(stats.input_interval_count, 4);
+        assert_eq!(stats.output_interval_count, 3);
+        assert_eq!(stats.merged_interval_count, 1);
+        assert_eq!(
+            fs::read_to_string(&output).unwrap(),
+            "chr1\t0\t10\nchr1\t12\t14\nchr2\t1\t3\n"
+        );
+        fs::remove_file(input).unwrap();
+        fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn subtracts_bed_intervals_into_remaining_fragments() {
+        let left = fixture_path("left.bed");
+        let right = fixture_path("right.bed");
+        let output = fixture_path("subtracted.bed");
+        fs::write(&left, b"chr1\t0\t10\nchr1\t20\t30\nchr2\t5\t9\n").unwrap();
+        fs::write(&right, b"chr1\t3\t6\nchr1\t8\t25\nchr2\t0\t6\n").unwrap();
+
+        let stats = bed_subtract_path(&left, &right, &output).unwrap();
+
+        assert_eq!(stats.left_interval_count, 3);
+        assert_eq!(stats.right_interval_count, 3);
+        assert_eq!(stats.affected_left_interval_count, 3);
+        assert_eq!(stats.output_interval_count, 4);
+        assert_eq!(stats.removed_bases, 11);
+        assert_eq!(
+            fs::read_to_string(&output).unwrap(),
+            "chr1\t0\t3\nchr1\t6\t8\nchr1\t25\t30\nchr2\t6\t9\n"
+        );
+        fs::remove_file(left).unwrap();
+        fs::remove_file(right).unwrap();
+        fs::remove_file(output).unwrap();
     }
 }

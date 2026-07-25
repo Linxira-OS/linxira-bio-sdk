@@ -21,7 +21,8 @@ the agent skills that select and validate them.
 - Read `skills/analyze-sam-quality/SKILL.md` for the implemented SAM-text
   `alignment.qc.v1` capability; BAM and CRAM still require native tools.
 - Read `skills/intersect-genomic-intervals/SKILL.md` for the implemented BED
-  `interval.intersect.v1` capability.
+  `interval.intersect.v1`, `interval.merge.v1`, and
+  `interval.subtract.v1` capabilities.
 - Read `skills/analyze-expression-matrix/SKILL.md` for the implemented CSV/TSV
   `expression.matrix.qc.v1` capability.
 - Read `skills/analyze-variant-statistics/SKILL.md` for the implemented

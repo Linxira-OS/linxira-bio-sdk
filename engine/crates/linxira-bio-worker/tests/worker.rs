@@ -375,6 +375,101 @@ fn executes_interval_intersection_job() {
 }
 
 #[test]
+fn executes_interval_set_operation_jobs() {
+    let root = workspace_root();
+    let result_dir = root.join("target/test-results");
+    std::fs::create_dir_all(&result_dir).expect("create interval result directory");
+    let output_paths = [
+        result_dir.join("interval-merge.bed"),
+        result_dir.join("interval-subtract.bed"),
+        result_dir.join("interval-merge-v2.bed"),
+        result_dir.join("interval-subtract-v2.bed"),
+    ];
+    for path in &output_paths {
+        if path.exists() {
+            std::fs::remove_file(path).expect("remove stale interval output");
+        }
+    }
+
+    let cases = [
+        (
+            "interval-merge.json",
+            "interval.merge.v1",
+            "output_interval_count",
+            2,
+            "chr1\t0\t20\nchr2\t5\t12\n",
+        ),
+        (
+            "interval-subtract.json",
+            "interval.subtract.v1",
+            "output_interval_count",
+            3,
+            "chr1\t0\t5\nchr1\t15\t20\nchr2\t7\t12\n",
+        ),
+        (
+            "interval-merge-v2.json",
+            "interval.merge.v1",
+            "output_interval_count",
+            2,
+            "chr1\t0\t20\nchr2\t5\t12\n",
+        ),
+        (
+            "interval-subtract-v2.json",
+            "interval.subtract.v1",
+            "output_interval_count",
+            3,
+            "chr1\t0\t5\nchr1\t15\t20\nchr2\t7\t12\n",
+        ),
+    ];
+
+    for (index, (fixture, capability, field, expected, expected_bed)) in cases.iter().enumerate() {
+        let request = root.join("tests/fixtures/jobs").join(fixture);
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(request)
+            .output()
+            .unwrap_or_else(|error| panic!("run {capability}: {error}"));
+
+        assert!(
+            output.status.success(),
+            "{capability}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid interval set operation result");
+        assert_eq!(result["status"], "ok", "{capability}");
+        assert_eq!(result["capability"], *capability, "{capability}");
+        assert_eq!(result["result"][*field], *expected, "{capability}");
+        assert_eq!(
+            std::fs::read_to_string(&output_paths[index]).expect("interval BED output"),
+            *expected_bed,
+            "{capability}"
+        );
+        if fixture.ends_with("-v2.json") {
+            assert_eq!(result["schema_version"], "2", "{capability}");
+            assert_eq!(result["artifacts"][0]["role"], "bed", "{capability}");
+            assert_eq!(
+                result["artifacts"][0]["kind"], "domain-file",
+                "{capability}"
+            );
+            assert_eq!(result["artifacts"][0]["format"], "bed", "{capability}");
+            assert_eq!(
+                result["artifacts"][0]["media_type"], "text/x-bed",
+                "{capability}"
+            );
+            assert_eq!(
+                result["artifacts"][0]["sha256"].as_str().map(str::len),
+                Some(64),
+                "{capability}"
+            );
+        }
+    }
+
+    for path in output_paths {
+        std::fs::remove_file(path).expect("remove interval output");
+    }
+}
+
+#[test]
 fn executes_expression_matrix_qc_job() {
     let request = workspace_root().join("tests/fixtures/jobs/expression-matrix-qc.json");
     let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
