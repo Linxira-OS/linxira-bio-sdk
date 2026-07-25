@@ -1,0 +1,12 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-annotation-stats",
+  "capability": "annotation.gxf.stats.v1",
+  "inputs": {
+    "annotation": "../annotation/genes.gff3"
+  },
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {}
+}

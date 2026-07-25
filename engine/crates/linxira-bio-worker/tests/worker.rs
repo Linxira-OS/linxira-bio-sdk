@@ -18,6 +18,56 @@ fn executes_sequence_statistics_job() {
 }
 
 #[test]
+fn executes_annotation_jobs() {
+    let root = workspace_root();
+    let request = root.join("tests/fixtures/jobs/annotation-stats.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(request)
+        .output()
+        .expect("run annotation statistics worker request");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid annotation statistics result");
+    assert_eq!(result["capability"], "annotation.gxf.stats.v1");
+    assert_eq!(result["result"]["record_count"], 10);
+
+    let output_path = root.join("target/test-results/annotation-extract-v2.fa");
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent).expect("create annotation result directory");
+    }
+    if output_path.exists() {
+        std::fs::remove_file(&output_path).expect("remove stale annotation result");
+    }
+    let request = root.join("tests/fixtures/jobs/annotation-extract-v2.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(request)
+        .output()
+        .expect("run annotation extraction worker request");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid annotation extraction result");
+    assert_eq!(result["schema_version"], "2");
+    assert_eq!(result["capability"], "annotation.sequence.extract.v1");
+    assert_eq!(result["result"]["output_sequence_count"], 2);
+    assert_eq!(result["artifacts"][0]["format"], "fasta");
+    assert_eq!(
+        result["provenance"]["input_sha256"]
+            .as_object()
+            .map(|hashes| hashes.len()),
+        Some(2)
+    );
+    std::fs::remove_file(output_path).expect("remove annotation result");
+}
+
+#[test]
 fn executes_dataset_inspection_job() {
     let request = workspace_root().join("tests/fixtures/jobs/dataset-inspect.json");
     let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))

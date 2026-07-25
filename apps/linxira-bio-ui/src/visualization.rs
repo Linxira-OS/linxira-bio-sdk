@@ -71,6 +71,7 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         "fastq.qc.v1" => fastq_charts(payload, zh_cn),
         "fastq.trim.v1" | "fastq.adapter.v1" => fastq_transform_charts(payload, zh_cn),
         "alignment.qc.v1" => alignment_charts(payload, zh_cn),
+        "annotation.gxf.stats.v1" => annotation_charts(payload, zh_cn),
         "interval.intersect.v1" => interval_charts(payload, zh_cn),
         "interval.merge.v1" => interval_merge_charts(payload, zh_cn),
         "interval.subtract.v1" => interval_subtract_charts(payload, zh_cn),
@@ -83,6 +84,53 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         _ if payload.get("n50").is_some() => sequence_charts(payload, zh_cn),
         _ => Vec::new(),
     }
+}
+
+fn annotation_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let mut features = payload
+        .get("feature_type_counts")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+        .filter_map(|(name, value)| {
+            Some(BarValue {
+                label: name.clone(),
+                value: value.as_f64()?,
+            })
+        })
+        .collect::<Vec<_>>();
+    sort_and_limit(&mut features, 12);
+
+    let mut sequences = payload
+        .get("sequence_counts")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+        .filter_map(|(name, value)| {
+            Some(BarValue {
+                label: name.clone(),
+                value: value.as_f64()?,
+            })
+        })
+        .collect::<Vec<_>>();
+    sort_and_limit(&mut sequences, 12);
+
+    let mut charts = Vec::new();
+    if !features.is_empty() {
+        charts.push(ChartSpec::Bars {
+            title: localized(zh_cn, "注释特征类型", "Annotation feature types").to_owned(),
+            values: features,
+            percent: false,
+        });
+    }
+    if !sequences.is_empty() {
+        charts.push(ChartSpec::Bars {
+            title: localized(zh_cn, "注释最多的序列", "Top annotated sequences").to_owned(),
+            values: sequences,
+            percent: false,
+        });
+    }
+    charts
 }
 
 fn fastq_transform_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
@@ -943,6 +991,17 @@ mod tests {
         });
         let charts = chart_specs(&payload, Some("fastq.qc.v1"), false);
         assert!(matches!(charts.first(), Some(ChartSpec::Lines { .. })));
+    }
+
+    #[test]
+    fn annotation_statistics_build_feature_and_sequence_charts() {
+        let payload = json!({
+            "feature_type_counts": {"gene": 4, "mRNA": 3, "exon": 12},
+            "sequence_counts": {"chr1": 10, "chr2": 9}
+        });
+        let charts = chart_specs(&payload, Some("annotation.gxf.stats.v1"), true);
+        assert_eq!(charts.len(), 2);
+        assert!(matches!(charts.first(), Some(ChartSpec::Bars { .. })));
     }
 
     #[test]

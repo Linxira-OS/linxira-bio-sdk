@@ -267,6 +267,10 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "fastq.trim.v1",
     "fastq.adapter.v1",
     "alignment.qc.v1",
+    "annotation.gxf.stats.v1",
+    "annotation.gxf.normalize.v1",
+    "annotation.gene-position.v1",
+    "annotation.sequence.extract.v1",
     "interval.intersect.v1",
     "interval.merge.v1",
     "interval.subtract.v1",
@@ -298,6 +302,8 @@ struct BioApp {
     inspection_queue: VecDeque<InspectionTask>,
     active_inspections: usize,
     selected_capability: String,
+    annotation_feature_type: String,
+    annotation_sort: bool,
     interpret_pdb_b_factors_as_plddt: bool,
     job_history: Vec<JobRecord>,
     analysis_job_id: Option<String>,
@@ -342,6 +348,8 @@ impl BioApp {
             inspection_queue: VecDeque::new(),
             active_inspections: 0,
             selected_capability: "sequence.stats.v1".to_owned(),
+            annotation_feature_type: "gene".to_owned(),
+            annotation_sort: false,
             interpret_pdb_b_factors_as_plddt: false,
             job_history: Vec::new(),
             analysis_job_id: None,
@@ -683,7 +691,10 @@ impl BioApp {
             let Some(secondary) = self.datasets.get(secondary_index) else {
                 return;
             };
-            let secondary_runnable = dataset_detected_format(secondary) == "bed"
+            let Some(required_format) = secondary_input_format(route.capability) else {
+                return;
+            };
+            let secondary_runnable = dataset_detected_format(secondary) == required_format
                 && secondary
                     .inspection
                     .as_ref()
@@ -696,16 +707,31 @@ impl BioApp {
             if !secondary_runnable {
                 return;
             }
+            let Some(role) = secondary_input_role(route.capability) else {
+                return;
+            };
             request
                 .inputs
-                .insert("right-bed".to_owned(), secondary.path.clone());
+                .insert(role.to_owned(), secondary.path.clone());
             dataset_name = format!("{dataset_name} + {}", secondary.name);
         }
         if let Some(extension) = capability_output_extension(route.capability) {
             let output = derived_analysis_output_path(&dataset_path, route.capability, extension);
-            request.parameters = serde_json::json!({
-                "output": output.to_string_lossy(),
-            });
+            let mut parameters = serde_json::Map::new();
+            parameters.insert(
+                "output".to_owned(),
+                Value::String(output.to_string_lossy().into_owned()),
+            );
+            if route.capability == "annotation.gxf.normalize.v1" {
+                parameters.insert("sort".to_owned(), Value::Bool(self.annotation_sort));
+            }
+            if route.capability == "annotation.sequence.extract.v1" {
+                parameters.insert(
+                    "feature_type".to_owned(),
+                    Value::String(self.annotation_feature_type.clone()),
+                );
+            }
+            request.parameters = Value::Object(parameters);
         }
         if route.capability == "structure.pdb.summary.v1" {
             request.parameters = serde_json::json!({
@@ -1471,6 +1497,10 @@ impl BioApp {
                     "fastq.trim.v1",
                     "fastq.adapter.v1",
                     "alignment.qc.v1",
+                    "annotation.gxf.stats.v1",
+                    "annotation.gxf.normalize.v1",
+                    "annotation.gene-position.v1",
+                    "annotation.sequence.extract.v1",
                     "variant.stats.v1",
                     "interval.intersect.v1",
                     "interval.merge.v1",
@@ -1489,13 +1519,15 @@ impl BioApp {
 
         let requires_secondary = capability_requires_secondary(&self.selected_capability);
         let primary_index = self.selected_dataset;
-        let bed_candidates = self
+        let secondary_format = secondary_input_format(&self.selected_capability);
+        let secondary_candidates = self
             .datasets
             .iter()
             .enumerate()
             .filter(|(index, dataset)| {
                 Some(*index) != primary_index
-                    && dataset_detected_format(dataset) == "bed"
+                    && secondary_format
+                        .is_some_and(|format| dataset_detected_format(dataset) == format)
                     && dataset
                         .inspection
                         .as_ref()
@@ -1508,31 +1540,77 @@ impl BioApp {
             .map(|(index, dataset)| (index, dataset.name.clone()))
             .collect::<Vec<_>>();
         if requires_secondary
-            && !self
-                .secondary_dataset
-                .is_some_and(|selected| bed_candidates.iter().any(|(index, _)| *index == selected))
+            && !self.secondary_dataset.is_some_and(|selected| {
+                secondary_candidates
+                    .iter()
+                    .any(|(index, _)| *index == selected)
+            })
         {
-            self.secondary_dataset = bed_candidates.first().map(|(index, _)| *index);
+            self.secondary_dataset = secondary_candidates.first().map(|(index, _)| *index);
         }
         if requires_secondary {
             ui.add_space(10.0);
             ui.horizontal(|ui| {
-                ui.label(self.text("右侧 BED", "Right BED"));
-                egui::ComboBox::from_id_salt("secondary-bed-dataset")
+                ui.label(if secondary_format == Some("fasta") {
+                    self.text("参考 FASTA", "Reference FASTA")
+                } else {
+                    self.text("右侧 BED", "Right BED")
+                });
+                egui::ComboBox::from_id_salt("secondary-analysis-dataset")
                     .selected_text(
                         self.secondary_dataset
                             .and_then(|selected| {
-                                bed_candidates
+                                secondary_candidates
                                     .iter()
                                     .find(|(index, _)| *index == selected)
                                     .map(|(_, name)| name.as_str())
                             })
-                            .unwrap_or_else(|| self.text("没有其他 BED", "No other BED")),
+                            .unwrap_or_else(|| {
+                                if secondary_format == Some("fasta") {
+                                    self.text("没有可用 FASTA", "No FASTA available")
+                                } else {
+                                    self.text("没有其他 BED", "No other BED")
+                                }
+                            }),
                     )
                     .width(300.0)
                     .show_ui(ui, |ui| {
-                        for (index, name) in &bed_candidates {
+                        for (index, name) in &secondary_candidates {
                             ui.selectable_value(&mut self.secondary_dataset, Some(*index), name);
+                        }
+                    });
+            });
+        }
+        if self.selected_capability == "annotation.gxf.normalize.v1" {
+            ui.add_space(8.0);
+            ui.checkbox(
+                &mut self.annotation_sort,
+                self.language
+                    .text("按序列和坐标排序", "Sort by sequence and coordinate"),
+            );
+        }
+        if self.selected_capability == "annotation.sequence.extract.v1" {
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.label(self.text("提取类型", "Feature type"));
+                egui::ComboBox::from_id_salt("annotation-feature-type")
+                    .selected_text(&self.annotation_feature_type)
+                    .show_ui(ui, |ui| {
+                        for feature_type in [
+                            "gene",
+                            "transcript",
+                            "cds",
+                            "exon",
+                            "utr",
+                            "five_prime_utr",
+                            "three_prime_utr",
+                            "promoter",
+                        ] {
+                            ui.selectable_value(
+                                &mut self.annotation_feature_type,
+                                feature_type.to_owned(),
+                                feature_type,
+                            );
                         }
                     });
             });
@@ -1582,11 +1660,19 @@ impl BioApp {
                 )
                 .to_owned()
             } else if !secondary_ready {
-                self.text(
-                    "区间相交或扣除需要再导入一个检查通过的 BED 文件。",
-                    "Interval intersection or subtraction requires another validated BED file.",
-                )
-                .to_owned()
+                if secondary_format == Some("fasta") {
+                    self.text(
+                        "注释序列提取需要再导入一个检查通过的参考 FASTA。",
+                        "Annotation extraction requires another validated reference FASTA.",
+                    )
+                    .to_owned()
+                } else {
+                    self.text(
+                        "区间相交或扣除需要再导入一个检查通过的 BED 文件。",
+                        "Interval intersection or subtraction requires another validated BED file.",
+                    )
+                    .to_owned()
+                }
             } else if let Some(route) = route {
                 match self.language {
                     Language::ZhCn => format!(
@@ -2169,6 +2255,10 @@ fn analysis_route_for_format(format: &str) -> Option<AnalysisRoute> {
             capability: "alignment.qc.v1",
             input_role: "sam",
         }),
+        "gff3" | "gtf" => Some(AnalysisRoute {
+            capability: "annotation.gxf.stats.v1",
+            input_role: "annotation",
+        }),
         "bed" => Some(AnalysisRoute {
             capability: "interval.intersect.v1",
             input_role: "left-bed",
@@ -2212,6 +2302,21 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             capability: "alignment.qc.v1",
             input_role: "sam",
         }),
+        (
+            "annotation.gxf.stats.v1"
+            | "annotation.gxf.normalize.v1"
+            | "annotation.gene-position.v1"
+            | "annotation.sequence.extract.v1",
+            "gff3" | "gtf",
+        ) => Some(AnalysisRoute {
+            capability: match capability {
+                "annotation.gxf.stats.v1" => "annotation.gxf.stats.v1",
+                "annotation.gxf.normalize.v1" => "annotation.gxf.normalize.v1",
+                "annotation.gene-position.v1" => "annotation.gene-position.v1",
+                _ => "annotation.sequence.extract.v1",
+            },
+            input_role: "annotation",
+        }),
         ("interval.intersect.v1", "bed") => Some(AnalysisRoute {
             capability: "interval.intersect.v1",
             input_role: "left-bed",
@@ -2245,7 +2350,23 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
 }
 
 fn capability_requires_secondary(capability: &str) -> bool {
-    matches!(capability, "interval.intersect.v1" | "interval.subtract.v1")
+    secondary_input_format(capability).is_some()
+}
+
+fn secondary_input_format(capability: &str) -> Option<&'static str> {
+    match capability {
+        "interval.intersect.v1" | "interval.subtract.v1" => Some("bed"),
+        "annotation.sequence.extract.v1" => Some("fasta"),
+        _ => None,
+    }
+}
+
+fn secondary_input_role(capability: &str) -> Option<&'static str> {
+    match capability {
+        "interval.intersect.v1" | "interval.subtract.v1" => Some("right-bed"),
+        "annotation.sequence.extract.v1" => Some("fasta"),
+        _ => None,
+    }
 }
 
 fn capability_output_extension(capability: &str) -> Option<&'static str> {
@@ -2253,6 +2374,9 @@ fn capability_output_extension(capability: &str) -> Option<&'static str> {
         "fastq.trim.v1" | "fastq.adapter.v1" => Some("fastq"),
         "interval.merge.v1" | "interval.subtract.v1" => Some("bed"),
         "table.manipulate.v1" => Some("tsv"),
+        "annotation.gxf.normalize.v1" => Some("gff3"),
+        "annotation.gene-position.v1" => Some("tsv"),
+        "annotation.sequence.extract.v1" => Some("fasta"),
         _ => None,
     }
 }
@@ -2870,6 +2994,12 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "interval.subtract.v1" => language.text("BED 区间扣除", "BED interval subtraction"),
         "variant.stats.v1" => language.text("变异统计", "Variant statistics"),
         "alignment.qc.v1" => language.text("比对质量控制", "Alignment quality control"),
+        "annotation.gxf.stats.v1" => language.text("注释统计", "Annotation statistics"),
+        "annotation.gxf.normalize.v1" => language.text("注释规范化", "Annotation normalization"),
+        "annotation.gene-position.v1" => language.text("基因位置表", "Gene position table"),
+        "annotation.sequence.extract.v1" => {
+            language.text("按注释提取序列", "Annotation-guided extraction")
+        }
         "expression.matrix.qc.v1" => language.text("表达矩阵", "Expression matrix"),
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
@@ -3296,6 +3426,30 @@ fn metric_label(key: &str, language: Language) -> &str {
         "per_cycle" => "逐循环指标",
         "warnings" => "警告",
         "record_count" => "记录数",
+        "directive_count" => "指令数",
+        "comment_count" => "注释行数",
+        "sequence_region_count" => "序列区域数",
+        "records_with_id" => "含标识符记录数",
+        "records_with_parent" => "含父级记录数",
+        "min_start" => "最小起点",
+        "max_end" => "最大终点",
+        "feature_type_counts" => "各特征类型记录数",
+        "sequence_counts" => "各序列记录数",
+        "source_counts" => "各来源记录数",
+        "strand_counts" => "各链方向记录数",
+        "input_record_count" => "输入记录数",
+        "output_record_count" => "输出记录数",
+        "converted_gtf_attribute_records" => "转换 GTF 属性记录数",
+        "sorted" => "已排序",
+        "missing_identifier_count" => "缺失标识符数",
+        "annotation_record_count" => "注释记录数",
+        "matched_feature_count" => "匹配特征数",
+        "output_sequence_count" => "输出序列数",
+        "output_base_count" => "输出碱基数",
+        "missing_reference_count" => "缺失参考数",
+        "skipped_feature_count" => "跳过特征数",
+        "feature_type" => "特征类型",
+        "promoter_length" => "启动子长度",
         "header_line_count" => "表头行数",
         "primary_record_count" => "主要比对记录数",
         "secondary_record_count" => "次要比对记录数",
@@ -3383,6 +3537,16 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "fastq.trim.v1" => language.text("FASTQ 质量裁剪", "FASTQ quality trimming"),
         "fastq.adapter.v1" => language.text("FASTQ 接头去除", "FASTQ adapter removal"),
         "alignment.qc.v1" => language.text("SAM 比对质量控制", "SAM alignment quality control"),
+        "annotation.gxf.stats.v1" => {
+            language.text("GFF/GTF 注释统计", "GFF/GTF annotation statistics")
+        }
+        "annotation.gxf.normalize.v1" => {
+            language.text("GFF/GTF 注释规范化", "GFF/GTF annotation normalization")
+        }
+        "annotation.gene-position.v1" => language.text("基因位置表", "Gene position table"),
+        "annotation.sequence.extract.v1" => {
+            language.text("按注释提取序列", "Annotation-guided sequence extraction")
+        }
         "interval.intersect.v1" => language.text("BED 区间相交", "BED interval intersection"),
         "interval.merge.v1" => language.text("BED 区间合并", "BED interval merge"),
         "interval.subtract.v1" => language.text("BED 区间扣除", "BED interval subtraction"),
@@ -3450,6 +3614,30 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("alignment.qc.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/alignment.qc.v1/en-US.md"
+        )),
+        ("annotation.gxf.stats.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/annotation.gxf.stats.v1/zh-CN.md"
+        )),
+        ("annotation.gxf.stats.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/annotation.gxf.stats.v1/en-US.md"
+        )),
+        ("annotation.gxf.normalize.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/annotation.gxf.normalize.v1/zh-CN.md"
+        )),
+        ("annotation.gxf.normalize.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/annotation.gxf.normalize.v1/en-US.md"
+        )),
+        ("annotation.gene-position.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/annotation.gene-position.v1/zh-CN.md"
+        )),
+        ("annotation.gene-position.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/annotation.gene-position.v1/en-US.md"
+        )),
+        ("annotation.sequence.extract.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/annotation.sequence.extract.v1/zh-CN.md"
+        )),
+        ("annotation.sequence.extract.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/annotation.sequence.extract.v1/en-US.md"
         )),
         ("interval.intersect.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/interval.intersect.v1/zh-CN.md"
@@ -4007,6 +4195,13 @@ mod tests {
             })
         );
         assert_eq!(
+            analysis_route_for_format("gff3"),
+            Some(AnalysisRoute {
+                capability: "annotation.gxf.stats.v1",
+                input_role: "annotation",
+            })
+        );
+        assert_eq!(
             analysis_route_for_format("bed"),
             Some(AnalysisRoute {
                 capability: "interval.intersect.v1",
@@ -4057,8 +4252,18 @@ mod tests {
                 input_role: "table",
             })
         );
+        assert_eq!(
+            analysis_route_for_capability("annotation.sequence.extract.v1", "gtf"),
+            Some(AnalysisRoute {
+                capability: "annotation.sequence.extract.v1",
+                input_role: "annotation",
+            })
+        );
         assert!(!capability_requires_secondary("interval.merge.v1"));
         assert!(capability_requires_secondary("interval.subtract.v1"));
+        assert!(capability_requires_secondary(
+            "annotation.sequence.extract.v1"
+        ));
         assert_eq!(
             capability_output_extension("interval.merge.v1"),
             Some("bed")
@@ -4066,6 +4271,10 @@ mod tests {
         assert_eq!(
             capability_output_extension("table.manipulate.v1"),
             Some("tsv")
+        );
+        assert_eq!(
+            capability_output_extension("annotation.gxf.normalize.v1"),
+            Some("gff3")
         );
         assert_eq!(capability_output_extension("sequence.stats.v1"), None);
 

@@ -1,0 +1,12 @@
+##gff-version 3
+##sequence-region chr1 1 40
+chr1	demo	gene	2	12	.	+	.	ID=g1;Name=Gene1
+chr1	demo	mRNA	2	12	.	+	.	ID=t1;Parent=g1
+chr1	demo	exon	2	4	.	+	.	Parent=t1
+chr1	demo	exon	9	12	.	+	.	Parent=t1
+chr1	demo	CDS	2	4	.	+	0	Parent=t1
+chr1	demo	CDS	9	12	.	+	0	Parent=t1
+chr1	demo	gene	20	32	.	-	.	ID=g2;Name=Gene2
+chr1	demo	mRNA	20	32	.	-	.	ID=t2;Parent=g2
+chr1	demo	exon	20	23	.	-	.	Parent=t2
+chr1	demo	exon	29	32	.	-	.	Parent=t2

@@ -3,6 +3,11 @@
 //! Execute versioned Linxira Bio jobs through one shared local worker API.
 
 use linxira_bio_core::alignment::sam_qc_path;
+use linxira_bio_core::annotation::{
+    AnnotationExtractOptions, AnnotationNormalizeOptions, GenePositionOptions,
+    annotation_gene_positions_path, annotation_stats_path, extract_annotation_sequences_path,
+    normalize_annotation_path,
+};
 use linxira_bio_core::dataset::{
     DatasetCompression, DatasetFormat, DatasetInspectionOptions, DetectionConfidence,
     inspect_dataset_with_options,
@@ -83,6 +88,10 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
 
     match request.capability.as_str() {
         "alignment.qc.v1" => run_alignment_qc(base_directory, request),
+        "annotation.gxf.stats.v1" => run_annotation_stats(base_directory, request),
+        "annotation.gxf.normalize.v1" => run_annotation_normalize(base_directory, request),
+        "annotation.gene-position.v1" => run_annotation_positions(base_directory, request),
+        "annotation.sequence.extract.v1" => run_annotation_extract(base_directory, request),
         "environment.audit.v1" => run_environment_audit(request),
         "environment.plan.v1" => run_environment_plan(base_directory, request),
         "dataset.inspect.v1" => run_dataset_inspection(base_directory, request),
@@ -175,6 +184,95 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 }));
             finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
             Ok(serde_json::to_string(&result)?)
+        }
+        "annotation.gxf.stats.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "annotation")?;
+            serialize_v2_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                annotation_stats_path(input)?,
+            )
+        }
+        "annotation.gxf.normalize.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "annotation")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let summary = normalize_annotation_path(
+                input,
+                &output,
+                AnnotationNormalizeOptions {
+                    sort: optional_parameter_bool(&request.parameters, "sort")?.unwrap_or(false),
+                },
+            )?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "normalized-annotation",
+                    role: "annotation",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Gff3),
+                    media_type: Some("text/x-gff3"),
+                },
+            )
+        }
+        "annotation.gene-position.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "annotation")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let feature_types =
+                optional_string_array_parameter(&request.parameters, "feature_types")?;
+            let options = GenePositionOptions {
+                feature_types: if feature_types.is_empty() {
+                    GenePositionOptions::default().feature_types
+                } else {
+                    feature_types
+                },
+            };
+            let summary = annotation_gene_positions_path(input, &output, &options)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "gene-position-table",
+                    role: "table",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "annotation.sequence.extract.v1" => {
+            let annotation = resolve_v2_single_input(base_directory, &request, "annotation")?;
+            let fasta = resolve_v2_single_input(base_directory, &request, "fasta")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let options = annotation_extract_options(&request.parameters)?;
+            let summary = extract_annotation_sequences_path(annotation, fasta, &output, &options)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "annotation-sequences",
+                    role: "fasta",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Fasta),
+                    media_type: Some("text/x-fasta"),
+                },
+            )
         }
         "environment.audit.v1" => {
             let audit = audit_environment()?;
@@ -672,6 +770,13 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
     let (required_roles, allowed_parameters): (&[&str], &[&str]) = match request.capability.as_str()
     {
         "alignment.qc.v1" => (&["sam"], &[]),
+        "annotation.gxf.stats.v1" => (&["annotation"], &[]),
+        "annotation.gxf.normalize.v1" => (&["annotation"], &["output", "sort"]),
+        "annotation.gene-position.v1" => (&["annotation"], &["output", "feature_types"]),
+        "annotation.sequence.extract.v1" => (
+            &["annotation", "fasta"],
+            &["output", "feature_type", "promoter_length"],
+        ),
         "environment.audit.v1" => (&[], &[]),
         "environment.plan.v1" => (&[], &["profile", "mode", "project_root"]),
         "dataset.inspect.v1" => (&["file"], &["max_preview_records", "max_preview_bytes"]),
@@ -1328,6 +1433,108 @@ fn run_alignment_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_annotation_stats(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "annotation", &[])?;
+    let input = request
+        .inputs
+        .get("annotation")
+        .ok_or("annotation.gxf.stats.v1 requires inputs.annotation")?;
+    let stats = annotation_stats_path(resolve_input(base_directory, input))?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        stats.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = stats.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_annotation_normalize(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "annotation", &["output", "sort"])?;
+    let input = request
+        .inputs
+        .get("annotation")
+        .ok_or("annotation.gxf.normalize.v1 requires inputs.annotation")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let summary = normalize_annotation_path(
+        input,
+        output,
+        AnnotationNormalizeOptions {
+            sort: optional_parameter_bool(&request.parameters, "sort")?.unwrap_or(false),
+        },
+    )?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_annotation_positions(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "annotation", &["output", "feature_types"])?;
+    let input = request
+        .inputs
+        .get("annotation")
+        .ok_or("annotation.gene-position.v1 requires inputs.annotation")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let feature_types = optional_string_array_parameter(&request.parameters, "feature_types")?;
+    let options = GenePositionOptions {
+        feature_types: if feature_types.is_empty() {
+            GenePositionOptions::default().feature_types
+        } else {
+            feature_types
+        },
+    };
+    let summary = annotation_gene_positions_path(input, output, &options)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_annotation_extract(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["annotation", "fasta"],
+        &["output", "feature_type", "promoter_length"],
+    )?;
+    let annotation = request
+        .inputs
+        .get("annotation")
+        .ok_or("annotation.sequence.extract.v1 requires inputs.annotation")?;
+    let fasta = request
+        .inputs
+        .get("fasta")
+        .ok_or("annotation.sequence.extract.v1 requires inputs.fasta")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let annotation = resolve_input(base_directory, annotation);
+    let fasta = resolve_input(base_directory, fasta);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&annotation, &output)?;
+    ensure_distinct_input_output(&fasta, &output)?;
+    let options = annotation_extract_options(&request.parameters)?;
+    let summary = extract_annotation_sequences_path(annotation, fasta, output, &options)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_expression_matrix_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -1564,6 +1771,18 @@ fn table_manipulate_options(
         filter: table_filter_parameter(parameters)?,
         skip_rows: optional_parameter_usize(parameters, "skip_rows")?.unwrap_or(0),
         limit: optional_parameter_usize(parameters, "limit")?,
+    })
+}
+
+fn annotation_extract_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<AnnotationExtractOptions> {
+    Ok(AnnotationExtractOptions {
+        feature_type: optional_parameter_string(parameters, "feature_type")?
+            .unwrap_or("gene")
+            .to_owned(),
+        promoter_length: optional_parameter_u64(parameters, "promoter_length")?
+            .unwrap_or(linxira_bio_core::annotation::DEFAULT_PROMOTER_LENGTH),
     })
 }
 
@@ -2072,6 +2291,35 @@ fn validate_v1_named_input_contract(
     if let Some(parameters) = parameter_object(&request.parameters)? {
         for parameter in parameters.keys() {
             if !allowed.contains(&parameter.as_str()) {
+                return Err(format!(
+                    "{} does not accept parameter {parameter}",
+                    request.capability
+                )
+                .into());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_v1_multi_input_contract(
+    request: &JobRequest,
+    expected_roles: &[&str],
+    allowed_parameters: &[&str],
+) -> WorkerResult<()> {
+    for role in expected_roles {
+        if !request.inputs.contains_key(*role) {
+            return Err(format!("{} requires inputs.{role}", request.capability).into());
+        }
+    }
+    for role in request.inputs.keys() {
+        if !expected_roles.contains(&role.as_str()) {
+            return Err(format!("{} does not accept input role {role}", request.capability).into());
+        }
+    }
+    if let Some(parameters) = parameter_object(&request.parameters)? {
+        for parameter in parameters.keys() {
+            if !allowed_parameters.contains(&parameter.as_str()) {
                 return Err(format!(
                     "{} does not accept parameter {parameter}",
                     request.capability

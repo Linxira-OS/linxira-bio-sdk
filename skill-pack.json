@@ -69,6 +69,17 @@
       "capabilities": ["alignment.qc.v1"]
     },
     {
+      "id": "analyze-genome-annotations",
+      "path": "skills/analyze-genome-annotations",
+      "kind": "executable",
+      "capabilities": [
+        "annotation.gxf.stats.v1",
+        "annotation.gxf.normalize.v1",
+        "annotation.gene-position.v1",
+        "annotation.sequence.extract.v1"
+      ]
+    },
+    {
       "id": "intersect-genomic-intervals",
       "path": "skills/intersect-genomic-intervals",
       "kind": "executable",

@@ -119,6 +119,99 @@ fn reports_fastq_quality_control_as_json() {
 }
 
 #[test]
+fn runs_annotation_statistics_and_sequence_extraction() {
+    let root = workspace_root();
+    let annotation = root.join("tests/fixtures/annotation/genes.gff3");
+    let reference = root.join("tests/fixtures/annotation/reference.fa");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["annotation", "stats"])
+        .arg(&annotation)
+        .arg("--json")
+        .output()
+        .expect("run annotation stats");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid annotation stats JSON");
+    assert_eq!(result["capability"], "annotation.gxf.stats.v1");
+    assert_eq!(result["result"]["record_count"], 10);
+    assert_eq!(result["result"]["feature_type_counts"]["gene"], 2);
+
+    let temp = temporary_directory("annotation-extract");
+    let normalized = temp.join("normalized.gff3");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["annotation", "normalize"])
+        .arg(&annotation)
+        .arg(&normalized)
+        .args(["--sort", "--json"])
+        .output()
+        .expect("run annotation normalization");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid normalization JSON");
+    assert_eq!(result["capability"], "annotation.gxf.normalize.v1");
+    assert_eq!(result["result"]["output_record_count"], 10);
+    assert!(
+        fs::read_to_string(&normalized)
+            .expect("normalized GFF3")
+            .starts_with("##gff-version 3\n")
+    );
+
+    let positions = temp.join("positions.tsv");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["annotation", "positions"])
+        .arg(&annotation)
+        .arg(&positions)
+        .args(["--feature-type", "gene", "--json"])
+        .output()
+        .expect("run annotation positions");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid positions JSON");
+    assert_eq!(result["capability"], "annotation.gene-position.v1");
+    assert_eq!(result["result"]["output_record_count"], 2);
+    assert!(
+        fs::read_to_string(&positions)
+            .expect("gene positions")
+            .contains("g1\tGene1\tchr1\t2\t12")
+    );
+
+    let fasta = temp.join("exons.fa");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["annotation", "extract"])
+        .arg(&annotation)
+        .arg(&reference)
+        .arg(&fasta)
+        .args(["--feature-type", "exon", "--json"])
+        .output()
+        .expect("run annotation extraction");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid annotation extraction JSON");
+    assert_eq!(result["capability"], "annotation.sequence.extract.v1");
+    assert_eq!(result["result"]["output_sequence_count"], 2);
+    let extracted = fs::read_to_string(fasta).expect("annotation FASTA output");
+    assert!(extracted.contains(">t1 feature=exon"));
+    assert!(extracted.contains("CGTACGT"));
+    fs::remove_dir_all(temp).expect("remove annotation extraction directory");
+}
+
+#[test]
 fn processes_fastq_reads_as_json() {
     let root = workspace_root();
     let fixture = root.join("tests/fixtures/fastq-transform/reads.fastq");
