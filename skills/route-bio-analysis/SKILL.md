@@ -30,8 +30,10 @@ a replacement script silently.
 
 - FASTA assembly statistics and FASTQ read QC: use
   `analyze-sequence-statistics` for supported FASTA and
-  `analyze-fastq-quality` for supported FASTQ. Other sequence manipulation and
-  assembly capabilities remain planned.
+  `analyze-fastq-quality` for supported FASTQ. Use
+  `manipulate-biological-sequences` for supported FASTA record extraction,
+  coordinate extraction, filtering, reverse-complement generation,
+  translation, and ORF finding.
 - BED interval-set overlap summaries: use `intersect-genomic-intervals`.
   GFF/GTF joins, coverage, strand rules, fractional overlaps, and emitted
   records still require an approved external workflow.

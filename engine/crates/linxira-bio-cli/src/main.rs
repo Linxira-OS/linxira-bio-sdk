@@ -11,6 +11,11 @@ use linxira_bio_core::fastq::{FastqQcMetrics, FastqQcOptions, QualityEncodingMod
 use linxira_bio_core::interval::{IntervalIntersectStats, bed_intersect_path};
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
 use linxira_bio_core::sequence::{SequenceStats, fasta_stats_path};
+use linxira_bio_core::sequence_transform::{
+    SequenceExtractOptions, SequenceFilterOptions, SequenceOrfOptions, SequenceTranslateOptions,
+    extract_fasta_path, filter_fasta_path, find_orfs_fasta_path, parse_sequence_region_spec,
+    reverse_complement_fasta_path, translate_fasta_path,
+};
 use linxira_bio_core::structure::{PdbStructureSummary, PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::variant::{VcfStats, vcf_stats_path};
 use linxira_bio_export::export_json_file;
@@ -95,6 +100,25 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if sequence == "sequence" && stats == "stats" && json == "--json" =>
         {
             print_sequence_stats(path, true)
+        }
+        [sequence, extract, arguments @ ..] if sequence == "sequence" && extract == "extract" => {
+            print_sequence_extract(arguments)
+        }
+        [sequence, filter, arguments @ ..] if sequence == "sequence" && filter == "filter" => {
+            print_sequence_filter(arguments)
+        }
+        [sequence, reverse_complement, arguments @ ..]
+            if sequence == "sequence" && reverse_complement == "reverse-complement" =>
+        {
+            print_sequence_reverse_complement(arguments)
+        }
+        [sequence, translate, arguments @ ..]
+            if sequence == "sequence" && translate == "translate" =>
+        {
+            print_sequence_translate(arguments)
+        }
+        [sequence, orf, arguments @ ..] if sequence == "sequence" && orf == "orf" => {
+            print_sequence_orf(arguments)
         }
         [variant, stats, path] if variant == "variant" && stats == "stats" => {
             print_variant_stats(path, false)
@@ -361,6 +385,308 @@ fn print_sequence_stats(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
         print_stats_json(&stats)?;
     } else {
         print_stats_text(&stats);
+    }
+    Ok(())
+}
+
+fn print_sequence_extract(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut identifiers = Vec::new();
+    let mut regions = Vec::new();
+    let mut strict = false;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--id" => {
+                index += 1;
+                identifiers.push(
+                    arguments
+                        .get(index)
+                        .ok_or("--id requires a FASTA identifier")?
+                        .clone(),
+                );
+            }
+            "--region" => {
+                index += 1;
+                let region = arguments
+                    .get(index)
+                    .ok_or("--region requires ID:START-END")?;
+                regions.push(parse_sequence_region_spec(region)?);
+            }
+            "--strict" => strict = true,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence extract option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "sequence extract")?,
+        }
+        index += 1;
+    }
+    let (input, output) = require_sequence_paths(input, output, "sequence extract")?;
+    let summary = extract_fasta_path(
+        input,
+        output,
+        &SequenceExtractOptions {
+            identifiers,
+            regions,
+            strict,
+        },
+    )?;
+    print_sequence_transform_result(
+        "sequence-extract",
+        "sequence.extract.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
+fn print_sequence_filter(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = SequenceFilterOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--min-length" => {
+                index += 1;
+                options.min_length = parse_sequence_u64(arguments.get(index), "--min-length")?;
+            }
+            "--max-length" => {
+                index += 1;
+                options.max_length =
+                    Some(parse_sequence_u64(arguments.get(index), "--max-length")?);
+            }
+            "--min-gc-percent" => {
+                index += 1;
+                options.min_gc_percent = Some(parse_sequence_percentage(
+                    arguments.get(index),
+                    "--min-gc-percent",
+                )?);
+            }
+            "--max-gc-percent" => {
+                index += 1;
+                options.max_gc_percent = Some(parse_sequence_percentage(
+                    arguments.get(index),
+                    "--max-gc-percent",
+                )?);
+            }
+            "--max-n-percent" => {
+                index += 1;
+                options.max_n_percent = Some(parse_sequence_percentage(
+                    arguments.get(index),
+                    "--max-n-percent",
+                )?);
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence filter option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "sequence filter")?,
+        }
+        index += 1;
+    }
+    let (input, output) = require_sequence_paths(input, output, "sequence filter")?;
+    let summary = filter_fasta_path(input, output, &options)?;
+    print_sequence_transform_result(
+        "sequence-filter",
+        "sequence.filter.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
+fn print_sequence_reverse_complement(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut json = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence reverse-complement option: {value}").into());
+            }
+            value => assign_sequence_path(
+                &mut input,
+                &mut output,
+                value,
+                "sequence reverse-complement",
+            )?,
+        }
+    }
+    let (input, output) = require_sequence_paths(input, output, "sequence reverse-complement")?;
+    let summary = reverse_complement_fasta_path(input, output)?;
+    print_sequence_transform_result(
+        "sequence-reverse-complement",
+        "sequence.reverse-complement.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
+fn print_sequence_translate(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut frames = Vec::new();
+    let mut trim_terminal_stop = false;
+    let mut stop_at_first = false;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--frame" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--frame requires a value")?;
+                let frame = value
+                    .parse::<i8>()
+                    .map_err(|_| format!("--frame requires an integer, got {value:?}"))?;
+                if !matches!(frame, -3..=-1 | 1..=3) {
+                    return Err(format!(
+                        "unsupported translation frame {frame}; expected -3, -2, -1, 1, 2, or 3"
+                    )
+                    .into());
+                }
+                frames.push(frame);
+            }
+            "--trim-terminal-stop" => trim_terminal_stop = true,
+            "--stop-at-first" => stop_at_first = true,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence translate option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "sequence translate")?,
+        }
+        index += 1;
+    }
+    let (input, output) = require_sequence_paths(input, output, "sequence translate")?;
+    let summary = translate_fasta_path(
+        input,
+        output,
+        &SequenceTranslateOptions {
+            frames: if frames.is_empty() { vec![1] } else { frames },
+            trim_terminal_stop,
+            stop_at_first,
+        },
+    )?;
+    print_sequence_transform_result(
+        "sequence-translate",
+        "sequence.translate.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
+fn print_sequence_orf(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = SequenceOrfOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--min-amino-acids" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--min-amino-acids requires a value")?;
+                options.min_amino_acids = value.parse::<usize>().map_err(|_| {
+                    format!("--min-amino-acids requires a positive integer, got {value:?}")
+                })?;
+                if options.min_amino_acids == 0 {
+                    return Err("--min-amino-acids must be at least 1".into());
+                }
+            }
+            "--forward-only" => options.include_reverse_strand = false,
+            "--include-partial-3prime" => options.include_partial_3prime = true,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence orf option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "sequence orf")?,
+        }
+        index += 1;
+    }
+    let (input, output) = require_sequence_paths(input, output, "sequence orf")?;
+    let summary = find_orfs_fasta_path(input, output, &options)?;
+    print_sequence_transform_result("sequence-orf", "sequence.orf.v1", output, summary, json)
+}
+
+fn assign_sequence_path<'a>(
+    input: &mut Option<&'a str>,
+    output: &mut Option<&'a str>,
+    value: &'a str,
+    command: &str,
+) -> Result<(), Box<dyn Error>> {
+    if input.is_none() {
+        *input = Some(value);
+    } else if output.is_none() {
+        *output = Some(value);
+    } else {
+        return Err(format!("unexpected {command} argument: {value}").into());
+    }
+    Ok(())
+}
+
+fn require_sequence_paths<'a>(
+    input: Option<&'a str>,
+    output: Option<&'a str>,
+    command: &str,
+) -> Result<(&'a Path, &'a Path), Box<dyn Error>> {
+    let input = input.ok_or_else(|| format!("{command} requires an input FASTA path"))?;
+    let output = output.ok_or_else(|| format!("{command} requires an output FASTA path"))?;
+    Ok((Path::new(input), Path::new(output)))
+}
+
+fn parse_sequence_u64(value: Option<&String>, option: &str) -> Result<u64, Box<dyn Error>> {
+    let value = value.ok_or_else(|| format!("{option} requires a value"))?;
+    value
+        .parse::<u64>()
+        .map_err(|_| format!("{option} requires a non-negative integer, got {value:?}").into())
+}
+
+fn parse_sequence_percentage(value: Option<&String>, option: &str) -> Result<f64, Box<dyn Error>> {
+    let value = value.ok_or_else(|| format!("{option} requires a value"))?;
+    let percent = value
+        .parse::<f64>()
+        .map_err(|_| format!("{option} requires a number, got {value:?}"))?;
+    if !percent.is_finite() || !(0.0..=100.0).contains(&percent) {
+        return Err(format!("{option} must be between 0 and 100").into());
+    }
+    Ok(percent)
+}
+
+fn print_sequence_transform_result<T>(
+    job_id: &str,
+    capability: &str,
+    output: &Path,
+    summary: T,
+    json: bool,
+) -> Result<(), Box<dyn Error>>
+where
+    T: serde::Serialize,
+{
+    if json {
+        print_analysis_json(job_id, capability, summary)?;
+    } else {
+        println!("output\t{}", output.display());
+        if let serde_json::Value::Object(fields) = serde_json::to_value(summary)? {
+            for (name, value) in fields {
+                let rendered = match value {
+                    serde_json::Value::String(value) => value,
+                    serde_json::Value::Number(value) => value.to_string(),
+                    serde_json::Value::Bool(value) => value.to_string(),
+                    serde_json::Value::Null => "null".to_owned(),
+                    value => serde_json::to_string(&value)?,
+                };
+                println!("{name}\t{rendered}");
+            }
+        }
     }
     Ok(())
 }
@@ -640,5 +966,5 @@ fn print_stats_json(stats: &SequenceStats) -> Result<(), Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n  linxira-bio runtime catalog [--json]\n  linxira-bio dataset inspect <input> [--json]\n  linxira-bio sequence stats <input.fasta[.gz]> [--json]\n  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n  linxira-bio alignment qc <input.sam[.gz]> [--json]\n  linxira-bio variant stats <input.vcf[.gz]> [--json]\n  linxira-bio interval intersect <left.bed[.gz]> <right.bed[.gz]> [--json]\n  linxira-bio expression matrix-qc <matrix.csv|tsv[.gz]> [--json]\n  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
+    "usage:\n  linxira-bio capabilities [--json]\n  linxira-bio doctor [--json]\n  linxira-bio environment audit [--json]\n  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n  linxira-bio runtime catalog [--json]\n  linxira-bio dataset inspect <input> [--json]\n  linxira-bio sequence stats <input.fasta[.gz]> [--json]\n  linxira-bio sequence extract <input.fasta[.gz]> <output.fasta> [--id ID ...] [--region ID:START-END[:+|-] ...] [--strict] [--json]\n  linxira-bio sequence filter <input.fasta[.gz]> <output.fasta> [--min-length N] [--max-length N] [--min-gc-percent P] [--max-gc-percent P] [--max-n-percent P] [--json]\n  linxira-bio sequence reverse-complement <input.fasta[.gz]> <output.fasta> [--json]\n  linxira-bio sequence translate <input.fasta[.gz]> <output.fasta> [--frame FRAME ...] [--trim-terminal-stop] [--stop-at-first] [--json]\n  linxira-bio sequence orf <input.fasta[.gz]> <output.fasta> [--min-amino-acids N] [--forward-only] [--include-partial-3prime] [--json]\n  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n  linxira-bio alignment qc <input.sam[.gz]> [--json]\n  linxira-bio variant stats <input.vcf[.gz]> [--json]\n  linxira-bio interval intersect <left.bed[.gz]> <right.bed[.gz]> [--json]\n  linxira-bio expression matrix-qc <matrix.csv|tsv[.gz]> [--json]\n  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
 }

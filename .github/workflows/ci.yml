@@ -137,6 +137,7 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
+      - run: cargo fetch --locked
       - run: cargo fetch --locked --target x86_64-pc-windows-gnu
       - run: cargo fetch --locked --target x86_64-unknown-linux-gnu
       - run: .venv-ci/bin/python scripts/generate_third_party_notices.py --check-config

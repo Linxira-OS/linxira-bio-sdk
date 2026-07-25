@@ -17,6 +17,11 @@ use linxira_bio_core::fastq::{
 };
 use linxira_bio_core::interval::bed_intersect_path;
 use linxira_bio_core::sequence::fasta_stats_path;
+use linxira_bio_core::sequence_transform::{
+    SequenceExtractOptions, SequenceFilterOptions, SequenceOrfOptions, SequenceTransformError,
+    SequenceTranslateOptions, extract_fasta_path, filter_fasta_path, find_orfs_fasta_path,
+    parse_sequence_region_spec, reverse_complement_fasta_path, translate_fasta_path,
+};
 use linxira_bio_core::structure::{PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::variant::vcf_stats_path;
 use linxira_bio_export::{ExportFormat, ensure_distinct_input_output, export_json_file};
@@ -72,7 +77,14 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "expression.matrix.qc.v1" => run_expression_matrix_qc(base_directory, request),
         "interval.intersect.v1" => run_interval_intersect(base_directory, request),
         "table.export.v1" => run_table_export(base_directory, request),
+        "sequence.extract.v1" => run_sequence_extract(base_directory, request),
+        "sequence.filter.v1" => run_sequence_filter(base_directory, request),
+        "sequence.reverse-complement.v1" => {
+            run_sequence_reverse_complement(base_directory, request)
+        }
         "sequence.stats.v1" => run_sequence_stats(base_directory, request),
+        "sequence.translate.v1" => run_sequence_translate(base_directory, request),
+        "sequence.orf.v1" => run_sequence_orf(base_directory, request),
         "structure.pdb.summary.v1" => run_pdb_summary(base_directory, request),
         "variant.stats.v1" => run_variant_stats(base_directory, request),
         capability => Err(format!("unsupported capability: {capability}").into()),
@@ -323,6 +335,48 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 fasta_stats_path(path)?,
             )
         }
+        "sequence.extract.v1" => {
+            let options = sequence_extract_options(&request.parameters)?;
+            execute_sequence_transform_v2(
+                &request,
+                base_directory,
+                &verified_inputs,
+                |input, output| extract_fasta_path(input, output, &options),
+            )
+        }
+        "sequence.filter.v1" => {
+            let options = sequence_filter_options(&request.parameters)?;
+            execute_sequence_transform_v2(
+                &request,
+                base_directory,
+                &verified_inputs,
+                |input, output| filter_fasta_path(input, output, &options),
+            )
+        }
+        "sequence.reverse-complement.v1" => execute_sequence_transform_v2(
+            &request,
+            base_directory,
+            &verified_inputs,
+            |input, output| reverse_complement_fasta_path(input, output),
+        ),
+        "sequence.translate.v1" => {
+            let options = sequence_translate_options(&request.parameters)?;
+            execute_sequence_transform_v2(
+                &request,
+                base_directory,
+                &verified_inputs,
+                |input, output| translate_fasta_path(input, output, &options),
+            )
+        }
+        "sequence.orf.v1" => {
+            let options = sequence_orf_options(&request.parameters)?;
+            execute_sequence_transform_v2(
+                &request,
+                base_directory,
+                &verified_inputs,
+                |input, output| find_orfs_fasta_path(input, output, &options),
+            )
+        }
         "structure.pdb.summary.v1" => {
             let path = resolve_v2_single_input(base_directory, &request, "pdb")?;
             let summary = pdb_summary_path(path, pdb_options(&request.parameters)?)?;
@@ -385,6 +439,32 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         "interval.intersect.v1" => (&["left-bed", "right-bed"], &[]),
         "table.export.v1" => (&["table"], &["output"]),
         "sequence.stats.v1" => (&["fasta"], &[]),
+        "sequence.extract.v1" => (&["fasta"], &["output", "identifiers", "regions", "strict"]),
+        "sequence.filter.v1" => (
+            &["fasta"],
+            &[
+                "output",
+                "min_length",
+                "max_length",
+                "min_gc_percent",
+                "max_gc_percent",
+                "max_n_percent",
+            ],
+        ),
+        "sequence.reverse-complement.v1" => (&["fasta"], &["output"]),
+        "sequence.translate.v1" => (
+            &["fasta"],
+            &["output", "frames", "trim_terminal_stop", "stop_at_first"],
+        ),
+        "sequence.orf.v1" => (
+            &["fasta"],
+            &[
+                "output",
+                "min_amino_acids",
+                "include_reverse_strand",
+                "include_partial_3prime",
+            ],
+        ),
         "structure.pdb.summary.v1" => (&["pdb"], &["interpret_b_factors_as_plddt"]),
         "variant.stats.v1" => (&["vcf"], &[]),
         capability => return Err(format!("unsupported capability: {capability}").into()),
@@ -1021,6 +1101,357 @@ fn run_environment_plan(base_directory: &Path, request: JobRequest) -> WorkerRes
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_sequence_extract(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_sequence_contract(&request, &["output", "identifiers", "regions", "strict"])?;
+    let options = sequence_extract_options(&request.parameters)?;
+    execute_sequence_transform_v1(base_directory, request, |input, output| {
+        extract_fasta_path(input, output, &options)
+    })
+}
+
+fn run_sequence_filter(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_sequence_contract(
+        &request,
+        &[
+            "output",
+            "min_length",
+            "max_length",
+            "min_gc_percent",
+            "max_gc_percent",
+            "max_n_percent",
+        ],
+    )?;
+    let options = sequence_filter_options(&request.parameters)?;
+    execute_sequence_transform_v1(base_directory, request, |input, output| {
+        filter_fasta_path(input, output, &options)
+    })
+}
+
+fn run_sequence_reverse_complement(
+    base_directory: &Path,
+    request: JobRequest,
+) -> WorkerResult<String> {
+    validate_v1_sequence_contract(&request, &["output"])?;
+    execute_sequence_transform_v1(base_directory, request, |input, output| {
+        reverse_complement_fasta_path(input, output)
+    })
+}
+
+fn run_sequence_translate(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_sequence_contract(
+        &request,
+        &["output", "frames", "trim_terminal_stop", "stop_at_first"],
+    )?;
+    let options = sequence_translate_options(&request.parameters)?;
+    execute_sequence_transform_v1(base_directory, request, |input, output| {
+        translate_fasta_path(input, output, &options)
+    })
+}
+
+fn run_sequence_orf(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_sequence_contract(
+        &request,
+        &[
+            "output",
+            "min_amino_acids",
+            "include_reverse_strand",
+            "include_partial_3prime",
+        ],
+    )?;
+    let options = sequence_orf_options(&request.parameters)?;
+    execute_sequence_transform_v1(base_directory, request, |input, output| {
+        find_orfs_fasta_path(input, output, &options)
+    })
+}
+
+fn execute_sequence_transform_v1<T>(
+    base_directory: &Path,
+    request: JobRequest,
+    operation: impl FnOnce(&Path, &Path) -> Result<T, SequenceTransformError>,
+) -> WorkerResult<String>
+where
+    T: serde::Serialize,
+{
+    let input = request
+        .inputs
+        .get("fasta")
+        .ok_or_else(|| format!("{} requires inputs.fasta", request.capability))?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let summary = operation(&input, &output)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn execute_sequence_transform_v2<T>(
+    request: &JobRequestV2,
+    base_directory: &Path,
+    verified_inputs: &BTreeMap<String, String>,
+    operation: impl FnOnce(&Path, &Path) -> Result<T, SequenceTransformError>,
+) -> WorkerResult<String>
+where
+    T: serde::Serialize,
+{
+    let input = resolve_v2_single_input(base_directory, request, "fasta")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let output = resolve_input(base_directory, output);
+    ensure_v2_export_output_is_distinct(request, base_directory, &output)?;
+    let summary = operation(&input, &output)?;
+    let size_bytes = std::fs::metadata(&output)?.len();
+    let sha256 = sha256_file(&output)?;
+    let mut result = AnalysisResultV2::ok(
+        request.job_id.clone(),
+        request.capability.clone(),
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    result.artifacts.push(OutputArtifact {
+        artifact_id: "sequence-output".to_owned(),
+        role: "fasta".to_owned(),
+        kind: OutputArtifactKind::DomainFile,
+        path: output.to_string_lossy().into_owned(),
+        format: Some(BioDataFormat::Fasta),
+        media_type: Some("text/x-fasta".to_owned()),
+        size_bytes: Some(size_bytes),
+        sha256: Some(sha256),
+        metadata: Default::default(),
+    });
+    finalize_v2_input_hashes(&mut result, request, base_directory, verified_inputs)?;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn validate_v1_sequence_contract(request: &JobRequest, allowed: &[&str]) -> WorkerResult<()> {
+    if !request.inputs.contains_key("fasta") {
+        return Err(format!("{} requires inputs.fasta", request.capability).into());
+    }
+    for role in request.inputs.keys() {
+        if role != "fasta" {
+            return Err(format!("{} does not accept input role {role}", request.capability).into());
+        }
+    }
+    if let Some(parameters) = parameter_object(&request.parameters)? {
+        for parameter in parameters.keys() {
+            if !allowed.contains(&parameter.as_str()) {
+                return Err(format!(
+                    "{} does not accept parameter {parameter}",
+                    request.capability
+                )
+                .into());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn parameter_object(
+    parameters: &serde_json::Value,
+) -> WorkerResult<Option<&serde_json::Map<String, serde_json::Value>>> {
+    match parameters {
+        serde_json::Value::Null => Ok(None),
+        serde_json::Value::Object(parameters) => Ok(Some(parameters)),
+        _ => Err("sequence transform parameters must be an object".into()),
+    }
+}
+
+fn required_sequence_output<'a>(
+    parameters: &'a serde_json::Value,
+    capability: &str,
+) -> WorkerResult<&'a str> {
+    let output = parameters
+        .get("output")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| format!("{capability} requires string parameters.output"))?;
+    if output.trim().is_empty() {
+        return Err(format!("{capability} requires a non-empty parameters.output").into());
+    }
+    Ok(output)
+}
+
+fn sequence_extract_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<SequenceExtractOptions> {
+    let identifiers = optional_parameter_array(parameters, "identifiers")?;
+    let identifiers = identifiers
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            value
+                .as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| format!("identifiers[{index}] must be a string").into())
+        })
+        .collect::<WorkerResult<Vec<_>>>()?;
+    let regions = optional_parameter_array(parameters, "regions")?;
+    let regions = regions
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let specification = value.as_str().ok_or_else(|| -> WorkerError {
+                format!("regions[{index}] must be a string").into()
+            })?;
+            parse_sequence_region_spec(specification).map_err(Into::into)
+        })
+        .collect::<WorkerResult<Vec<_>>>()?;
+    Ok(SequenceExtractOptions {
+        identifiers,
+        regions,
+        strict: optional_parameter_bool(parameters, "strict")?.unwrap_or(false),
+    })
+}
+
+fn optional_parameter_array(
+    parameters: &serde_json::Value,
+    key: &str,
+) -> WorkerResult<Vec<serde_json::Value>> {
+    match parameters.get(key) {
+        Some(value) => value
+            .as_array()
+            .cloned()
+            .ok_or_else(|| format!("{key} must be an array").into()),
+        None => Ok(Vec::new()),
+    }
+}
+
+fn sequence_filter_options(parameters: &serde_json::Value) -> WorkerResult<SequenceFilterOptions> {
+    let options = SequenceFilterOptions {
+        min_length: optional_parameter_u64(parameters, "min_length")?.unwrap_or(0),
+        max_length: optional_parameter_u64(parameters, "max_length")?,
+        min_gc_percent: optional_parameter_percentage(parameters, "min_gc_percent")?,
+        max_gc_percent: optional_parameter_percentage(parameters, "max_gc_percent")?,
+        max_n_percent: optional_parameter_percentage(parameters, "max_n_percent")?,
+    };
+    if options
+        .max_length
+        .is_some_and(|maximum| maximum < options.min_length)
+    {
+        return Err("max_length must be at least min_length".into());
+    }
+    if matches!(
+        (options.min_gc_percent, options.max_gc_percent),
+        (Some(minimum), Some(maximum)) if maximum < minimum
+    ) {
+        return Err("max_gc_percent must be at least min_gc_percent".into());
+    }
+    Ok(options)
+}
+
+fn sequence_translate_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<SequenceTranslateOptions> {
+    let frames = match parameters.get("frames") {
+        None => vec![1],
+        Some(value) => {
+            let values = value
+                .as_array()
+                .ok_or("frames must be an array of integers")?;
+            if values.is_empty() {
+                return Err("frames must contain at least one translation frame".into());
+            }
+            values
+                .iter()
+                .enumerate()
+                .map(|(index, value)| {
+                    let frame = value
+                        .as_i64()
+                        .ok_or_else(|| format!("frames[{index}] must be an integer"))?;
+                    let frame = i8::try_from(frame)
+                        .map_err(|_| format!("frames[{index}] is outside the supported range"))?;
+                    if !matches!(frame, -3..=-1 | 1..=3) {
+                        return Err(format!(
+                            "unsupported translation frame {frame}; expected -3, -2, -1, 1, 2, or 3"
+                        )
+                        .into());
+                    }
+                    Ok(frame)
+                })
+                .collect::<WorkerResult<Vec<_>>>()?
+        }
+    };
+    Ok(SequenceTranslateOptions {
+        frames,
+        trim_terminal_stop: optional_parameter_bool(parameters, "trim_terminal_stop")?
+            .unwrap_or(false),
+        stop_at_first: optional_parameter_bool(parameters, "stop_at_first")?.unwrap_or(false),
+    })
+}
+
+fn sequence_orf_options(parameters: &serde_json::Value) -> WorkerResult<SequenceOrfOptions> {
+    let mut options = SequenceOrfOptions::default();
+    if let Some(minimum) = optional_parameter_usize(parameters, "min_amino_acids")? {
+        if minimum == 0 {
+            return Err("min_amino_acids must be at least 1".into());
+        }
+        options.min_amino_acids = minimum;
+    }
+    if let Some(include) = optional_parameter_bool(parameters, "include_reverse_strand")? {
+        options.include_reverse_strand = include;
+    }
+    if let Some(include) = optional_parameter_bool(parameters, "include_partial_3prime")? {
+        options.include_partial_3prime = include;
+    }
+    Ok(options)
+}
+
+fn optional_parameter_u64(parameters: &serde_json::Value, key: &str) -> WorkerResult<Option<u64>> {
+    match parameters.get(key) {
+        Some(value) => value
+            .as_u64()
+            .map(Some)
+            .ok_or_else(|| format!("{key} must be a non-negative integer").into()),
+        None => Ok(None),
+    }
+}
+
+fn optional_parameter_usize(
+    parameters: &serde_json::Value,
+    key: &str,
+) -> WorkerResult<Option<usize>> {
+    optional_parameter_u64(parameters, key)?
+        .map(|value| {
+            usize::try_from(value)
+                .map_err(|_| format!("{key} exceeds this platform's size limit").into())
+        })
+        .transpose()
+}
+
+fn optional_parameter_bool(
+    parameters: &serde_json::Value,
+    key: &str,
+) -> WorkerResult<Option<bool>> {
+    match parameters.get(key) {
+        Some(value) => value
+            .as_bool()
+            .map(Some)
+            .ok_or_else(|| format!("{key} must be a boolean").into()),
+        None => Ok(None),
+    }
+}
+
+fn optional_parameter_percentage(
+    parameters: &serde_json::Value,
+    key: &str,
+) -> WorkerResult<Option<f64>> {
+    match parameters.get(key) {
+        Some(value) => {
+            let percent = value
+                .as_f64()
+                .ok_or_else(|| format!("{key} must be a number"))?;
+            if !percent.is_finite() || !(0.0..=100.0).contains(&percent) {
+                return Err(format!("{key} must be between 0 and 100").into());
+            }
+            Ok(Some(percent))
+        }
+        None => Ok(None),
+    }
+}
+
 fn run_sequence_stats(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -1395,6 +1826,262 @@ mod tests {
     }
 
     #[test]
+    fn v1_executes_all_sequence_transform_capabilities() {
+        let input = write_temporary(
+            "sequence-transform-v1.fa",
+            b">gene description\nATGAAATAA\n>gc\nGCGCGC\n>short\nNN\n",
+        );
+        let cases = [
+            (
+                "sequence.extract.v1",
+                serde_json::json!({"identifiers": ["gene"], "regions": ["gene:1-3"], "strict": true}),
+            ),
+            (
+                "sequence.filter.v1",
+                serde_json::json!({"min_length": 6, "min_gc_percent": 50}),
+            ),
+            ("sequence.reverse-complement.v1", serde_json::json!({})),
+            (
+                "sequence.translate.v1",
+                serde_json::json!({"frames": [1, -1], "trim_terminal_stop": true}),
+            ),
+            (
+                "sequence.orf.v1",
+                serde_json::json!({
+                    "min_amino_acids": 2,
+                    "include_reverse_strand": false
+                }),
+            ),
+        ];
+
+        for (capability, mut parameters) in cases {
+            let output = temporary_path(&format!("{capability}.fa"));
+            parameters["output"] = serde_json::json!(output);
+            let request = sequence_v1_request(&input, capability, parameters);
+            let serialized = execute_request(request, Path::new("."))
+                .unwrap_or_else(|error| panic!("{capability} failed: {error}"));
+            let result: serde_json::Value =
+                serde_json::from_str(&serialized).expect("valid v1 sequence result");
+
+            assert_eq!(result["status"], "ok", "{capability}");
+            assert_eq!(result["capability"], capability, "{capability}");
+            assert!(fs::metadata(&output).expect("sequence output").len() > 0);
+            fs::remove_file(output).expect("remove sequence output");
+        }
+        fs::remove_file(input).expect("remove v1 sequence input");
+    }
+
+    #[test]
+    fn v2_executes_all_sequence_transforms_with_hashed_fasta_artifacts() {
+        let input = write_temporary(
+            "sequence-transform-v2.fa",
+            b">gene description\nATGAAATAA\n>gc\nGCGCGC\n>short\nNN\n",
+        );
+        let cases = [
+            (
+                "sequence.extract.v1",
+                serde_json::json!({"identifiers": ["gene"], "regions": ["gene:1-3"], "strict": true}),
+            ),
+            (
+                "sequence.filter.v1",
+                serde_json::json!({"max_n_percent": 0}),
+            ),
+            ("sequence.reverse-complement.v1", serde_json::json!({})),
+            (
+                "sequence.translate.v1",
+                serde_json::json!({"frames": [1, -1], "stop_at_first": false}),
+            ),
+            (
+                "sequence.orf.v1",
+                serde_json::json!({
+                    "min_amino_acids": 2,
+                    "include_reverse_strand": true,
+                    "include_partial_3prime": true
+                }),
+            ),
+        ];
+
+        for (capability, mut parameters) in cases {
+            let output = temporary_path(&format!("{capability}-v2.fa"));
+            parameters["output"] = serde_json::json!(output);
+            let mut request = artifact_request(
+                &input,
+                BioDataFormat::Fasta,
+                CompressionFormat::None,
+                capability,
+                "fasta",
+            );
+            request.parameters = parameters;
+            let serialized = execute_request_v2(request, Path::new("."))
+                .unwrap_or_else(|error| panic!("{capability} failed: {error}"));
+            let result: AnalysisResultV2<serde_json::Value> =
+                serde_json::from_str(&serialized).expect("valid v2 sequence result");
+
+            assert_eq!(result.status, JobStatus::Ok, "{capability}");
+            assert_eq!(result.capability, capability, "{capability}");
+            assert_eq!(result.provenance.input_sha256.len(), 1, "{capability}");
+            let expected_input_hash = super::sha256_file(&input).expect("hash sequence input");
+            assert_eq!(
+                result.provenance.input_sha256.get("input-file"),
+                Some(&expected_input_hash),
+                "{capability}"
+            );
+            assert_eq!(result.artifacts.len(), 1, "{capability}");
+            let artifact = &result.artifacts[0];
+            assert_eq!(artifact.role, "fasta", "{capability}");
+            assert_eq!(
+                artifact.kind,
+                linxira_bio_protocol::OutputArtifactKind::DomainFile
+            );
+            assert_eq!(artifact.format, Some(BioDataFormat::Fasta));
+            assert_eq!(artifact.media_type.as_deref(), Some("text/x-fasta"));
+            assert_eq!(PathBuf::from(&artifact.path), output, "{capability}");
+            assert_eq!(
+                artifact.size_bytes,
+                Some(fs::metadata(&output).expect("sequence output").len()),
+                "{capability}"
+            );
+            let expected_output_hash = super::sha256_file(&output).expect("hash sequence output");
+            assert_eq!(
+                artifact.sha256.as_deref(),
+                Some(expected_output_hash.as_str()),
+                "{capability}"
+            );
+            fs::remove_file(output).expect("remove v2 sequence output");
+        }
+        fs::remove_file(input).expect("remove v2 sequence input");
+    }
+
+    #[test]
+    fn sequence_transform_requests_reject_invalid_contracts_and_values() {
+        let input = write_temporary("sequence-transform-invalid.fa", b">gene\nATGAAATAA\n");
+        let cases = [
+            (
+                "sequence.extract.v1",
+                serde_json::json!({"identifiers": "gene"}),
+                "identifiers must be an array",
+            ),
+            (
+                "sequence.filter.v1",
+                serde_json::json!({"min_gc_percent": 101}),
+                "must be between 0 and 100",
+            ),
+            (
+                "sequence.translate.v1",
+                serde_json::json!({"frames": [0]}),
+                "unsupported translation frame 0",
+            ),
+            (
+                "sequence.orf.v1",
+                serde_json::json!({"min_amino_acids": 0}),
+                "must be at least 1",
+            ),
+            (
+                "sequence.reverse-complement.v1",
+                serde_json::json!({"unexpected": true}),
+                "does not accept parameter unexpected",
+            ),
+        ];
+
+        for (capability, mut parameters, expected_message) in cases {
+            let output = temporary_path(&format!("invalid-{capability}.fa"));
+            parameters["output"] = serde_json::json!(output);
+            let mut request = artifact_request(
+                &input,
+                BioDataFormat::Fasta,
+                CompressionFormat::None,
+                capability,
+                "fasta",
+            );
+            request.parameters = parameters;
+            let serialized = execute_request_v2(request, Path::new("."))
+                .expect("invalid v2 request uses an error envelope");
+            let result: AnalysisResultV2<serde_json::Value> =
+                serde_json::from_str(&serialized).expect("valid v2 error result");
+
+            assert_eq!(result.status, JobStatus::Error, "{capability}");
+            assert!(
+                result.diagnostics[0].message.contains(expected_message),
+                "{capability}: {}",
+                result.diagnostics[0].message
+            );
+            assert!(result.artifacts.is_empty(), "{capability}");
+            assert!(!output.exists(), "{capability}");
+        }
+
+        let output = temporary_path("wrong-role.fa");
+        let mut wrong_role = artifact_request(
+            &input,
+            BioDataFormat::Fasta,
+            CompressionFormat::None,
+            "sequence.filter.v1",
+            "file",
+        );
+        wrong_role.parameters = serde_json::json!({"output": output});
+        let serialized = execute_request_v2(wrong_role, Path::new("."))
+            .expect("wrong role uses an error envelope");
+        let result: AnalysisResultV2<serde_json::Value> =
+            serde_json::from_str(&serialized).expect("valid wrong-role result");
+        assert_eq!(result.status, JobStatus::Error);
+        assert!(
+            result.diagnostics[0]
+                .message
+                .contains("requires input role fasta")
+        );
+
+        let mut legacy = sequence_v1_request(
+            &input,
+            "sequence.reverse-complement.v1",
+            serde_json::json!({"output": output, "unexpected": true}),
+        );
+        legacy
+            .inputs
+            .insert("extra".to_owned(), input.to_string_lossy().into_owned());
+        let error = execute_request(legacy, Path::new("."))
+            .expect_err("legacy request rejects extra input roles");
+        assert!(
+            error
+                .to_string()
+                .contains("does not accept input role extra")
+        );
+
+        fs::remove_file(input).expect("remove invalid sequence input");
+    }
+
+    #[test]
+    fn v2_sequence_transform_preserves_an_existing_output() {
+        let input = write_temporary("sequence-transform-input.fa", b">sequence\nACGT\n");
+        let output = write_temporary("sequence-transform-protected.fa", b"protected\n");
+        let mut request = artifact_request(
+            &input,
+            BioDataFormat::Fasta,
+            CompressionFormat::None,
+            "sequence.reverse-complement.v1",
+            "fasta",
+        );
+        request.parameters = serde_json::json!({"output": output});
+
+        let serialized = execute_request_v2(request, Path::new("."))
+            .expect("existing output uses an error envelope");
+        let result: AnalysisResultV2<serde_json::Value> =
+            serde_json::from_str(&serialized).expect("valid overwrite error result");
+
+        assert_eq!(result.status, JobStatus::Error);
+        assert!(result.artifacts.is_empty());
+        assert!(
+            result.diagnostics[0]
+                .message
+                .contains("refusing to overwrite")
+        );
+        assert_eq!(
+            fs::read_to_string(&output).expect("protected output remains"),
+            "protected\n"
+        );
+        fs::remove_file(input).expect("remove overwrite input");
+        fs::remove_file(output).expect("remove protected output");
+    }
+
+    #[test]
     fn v2_executes_new_single_input_qc_capabilities() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
         let cases = [
@@ -1484,6 +2171,23 @@ mod tests {
             job_id: "environment-plan-test".to_owned(),
             capability: "environment.plan.v1".to_owned(),
             inputs: BTreeMap::new(),
+            execution: ExecutionRequest {
+                mode: ExecutionMode::LocalCpu,
+            },
+            parameters,
+        }
+    }
+
+    fn sequence_v1_request(
+        path: &Path,
+        capability: &str,
+        parameters: serde_json::Value,
+    ) -> JobRequest {
+        JobRequest {
+            schema_version: SCHEMA_VERSION.to_owned(),
+            job_id: "sequence-transform-v1-test".to_owned(),
+            capability: capability.to_owned(),
+            inputs: BTreeMap::from([("fasta".to_owned(), path.to_string_lossy().into_owned())]),
             execution: ExecutionRequest {
                 mode: ExecutionMode::LocalCpu,
             },

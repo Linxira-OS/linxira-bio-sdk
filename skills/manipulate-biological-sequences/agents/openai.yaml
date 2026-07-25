@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manipulate Biological Sequences"
+  short_description: "Run verified FASTA sequence manipulation"
+  default_prompt: "Use $manipulate-biological-sequences to extract, filter, reverse-complement, translate, or find ORFs in FASTA data."

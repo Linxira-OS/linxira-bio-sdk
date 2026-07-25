@@ -10,5 +10,6 @@ pub mod fastq;
 pub mod interval;
 pub mod runtime;
 pub mod sequence;
+pub mod sequence_transform;
 pub mod structure;
 pub mod variant;
