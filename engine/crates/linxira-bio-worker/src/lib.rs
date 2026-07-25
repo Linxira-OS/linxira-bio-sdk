@@ -15,6 +15,11 @@ use linxira_bio_core::expression::expression_matrix_qc_path;
 use linxira_bio_core::fastq::{
     DEFAULT_MAX_CYCLES, FastqQcOptions, QualityEncodingMode, fastq_qc_path,
 };
+use linxira_bio_core::fastq_transform::{
+    DEFAULT_ADAPTER_MIN_OVERLAP, DEFAULT_MIN_LENGTH, DEFAULT_TRIM_QUALITY, FastqAdapterOptions,
+    FastqTransformError, FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
+    fastq_trim_path,
+};
 use linxira_bio_core::interval::{
     IntervalMergeOptions, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
@@ -79,6 +84,8 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "environment.plan.v1" => run_environment_plan(base_directory, request),
         "dataset.inspect.v1" => run_dataset_inspection(base_directory, request),
         "fastq.qc.v1" => run_fastq_qc(base_directory, request),
+        "fastq.trim.v1" => run_fastq_trim(base_directory, request),
+        "fastq.adapter.v1" => run_fastq_adapter_trim(base_directory, request),
         "expression.matrix.qc.v1" => run_expression_matrix_qc(base_directory, request),
         "interval.intersect.v1" => run_interval_intersect(base_directory, request),
         "interval.merge.v1" => run_interval_merge(base_directory, request),
@@ -264,6 +271,24 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 }));
             finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
             Ok(serde_json::to_string(&result)?)
+        }
+        "fastq.trim.v1" => {
+            let options = fastq_trim_options(&request.parameters)?;
+            execute_fastq_transform_v2(
+                &request,
+                base_directory,
+                &verified_inputs,
+                |input, output| fastq_trim_path(input, output, &options),
+            )
+        }
+        "fastq.adapter.v1" => {
+            let options = fastq_adapter_options(&request.parameters)?;
+            execute_fastq_transform_v2(
+                &request,
+                base_directory,
+                &verified_inputs,
+                |input, output| fastq_adapter_trim_path(input, output, &options),
+            )
         }
         "expression.matrix.qc.v1" => {
             let path = resolve_v2_single_input(base_directory, &request, "matrix")?;
@@ -620,6 +645,14 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         "environment.plan.v1" => (&[], &["profile", "mode", "project_root"]),
         "dataset.inspect.v1" => (&["file"], &["max_preview_records", "max_preview_bytes"]),
         "fastq.qc.v1" => (&["fastq"], &["max_cycles", "quality_encoding"]),
+        "fastq.trim.v1" => (
+            &["fastq"],
+            &["output", "min_quality", "min_length", "quality_encoding"],
+        ),
+        "fastq.adapter.v1" => (
+            &["fastq"],
+            &["output", "adapter", "adapters", "min_overlap", "min_length"],
+        ),
         "expression.matrix.qc.v1" => (&["matrix"], &[]),
         "interval.intersect.v1" => (&["left-bed", "right-bed"], &[]),
         "interval.merge.v1" => (&["bed"], &["output", "max_gap"]),
@@ -1173,6 +1206,30 @@ fn run_fastq_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<Stri
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_fastq_trim(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "fastq",
+        &["output", "min_quality", "min_length", "quality_encoding"],
+    )?;
+    let options = fastq_trim_options(&request.parameters)?;
+    execute_fastq_transform_v1(base_directory, request, |input, output| {
+        fastq_trim_path(input, output, &options)
+    })
+}
+
+fn run_fastq_adapter_trim(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "fastq",
+        &["output", "adapter", "adapters", "min_overlap", "min_length"],
+    )?;
+    let options = fastq_adapter_options(&request.parameters)?;
+    execute_fastq_transform_v1(base_directory, request, |input, output| {
+        fastq_adapter_trim_path(input, output, &options)
+    })
+}
+
 fn run_alignment_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -1349,6 +1406,66 @@ fn parse_quality_encoding(value: Option<&serde_json::Value>) -> WorkerResult<Qua
         "phred+64" => Ok(QualityEncodingMode::Phred64),
         value => Err(format!(
             "unsupported quality_encoding {value:?}; expected auto, phred+33, or phred+64"
+        )
+        .into()),
+    }
+}
+
+fn fastq_trim_options(parameters: &serde_json::Value) -> WorkerResult<FastqTrimOptions> {
+    Ok(FastqTrimOptions {
+        min_quality: optional_parameter_u8(parameters, "min_quality")?
+            .unwrap_or(DEFAULT_TRIM_QUALITY),
+        min_length: optional_parameter_usize(parameters, "min_length")?
+            .unwrap_or(DEFAULT_MIN_LENGTH),
+        quality_encoding: parse_fastq_transform_quality_encoding(
+            parameters.get("quality_encoding"),
+        )?,
+    })
+}
+
+fn fastq_adapter_options(parameters: &serde_json::Value) -> WorkerResult<FastqAdapterOptions> {
+    let adapters = match (
+        optional_parameter_string(parameters, "adapter")?,
+        parameters.get("adapters"),
+    ) {
+        (Some(adapter), None) => vec![adapter.to_owned()],
+        (None, Some(value)) => value
+            .as_array()
+            .ok_or("adapters must be an array of strings")?
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| format!("adapters[{index}] must be a string").into())
+            })
+            .collect::<WorkerResult<Vec<_>>>()?,
+        (Some(_), Some(_)) => {
+            return Err("use either adapter or adapters, not both".into());
+        }
+        (None, None) => FastqAdapterOptions::default().adapters,
+    };
+    Ok(FastqAdapterOptions {
+        adapters,
+        min_overlap: optional_parameter_usize(parameters, "min_overlap")?
+            .unwrap_or(DEFAULT_ADAPTER_MIN_OVERLAP),
+        min_length: optional_parameter_usize(parameters, "min_length")?
+            .unwrap_or(DEFAULT_MIN_LENGTH),
+    })
+}
+
+fn parse_fastq_transform_quality_encoding(
+    value: Option<&serde_json::Value>,
+) -> WorkerResult<FastqTransformQualityEncoding> {
+    match value
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("phred+33")
+    {
+        "phred+33" => Ok(FastqTransformQualityEncoding::Phred33),
+        "phred+64" => Ok(FastqTransformQualityEncoding::Phred64),
+        value => Err(format!(
+            "unsupported quality_encoding {value:?}; expected phred+33 or phred+64"
         )
         .into()),
     }
@@ -1699,6 +1816,62 @@ where
     });
     finalize_v2_input_hashes(&mut result, request, base_directory, verified_inputs)?;
     Ok(serde_json::to_string(&result)?)
+}
+
+fn execute_fastq_transform_v1<T>(
+    base_directory: &Path,
+    request: JobRequest,
+    operation: impl FnOnce(&Path, &Path) -> Result<T, FastqTransformError>,
+) -> WorkerResult<String>
+where
+    T: serde::Serialize,
+{
+    let input = request
+        .inputs
+        .get("fastq")
+        .ok_or_else(|| format!("{} requires inputs.fastq", request.capability))?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let summary = operation(&input, &output)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn execute_fastq_transform_v2<T>(
+    request: &JobRequestV2,
+    base_directory: &Path,
+    verified_inputs: &BTreeMap<String, String>,
+    operation: impl FnOnce(&Path, &Path) -> Result<T, FastqTransformError>,
+) -> WorkerResult<String>
+where
+    T: serde::Serialize,
+{
+    let input = resolve_v2_single_input(base_directory, request, "fastq")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let output = resolve_input(base_directory, output);
+    ensure_v2_export_output_is_distinct(request, base_directory, &output)?;
+    let summary = operation(&input, &output)?;
+    serialize_v2_file_artifact_result(
+        request,
+        base_directory,
+        verified_inputs,
+        summary,
+        FileArtifactSpec {
+            artifact_id: "fastq-output",
+            role: "fastq",
+            kind: OutputArtifactKind::DomainFile,
+            path: output,
+            format: Some(BioDataFormat::Fastq),
+            media_type: Some("text/x-fastq"),
+        },
+    )
 }
 
 fn validate_v1_sequence_contract(request: &JobRequest, allowed: &[&str]) -> WorkerResult<()> {
@@ -2052,6 +2225,12 @@ fn optional_parameter_usize(
             usize::try_from(value)
                 .map_err(|_| format!("{key} exceeds this platform's size limit").into())
         })
+        .transpose()
+}
+
+fn optional_parameter_u8(parameters: &serde_json::Value, key: &str) -> WorkerResult<Option<u8>> {
+    optional_parameter_u64(parameters, key)?
+        .map(|value| u8::try_from(value).map_err(|_| format!("{key} must be 0..255").into()))
         .transpose()
 }
 

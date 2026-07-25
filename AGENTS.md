@@ -18,6 +18,8 @@ the agent skills that select and validate them.
   `sequence.from-table.v1` capabilities.
 - Read `skills/analyze-fastq-quality/SKILL.md` for the implemented
   `fastq.qc.v1` capability.
+- Read `skills/process-fastq-reads/SKILL.md` for the implemented
+  `fastq.trim.v1` and `fastq.adapter.v1` capabilities.
 - Read `skills/analyze-sam-quality/SKILL.md` for the implemented SAM-text
   `alignment.qc.v1` capability; BAM and CRAM still require native tools.
 - Read `skills/intersect-genomic-intervals/SKILL.md` for the implemented BED

@@ -314,6 +314,102 @@ fn executes_fastq_qc_job() {
 }
 
 #[test]
+fn executes_fastq_read_processing_jobs() {
+    let root = workspace_root();
+    let result_dir = root.join("target/test-results");
+    std::fs::create_dir_all(&result_dir).expect("create FASTQ result directory");
+    let output_paths = [
+        result_dir.join("fastq-trim.fastq"),
+        result_dir.join("fastq-adapter-trim.fastq"),
+        result_dir.join("fastq-trim-v2.fastq"),
+        result_dir.join("fastq-adapter-trim-v2.fastq"),
+    ];
+    for path in &output_paths {
+        if path.exists() {
+            std::fs::remove_file(path).expect("remove stale FASTQ output");
+        }
+    }
+
+    let cases = [
+        (
+            "fastq-trim.json",
+            "fastq.trim.v1",
+            "quality_trimmed_bases",
+            6,
+            "@trim\nACGT\n+\nIIII\n@adapter\nTTTTAGATCGGA\n+\nIIIIIIIIIIII\n",
+        ),
+        (
+            "fastq-adapter-trim.json",
+            "fastq.adapter.v1",
+            "adapter_trimmed_bases",
+            8,
+            "@trim\nACGTAC\n+\nIIII!!\n@adapter\nTTTT\n+\nIIII\n@drop\nACGT\n+\n!!!!\n",
+        ),
+        (
+            "fastq-trim-v2.json",
+            "fastq.trim.v1",
+            "quality_trimmed_bases",
+            6,
+            "@trim\nACGT\n+\nIIII\n@adapter\nTTTTAGATCGGA\n+\nIIIIIIIIIIII\n",
+        ),
+        (
+            "fastq-adapter-trim-v2.json",
+            "fastq.adapter.v1",
+            "adapter_trimmed_bases",
+            8,
+            "@trim\nACGTAC\n+\nIIII!!\n@adapter\nTTTT\n+\nIIII\n@drop\nACGT\n+\n!!!!\n",
+        ),
+    ];
+
+    for (index, (fixture, capability, field, expected, expected_fastq)) in cases.iter().enumerate()
+    {
+        let request = root.join("tests/fixtures/jobs").join(fixture);
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(request)
+            .output()
+            .unwrap_or_else(|error| panic!("run {capability}: {error}"));
+
+        assert!(
+            output.status.success(),
+            "{capability}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid FASTQ transform result");
+        assert_eq!(result["status"], "ok", "{capability}");
+        assert_eq!(result["capability"], *capability, "{capability}");
+        assert_eq!(result["result"][*field], *expected, "{capability}");
+        assert_eq!(
+            std::fs::read_to_string(&output_paths[index]).expect("FASTQ output"),
+            *expected_fastq,
+            "{capability}"
+        );
+        if fixture.ends_with("-v2.json") {
+            assert_eq!(result["schema_version"], "2", "{capability}");
+            assert_eq!(result["artifacts"][0]["role"], "fastq", "{capability}");
+            assert_eq!(
+                result["artifacts"][0]["kind"], "domain-file",
+                "{capability}"
+            );
+            assert_eq!(result["artifacts"][0]["format"], "fastq", "{capability}");
+            assert_eq!(
+                result["artifacts"][0]["media_type"], "text/x-fastq",
+                "{capability}"
+            );
+            assert_eq!(
+                result["artifacts"][0]["sha256"].as_str().map(str::len),
+                Some(64),
+                "{capability}"
+            );
+        }
+    }
+
+    for path in output_paths {
+        std::fs::remove_file(path).expect("remove FASTQ output");
+    }
+}
+
+#[test]
 fn executes_variant_statistics_job() {
     let request = workspace_root().join("tests/fixtures/jobs/variant-stats.json");
     let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))

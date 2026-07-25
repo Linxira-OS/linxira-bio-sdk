@@ -69,6 +69,7 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
     match capability.unwrap_or_default() {
         "sequence.stats.v1" => sequence_charts(payload, zh_cn),
         "fastq.qc.v1" => fastq_charts(payload, zh_cn),
+        "fastq.trim.v1" | "fastq.adapter.v1" => fastq_transform_charts(payload, zh_cn),
         "alignment.qc.v1" => alignment_charts(payload, zh_cn),
         "interval.intersect.v1" => interval_charts(payload, zh_cn),
         "interval.merge.v1" => interval_merge_charts(payload, zh_cn),
@@ -81,6 +82,58 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         _ if payload.get("n50").is_some() => sequence_charts(payload, zh_cn),
         _ => Vec::new(),
     }
+}
+
+fn fastq_transform_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let reads = values_for_keys(
+        payload,
+        &[
+            (
+                "input_read_count",
+                localized(zh_cn, "输入读段", "Input reads"),
+            ),
+            (
+                "output_read_count",
+                localized(zh_cn, "输出读段", "Output reads"),
+            ),
+            (
+                "discarded_read_count",
+                localized(zh_cn, "丢弃读段", "Discarded reads"),
+            ),
+            (
+                "trimmed_read_count",
+                localized(zh_cn, "被裁剪读段", "Trimmed reads"),
+            ),
+        ],
+    );
+    let bases = values_for_keys(
+        payload,
+        &[
+            ("input_bases", localized(zh_cn, "输入碱基", "Input bases")),
+            ("output_bases", localized(zh_cn, "输出碱基", "Output bases")),
+            (
+                "quality_trimmed_bases",
+                localized(zh_cn, "质量裁剪碱基", "Quality-trimmed bases"),
+            ),
+            (
+                "adapter_trimmed_bases",
+                localized(zh_cn, "接头裁剪碱基", "Adapter-trimmed bases"),
+            ),
+        ],
+    );
+    bar_specs(
+        [
+            (
+                localized(zh_cn, "FASTQ 读段处理摘要", "FASTQ read processing summary"),
+                reads,
+            ),
+            (
+                localized(zh_cn, "输入/输出/裁剪碱基", "Input/output/trimmed bases"),
+                bases,
+            ),
+        ],
+        false,
+    )
 }
 
 fn alignment_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {

@@ -8,6 +8,10 @@ use linxira_bio_core::environment::{
 };
 use linxira_bio_core::expression::{ExpressionMatrixQc, expression_matrix_qc_path};
 use linxira_bio_core::fastq::{FastqQcMetrics, FastqQcOptions, QualityEncodingMode, fastq_qc_path};
+use linxira_bio_core::fastq_transform::{
+    FastqAdapterOptions, FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
+    fastq_trim_path,
+};
 use linxira_bio_core::interval::{
     IntervalIntersectStats, IntervalMergeOptions, bed_intersect_path, bed_merge_path,
     bed_subtract_path,
@@ -67,6 +71,14 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             print_environment_plan(arguments)
         }
         [fastq, qc, arguments @ ..] if fastq == "fastq" && qc == "qc" => print_fastq_qc(arguments),
+        [fastq, trim, arguments @ ..] if fastq == "fastq" && trim == "trim" => {
+            print_fastq_trim(arguments)
+        }
+        [fastq, adapter_trim, arguments @ ..]
+            if fastq == "fastq" && adapter_trim == "adapter-trim" =>
+        {
+            print_fastq_adapter_trim(arguments)
+        }
         [alignment, qc, path] if alignment == "alignment" && qc == "qc" => {
             print_alignment_qc(path, false)
         }
@@ -1036,6 +1048,115 @@ fn print_fastq_qc_text(metrics: &FastqQcMetrics) {
     }
 }
 
+fn print_fastq_trim(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = FastqTrimOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--min-quality" => {
+                index += 1;
+                options.min_quality = parse_u8(arguments.get(index), "--min-quality")?;
+            }
+            "--min-length" => {
+                index += 1;
+                options.min_length = parse_sequence_usize(arguments.get(index), "--min-length")?;
+            }
+            "--quality-encoding" => {
+                index += 1;
+                options.quality_encoding = parse_fastq_transform_quality_encoding(
+                    arguments.get(index),
+                    "--quality-encoding",
+                )?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown FASTQ trim option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "fastq trim")?,
+        }
+        index += 1;
+    }
+    let input = input.ok_or("fastq trim requires an input FASTQ path")?;
+    let output = output.ok_or("fastq trim requires an output FASTQ path")?;
+    let output = Path::new(output);
+    let summary = fastq_trim_path(Path::new(input), output, &options)?;
+    print_sequence_transform_result("fastq-trim", "fastq.trim.v1", output, summary, json)
+}
+
+fn print_fastq_adapter_trim(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = FastqAdapterOptions::default();
+    let mut explicit_adapters = Vec::new();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--adapter" => {
+                index += 1;
+                explicit_adapters.push(
+                    arguments
+                        .get(index)
+                        .ok_or("--adapter requires a sequence")?
+                        .clone(),
+                );
+            }
+            "--min-overlap" => {
+                index += 1;
+                options.min_overlap = parse_sequence_usize(arguments.get(index), "--min-overlap")?;
+            }
+            "--min-length" => {
+                index += 1;
+                options.min_length = parse_sequence_usize(arguments.get(index), "--min-length")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown FASTQ adapter-trim option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "fastq adapter-trim")?,
+        }
+        index += 1;
+    }
+    if !explicit_adapters.is_empty() {
+        options.adapters = explicit_adapters;
+    }
+    let input = input.ok_or("fastq adapter-trim requires an input FASTQ path")?;
+    let output = output.ok_or("fastq adapter-trim requires an output FASTQ path")?;
+    let output = Path::new(output);
+    let summary = fastq_adapter_trim_path(Path::new(input), output, &options)?;
+    print_sequence_transform_result(
+        "fastq-adapter-trim",
+        "fastq.adapter.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
+fn parse_fastq_transform_quality_encoding(
+    value: Option<&String>,
+    option: &str,
+) -> Result<FastqTransformQualityEncoding, Box<dyn Error>> {
+    match value
+        .ok_or_else(|| format!("{option} requires a value"))?
+        .as_str()
+    {
+        "phred+33" => Ok(FastqTransformQualityEncoding::Phred33),
+        "phred+64" => Ok(FastqTransformQualityEncoding::Phred64),
+        value => Err(format!("{option} must be phred+33 or phred+64, got {value:?}").into()),
+    }
+}
+
+fn parse_u8(value: Option<&String>, option: &str) -> Result<u8, Box<dyn Error>> {
+    let value = value.ok_or_else(|| format!("{option} requires a value"))?;
+    value
+        .parse::<u8>()
+        .map_err(|_| format!("{option} requires an integer from 0 to 255, got {value:?}").into())
+}
+
 fn print_variant_stats(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
     let stats = vcf_stats_path(Path::new(path))?;
     if json {
@@ -1323,6 +1444,8 @@ fn usage() -> &'static str {
         "  linxira-bio sequence to-table <input.fasta[.gz]> <output.csv|tsv> [--delimiter csv|tsv] [--no-header] [--json]\n",
         "  linxira-bio sequence from-table <input.csv|tsv[.gz]> <output.fasta> [--delimiter csv|tsv] [--id-column NAME] [--sequence-column NAME] [--description-column NAME|--no-description-column] [--json]\n",
         "  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n",
+        "  linxira-bio fastq trim <input.fastq[.gz]> <output.fastq> [--min-quality N] [--min-length N] [--quality-encoding phred+33|phred+64] [--json]\n",
+        "  linxira-bio fastq adapter-trim <input.fastq[.gz]> <output.fastq> [--adapter SEQ ...] [--min-overlap N] [--min-length N] [--json]\n",
         "  linxira-bio alignment qc <input.sam[.gz]> [--json]\n",
         "  linxira-bio variant stats <input.vcf[.gz]> [--json]\n",
         "  linxira-bio interval intersect <left.bed[.gz]> <right.bed[.gz]> [--json]\n",

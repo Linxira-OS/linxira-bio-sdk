@@ -181,6 +181,24 @@
       "output_formats": ["json"]
     },
     {
+      "id": "fastq.trim.v1",
+      "status": "available",
+      "category": "read-processing",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio fastq trim <input.fastq> <output.fastq> --json",
+      "input_formats": ["fastq"],
+      "output_formats": ["fastq", "json"]
+    },
+    {
+      "id": "fastq.adapter.v1",
+      "status": "available",
+      "category": "read-processing",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio fastq adapter-trim <input.fastq> <output.fastq> --json",
+      "input_formats": ["fastq"],
+      "output_formats": ["fastq", "json"]
+    },
+    {
       "id": "interval.intersect.v1",
       "status": "available",
       "category": "genome-intervals",

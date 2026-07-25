@@ -263,6 +263,8 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "table.export.v1",
     "sequence.stats.v1",
     "fastq.qc.v1",
+    "fastq.trim.v1",
+    "fastq.adapter.v1",
     "alignment.qc.v1",
     "interval.intersect.v1",
     "interval.merge.v1",
@@ -1465,6 +1467,8 @@ impl BioApp {
                 for capability in [
                     "sequence.stats.v1",
                     "fastq.qc.v1",
+                    "fastq.trim.v1",
+                    "fastq.adapter.v1",
                     "alignment.qc.v1",
                     "variant.stats.v1",
                     "interval.intersect.v1",
@@ -2194,6 +2198,14 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             capability: "fastq.qc.v1",
             input_role: "fastq",
         }),
+        ("fastq.trim.v1", "fastq") => Some(AnalysisRoute {
+            capability: "fastq.trim.v1",
+            input_role: "fastq",
+        }),
+        ("fastq.adapter.v1", "fastq") => Some(AnalysisRoute {
+            capability: "fastq.adapter.v1",
+            input_role: "fastq",
+        }),
         ("alignment.qc.v1", "sam") => Some(AnalysisRoute {
             capability: "alignment.qc.v1",
             input_role: "sam",
@@ -2232,6 +2244,7 @@ fn capability_requires_secondary(capability: &str) -> bool {
 
 fn capability_output_extension(capability: &str) -> Option<&'static str> {
     match capability {
+        "fastq.trim.v1" | "fastq.adapter.v1" => Some("fastq"),
         "interval.merge.v1" | "interval.subtract.v1" => Some("bed"),
         _ => None,
     }
@@ -2843,6 +2856,8 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
     match capability {
         "sequence.stats.v1" => language.text("FASTA 序列统计", "FASTA sequence statistics"),
         "fastq.qc.v1" => language.text("FASTQ 质量控制", "FASTQ quality control"),
+        "fastq.trim.v1" => language.text("FASTQ 质量裁剪", "FASTQ quality trimming"),
+        "fastq.adapter.v1" => language.text("FASTQ 接头去除", "FASTQ adapter removal"),
         "interval.intersect.v1" => language.text("BED 区间相交", "BED interval intersection"),
         "interval.merge.v1" => language.text("BED 区间合并", "BED interval merge"),
         "interval.subtract.v1" => language.text("BED 区间扣除", "BED interval subtraction"),
@@ -3261,6 +3276,10 @@ fn metric_label(key: &str, language: Language) -> &str {
         "n_count" => "N 数量",
         "n_percent" => "N 百分比",
         "read_count" => "读段数",
+        "input_read_count" => "输入读段数",
+        "output_read_count" => "输出读段数",
+        "discarded_read_count" => "丢弃读段数",
+        "trimmed_read_count" => "被裁剪读段数",
         "mean_quality" => "平均质量值",
         "q20_percent" => "Q20 百分比",
         "q30_percent" => "Q30 百分比",
@@ -3302,6 +3321,8 @@ fn metric_label(key: &str, language: Language) -> &str {
         "merged_interval_count" => "被合并区间数",
         "input_bases" => "输入碱基数",
         "output_bases" => "输出碱基数",
+        "quality_trimmed_bases" => "质量裁剪碱基数",
+        "adapter_trimmed_bases" => "接头裁剪碱基数",
         "max_gap" => "最大间隔",
         "affected_left_interval_count" => "受影响左侧区间数",
         "removed_bases" => "被扣除碱基数",
@@ -3341,6 +3362,8 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "table.export.v1" => language.text("表格导出", "Table export"),
         "sequence.stats.v1" => language.text("FASTA 序列统计", "FASTA sequence statistics"),
         "fastq.qc.v1" => language.text("FASTQ 质量控制", "FASTQ quality control"),
+        "fastq.trim.v1" => language.text("FASTQ 质量裁剪", "FASTQ quality trimming"),
+        "fastq.adapter.v1" => language.text("FASTQ 接头去除", "FASTQ adapter removal"),
         "alignment.qc.v1" => language.text("SAM 比对质量控制", "SAM alignment quality control"),
         "interval.intersect.v1" => language.text("BED 区间相交", "BED interval intersection"),
         "interval.merge.v1" => language.text("BED 区间合并", "BED interval merge"),
@@ -3384,6 +3407,18 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("fastq.qc.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/fastq.qc.v1/en-US.md"
+        )),
+        ("fastq.trim.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/fastq.trim.v1/zh-CN.md"
+        )),
+        ("fastq.trim.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/fastq.trim.v1/en-US.md"
+        )),
+        ("fastq.adapter.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/fastq.adapter.v1/zh-CN.md"
+        )),
+        ("fastq.adapter.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/fastq.adapter.v1/en-US.md"
         )),
         ("alignment.qc.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/alignment.qc.v1/zh-CN.md"

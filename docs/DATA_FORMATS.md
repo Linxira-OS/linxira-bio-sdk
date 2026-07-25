@@ -9,7 +9,7 @@ means that an analysis capability is available.
 | Format | Content detection | Bounded preview | Available analysis | Current boundary |
 | --- | --- | --- | --- | --- |
 | FASTA | Yes | Sequence records | `sequence.stats.v1` | Plain, gzip, and BGZF |
-| FASTQ | Yes | Read records | `fastq.qc.v1` | Plain, gzip, and BGZF |
+| FASTQ | Yes | Read records | `fastq.qc.v1`, `fastq.trim.v1`, `fastq.adapter.v1` | QC plus FASTQ output for 3' quality trimming and adapter removal; plain, gzip, and BGZF input |
 | CSV | Yes | Parsed table | `expression.matrix.qc.v1` | Rectangular expression matrices; quoted and multiline preview fields supported |
 | TSV | Yes | Parsed table | `expression.matrix.qc.v1` | Rectangular expression matrices |
 | BED | Yes | Interval rows | `interval.intersect.v1`, `interval.merge.v1`, `interval.subtract.v1` | Pairwise half-open overlap summary plus BED3 merge/subtract outputs |
@@ -49,7 +49,7 @@ including the header.
 
 “识别”“预览”“可执行分析”和“导出”是四种不同承诺。文件被识别并不代表已有可运行
 的生物学分析能力。FASTA、FASTQ、SAM 和 VCF 当前分别可运行序列统计、读段质量
-控制、文本比对质控和变异描述统计；BED 可计算两组区间的半开重叠摘要，CSV/TSV
+控制/质量裁剪/接头去除、文本比对质控和变异描述统计；BED 可计算两组区间的半开重叠摘要，CSV/TSV
 可进行矩形表达矩阵质控，PDB 可生成结构摘要和供渲染使用的原子坐标。PDB/mmCIF
 均可在 GUI 中进行有界 3D 预览并导出当前视角 PNG，但 mmCIF 分析仍未实现。GFF3、GTF 目前只做有界
 预览；BAM、BCF、CRAM、H5AD 等二进制格式仅识别，不会伪装成可用能力。
