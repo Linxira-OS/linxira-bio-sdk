@@ -1,0 +1,43 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-interval-subtract-v2",
+  "capability": "interval.subtract.v1",
+  "inputs": [
+    {
+      "artifact_id": "left-bed",
+      "role": "left-bed",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "left-bed-1",
+          "path": "../interval-intersect/left.bed",
+          "format": "bed",
+          "compression": "none",
+          "size_bytes": 70,
+          "sha256": "f538d57afff15ccb57b618e375040f4033cf8a12be89d0b24d5814a659969e20"
+        }
+      ]
+    },
+    {
+      "artifact_id": "right-bed",
+      "role": "right-bed",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "right-bed-1",
+          "path": "../interval-intersect/right.bed",
+          "format": "bed",
+          "compression": "none",
+          "size_bytes": 54,
+          "sha256": "90d4d8c2399f0cc7b0600ec327a646d2057616158f1de5606e602cb65cd864d5"
+        }
+      ]
+    }
+  ],
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "output": "../../../target/test-results/interval-subtract-v2.bed"
+  }
+}

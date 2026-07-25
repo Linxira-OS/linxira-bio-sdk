@@ -15,7 +15,9 @@ use linxira_bio_core::expression::expression_matrix_qc_path;
 use linxira_bio_core::fastq::{
     DEFAULT_MAX_CYCLES, FastqQcOptions, QualityEncodingMode, fastq_qc_path,
 };
-use linxira_bio_core::interval::bed_intersect_path;
+use linxira_bio_core::interval::{
+    IntervalMergeOptions, bed_intersect_path, bed_merge_path, bed_subtract_path,
+};
 use linxira_bio_core::sequence::fasta_stats_path;
 use linxira_bio_core::sequence_transform::{
     SequenceExtractOptions, SequenceFilterOptions, SequenceFromTableOptions,
@@ -79,6 +81,8 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "fastq.qc.v1" => run_fastq_qc(base_directory, request),
         "expression.matrix.qc.v1" => run_expression_matrix_qc(base_directory, request),
         "interval.intersect.v1" => run_interval_intersect(base_directory, request),
+        "interval.merge.v1" => run_interval_merge(base_directory, request),
+        "interval.subtract.v1" => run_interval_subtract(base_directory, request),
         "table.export.v1" => run_table_export(base_directory, request),
         "sequence.extract.v1" => run_sequence_extract(base_directory, request),
         "sequence.filter.v1" => run_sequence_filter(base_directory, request),
@@ -307,6 +311,55 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 }));
             finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
             Ok(serde_json::to_string(&result)?)
+        }
+        "interval.merge.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "bed")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let stats = bed_merge_path(
+                input,
+                &output,
+                IntervalMergeOptions {
+                    max_gap: optional_parameter_u64(&request.parameters, "max_gap")?.unwrap_or(0),
+                },
+            )?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                stats,
+                FileArtifactSpec {
+                    artifact_id: "interval-output",
+                    role: "bed",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Bed),
+                    media_type: Some("text/x-bed"),
+                },
+            )
+        }
+        "interval.subtract.v1" => {
+            let left = resolve_v2_single_input(base_directory, &request, "left-bed")?;
+            let right = resolve_v2_single_input(base_directory, &request, "right-bed")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let stats = bed_subtract_path(left, right, &output)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                stats,
+                FileArtifactSpec {
+                    artifact_id: "interval-output",
+                    role: "bed",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Bed),
+                    media_type: Some("text/x-bed"),
+                },
+            )
         }
         "table.export.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "table")?;
@@ -569,6 +622,8 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         "fastq.qc.v1" => (&["fastq"], &["max_cycles", "quality_encoding"]),
         "expression.matrix.qc.v1" => (&["matrix"], &[]),
         "interval.intersect.v1" => (&["left-bed", "right-bed"], &[]),
+        "interval.merge.v1" => (&["bed"], &["output", "max_gap"]),
+        "interval.subtract.v1" => (&["left-bed", "right-bed"], &["output"]),
         "table.export.v1" => (&["table"], &["output"]),
         "sequence.stats.v1" => (&["fasta"], &[]),
         "sequence.extract.v1" => (&["fasta"], &["output", "identifiers", "regions", "strict"]),
@@ -1173,6 +1228,58 @@ fn run_interval_intersect(base_directory: &Path, request: JobRequest) -> WorkerR
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_interval_merge(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_interval_merge_contract(&request)?;
+    let input = request
+        .inputs
+        .get("bed")
+        .ok_or("interval.merge.v1 requires inputs.bed")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let stats = bed_merge_path(
+        &input,
+        &output,
+        IntervalMergeOptions {
+            max_gap: optional_parameter_u64(&request.parameters, "max_gap")?.unwrap_or(0),
+        },
+    )?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        stats,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_interval_subtract(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_interval_subtract_contract(&request)?;
+    let left = request
+        .inputs
+        .get("left-bed")
+        .ok_or("interval.subtract.v1 requires inputs.left-bed")?;
+    let right = request
+        .inputs
+        .get("right-bed")
+        .ok_or("interval.subtract.v1 requires inputs.right-bed")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let left = resolve_input(base_directory, left);
+    let right = resolve_input(base_directory, right);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&left, &output)?;
+    ensure_distinct_input_output(&right, &output)?;
+    let stats = bed_subtract_path(&left, &right, &output)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        stats,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_variant_stats(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -1633,6 +1740,54 @@ fn validate_v1_named_input_contract(
     if let Some(parameters) = parameter_object(&request.parameters)? {
         for parameter in parameters.keys() {
             if !allowed.contains(&parameter.as_str()) {
+                return Err(format!(
+                    "{} does not accept parameter {parameter}",
+                    request.capability
+                )
+                .into());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_v1_interval_merge_contract(request: &JobRequest) -> WorkerResult<()> {
+    if !request.inputs.contains_key("bed") {
+        return Err(format!("{} requires inputs.bed", request.capability).into());
+    }
+    for role in request.inputs.keys() {
+        if role != "bed" {
+            return Err(format!("{} does not accept input role {role}", request.capability).into());
+        }
+    }
+    if let Some(parameters) = parameter_object(&request.parameters)? {
+        for parameter in parameters.keys() {
+            if !matches!(parameter.as_str(), "output" | "max_gap") {
+                return Err(format!(
+                    "{} does not accept parameter {parameter}",
+                    request.capability
+                )
+                .into());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_v1_interval_subtract_contract(request: &JobRequest) -> WorkerResult<()> {
+    for required in ["left-bed", "right-bed"] {
+        if !request.inputs.contains_key(required) {
+            return Err(format!("{} requires inputs.{required}", request.capability).into());
+        }
+    }
+    for role in request.inputs.keys() {
+        if !matches!(role.as_str(), "left-bed" | "right-bed") {
+            return Err(format!("{} does not accept input role {role}", request.capability).into());
+        }
+    }
+    if let Some(parameters) = parameter_object(&request.parameters)? {
+        for parameter in parameters.keys() {
+            if parameter != "output" {
                 return Err(format!(
                     "{} does not accept parameter {parameter}",
                     request.capability

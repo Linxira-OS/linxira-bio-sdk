@@ -71,6 +71,8 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         "fastq.qc.v1" => fastq_charts(payload, zh_cn),
         "alignment.qc.v1" => alignment_charts(payload, zh_cn),
         "interval.intersect.v1" => interval_charts(payload, zh_cn),
+        "interval.merge.v1" => interval_merge_charts(payload, zh_cn),
+        "interval.subtract.v1" => interval_subtract_charts(payload, zh_cn),
         "expression.matrix.qc.v1" => expression_charts(payload, zh_cn),
         "variant.stats.v1" => variant_charts(payload, zh_cn),
         "structure.pdb.summary.v1" => structure_charts(payload, zh_cn),
@@ -168,6 +170,127 @@ fn interval_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
             ),
             (
                 localized(zh_cn, "各区域重叠碱基", "Overlap bases by contig"),
+                contigs,
+            ),
+        ],
+        false,
+    )
+}
+
+fn interval_merge_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let summary = values_for_keys(
+        payload,
+        &[
+            (
+                "input_interval_count",
+                localized(zh_cn, "输入区间", "Input intervals"),
+            ),
+            (
+                "output_interval_count",
+                localized(zh_cn, "输出区间", "Output intervals"),
+            ),
+            (
+                "merged_interval_count",
+                localized(zh_cn, "被合并", "Merged"),
+            ),
+        ],
+    );
+    let bases = values_for_keys(
+        payload,
+        &[
+            ("input_bases", localized(zh_cn, "输入碱基", "Input bases")),
+            ("output_bases", localized(zh_cn, "输出碱基", "Output bases")),
+        ],
+    );
+    let mut contigs = payload
+        .get("contigs")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+        .filter_map(|(name, metrics)| {
+            Some(BarValue {
+                label: name.clone(),
+                value: number(metrics, "output_bases")?,
+            })
+        })
+        .collect::<Vec<_>>();
+    sort_and_limit(&mut contigs, 12);
+    bar_specs(
+        [
+            (
+                localized(zh_cn, "区间合并摘要", "Interval merge summary"),
+                summary,
+            ),
+            (
+                localized(zh_cn, "输入/输出碱基", "Input/output bases"),
+                bases,
+            ),
+            (
+                localized(zh_cn, "各区域输出碱基", "Output bases by contig"),
+                contigs,
+            ),
+        ],
+        false,
+    )
+}
+
+fn interval_subtract_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let summary = values_for_keys(
+        payload,
+        &[
+            (
+                "left_interval_count",
+                localized(zh_cn, "左侧区间", "Left intervals"),
+            ),
+            (
+                "right_interval_count",
+                localized(zh_cn, "右侧区间", "Right intervals"),
+            ),
+            (
+                "output_interval_count",
+                localized(zh_cn, "输出区间", "Output intervals"),
+            ),
+            (
+                "affected_left_interval_count",
+                localized(zh_cn, "受影响左侧", "Affected left"),
+            ),
+        ],
+    );
+    let bases = values_for_keys(
+        payload,
+        &[
+            (
+                "removed_bases",
+                localized(zh_cn, "扣除碱基", "Removed bases"),
+            ),
+            ("output_bases", localized(zh_cn, "输出碱基", "Output bases")),
+        ],
+    );
+    let mut contigs = payload
+        .get("contigs")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+        .filter_map(|(name, metrics)| {
+            Some(BarValue {
+                label: name.clone(),
+                value: number(metrics, "output_bases")?,
+            })
+        })
+        .collect::<Vec<_>>();
+    sort_and_limit(&mut contigs, 12);
+    bar_specs(
+        [
+            (
+                localized(zh_cn, "区间扣除摘要", "Interval subtraction summary"),
+                summary,
+            ),
+            (
+                localized(zh_cn, "扣除/输出碱基", "Removed/output bases"),
+                bases,
+            ),
+            (
+                localized(zh_cn, "各区域输出碱基", "Output bases by contig"),
                 contigs,
             ),
         ],
@@ -780,6 +903,46 @@ mod tests {
         };
         assert_eq!(values.len(), 12);
         assert_eq!(values[0].value, 19.0);
+    }
+
+    #[test]
+    fn interval_set_operations_build_output_charts() {
+        let merge = json!({
+            "input_interval_count": 3,
+            "output_interval_count": 2,
+            "merged_interval_count": 1,
+            "input_bases": 27,
+            "output_bases": 20,
+            "contigs": {
+                "chr1": {"output_bases": 13},
+                "chr2": {"output_bases": 7}
+            }
+        });
+        let merge_charts = chart_specs(&merge, Some("interval.merge.v1"), false);
+        assert_eq!(merge_charts.len(), 3);
+        let ChartSpec::Bars { values, .. } = &merge_charts[0] else {
+            panic!("expected merge summary chart");
+        };
+        assert_eq!(values[0].label, "Input intervals");
+
+        let subtract = json!({
+            "left_interval_count": 3,
+            "right_interval_count": 3,
+            "output_interval_count": 3,
+            "affected_left_interval_count": 3,
+            "removed_bases": 12,
+            "output_bases": 15,
+            "contigs": {
+                "chr1": {"output_bases": 10},
+                "chr2": {"output_bases": 5}
+            }
+        });
+        let subtract_charts = chart_specs(&subtract, Some("interval.subtract.v1"), false);
+        assert_eq!(subtract_charts.len(), 3);
+        let ChartSpec::Bars { values, .. } = &subtract_charts[1] else {
+            panic!("expected subtraction bases chart");
+        };
+        assert_eq!(values[0].label, "Removed bases");
     }
 
     #[test]

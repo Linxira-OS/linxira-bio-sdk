@@ -36,6 +36,8 @@
     "fastq.qc.v1",
     "alignment.qc.v1",
     "interval.intersect.v1",
+    "interval.merge.v1",
+    "interval.subtract.v1",
     "expression.matrix.qc.v1",
     "variant.stats.v1",
     "structure.pdb.summary.v1",

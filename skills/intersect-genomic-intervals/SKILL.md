@@ -1,24 +1,34 @@
 ---
 name: intersect-genomic-intervals
-description: Validate and measure overlap between two local BED interval sets with the executable interval.intersect.v1 capability. Use for region-set intersection counts, overlapped-feature counts, per-contig summaries, and total overlap bases when both inputs use compatible BED coordinates.
+description: Validate and transform local BED interval sets with executable interval.intersect.v1, interval.merge.v1, and interval.subtract.v1 capabilities. Use for region-set overlap summaries, BED3 interval merging, BED3 subtraction, per-contig summaries, and total base counts when inputs use compatible BED coordinates.
 ---
 
 # Intersect Genomic Intervals
 
-Compare two BED files locally with deterministic zero-based, half-open interval
-semantics.
+Compare or transform BED files locally with deterministic zero-based, half-open
+interval semantics.
 
 ## Run
 
-1. Inspect both inputs with `linxira-bio dataset inspect <input.bed> --json`.
+1. Inspect every input with `linxira-bio dataset inspect <input.bed> --json`.
 2. Confirm both files are BED and refer to the same reference assembly and
    contig naming convention.
-3. Run `linxira-bio interval intersect <left.bed> <right.bed> --json`.
-4. Preserve input order because left- and right-overlapped counts differ.
+3. Select the operation:
+   - Intersect: `linxira-bio interval intersect <left.bed> <right.bed> --json`.
+   - Merge: `linxira-bio interval merge <input.bed> <output.bed> [--max-gap N] --json`.
+   - Subtract: `linxira-bio interval subtract <left.bed> <right.bed> <output.bed> --json`.
+4. Preserve input order for intersect and subtract because left and right roles
+   are semantically different.
 
-For an artifact-aware agent job, invoke `interval.intersect.v1` with single
-inputs whose roles are `left-bed` and `right-bed`, formats are `bed`, and
-execution mode is `local-cpu`.
+For artifact-aware agent jobs:
+
+- Invoke `interval.intersect.v1` with single inputs whose roles are `left-bed`
+  and `right-bed`.
+- Invoke `interval.merge.v1` with one single input role, `bed`, plus string
+  parameter `output` and optional integer parameter `max_gap`.
+- Invoke `interval.subtract.v1` with single inputs whose roles are `left-bed`
+  and `right-bed`, plus string parameter `output`.
+- Declare input format `bed` and execution mode `local-cpu`.
 
 ## Validate And Interpret
 
@@ -29,7 +39,12 @@ execution mode is `local-cpu`.
   contribute to several pairs.
 - Use `total_overlap_bases` as the sum across overlap pairs; it can double-count
   bases when intervals within an input overlap each other.
+- `interval.merge.v1` emits BED3 only and merges overlapping, bookended, or
+  `--max-gap`-separated intervals within each contig.
+- `interval.subtract.v1` emits BED3 only and removes right-side bases from
+  left-side intervals; unmapped BED fields are not preserved.
 - Review per-contig counts for unexpected alternate contigs or naming splits.
 
-Use a maintained `bedtools` workflow for joins, fractional-overlap thresholds,
-strand rules, or emitted BED records not covered by this summary capability.
+Use a maintained `bedtools` workflow for joins, coverage, closest-feature
+lookup, fractional-overlap thresholds, strand rules, or record-preserving
+operations not covered by these v1 capabilities.
