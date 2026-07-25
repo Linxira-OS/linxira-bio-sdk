@@ -157,9 +157,40 @@ def repository_path(relative_path: str) -> Path:
     if not isinstance(relative_path, str) or not relative_path:
         raise NoticeError("notice document path must be a non-empty string")
     candidate = (ROOT / relative_path).resolve()
-    if candidate != ROOT and ROOT not in candidate.parents:
+    if not path_is_at_or_inside(candidate, ROOT):
         raise NoticeError(f"notice document leaves repository: {relative_path}")
     return candidate
+
+
+def paths_refer_to_same_existing_file(left: Path, right: Path) -> bool:
+    try:
+        return left.samefile(right)
+    except OSError:
+        return False
+
+
+def path_is_at_or_inside(candidate: Path, root: Path) -> bool:
+    try:
+        candidate.relative_to(root)
+        return True
+    except ValueError:
+        pass
+    if paths_refer_to_same_existing_file(candidate, root):
+        return True
+    return any(paths_refer_to_same_existing_file(parent, root) for parent in candidate.parents)
+
+
+def relative_to_existing_root(candidate: Path, root: Path) -> Path:
+    try:
+        return candidate.relative_to(root)
+    except ValueError:
+        pass
+    if paths_refer_to_same_existing_file(candidate, root):
+        return Path()
+    for parent in candidate.parents:
+        if paths_refer_to_same_existing_file(parent, root):
+            return candidate.relative_to(parent)
+    raise ValueError(f"{candidate!s} is not in the subpath of {root!s}")
 
 
 def decode_notice(content: bytes, origin: object) -> tuple[bytes, str]:
@@ -294,7 +325,7 @@ def validate_override_configuration() -> list[dict[str, object]]:
             ):
                 raise NoticeError(f"override document has invalid path: {relative_path}")
             path = repository_path(relative_path)
-            if path != override_root and override_root not in path.parents:
+            if not path_is_at_or_inside(path, override_root):
                 raise NoticeError(
                     f"override document leaves licenses/cargo-overrides: {relative_path}"
                 )
@@ -512,7 +543,7 @@ def is_notice_relative_path(relative: PurePosixPath) -> bool:
 
 
 def is_notice_path(path: Path, package_root: Path) -> bool:
-    relative = PurePosixPath(path.relative_to(package_root).as_posix())
+    relative = PurePosixPath(relative_to_existing_root(path, package_root).as_posix())
     return is_notice_relative_path(relative)
 
 
@@ -597,7 +628,7 @@ def archive_license_file_path(
     candidate = Path(license_file)
     if candidate.is_absolute():
         try:
-            candidate = candidate.relative_to(package_root)
+            candidate = relative_to_existing_root(candidate.resolve(), package_root.resolve())
         except ValueError as error:
             raise NoticeError(
                 f"package license_file leaves package root: {package['id']}"
@@ -742,16 +773,19 @@ def discover_package_documents(
 
     documents: list[dict[str, str]] = []
     unresolved_pointers: list[str] = []
-    for path in sorted(candidates, key=lambda item: item.relative_to(package_root).as_posix()):
+    for path in sorted(
+        candidates, key=lambda item: relative_to_existing_root(item, package_root).as_posix()
+    ):
+        relative_path = relative_to_existing_root(path, package_root).as_posix()
         try:
             content, text = read_notice(path)
         except UnresolvedNoticePointer:
-            unresolved_pointers.append(path.relative_to(package_root).as_posix())
+            unresolved_pointers.append(relative_path)
             continue
         documents.append(
             {
                 "origin": "crate-package",
-                "path": path.relative_to(package_root).as_posix(),
+                "path": relative_path,
                 "sha256": sha256_bytes(content),
                 "source_url": f"https://crates.io/crates/{package['name']}/{package['version']}",
                 "text": text,
