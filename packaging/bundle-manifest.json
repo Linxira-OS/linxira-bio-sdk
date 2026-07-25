@@ -11,7 +11,7 @@
     "skill-pack.json",
     "capabilities/catalog.json",
     "capabilities/coverage-v1.json",
-    "capabilities/reference-inventories/offline-offline-offline-reference-2.475.json",
+    "capabilities/reference-inventories/offline-reference-2.475.json",
     "runtimes/catalog.json",
     "tools/catalog.json",
     "profiles/local-core.json",

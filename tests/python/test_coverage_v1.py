@@ -168,7 +168,7 @@ class CoverageV1ValidationTests(unittest.TestCase):
 
     def test_every_offline_reference_fact_requires_a_known_mapping(self) -> None:
         inventory = copy.deepcopy(self.inventory)
-        self.feature(inventory, "offline-offline-offline-reference-2.475.hf.009")["coverage_ids"] = [
+        self.feature(inventory, "offline-reference-2.475.hf.009")["coverage_ids"] = [
             "missing.coverage"
         ]
         with self.assertRaisesRegex(

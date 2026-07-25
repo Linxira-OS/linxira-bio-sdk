@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_COVERAGE = ROOT / "capabilities" / "coverage-v1.json"
 DEFAULT_CAPABILITY_CATALOG = ROOT / "capabilities" / "catalog.json"
 DEFAULT_REFERENCE_INVENTORY = (
-    ROOT / "capabilities" / "reference-inventories" / "offline-offline-offline-reference-2.475.json"
+    ROOT / "capabilities" / "reference-inventories" / "offline-reference-2.475.json"
 )
 
 DOMAINS = {
