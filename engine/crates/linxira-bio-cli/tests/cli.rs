@@ -478,6 +478,117 @@ fn executes_all_sequence_transform_commands_as_json() {
             .contains("strand=+ frame=+1 start=1 end=9 complete\nMK\n")
     );
 
+    let normalized_output = root.join("normalized.fa");
+    let normalized = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "normalize-ids"])
+        .arg(&input)
+        .arg(&normalized_output)
+        .args(["--prefix", "seq", "--start", "5", "--width", "2", "--json"])
+        .output()
+        .expect("run ID normalization");
+    assert!(
+        normalized.status.success(),
+        "{}",
+        String::from_utf8_lossy(&normalized.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&normalized.stdout).expect("valid normalize result");
+    assert_eq!(result["capability"], "sequence.id.normalize.v1");
+    assert_eq!(result["result"]["last_index"], 7);
+    assert!(
+        fs::read_to_string(&normalized_output)
+            .expect("normalized FASTA")
+            .contains(">seq05 description\nATGAAATAA\n")
+    );
+
+    let extra = root.join("extra.fa");
+    fs::write(&extra, b">extra\nAC\n").expect("write merge input");
+    let merged_output = root.join("merged.fa");
+    let merged = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "merge"])
+        .arg(&merged_output)
+        .arg(&input)
+        .arg(&extra)
+        .arg("--json")
+        .output()
+        .expect("run FASTA merge");
+    assert!(
+        merged.status.success(),
+        "{}",
+        String::from_utf8_lossy(&merged.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&merged.stdout).expect("valid merge result");
+    assert_eq!(result["capability"], "sequence.merge.v1");
+    assert_eq!(result["result"]["input_files"], 2);
+    assert_eq!(result["result"]["output_records"], 4);
+
+    let split_directory = root.join("split");
+    let split = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "split"])
+        .arg(&input)
+        .arg(&split_directory)
+        .args(["--records-per-file", "2", "--prefix", "shard", "--json"])
+        .output()
+        .expect("run FASTA split");
+    assert!(
+        split.status.success(),
+        "{}",
+        String::from_utf8_lossy(&split.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&split.stdout).expect("valid split result");
+    assert_eq!(result["capability"], "sequence.split.v1");
+    assert_eq!(result["result"]["output_files"], 2);
+    assert!(split_directory.join("shard_001.fa").is_file());
+    assert!(split_directory.join("shard_002.fa").is_file());
+
+    let table_output = root.join("sequences.tsv");
+    let table = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "to-table"])
+        .arg(&input)
+        .arg(&table_output)
+        .args(["--delimiter", "tsv", "--json"])
+        .output()
+        .expect("run FASTA to table");
+    assert!(
+        table.status.success(),
+        "{}",
+        String::from_utf8_lossy(&table.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&table.stdout).expect("valid to-table result");
+    assert_eq!(result["capability"], "sequence.to-table.v1");
+    assert_eq!(result["result"]["output_rows"], 3);
+    assert!(
+        fs::read_to_string(&table_output)
+            .expect("sequence table")
+            .starts_with("id\tdescription\tlength\tsequence\n")
+    );
+
+    let from_table_output = root.join("from-table.fa");
+    let from_table = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "from-table"])
+        .arg(&table_output)
+        .arg(&from_table_output)
+        .args(["--delimiter", "tsv", "--json"])
+        .output()
+        .expect("run table to FASTA");
+    assert!(
+        from_table.status.success(),
+        "{}",
+        String::from_utf8_lossy(&from_table.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&from_table.stdout).expect("valid from-table result");
+    assert_eq!(result["capability"], "sequence.from-table.v1");
+    assert_eq!(result["result"]["output_records"], 3);
+    assert!(
+        fs::read_to_string(&from_table_output)
+            .expect("roundtripped FASTA")
+            .contains(">gene description\nATGAAATAA\n")
+    );
+
     fs::remove_dir_all(root).expect("remove sequence transform directory");
 }
 

@@ -1,0 +1,29 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-sequence-to-table-v2",
+  "capability": "sequence.to-table.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-fasta",
+      "role": "fasta",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-fasta-1",
+          "path": "../sequences/tiny.fa",
+          "format": "fasta",
+          "compression": "none",
+          "size_bytes": 32,
+          "sha256": "d36ea1364a0451fd99584f0f36307dbc34b818ca4008c24c7705a95855172a1c"
+        }
+      ]
+    }
+  ],
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "output": "../../../target/test-results/sequence-to-table-v2.tsv",
+    "delimiter": "tsv"
+  }
+}

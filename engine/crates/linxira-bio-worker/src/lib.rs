@@ -18,9 +18,12 @@ use linxira_bio_core::fastq::{
 use linxira_bio_core::interval::bed_intersect_path;
 use linxira_bio_core::sequence::fasta_stats_path;
 use linxira_bio_core::sequence_transform::{
-    SequenceExtractOptions, SequenceFilterOptions, SequenceOrfOptions, SequenceTransformError,
-    SequenceTranslateOptions, extract_fasta_path, filter_fasta_path, find_orfs_fasta_path,
-    parse_sequence_region_spec, reverse_complement_fasta_path, translate_fasta_path,
+    SequenceExtractOptions, SequenceFilterOptions, SequenceFromTableOptions,
+    SequenceIdNormalizeOptions, SequenceMergeOptions, SequenceOrfOptions, SequenceSplitOptions,
+    SequenceTableDelimiter, SequenceToTableOptions, SequenceTransformError,
+    SequenceTranslateOptions, extract_fasta_path, fasta_to_table_path, filter_fasta_path,
+    find_orfs_fasta_path, merge_fasta_paths, normalize_fasta_ids_path, parse_sequence_region_spec,
+    reverse_complement_fasta_path, split_fasta_path, table_to_fasta_path, translate_fasta_path,
 };
 use linxira_bio_core::structure::{PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::variant::vcf_stats_path;
@@ -85,6 +88,11 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "sequence.stats.v1" => run_sequence_stats(base_directory, request),
         "sequence.translate.v1" => run_sequence_translate(base_directory, request),
         "sequence.orf.v1" => run_sequence_orf(base_directory, request),
+        "sequence.id.normalize.v1" => run_sequence_id_normalize(base_directory, request),
+        "sequence.merge.v1" => run_sequence_merge(base_directory, request),
+        "sequence.split.v1" => run_sequence_split(base_directory, request),
+        "sequence.to-table.v1" => run_sequence_to_table(base_directory, request),
+        "sequence.from-table.v1" => run_sequence_from_table(base_directory, request),
         "structure.pdb.summary.v1" => run_pdb_summary(base_directory, request),
         "variant.stats.v1" => run_variant_stats(base_directory, request),
         capability => Err(format!("unsupported capability: {capability}").into()),
@@ -377,6 +385,130 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 |input, output| find_orfs_fasta_path(input, output, &options),
             )
         }
+        "sequence.id.normalize.v1" => {
+            let options = sequence_id_normalize_options(&request.parameters)?;
+            execute_sequence_transform_v2(
+                &request,
+                base_directory,
+                &verified_inputs,
+                |input, output| normalize_fasta_ids_path(input, output, &options),
+            )
+        }
+        "sequence.merge.v1" => {
+            let inputs = resolve_v2_input_files(base_directory, &request, "fasta")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let options = sequence_merge_options(&request.parameters)?;
+            let summary = merge_fasta_paths(&inputs, &output, &options)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "sequence-output",
+                    role: "fasta",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Fasta),
+                    media_type: Some("text/x-fasta"),
+                },
+            )
+        }
+        "sequence.split.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "fasta")?;
+            let output_directory = request
+                .parameters
+                .get("output_directory")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("sequence.split.v1 requires string parameters.output_directory")?;
+            let output_directory = resolve_input(base_directory, output_directory);
+            let options = sequence_split_options(&request.parameters)?;
+            let summary = split_fasta_path(input, &output_directory, &options)?;
+            let mut result = AnalysisResultV2::ok(
+                request.job_id.clone(),
+                request.capability.clone(),
+                summary.clone(),
+                ExecutionMode::LocalCpu,
+            );
+            result.artifacts.push(OutputArtifact {
+                artifact_id: "sequence-output-directory".to_owned(),
+                role: "fasta-directory".to_owned(),
+                kind: OutputArtifactKind::Directory,
+                path: output_directory.to_string_lossy().into_owned(),
+                format: None,
+                media_type: None,
+                size_bytes: None,
+                sha256: None,
+                metadata: BTreeMap::from([(
+                    "file_count".to_owned(),
+                    serde_json::json!(summary.output_files),
+                )]),
+            });
+            finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
+            Ok(serde_json::to_string(&result)?)
+        }
+        "sequence.to-table.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "fasta")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let delimiter =
+                sequence_table_delimiter_option(&request.parameters)?.unwrap_or_else(|| {
+                    SequenceTableDelimiter::infer_from_path(&output)
+                        .unwrap_or(SequenceTableDelimiter::Csv)
+                });
+            let summary = fasta_to_table_path(
+                input,
+                &output,
+                &SequenceToTableOptions {
+                    delimiter,
+                    include_header: optional_parameter_bool(&request.parameters, "include_header")?
+                        .unwrap_or(true),
+                },
+            )?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "sequence-table",
+                    role: "table",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(sequence_table_format(delimiter)),
+                    media_type: Some(delimiter.media_type()),
+                },
+            )
+        }
+        "sequence.from-table.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "table")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let mut options = sequence_from_table_options(&request.parameters)?;
+            if sequence_table_delimiter_option(&request.parameters)?.is_none() {
+                options.delimiter = SequenceTableDelimiter::infer_from_path(&input)
+                    .unwrap_or(SequenceTableDelimiter::Csv);
+            }
+            let summary = table_to_fasta_path(input, &output, &options)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "sequence-output",
+                    role: "fasta",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Fasta),
+                    media_type: Some("text/x-fasta"),
+                },
+            )
+        }
         "structure.pdb.summary.v1" => {
             let path = resolve_v2_single_input(base_directory, &request, "pdb")?;
             let summary = pdb_summary_path(path, pdb_options(&request.parameters)?)?;
@@ -465,6 +597,26 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
                 "include_partial_3prime",
             ],
         ),
+        "sequence.id.normalize.v1" => (
+            &["fasta"],
+            &["output", "prefix", "start", "width", "keep_description"],
+        ),
+        "sequence.merge.v1" => (&["fasta"], &["output", "allow_duplicate_ids"]),
+        "sequence.split.v1" => (
+            &["fasta"],
+            &["output_directory", "records_per_file", "prefix"],
+        ),
+        "sequence.to-table.v1" => (&["fasta"], &["output", "delimiter", "include_header"]),
+        "sequence.from-table.v1" => (
+            &["table"],
+            &[
+                "output",
+                "delimiter",
+                "id_column",
+                "sequence_column",
+                "description_column",
+            ],
+        ),
         "structure.pdb.summary.v1" => (&["pdb"], &["interpret_b_factors_as_plddt"]),
         "variant.stats.v1" => (&["vcf"], &[]),
         capability => return Err(format!("unsupported capability: {capability}").into()),
@@ -526,6 +678,46 @@ where
         value,
         ExecutionMode::LocalCpu,
     );
+    finalize_v2_input_hashes(&mut result, request, base_directory, verified_inputs)?;
+    Ok(serde_json::to_string(&result)?)
+}
+
+struct FileArtifactSpec {
+    artifact_id: &'static str,
+    role: &'static str,
+    kind: OutputArtifactKind,
+    path: PathBuf,
+    format: Option<BioDataFormat>,
+    media_type: Option<&'static str>,
+}
+
+fn serialize_v2_file_artifact_result<T>(
+    request: &JobRequestV2,
+    base_directory: &Path,
+    verified_inputs: &BTreeMap<String, String>,
+    value: T,
+    artifact: FileArtifactSpec,
+) -> WorkerResult<String>
+where
+    T: serde::Serialize,
+{
+    let mut result = AnalysisResultV2::ok(
+        request.job_id.clone(),
+        request.capability.clone(),
+        value,
+        ExecutionMode::LocalCpu,
+    );
+    result.artifacts.push(OutputArtifact {
+        artifact_id: artifact.artifact_id.to_owned(),
+        role: artifact.role.to_owned(),
+        kind: artifact.kind,
+        path: artifact.path.to_string_lossy().into_owned(),
+        format: artifact.format,
+        media_type: artifact.media_type.map(str::to_owned),
+        size_bytes: Some(std::fs::metadata(&artifact.path)?.len()),
+        sha256: Some(sha256_file(&artifact.path)?),
+        metadata: Default::default(),
+    });
     finalize_v2_input_hashes(&mut result, request, base_directory, verified_inputs)?;
     Ok(serde_json::to_string(&result)?)
 }
@@ -768,6 +960,41 @@ fn resolve_v2_single_input(
         return Err(format!("input role {role} requires exactly one file").into());
     }
     Ok(resolve_input(base_directory, &artifact.files[0].path))
+}
+
+fn resolve_v2_input_files(
+    base_directory: &Path,
+    request: &JobRequestV2,
+    role: &str,
+) -> WorkerResult<Vec<PathBuf>> {
+    let mut matching = request
+        .inputs
+        .iter()
+        .filter(|artifact| artifact.role == role);
+    let artifact = matching.next().ok_or_else(|| {
+        format!(
+            "{} requires an input artifact with role {role}",
+            request.capability
+        )
+    })?;
+    if matching.next().is_some() {
+        return Err(format!("duplicate input role: {role}").into());
+    }
+    if artifact.files.is_empty() {
+        return Err(format!("input role {role} requires at least one file").into());
+    }
+    Ok(artifact
+        .files
+        .iter()
+        .map(|file| resolve_input(base_directory, &file.path))
+        .collect())
+}
+
+fn sequence_table_format(delimiter: SequenceTableDelimiter) -> BioDataFormat {
+    match delimiter {
+        SequenceTableDelimiter::Csv => BioDataFormat::Csv,
+        SequenceTableDelimiter::Tsv => BioDataFormat::Tsv,
+    }
 }
 
 fn ensure_v2_export_output_is_distinct(
@@ -1164,6 +1391,146 @@ fn run_sequence_orf(base_directory: &Path, request: JobRequest) -> WorkerResult<
     })
 }
 
+fn run_sequence_id_normalize(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_sequence_contract(
+        &request,
+        &["output", "prefix", "start", "width", "keep_description"],
+    )?;
+    let options = sequence_id_normalize_options(&request.parameters)?;
+    execute_sequence_transform_v1(base_directory, request, |input, output| {
+        normalize_fasta_ids_path(input, output, &options)
+    })
+}
+
+fn run_sequence_merge(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    if let Some(parameters) = parameter_object(&request.parameters)? {
+        for parameter in parameters.keys() {
+            if !["output", "allow_duplicate_ids"].contains(&parameter.as_str()) {
+                return Err(format!(
+                    "{} does not accept parameter {parameter}",
+                    request.capability
+                )
+                .into());
+            }
+        }
+    }
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let output = resolve_input(base_directory, output);
+    let mut inputs = Vec::new();
+    for (role, path) in &request.inputs {
+        if role != "fasta" && !role.starts_with("fasta-") {
+            return Err(format!("sequence.merge.v1 does not accept input role {role}").into());
+        }
+        let input = resolve_input(base_directory, path);
+        ensure_distinct_input_output(&input, &output)?;
+        inputs.push(input);
+    }
+    if inputs.is_empty() {
+        return Err("sequence.merge.v1 requires at least one FASTA input".into());
+    }
+    let options = sequence_merge_options(&request.parameters)?;
+    let summary = merge_fasta_paths(&inputs, &output, &options)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_sequence_split(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_sequence_contract(
+        &request,
+        &["output_directory", "records_per_file", "prefix"],
+    )?;
+    let input = request
+        .inputs
+        .get("fasta")
+        .ok_or("sequence.split.v1 requires inputs.fasta")?;
+    let output_directory = request
+        .parameters
+        .get("output_directory")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("sequence.split.v1 requires string parameters.output_directory")?;
+    let options = sequence_split_options(&request.parameters)?;
+    let summary = split_fasta_path(
+        resolve_input(base_directory, input),
+        resolve_input(base_directory, output_directory),
+        &options,
+    )?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_sequence_to_table(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_sequence_contract(&request, &["output", "delimiter", "include_header"])?;
+    let input = request
+        .inputs
+        .get("fasta")
+        .ok_or("sequence.to-table.v1 requires inputs.fasta")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let delimiter = sequence_table_delimiter_option(&request.parameters)?.unwrap_or_else(|| {
+        SequenceTableDelimiter::infer_from_path(&output).unwrap_or(SequenceTableDelimiter::Csv)
+    });
+    let summary = fasta_to_table_path(
+        &input,
+        &output,
+        &SequenceToTableOptions {
+            delimiter,
+            include_header: optional_parameter_bool(&request.parameters, "include_header")?
+                .unwrap_or(true),
+        },
+    )?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_sequence_from_table(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    let allowed = [
+        "output",
+        "delimiter",
+        "id_column",
+        "sequence_column",
+        "description_column",
+    ];
+    validate_v1_named_input_contract(&request, "table", &allowed)?;
+    let input = request
+        .inputs
+        .get("table")
+        .ok_or("sequence.from-table.v1 requires inputs.table")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let mut options = sequence_from_table_options(&request.parameters)?;
+    if sequence_table_delimiter_option(&request.parameters)?.is_none() {
+        options.delimiter =
+            SequenceTableDelimiter::infer_from_path(&input).unwrap_or(SequenceTableDelimiter::Csv);
+    }
+    let summary = table_to_fasta_path(&input, &output, &options)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn execute_sequence_transform_v1<T>(
     base_directory: &Path,
     request: JobRequest,
@@ -1233,6 +1600,33 @@ fn validate_v1_sequence_contract(request: &JobRequest, allowed: &[&str]) -> Work
     }
     for role in request.inputs.keys() {
         if role != "fasta" {
+            return Err(format!("{} does not accept input role {role}", request.capability).into());
+        }
+    }
+    if let Some(parameters) = parameter_object(&request.parameters)? {
+        for parameter in parameters.keys() {
+            if !allowed.contains(&parameter.as_str()) {
+                return Err(format!(
+                    "{} does not accept parameter {parameter}",
+                    request.capability
+                )
+                .into());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_v1_named_input_contract(
+    request: &JobRequest,
+    expected_role: &str,
+    allowed: &[&str],
+) -> WorkerResult<()> {
+    if !request.inputs.contains_key(expected_role) {
+        return Err(format!("{} requires inputs.{expected_role}", request.capability).into());
+    }
+    for role in request.inputs.keys() {
+        if role != expected_role {
             return Err(format!("{} does not accept input role {role}", request.capability).into());
         }
     }
@@ -1399,6 +1793,91 @@ fn sequence_orf_options(parameters: &serde_json::Value) -> WorkerResult<Sequence
     Ok(options)
 }
 
+fn sequence_id_normalize_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<SequenceIdNormalizeOptions> {
+    let mut options = SequenceIdNormalizeOptions::default();
+    if let Some(prefix) = optional_parameter_string(parameters, "prefix")? {
+        options.prefix = prefix.to_owned();
+    }
+    if let Some(start) = optional_parameter_u64(parameters, "start")? {
+        if start == 0 {
+            return Err("start must be at least 1".into());
+        }
+        options.start = start;
+    }
+    if let Some(width) = optional_parameter_usize(parameters, "width")? {
+        if width == 0 {
+            return Err("width must be at least 1".into());
+        }
+        options.width = Some(width);
+    }
+    if let Some(keep) = optional_parameter_bool(parameters, "keep_description")? {
+        options.keep_description = keep;
+    }
+    Ok(options)
+}
+
+fn sequence_merge_options(parameters: &serde_json::Value) -> WorkerResult<SequenceMergeOptions> {
+    Ok(SequenceMergeOptions {
+        allow_duplicate_ids: optional_parameter_bool(parameters, "allow_duplicate_ids")?
+            .unwrap_or(false),
+    })
+}
+
+fn sequence_split_options(parameters: &serde_json::Value) -> WorkerResult<SequenceSplitOptions> {
+    let mut options = SequenceSplitOptions::default();
+    if let Some(records_per_file) = optional_parameter_usize(parameters, "records_per_file")? {
+        if records_per_file == 0 {
+            return Err("records_per_file must be at least 1".into());
+        }
+        options.records_per_file = records_per_file;
+    }
+    if let Some(prefix) = optional_parameter_string(parameters, "prefix")? {
+        options.prefix = prefix.to_owned();
+    }
+    Ok(options)
+}
+
+fn sequence_from_table_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<SequenceFromTableOptions> {
+    let mut options = SequenceFromTableOptions::default();
+    if let Some(delimiter) = sequence_table_delimiter_option(parameters)? {
+        options.delimiter = delimiter;
+    }
+    if let Some(column) = optional_parameter_string(parameters, "id_column")? {
+        options.id_column = column.to_owned();
+    }
+    if let Some(column) = optional_parameter_string(parameters, "sequence_column")? {
+        options.sequence_column = column.to_owned();
+    }
+    if let Some(value) = parameters.get("description_column") {
+        options.description_column = if value.is_null() {
+            None
+        } else {
+            Some(
+                value
+                    .as_str()
+                    .ok_or("description_column must be a string or null")?
+                    .to_owned(),
+            )
+        };
+    }
+    Ok(options)
+}
+
+fn sequence_table_delimiter_option(
+    parameters: &serde_json::Value,
+) -> WorkerResult<Option<SequenceTableDelimiter>> {
+    match optional_parameter_string(parameters, "delimiter")? {
+        Some("csv") => Ok(Some(SequenceTableDelimiter::Csv)),
+        Some("tsv" | "tab") => Ok(Some(SequenceTableDelimiter::Tsv)),
+        Some(value) => Err(format!("delimiter must be csv or tsv, got {value:?}").into()),
+        None => Ok(None),
+    }
+}
+
 fn optional_parameter_u64(parameters: &serde_json::Value, key: &str) -> WorkerResult<Option<u64>> {
     match parameters.get(key) {
         Some(value) => value
@@ -1430,6 +1909,19 @@ fn optional_parameter_bool(
             .as_bool()
             .map(Some)
             .ok_or_else(|| format!("{key} must be a boolean").into()),
+        None => Ok(None),
+    }
+}
+
+fn optional_parameter_string<'a>(
+    parameters: &'a serde_json::Value,
+    key: &str,
+) -> WorkerResult<Option<&'a str>> {
+    match parameters.get(key) {
+        Some(value) => value
+            .as_str()
+            .map(Some)
+            .ok_or_else(|| format!("{key} must be a string").into()),
         None => Ok(None),
     }
 }
@@ -1852,6 +2344,15 @@ mod tests {
                     "include_reverse_strand": false
                 }),
             ),
+            (
+                "sequence.id.normalize.v1",
+                serde_json::json!({
+                    "prefix": "seq",
+                    "start": 1,
+                    "width": 3,
+                    "keep_description": true
+                }),
+            ),
         ];
 
         for (capability, mut parameters) in cases {
@@ -1897,6 +2398,15 @@ mod tests {
                     "min_amino_acids": 2,
                     "include_reverse_strand": true,
                     "include_partial_3prime": true
+                }),
+            ),
+            (
+                "sequence.id.normalize.v1",
+                serde_json::json!({
+                    "prefix": "seq",
+                    "start": 1,
+                    "width": 3,
+                    "keep_description": true
                 }),
             ),
         ];
@@ -1950,6 +2460,123 @@ mod tests {
             fs::remove_file(output).expect("remove v2 sequence output");
         }
         fs::remove_file(input).expect("remove v2 sequence input");
+    }
+
+    #[test]
+    fn v2_executes_sequence_merge_split_and_table_conversion() {
+        let first = write_temporary("sequence-merge-first.fa", b">one\nACGT\n>two\nNN\n");
+        let second = write_temporary("sequence-merge-second.fa", b">three\nGG\n");
+
+        let merged_output = temporary_path("sequence-merged.fa");
+        let mut merge_request = artifact_request(
+            &first,
+            BioDataFormat::Fasta,
+            CompressionFormat::None,
+            "sequence.merge.v1",
+            "fasta",
+        );
+        merge_request.inputs[0].cardinality = InputCardinality::Batch;
+        merge_request.inputs[0].files.push(ArtifactFile {
+            file_id: "input-file-2".to_owned(),
+            path: second.to_string_lossy().into_owned(),
+            role: None,
+            format: BioDataFormat::Fasta,
+            compression: CompressionFormat::None,
+            size_bytes: fs::metadata(&second).expect("second input metadata").len(),
+            modified_at: None,
+            sha256: None,
+        });
+        merge_request.parameters = serde_json::json!({"output": merged_output});
+        let serialized =
+            execute_request_v2(merge_request, Path::new(".")).expect("merge executes through v2");
+        let result: AnalysisResultV2<serde_json::Value> =
+            serde_json::from_str(&serialized).expect("valid merge result");
+        assert_eq!(result.status, JobStatus::Ok);
+        assert_eq!(result.capability, "sequence.merge.v1");
+        assert_eq!(result.result["input_files"], 2);
+        assert_eq!(result.result["output_records"], 3);
+        assert_eq!(result.provenance.input_sha256.len(), 2);
+        assert_eq!(result.artifacts[0].format, Some(BioDataFormat::Fasta));
+        assert!(fs::metadata(&merged_output).expect("merged output").len() > 0);
+
+        let split_directory = temporary_path("sequence-split-output");
+        let mut split_request = artifact_request(
+            &merged_output,
+            BioDataFormat::Fasta,
+            CompressionFormat::None,
+            "sequence.split.v1",
+            "fasta",
+        );
+        split_request.parameters = serde_json::json!({
+            "output_directory": split_directory,
+            "records_per_file": 2,
+            "prefix": "chunk"
+        });
+        let serialized =
+            execute_request_v2(split_request, Path::new(".")).expect("split executes through v2");
+        let result: AnalysisResultV2<serde_json::Value> =
+            serde_json::from_str(&serialized).expect("valid split result");
+        assert_eq!(result.status, JobStatus::Ok);
+        assert_eq!(result.capability, "sequence.split.v1");
+        assert_eq!(result.result["output_files"], 2);
+        assert_eq!(
+            result.artifacts[0].kind,
+            linxira_bio_protocol::OutputArtifactKind::Directory
+        );
+        assert!(split_directory.join("chunk_001.fa").is_file());
+
+        let table_output = temporary_path("sequence-table.tsv");
+        let mut table_request = artifact_request(
+            &merged_output,
+            BioDataFormat::Fasta,
+            CompressionFormat::None,
+            "sequence.to-table.v1",
+            "fasta",
+        );
+        table_request.parameters = serde_json::json!({"output": table_output, "delimiter": "tsv"});
+        let serialized = execute_request_v2(table_request, Path::new("."))
+            .expect("to-table executes through v2");
+        let result: AnalysisResultV2<serde_json::Value> =
+            serde_json::from_str(&serialized).expect("valid to-table result");
+        assert_eq!(result.status, JobStatus::Ok);
+        assert_eq!(result.capability, "sequence.to-table.v1");
+        assert_eq!(result.result["output_rows"], 3);
+        assert_eq!(
+            result.artifacts[0].kind,
+            linxira_bio_protocol::OutputArtifactKind::Table
+        );
+        assert_eq!(result.artifacts[0].format, Some(BioDataFormat::Tsv));
+
+        let roundtrip_output = temporary_path("sequence-table-roundtrip.fa");
+        let mut roundtrip_request = artifact_request(
+            &table_output,
+            BioDataFormat::Tsv,
+            CompressionFormat::None,
+            "sequence.from-table.v1",
+            "table",
+        );
+        roundtrip_request.parameters =
+            serde_json::json!({"output": roundtrip_output, "delimiter": "tsv"});
+        let serialized = execute_request_v2(roundtrip_request, Path::new("."))
+            .expect("from-table executes through v2");
+        let result: AnalysisResultV2<serde_json::Value> =
+            serde_json::from_str(&serialized).expect("valid from-table result");
+        assert_eq!(result.status, JobStatus::Ok);
+        assert_eq!(result.capability, "sequence.from-table.v1");
+        assert_eq!(result.result["output_records"], 3);
+        assert_eq!(result.artifacts[0].format, Some(BioDataFormat::Fasta));
+        assert!(
+            fs::read_to_string(&roundtrip_output)
+                .expect("roundtrip FASTA")
+                .contains(">three\nGG\n")
+        );
+
+        fs::remove_file(first).expect("remove first merge input");
+        fs::remove_file(second).expect("remove second merge input");
+        fs::remove_file(merged_output).expect("remove merged output");
+        fs::remove_dir_all(split_directory).expect("remove split output");
+        fs::remove_file(table_output).expect("remove table output");
+        fs::remove_file(roundtrip_output).expect("remove roundtrip output");
     }
 
     #[test]

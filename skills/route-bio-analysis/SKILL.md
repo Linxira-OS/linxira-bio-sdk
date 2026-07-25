@@ -33,7 +33,8 @@ a replacement script silently.
   `analyze-fastq-quality` for supported FASTQ. Use
   `manipulate-biological-sequences` for supported FASTA record extraction,
   coordinate extraction, filtering, reverse-complement generation,
-  translation, and ORF finding.
+  translation, ORF finding, ID normalization, merge/split, and FASTA-table
+  conversion.
 - BED interval-set overlap summaries: use `intersect-genomic-intervals`.
   GFF/GTF joins, coverage, strand rules, fractional overlaps, and emitted
   records still require an approved external workflow.

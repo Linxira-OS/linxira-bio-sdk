@@ -42,7 +42,12 @@
         "sequence.filter.v1",
         "sequence.reverse-complement.v1",
         "sequence.translate.v1",
-        "sequence.orf.v1"
+        "sequence.orf.v1",
+        "sequence.id.normalize.v1",
+        "sequence.merge.v1",
+        "sequence.split.v1",
+        "sequence.to-table.v1",
+        "sequence.from-table.v1"
       ]
     },
     {
