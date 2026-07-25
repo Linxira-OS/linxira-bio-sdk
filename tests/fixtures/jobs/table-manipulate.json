@@ -1,0 +1,18 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-table-manipulate",
+  "capability": "table.manipulate.v1",
+  "inputs": {
+    "table": "../expression-matrix/counts.tsv"
+  },
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "output": "../../../target/test-results/table-manipulate.tsv",
+    "select_columns": ["gene_id", "sample_b"],
+    "filter_column": "sample_b",
+    "filter_op": "non-empty",
+    "limit": 3
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Biological Table Manipulation"
+  short_description: "Filter and reshape local CSV/TSV tables"
+  default_prompt: "Use $manipulate-bio-tables to filter and reshape a local CSV or TSV biology table."

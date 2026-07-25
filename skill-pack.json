@@ -85,6 +85,12 @@
       "capabilities": ["expression.matrix.qc.v1"]
     },
     {
+      "id": "manipulate-bio-tables",
+      "path": "skills/manipulate-bio-tables",
+      "kind": "executable",
+      "capabilities": ["table.manipulate.v1"]
+    },
+    {
       "id": "analyze-variant-statistics",
       "path": "skills/analyze-variant-statistics",
       "kind": "executable",

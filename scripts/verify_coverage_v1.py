@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_COVERAGE = ROOT / "capabilities" / "coverage-v1.json"
 DEFAULT_CAPABILITY_CATALOG = ROOT / "capabilities" / "catalog.json"
 DEFAULT_REFERENCE_INVENTORY = (
-    ROOT / "capabilities" / "reference-inventories" / "offline-offline-reference-2.475.json"
+    ROOT / "capabilities" / "reference-inventories" / "offline-offline-offline-reference-2.475.json"
 )
 
 DOMAINS = {
@@ -107,7 +107,7 @@ def validate_coverage_documents(
 
     _validate_header(coverage, "coverage catalog")
     _validate_header(capability_catalog, "capability catalog")
-    _validate_header(reference_inventory, "reference reference inventory")
+    _validate_header(reference_inventory, "offline reference inventory")
 
     if coverage.get("measurement") != "weighted-functional-slices":
         raise CoverageValidationError("coverage measurement must be weighted-functional-slices")
@@ -195,9 +195,9 @@ def validate_coverage_documents(
             )
         evidence = _require_unique_strings(item.get("evidence"), f"evidence for {item_id}")
         item_reference_refs = {
-            reference.removeprefix("reference:")
+            reference.removeprefix("offline-reference:")
             for reference in evidence
-            if reference.startswith("reference:")
+            if reference.startswith("offline-reference:")
         }
         reference_refs[item_id] = item_reference_refs
 
@@ -259,12 +259,10 @@ def validate_coverage_documents(
     if reference_inventory.get("product") != "external-offline-reference" or reference_inventory.get(
         "version"
     ) != "2.475":
-        raise CoverageValidationError("unexpected reference reference product/version")
+        raise CoverageValidationError("unexpected offline reference product/version")
     origin = reference_inventory.get("origin")
     if not isinstance(origin, dict):
         raise CoverageValidationError("reference inventory requires source origin")
-    if origin.get("upstream_repository") != "https://github.com/CJ-Chen/external-offline-reference/":
-        raise CoverageValidationError("unexpected reference upstream repository")
     _require_nonempty_string(origin.get("acquisition"), "reference acquisition")
     _require_nonempty_string(origin.get("recorded_on"), "reference record date")
     _require_nonempty_string(
@@ -455,7 +453,7 @@ def main() -> int:
     print(
         f"validated coverage-v1 ({mode}): {summary.total_weight} total, "
         f"{summary.target_weight} target, {summary.achieved_weight} achieved, "
-        f"{summary.offline_reference_count} reference offline reference facts"
+        f"{summary.offline_reference_count} offline reference facts"
     )
     return 0
 

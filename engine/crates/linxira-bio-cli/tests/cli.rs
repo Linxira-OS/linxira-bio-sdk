@@ -464,6 +464,51 @@ fn summarizes_expression_matrix_as_json() {
 }
 
 #[test]
+fn manipulates_delimited_tables_as_json() {
+    let root = workspace_root();
+    let temp = temporary_directory("table-manipulate");
+    let output_path = temp.join("selected.csv");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["table", "manipulate"])
+        .arg(root.join("tests/fixtures/expression-matrix/counts.tsv"))
+        .arg(&output_path)
+        .args([
+            "--select-column",
+            "gene_id",
+            "--select-column",
+            "sample_b",
+            "--filter-column",
+            "sample_b",
+            "--filter-op",
+            "contains",
+            "--filter-value",
+            "5",
+            "--output-delimiter",
+            "csv",
+            "--json",
+        ])
+        .output()
+        .expect("run table manipulation");
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid table manipulation result");
+    assert_eq!(result["capability"], "table.manipulate.v1");
+    assert_eq!(result["result"]["input_rows"], 4);
+    assert_eq!(result["result"]["output_rows"], 1);
+    assert_eq!(result["result"]["filtered_rows"], 3);
+    assert_eq!(
+        fs::read_to_string(&output_path).expect("manipulated table"),
+        "gene_id,sample_b\ngene_2,5\n"
+    );
+    fs::remove_dir_all(temp).expect("remove table manipulation directory");
+}
+
+#[test]
 fn executes_all_sequence_transform_commands_as_json() {
     let root = temporary_directory("sequence-transforms");
     let input = root.join("input.fa");

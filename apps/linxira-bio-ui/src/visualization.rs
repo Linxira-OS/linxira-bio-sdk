@@ -75,6 +75,7 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         "interval.merge.v1" => interval_merge_charts(payload, zh_cn),
         "interval.subtract.v1" => interval_subtract_charts(payload, zh_cn),
         "expression.matrix.qc.v1" => expression_charts(payload, zh_cn),
+        "table.manipulate.v1" => table_manipulate_charts(payload, zh_cn),
         "variant.stats.v1" => variant_charts(payload, zh_cn),
         "structure.pdb.summary.v1" => structure_charts(payload, zh_cn),
         _ if payload.get("per_cycle").is_some() => fastq_charts(payload, zh_cn),
@@ -389,6 +390,38 @@ fn expression_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
                     localized(zh_cn, "样本总量", "Sample totals")
                 },
                 totals,
+            ),
+        ],
+        false,
+    )
+}
+
+fn table_manipulate_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let rows = values_for_keys(
+        payload,
+        &[
+            ("input_rows", localized(zh_cn, "输入行", "Input rows")),
+            ("skipped_rows", localized(zh_cn, "跳过行", "Skipped rows")),
+            ("filtered_rows", localized(zh_cn, "过滤行", "Filtered rows")),
+            ("output_rows", localized(zh_cn, "输出行", "Output rows")),
+        ],
+    );
+    let columns = values_for_keys(
+        payload,
+        &[
+            ("input_columns", localized(zh_cn, "输入列", "Input columns")),
+            (
+                "output_columns",
+                localized(zh_cn, "输出列", "Output columns"),
+            ),
+        ],
+    );
+    bar_specs(
+        [
+            (localized(zh_cn, "表格行处理", "Table row handling"), rows),
+            (
+                localized(zh_cn, "表格列处理", "Table column handling"),
+                columns,
             ),
         ],
         false,
@@ -1038,6 +1071,27 @@ mod tests {
         assert_eq!(title, "Signed sample totals");
         assert_eq!(values[0].label, "negative");
         assert_eq!(bar_domain(values, false), (-30.0, 20.0));
+    }
+
+    #[test]
+    fn table_manipulation_builds_row_and_column_charts() {
+        let payload = json!({
+            "input_rows": 4,
+            "skipped_rows": 1,
+            "filtered_rows": 1,
+            "output_rows": 2,
+            "input_columns": 4,
+            "output_columns": 2
+        });
+        let charts = chart_specs(&payload, Some("table.manipulate.v1"), false);
+        assert_eq!(charts.len(), 2);
+        let ChartSpec::Bars { title, values, .. } = &charts[0] else {
+            panic!("expected row handling bar chart");
+        };
+
+        assert_eq!(title, "Table row handling");
+        assert_eq!(values[0].label, "Input rows");
+        assert_eq!(values[3].value, 2.0);
     }
 
     #[test]

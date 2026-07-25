@@ -87,7 +87,7 @@ class CoverageV1ValidationTests(unittest.TestCase):
                 *[
                     evidence
                     for evidence in item["evidence"]
-                    if evidence.startswith("reference:")
+                    if evidence.startswith("offline-reference:")
                 ],
             ]
             item.pop("owner", None)
@@ -121,13 +121,13 @@ class CoverageV1ValidationTests(unittest.TestCase):
 
     def test_planned_item_requires_owner(self) -> None:
         document = copy.deepcopy(self.coverage)
-        self.item(document, "table.manipulate").pop("owner")
+        self.item(document, "annotation.sequence.extract").pop("owner")
         with self.assertRaisesRegex(coverage_v1.CoverageValidationError, "owner"):
             self.validate(document)
 
     def test_excluded_item_cannot_be_a_target(self) -> None:
         document = copy.deepcopy(self.coverage)
-        item = self.item(document, "table.manipulate")
+        item = self.item(document, "annotation.sequence.extract")
         item["disposition"] = "excluded-with-reason"
         item["reason"] = "outside the supported research scope"
         item.pop("owner")
@@ -168,7 +168,7 @@ class CoverageV1ValidationTests(unittest.TestCase):
 
     def test_every_offline_reference_fact_requires_a_known_mapping(self) -> None:
         inventory = copy.deepcopy(self.inventory)
-        self.feature(inventory, "offline-offline-reference-2.475.hf.009")["coverage_ids"] = [
+        self.feature(inventory, "offline-offline-offline-reference-2.475.hf.009")["coverage_ids"] = [
             "missing.coverage"
         ]
         with self.assertRaisesRegex(

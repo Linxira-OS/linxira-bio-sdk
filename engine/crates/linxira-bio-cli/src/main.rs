@@ -27,6 +27,9 @@ use linxira_bio_core::sequence_transform::{
     split_fasta_path, table_to_fasta_path, translate_fasta_path,
 };
 use linxira_bio_core::structure::{PdbStructureSummary, PdbSummaryOptions, pdb_summary_path};
+use linxira_bio_core::table::{
+    TableDelimiter, TableFilter, TableManipulateOptions, manipulate_table_path,
+};
 use linxira_bio_core::variant::{VcfStats, vcf_stats_path};
 use linxira_bio_export::export_json_file;
 use linxira_bio_protocol::{AnalysisResult, ExecutionMode};
@@ -105,6 +108,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         [export, table, input, output] if export == "export" && table == "table" => {
             print_table_export(input, output, false)
+        }
+        [table, manipulate, arguments @ ..] if table == "table" && manipulate == "manipulate" => {
+            print_table_manipulate(arguments)
         }
         [export, table, input, output, json]
             if export == "export" && table == "table" && json == "--json" =>
@@ -1380,6 +1386,146 @@ fn print_table_export(input: &str, output: &str, json: bool) -> Result<(), Box<d
     Ok(())
 }
 
+fn print_table_manipulate(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = TableManipulateOptions::default();
+    let mut filter_column = None;
+    let mut filter_op = None;
+    let mut filter_value = None;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--delimiter" => {
+                index += 1;
+                options.input_delimiter =
+                    Some(parse_table_delimiter(arguments.get(index), "--delimiter")?);
+            }
+            "--output-delimiter" => {
+                index += 1;
+                options.output_delimiter = Some(parse_table_delimiter(
+                    arguments.get(index),
+                    "--output-delimiter",
+                )?);
+            }
+            "--select-column" => {
+                index += 1;
+                options.select_columns.push(
+                    arguments
+                        .get(index)
+                        .ok_or("--select-column requires a column name")?
+                        .clone(),
+                );
+            }
+            "--drop-column" => {
+                index += 1;
+                options.drop_columns.push(
+                    arguments
+                        .get(index)
+                        .ok_or("--drop-column requires a column name")?
+                        .clone(),
+                );
+            }
+            "--filter-column" => {
+                index += 1;
+                filter_column = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--filter-column requires a column name")?
+                        .clone(),
+                );
+            }
+            "--filter-op" => {
+                index += 1;
+                filter_op = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--filter-op requires equals, contains, or non-empty")?
+                        .clone(),
+                );
+            }
+            "--filter-value" => {
+                index += 1;
+                filter_value = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--filter-value requires a value")?
+                        .clone(),
+                );
+            }
+            "--skip-rows" => {
+                index += 1;
+                options.skip_rows = parse_sequence_usize(arguments.get(index), "--skip-rows")?;
+            }
+            "--limit" => {
+                index += 1;
+                options.limit = Some(parse_sequence_usize(arguments.get(index), "--limit")?);
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown table manipulate option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "table manipulate")?,
+        }
+        index += 1;
+    }
+    options.filter = parse_table_filter(filter_column, filter_op, filter_value)?;
+    let input = input.ok_or("table manipulate requires an input CSV/TSV path")?;
+    let output = output.ok_or("table manipulate requires an output CSV/TSV path")?;
+    let output = Path::new(output);
+    let summary = manipulate_table_path(Path::new(input), output, &options)?;
+    print_sequence_transform_result(
+        "table-manipulate",
+        "table.manipulate.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
+fn parse_table_filter(
+    column: Option<String>,
+    op: Option<String>,
+    value: Option<String>,
+) -> Result<Option<TableFilter>, Box<dyn Error>> {
+    match (column, op, value) {
+        (None, None, None) => Ok(None),
+        (Some(column), Some(op), value) => match op.as_str() {
+            "equals" | "eq" => Ok(Some(TableFilter::Equals {
+                column,
+                value: value.ok_or("--filter-value is required for equals")?,
+            })),
+            "contains" => Ok(Some(TableFilter::Contains {
+                column,
+                value: value.ok_or("--filter-value is required for contains")?,
+            })),
+            "non-empty" | "nonempty" => {
+                if value.is_some() {
+                    return Err("--filter-value is not used with non-empty".into());
+                }
+                Ok(Some(TableFilter::NonEmpty { column }))
+            }
+            value => Err(format!("unsupported --filter-op: {value}").into()),
+        },
+        _ => Err("--filter-column and --filter-op must be provided together".into()),
+    }
+}
+
+fn parse_table_delimiter(
+    value: Option<&String>,
+    option: &str,
+) -> Result<TableDelimiter, Box<dyn Error>> {
+    match value
+        .ok_or_else(|| format!("{option} requires a value"))?
+        .as_str()
+    {
+        "csv" => Ok(TableDelimiter::Csv),
+        "tsv" | "tab" => Ok(TableDelimiter::Tsv),
+        value => Err(format!("{option} must be csv or tsv, got {value:?}").into()),
+    }
+}
+
 fn print_inspection_text(inspection: &DatasetInspection) {
     let support = match inspection.support {
         DatasetSupport::Supported => "supported",
@@ -1452,6 +1598,7 @@ fn usage() -> &'static str {
         "  linxira-bio interval merge <input.bed[.gz]> <output.bed> [--max-gap N] [--json]\n",
         "  linxira-bio interval subtract <left.bed[.gz]> <right.bed[.gz]> <output.bed> [--json]\n",
         "  linxira-bio expression matrix-qc <matrix.csv|tsv[.gz]> [--json]\n",
+        "  linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> [--select-column NAME ...] [--drop-column NAME ...] [--filter-column NAME --filter-op equals|contains|non-empty [--filter-value VALUE]] [--skip-rows N] [--limit N] [--delimiter csv|tsv] [--output-delimiter csv|tsv] [--json]\n",
         "  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n",
         "  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
     )

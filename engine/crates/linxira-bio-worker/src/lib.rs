@@ -33,6 +33,9 @@ use linxira_bio_core::sequence_transform::{
     reverse_complement_fasta_path, split_fasta_path, table_to_fasta_path, translate_fasta_path,
 };
 use linxira_bio_core::structure::{PdbSummaryOptions, pdb_summary_path};
+use linxira_bio_core::table::{
+    TableDelimiter, TableFilter, TableManipulateOptions, manipulate_table_path,
+};
 use linxira_bio_core::variant::vcf_stats_path;
 use linxira_bio_export::{ExportFormat, ensure_distinct_input_output, export_json_file};
 use linxira_bio_protocol::{
@@ -90,6 +93,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "interval.intersect.v1" => run_interval_intersect(base_directory, request),
         "interval.merge.v1" => run_interval_merge(base_directory, request),
         "interval.subtract.v1" => run_interval_subtract(base_directory, request),
+        "table.manipulate.v1" => run_table_manipulate(base_directory, request),
         "table.export.v1" => run_table_export(base_directory, request),
         "sequence.extract.v1" => run_sequence_extract(base_directory, request),
         "sequence.filter.v1" => run_sequence_filter(base_directory, request),
@@ -412,6 +416,33 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
             finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
             Ok(serde_json::to_string(&result)?)
         }
+        "table.manipulate.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "table")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let options = table_manipulate_options(&request.parameters)?;
+            let summary = manipulate_table_path(&input, &output, &options)?;
+            let delimiter = options
+                .output_delimiter
+                .or_else(|| TableDelimiter::infer_from_path(&output))
+                .or(options.input_delimiter)
+                .unwrap_or(TableDelimiter::Csv);
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "manipulated-table",
+                    role: "table",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(table_bio_format(delimiter)),
+                    media_type: Some(delimiter.media_type()),
+                },
+            )
+        }
         "sequence.stats.v1" => {
             let path = resolve_v2_single_input(base_directory, &request, "fasta")?;
             serialize_v2_result(
@@ -658,6 +689,21 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         "interval.merge.v1" => (&["bed"], &["output", "max_gap"]),
         "interval.subtract.v1" => (&["left-bed", "right-bed"], &["output"]),
         "table.export.v1" => (&["table"], &["output"]),
+        "table.manipulate.v1" => (
+            &["table"],
+            &[
+                "output",
+                "delimiter",
+                "output_delimiter",
+                "select_columns",
+                "drop_columns",
+                "filter_column",
+                "filter_op",
+                "filter_value",
+                "skip_rows",
+                "limit",
+            ],
+        ),
         "sequence.stats.v1" => (&["fasta"], &[]),
         "sequence.extract.v1" => (&["fasta"], &["output", "identifiers", "regions", "strict"]),
         "sequence.filter.v1" => (
@@ -1187,6 +1233,42 @@ fn run_table_export(base_directory: &Path, request: JobRequest) -> WorkerResult<
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_table_manipulate(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "table",
+        &[
+            "output",
+            "delimiter",
+            "output_delimiter",
+            "select_columns",
+            "drop_columns",
+            "filter_column",
+            "filter_op",
+            "filter_value",
+            "skip_rows",
+            "limit",
+        ],
+    )?;
+    let input = request
+        .inputs
+        .get("table")
+        .ok_or("table.manipulate.v1 requires inputs.table")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let options = table_manipulate_options(&request.parameters)?;
+    let summary = manipulate_table_path(&input, &output, &options)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_fastq_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -1471,6 +1553,76 @@ fn parse_fastq_transform_quality_encoding(
     }
 }
 
+fn table_manipulate_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<TableManipulateOptions> {
+    Ok(TableManipulateOptions {
+        input_delimiter: table_delimiter_parameter(parameters, "delimiter")?,
+        output_delimiter: table_delimiter_parameter(parameters, "output_delimiter")?,
+        select_columns: optional_string_array_parameter(parameters, "select_columns")?,
+        drop_columns: optional_string_array_parameter(parameters, "drop_columns")?,
+        filter: table_filter_parameter(parameters)?,
+        skip_rows: optional_parameter_usize(parameters, "skip_rows")?.unwrap_or(0),
+        limit: optional_parameter_usize(parameters, "limit")?,
+    })
+}
+
+fn table_delimiter_parameter(
+    parameters: &serde_json::Value,
+    key: &str,
+) -> WorkerResult<Option<TableDelimiter>> {
+    match optional_parameter_string(parameters, key)? {
+        Some("csv") => Ok(Some(TableDelimiter::Csv)),
+        Some("tsv" | "tab") => Ok(Some(TableDelimiter::Tsv)),
+        Some(value) => Err(format!("{key} must be csv or tsv, got {value:?}").into()),
+        None => Ok(None),
+    }
+}
+
+fn optional_string_array_parameter(
+    parameters: &serde_json::Value,
+    key: &str,
+) -> WorkerResult<Vec<String>> {
+    optional_parameter_array(parameters, key)?
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            value
+                .as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| format!("{key}[{index}] must be a string").into())
+        })
+        .collect()
+}
+
+fn table_filter_parameter(parameters: &serde_json::Value) -> WorkerResult<Option<TableFilter>> {
+    let column = optional_parameter_string(parameters, "filter_column")?;
+    let op = optional_parameter_string(parameters, "filter_op")?;
+    let value = optional_parameter_string(parameters, "filter_value")?;
+    match (column, op, value) {
+        (None, None, None) => Ok(None),
+        (Some(column), Some("equals" | "eq"), Some(value)) => Ok(Some(TableFilter::Equals {
+            column: column.to_owned(),
+            value: value.to_owned(),
+        })),
+        (Some(column), Some("contains"), Some(value)) => Ok(Some(TableFilter::Contains {
+            column: column.to_owned(),
+            value: value.to_owned(),
+        })),
+        (Some(column), Some("non-empty" | "nonempty"), None) => Ok(Some(TableFilter::NonEmpty {
+            column: column.to_owned(),
+        })),
+        (Some(_), Some("equals" | "eq" | "contains"), None) => {
+            Err("filter_value is required for equals and contains filters".into())
+        }
+        (Some(_), Some("non-empty" | "nonempty"), Some(_)) => {
+            Err("filter_value is not used with non-empty filters".into())
+        }
+        (Some(_), Some(op), _) => Err(format!("unsupported filter_op: {op}").into()),
+        _ => Err("filter_column and filter_op must be provided together".into()),
+    }
+}
+
 fn required_v2_string_parameter<'a>(request: &'a JobRequestV2, key: &str) -> WorkerResult<&'a str> {
     request
         .parameters
@@ -1496,6 +1648,13 @@ fn export_media_type(format: ExportFormat) -> &'static str {
         ExportFormat::Json => "application/json",
         ExportFormat::Jsonl => "application/x-ndjson",
         ExportFormat::Xlsx => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }
+}
+
+fn table_bio_format(delimiter: TableDelimiter) -> BioDataFormat {
+    match delimiter {
+        TableDelimiter::Csv => BioDataFormat::Csv,
+        TableDelimiter::Tsv => BioDataFormat::Tsv,
     }
 }
 

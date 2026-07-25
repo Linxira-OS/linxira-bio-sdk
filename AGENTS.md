@@ -27,6 +27,8 @@ the agent skills that select and validate them.
   `interval.subtract.v1` capabilities.
 - Read `skills/analyze-expression-matrix/SKILL.md` for the implemented CSV/TSV
   `expression.matrix.qc.v1` capability.
+- Read `skills/manipulate-bio-tables/SKILL.md` for the implemented CSV/TSV
+  `table.manipulate.v1` capability.
 - Read `skills/analyze-variant-statistics/SKILL.md` for the implemented
   `variant.stats.v1` capability.
 - Read `skills/analyze-pdb-structure/SKILL.md` for the implemented
