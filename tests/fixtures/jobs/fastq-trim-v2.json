@@ -1,0 +1,31 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-fastq-trim-v2",
+  "capability": "fastq.trim.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-fastq",
+      "role": "fastq",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-fastq-1",
+          "path": "../fastq-transform/reads.fastq",
+          "format": "fastq",
+          "compression": "none",
+          "size_bytes": 77,
+          "sha256": "1f5c269d676c8696407dd241a4581cc1105e07d3abedf3065360fc906f934675"
+        }
+      ]
+    }
+  ],
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "output": "../../../target/test-results/fastq-trim-v2.fastq",
+    "min_quality": 20,
+    "min_length": 4,
+    "quality_encoding": "phred+33"
+  }
+}

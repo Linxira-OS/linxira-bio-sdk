@@ -7,6 +7,7 @@ pub mod dataset;
 pub mod environment;
 pub mod expression;
 pub mod fastq;
+pub mod fastq_transform;
 pub mod interval;
 pub mod runtime;
 pub mod sequence;

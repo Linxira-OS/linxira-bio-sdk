@@ -1,0 +1,17 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-fastq-trim",
+  "capability": "fastq.trim.v1",
+  "inputs": {
+    "fastq": "../fastq-transform/reads.fastq"
+  },
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "output": "../../../target/test-results/fastq-trim.fastq",
+    "min_quality": 20,
+    "min_length": 4,
+    "quality_encoding": "phred+33"
+  }
+}

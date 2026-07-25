@@ -119,6 +119,78 @@ fn reports_fastq_quality_control_as_json() {
 }
 
 #[test]
+fn processes_fastq_reads_as_json() {
+    let root = workspace_root();
+    let fixture = root.join("tests/fixtures/fastq-transform/reads.fastq");
+    let temp = temporary_directory("fastq-transform");
+    let trim_output = temp.join("trimmed.fastq");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["fastq", "trim"])
+        .arg(&fixture)
+        .arg(&trim_output)
+        .args([
+            "--min-quality",
+            "20",
+            "--min-length",
+            "4",
+            "--quality-encoding",
+            "phred+33",
+            "--json",
+        ])
+        .output()
+        .expect("run FASTQ trim");
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid FASTQ trim JSON");
+    assert_eq!(result["capability"], "fastq.trim.v1");
+    assert_eq!(result["result"]["output_read_count"], 2);
+    assert_eq!(result["result"]["discarded_read_count"], 1);
+    assert_eq!(result["result"]["quality_trimmed_bases"], 6);
+    assert_eq!(
+        fs::read_to_string(&trim_output).expect("trimmed FASTQ"),
+        "@trim\nACGT\n+\nIIII\n@adapter\nTTTTAGATCGGA\n+\nIIIIIIIIIIII\n"
+    );
+
+    let adapter_output = temp.join("adapter-trimmed.fastq");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["fastq", "adapter-trim"])
+        .arg(&fixture)
+        .arg(&adapter_output)
+        .args([
+            "--adapter",
+            "AGATCGGA",
+            "--min-overlap",
+            "4",
+            "--min-length",
+            "1",
+            "--json",
+        ])
+        .output()
+        .expect("run FASTQ adapter trim");
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid FASTQ adapter JSON");
+    assert_eq!(result["capability"], "fastq.adapter.v1");
+    assert_eq!(result["result"]["output_read_count"], 3);
+    assert_eq!(result["result"]["adapter_trimmed_bases"], 8);
+    assert_eq!(
+        fs::read_to_string(&adapter_output).expect("adapter-trimmed FASTQ"),
+        "@trim\nACGTAC\n+\nIIII!!\n@adapter\nTTTT\n+\nIIII\n@drop\nACGT\n+\n!!!!\n"
+    );
+    fs::remove_dir_all(temp).expect("remove FASTQ transform directory");
+}
+
+#[test]
 fn reports_variant_statistics_as_json() {
     let fixture = workspace_root().join("tests/fixtures/variant-stats/mixed.vcf");
     let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))

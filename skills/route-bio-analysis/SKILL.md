@@ -28,9 +28,10 @@ a replacement script silently.
 
 ## Category Routing
 
-- FASTA assembly statistics and FASTQ read QC: use
+- FASTA assembly statistics and FASTQ read QC/processing: use
   `analyze-sequence-statistics` for supported FASTA and
-  `analyze-fastq-quality` for supported FASTQ. Use
+  `analyze-fastq-quality` for supported FASTQ QC. Use
+  `process-fastq-reads` for FASTQ quality trimming and adapter removal. Use
   `manipulate-biological-sequences` for supported FASTA record extraction,
   coordinate extraction, filtering, reverse-complement generation,
   translation, ORF finding, ID normalization, merge/split, and FASTA-table

@@ -57,6 +57,12 @@
       "capabilities": ["fastq.qc.v1"]
     },
     {
+      "id": "process-fastq-reads",
+      "path": "skills/process-fastq-reads",
+      "kind": "executable",
+      "capabilities": ["fastq.trim.v1", "fastq.adapter.v1"]
+    },
+    {
       "id": "analyze-sam-quality",
       "path": "skills/analyze-sam-quality",
       "kind": "executable",

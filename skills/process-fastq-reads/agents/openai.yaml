@@ -1,0 +1,4 @@
+interface:
+  display_name: "FASTQ Read Processing"
+  short_description: "Trim FASTQ quality tails and sequencing adapters"
+  default_prompt: "Use $process-fastq-reads to trim local FASTQ reads and preserve the versioned capability result."
