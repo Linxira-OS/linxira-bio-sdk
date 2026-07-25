@@ -22,6 +22,8 @@ the agent skills that select and validate them.
   `fastq.trim.v1` and `fastq.adapter.v1` capabilities.
 - Read `skills/analyze-sam-quality/SKILL.md` for the implemented SAM-text
   `alignment.qc.v1` capability; BAM and CRAM still require native tools.
+- Read `skills/analyze-genome-annotations/SKILL.md` for implemented GFF3/GTF
+  statistics, normalization, position-table, and reference-guided extraction.
 - Read `skills/intersect-genomic-intervals/SKILL.md` for the implemented BED
   `interval.intersect.v1`, `interval.merge.v1`, and
   `interval.subtract.v1` capabilities.

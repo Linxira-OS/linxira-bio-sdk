@@ -1,6 +1,11 @@
 #![forbid(unsafe_code)]
 
 use linxira_bio_core::alignment::{SamQcMetrics, sam_qc_path};
+use linxira_bio_core::annotation::{
+    AnnotationExtractOptions, AnnotationNormalizeOptions, AnnotationStats, GenePositionOptions,
+    annotation_gene_positions_path, annotation_stats_path, extract_annotation_sequences_path,
+    normalize_annotation_path,
+};
 use linxira_bio_core::dataset::{DatasetInspection, DatasetSupport, inspect_dataset};
 use linxira_bio_core::environment::{
     EnvironmentAudit, EnvironmentMode, EnvironmentPlan, EnvironmentPlanOptions, PlanActionState,
@@ -89,6 +94,24 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if alignment == "alignment" && qc == "qc" && json == "--json" =>
         {
             print_alignment_qc(path, true)
+        }
+        [annotation, stats, arguments @ ..] if annotation == "annotation" && stats == "stats" => {
+            print_annotation_stats(arguments)
+        }
+        [annotation, normalize, arguments @ ..]
+            if annotation == "annotation" && normalize == "normalize" =>
+        {
+            print_annotation_normalize(arguments)
+        }
+        [annotation, positions, arguments @ ..]
+            if annotation == "annotation" && positions == "positions" =>
+        {
+            print_annotation_positions(arguments)
+        }
+        [annotation, extract, arguments @ ..]
+            if annotation == "annotation" && extract == "extract" =>
+        {
+            print_annotation_extract(arguments)
         }
         [runtime, catalog] if runtime == "runtime" && catalog == "catalog" => {
             print_runtime_catalog(false)
@@ -1173,6 +1196,162 @@ fn print_variant_stats(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn print_annotation_stats(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut json = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown annotation stats option: {value}").into());
+            }
+            value if input.is_none() => input = Some(value),
+            value => return Err(format!("unexpected annotation stats argument: {value}").into()),
+        }
+    }
+    let input = input.ok_or("annotation stats requires an input GFF3 or GTF path")?;
+    let stats = annotation_stats_path(input)?;
+    if json {
+        print_analysis_json("annotation-stats", "annotation.gxf.stats.v1", stats)?;
+    } else {
+        print_annotation_stats_text(&stats);
+    }
+    Ok(())
+}
+
+fn print_annotation_stats_text(stats: &AnnotationStats) {
+    println!("record_count\t{}", stats.record_count);
+    println!("directive_count\t{}", stats.directive_count);
+    println!("sequence_region_count\t{}", stats.sequence_region_count);
+    println!("records_with_id\t{}", stats.records_with_id);
+    println!("records_with_parent\t{}", stats.records_with_parent);
+    println!(
+        "feature_type_counts\t{}",
+        serde_json::to_string(&stats.feature_type_counts).unwrap_or_default()
+    );
+    println!(
+        "sequence_counts\t{}",
+        serde_json::to_string(&stats.sequence_counts).unwrap_or_default()
+    );
+    for warning in &stats.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_annotation_normalize(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = AnnotationNormalizeOptions::default();
+    let mut json = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--sort" => options.sort = true,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown annotation normalize option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "annotation normalize")?,
+        }
+    }
+    let input = input.ok_or("annotation normalize requires an input GFF3 or GTF path")?;
+    let output = output.ok_or("annotation normalize requires an output GFF3 path")?;
+    let summary = normalize_annotation_path(input, output, options)?;
+    print_sequence_transform_result(
+        "annotation-normalize",
+        "annotation.gxf.normalize.v1",
+        Path::new(output),
+        summary,
+        json,
+    )
+}
+
+fn print_annotation_positions(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut feature_types = Vec::new();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--feature-type" => {
+                index += 1;
+                feature_types.push(
+                    arguments
+                        .get(index)
+                        .ok_or("--feature-type requires a value")?
+                        .clone(),
+                );
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown annotation positions option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "annotation positions")?,
+        }
+        index += 1;
+    }
+    let input = input.ok_or("annotation positions requires an input GFF3 or GTF path")?;
+    let output = output.ok_or("annotation positions requires an output TSV path")?;
+    let options = GenePositionOptions {
+        feature_types: if feature_types.is_empty() {
+            GenePositionOptions::default().feature_types
+        } else {
+            feature_types
+        },
+    };
+    let summary = annotation_gene_positions_path(input, output, &options)?;
+    print_sequence_transform_result(
+        "annotation-positions",
+        "annotation.gene-position.v1",
+        Path::new(output),
+        summary,
+        json,
+    )
+}
+
+fn print_annotation_extract(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = AnnotationExtractOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--feature-type" => {
+                index += 1;
+                options.feature_type = arguments
+                    .get(index)
+                    .ok_or("--feature-type requires a value")?
+                    .clone();
+            }
+            "--promoter-length" => {
+                index += 1;
+                options.promoter_length =
+                    parse_sequence_u64(arguments.get(index), "--promoter-length")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown annotation extract option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err(
+            "annotation extract requires <annotation.gff3|gtf> <reference.fasta> <output.fasta>"
+                .into(),
+        );
+    }
+    let summary = extract_annotation_sequences_path(&paths[0], &paths[1], &paths[2], &options)?;
+    print_sequence_transform_result(
+        "annotation-extract",
+        "annotation.sequence.extract.v1",
+        &paths[2],
+        summary,
+        json,
+    )
+}
+
 fn print_variant_stats_text(stats: &VcfStats) {
     println!("record_count\t{}", stats.record_count);
     println!("sample_count\t{}", stats.sample_count);
@@ -1593,6 +1772,10 @@ fn usage() -> &'static str {
         "  linxira-bio fastq trim <input.fastq[.gz]> <output.fastq> [--min-quality N] [--min-length N] [--quality-encoding phred+33|phred+64] [--json]\n",
         "  linxira-bio fastq adapter-trim <input.fastq[.gz]> <output.fastq> [--adapter SEQ ...] [--min-overlap N] [--min-length N] [--json]\n",
         "  linxira-bio alignment qc <input.sam[.gz]> [--json]\n",
+        "  linxira-bio annotation stats <input.gff3|gtf[.gz]> [--json]\n",
+        "  linxira-bio annotation normalize <input.gff3|gtf[.gz]> <output.gff3> [--sort] [--json]\n",
+        "  linxira-bio annotation positions <input.gff3|gtf[.gz]> <output.tsv> [--feature-type TYPE ...] [--json]\n",
+        "  linxira-bio annotation extract <input.gff3|gtf[.gz]> <reference.fasta[.gz]> <output.fasta> [--feature-type gene|transcript|cds|exon|utr|five_prime_utr|three_prime_utr|promoter] [--promoter-length N] [--json]\n",
         "  linxira-bio variant stats <input.vcf[.gz]> [--json]\n",
         "  linxira-bio interval intersect <left.bed[.gz]> <right.bed[.gz]> [--json]\n",
         "  linxira-bio interval merge <input.bed[.gz]> <output.bed> [--max-gap N] [--json]\n",

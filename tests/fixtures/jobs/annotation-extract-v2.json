@@ -1,0 +1,44 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-annotation-extract-v2",
+  "capability": "annotation.sequence.extract.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-annotation",
+      "role": "annotation",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-annotation-1",
+          "path": "../annotation/genes.gff3",
+          "format": "gff3",
+          "compression": "none",
+          "size_bytes": 430,
+          "sha256": "a6c5c002782efd728e9b84152be747ad3efdae2fc193e5736b7694edcb52f850"
+        }
+      ]
+    },
+    {
+      "artifact_id": "input-fasta",
+      "role": "fasta",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-fasta-1",
+          "path": "../annotation/reference.fa",
+          "format": "fasta",
+          "compression": "none",
+          "size_bytes": 47,
+          "sha256": "522656f5eeaef79bc8859eab1161935676fa48ba4f9d694f646a23275d4dc9d6"
+        }
+      ]
+    }
+  ],
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "output": "../../../target/test-results/annotation-extract-v2.fa",
+    "feature_type": "exon"
+  }
+}

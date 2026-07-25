@@ -37,9 +37,11 @@ a replacement script silently.
   translation, ORF finding, ID normalization, merge/split, and FASTA-table
   conversion.
 - BED interval operations: use `intersect-genomic-intervals` for overlap
-  summaries, BED3 merge, and BED3 subtraction. GFF/GTF joins, coverage, closest
-  feature lookup, strand rules, fractional overlaps, and record-preserving
-  outputs still require an approved external workflow.
+  summaries, BED3 merge, and BED3 subtraction.
+- GFF3/GTF annotation statistics, GTF-to-GFF3 normalization, feature position
+  tables, and reference-guided gene/transcript/CDS/exon/UTR/promoter extraction:
+  use `analyze-genome-annotations`. Annotation joins, closest-feature lookup,
+  ontology validation, and automatic relationship repair remain planned.
 - SAM text mapping QC: use `analyze-sam-quality`. BAM, CRAM, pileup, coverage,
   and advanced mapping reports still require a maintained native workflow.
 - VCF, BCF, variants, genotypes, and normalization: variant skills. Use

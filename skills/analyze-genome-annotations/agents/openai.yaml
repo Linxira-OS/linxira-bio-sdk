@@ -1,0 +1,4 @@
+interface:
+  display_name: "Genome Annotation Analysis"
+  short_description: "Analyze, normalize, tabulate, and extract GFF/GTF features"
+  default_prompt: "Use $analyze-genome-annotations to validate this GFF3 or GTF file and run the appropriate local annotation capability."

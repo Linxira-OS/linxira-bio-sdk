@@ -13,8 +13,8 @@ means that an analysis capability is available.
 | CSV | Yes | Parsed table | `expression.matrix.qc.v1`, `table.manipulate.v1` | Rectangular expression matrices; quoted and multiline preview fields supported; row/column manipulation supported |
 | TSV | Yes | Parsed table | `expression.matrix.qc.v1`, `table.manipulate.v1` | Rectangular expression matrices; row/column manipulation supported |
 | BED | Yes | Interval rows | `interval.intersect.v1`, `interval.merge.v1`, `interval.subtract.v1` | Pairwise half-open overlap summary plus BED3 merge/subtract outputs |
-| GFF3 | Yes | Feature rows | None | Inspection only |
-| GTF | Yes | Feature rows | None | Inspection only |
+| GFF3 | Yes | Feature rows | `annotation.gxf.stats.v1`, `annotation.gxf.normalize.v1`, `annotation.gene-position.v1`, `annotation.sequence.extract.v1` | Strict nine-column parsing, gzip input, normalization, coordinate tables, and reference-guided FASTA extraction |
+| GTF | Yes | Feature rows | `annotation.gxf.stats.v1`, `annotation.gxf.normalize.v1`, `annotation.gene-position.v1`, `annotation.sequence.extract.v1` | GTF attributes can be normalized to GFF3 and used for coordinate or sequence extraction |
 | VCF | Yes | Variant rows | `variant.stats.v1` | Plain, gzip, and BGZF; no BCF |
 | SAM | Yes | Alignment rows | `alignment.qc.v1` | Text SAM flag and mapping QC; plain or gzip |
 | BAM | Magic bytes only | Binary metadata | None | `recognized-unsupported` |
@@ -51,8 +51,8 @@ including the header.
 的生物学分析能力。FASTA、FASTQ、SAM 和 VCF 当前分别可运行序列统计、读段质量
 控制/质量裁剪/接头去除、文本比对质控和变异描述统计；BED 可计算两组区间的半开重叠摘要，CSV/TSV
 可进行矩形表达矩阵质控，PDB 可生成结构摘要和供渲染使用的原子坐标。PDB/mmCIF
-均可在 GUI 中进行有界 3D 预览并导出当前视角 PNG，但 mmCIF 分析仍未实现。GFF3、GTF 目前只做有界
-预览；BAM、BCF、CRAM、H5AD 等二进制格式仅识别，不会伪装成可用能力。
+均可在 GUI 中进行有界 3D 预览并导出当前视角 PNG，但 mmCIF 分析仍未实现。GFF3、GTF 已支持
+统计、规范化、坐标表和参考序列提取；BAM、BCF、CRAM、H5AD 等二进制格式仅识别，不会伪装成可用能力。
 
 预览最多读取 200 条记录或 10 MiB 解压后内容。表格默认导出 CSV，也支持 TSV、
 JSON、逐行对象 JSONL 和 XLSX。需要保留 VCF、BED、GFF3 等领域语义时，应保留

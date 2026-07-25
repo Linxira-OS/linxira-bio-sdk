@@ -158,6 +158,42 @@
       "output_formats": ["csv", "tsv", "json", "jsonl", "xlsx"]
     },
     {
+      "id": "annotation.gxf.stats.v1",
+      "status": "available",
+      "category": "genome-annotation",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio annotation stats <input.gff3|gtf> --json",
+      "input_formats": ["gff3", "gtf"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "annotation.gxf.normalize.v1",
+      "status": "available",
+      "category": "genome-annotation",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio annotation normalize <input.gff3|gtf> <output.gff3> --json",
+      "input_formats": ["gff3", "gtf"],
+      "output_formats": ["gff3", "json"]
+    },
+    {
+      "id": "annotation.gene-position.v1",
+      "status": "available",
+      "category": "genome-annotation",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio annotation positions <input.gff3|gtf> <output.tsv> --json",
+      "input_formats": ["gff3", "gtf"],
+      "output_formats": ["tsv", "json"]
+    },
+    {
+      "id": "annotation.sequence.extract.v1",
+      "status": "available",
+      "category": "genome-annotation",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio annotation extract <input.gff3|gtf> <reference.fasta> <output.fasta> --json",
+      "input_formats": ["gff3", "gtf", "fasta"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
       "id": "table.manipulate.v1",
       "status": "available",
       "category": "data-management",

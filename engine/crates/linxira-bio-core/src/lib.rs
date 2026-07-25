@@ -3,6 +3,7 @@
 //! Shared deterministic bioinformatics capabilities.
 
 pub mod alignment;
+pub mod annotation;
 pub mod dataset;
 pub mod environment;
 pub mod expression;
