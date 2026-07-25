@@ -45,6 +45,51 @@
       "command": "linxira-bio sequence stats <input.fasta> --json"
     },
     {
+      "id": "sequence.extract.v1",
+      "status": "available",
+      "category": "sequence-io",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence extract <input.fasta> <output.fasta> --id ID --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
+      "id": "sequence.filter.v1",
+      "status": "available",
+      "category": "sequence-io",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence filter <input.fasta> <output.fasta> --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
+      "id": "sequence.reverse-complement.v1",
+      "status": "available",
+      "category": "sequence-algorithms",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence reverse-complement <input.fasta> <output.fasta> --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
+      "id": "sequence.translate.v1",
+      "status": "available",
+      "category": "sequence-algorithms",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence translate <input.fasta> <output.fasta> --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
+      "id": "sequence.orf.v1",
+      "status": "available",
+      "category": "sequence-algorithms",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence orf <input.fasta> <output.fasta> --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
       "id": "dataset.inspect.v1",
       "status": "available",
       "category": "data-management",

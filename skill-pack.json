@@ -34,6 +34,18 @@
       "capabilities": ["sequence.stats.v1"]
     },
     {
+      "id": "manipulate-biological-sequences",
+      "path": "skills/manipulate-biological-sequences",
+      "kind": "executable",
+      "capabilities": [
+        "sequence.extract.v1",
+        "sequence.filter.v1",
+        "sequence.reverse-complement.v1",
+        "sequence.translate.v1",
+        "sequence.orf.v1"
+      ]
+    },
+    {
       "id": "analyze-fastq-quality",
       "path": "skills/analyze-fastq-quality",
       "kind": "executable",

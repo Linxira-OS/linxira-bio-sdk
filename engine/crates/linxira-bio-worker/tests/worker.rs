@@ -63,6 +63,54 @@ fn executes_artifact_aware_v2_job() {
 }
 
 #[test]
+fn executes_v2_sequence_transform_with_relative_output_and_hashes() {
+    let root = workspace_root();
+    let output_path = root.join("target/test-results/sequence-reverse-complement-v2.fa");
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent).expect("create sequence result directory");
+    }
+    if output_path.exists() {
+        std::fs::remove_file(&output_path).expect("remove stale sequence result");
+    }
+    let request = root.join("tests/fixtures/jobs/sequence-reverse-complement-v2.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(request)
+        .output()
+        .expect("run v2 sequence transform");
+
+    assert!(output.status.success());
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid v2 sequence result");
+    assert_eq!(result["schema_version"], "2");
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["capability"], "sequence.reverse-complement.v1");
+    assert_eq!(result["result"]["output_records"], 3);
+    assert_eq!(result["artifacts"][0]["role"], "fasta");
+    assert_eq!(result["artifacts"][0]["kind"], "domain-file");
+    assert_eq!(result["artifacts"][0]["format"], "fasta");
+    assert_eq!(result["artifacts"][0]["media_type"], "text/x-fasta");
+    assert_eq!(
+        result["artifacts"][0]["size_bytes"],
+        std::fs::metadata(&output_path)
+            .expect("sequence output metadata")
+            .len()
+    );
+    assert_eq!(
+        result["artifacts"][0]["sha256"].as_str().map(str::len),
+        Some(64)
+    );
+    assert_eq!(
+        result["provenance"]["input_sha256"]["input-fasta-1"],
+        "d36ea1364a0451fd99584f0f36307dbc34b818ca4008c24c7705a95855172a1c"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&output_path).expect("reverse-complement FASTA"),
+        ">one\nNNACGT\n>two\nCCCC\n>three\nAT\n"
+    );
+    std::fs::remove_file(output_path).expect("remove v2 sequence result");
+}
+
+#[test]
 fn returns_structured_v2_validation_errors_from_the_binary() {
     let request = temporary_request_path("v2-validation-error");
     std::fs::write(

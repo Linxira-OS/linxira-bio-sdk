@@ -10,6 +10,10 @@ the agent skills that select and validate them.
   browser execution must be selected.
 - Read `skills/analyze-sequence-statistics/SKILL.md` for the implemented
   `sequence.stats.v1` capability.
+- Read `skills/manipulate-biological-sequences/SKILL.md` for the implemented
+  `sequence.extract.v1`, `sequence.filter.v1`,
+  `sequence.reverse-complement.v1`, `sequence.translate.v1`, and
+  `sequence.orf.v1` capabilities.
 - Read `skills/analyze-fastq-quality/SKILL.md` for the implemented
   `fastq.qc.v1` capability.
 - Read `skills/analyze-sam-quality/SKILL.md` for the implemented SAM-text

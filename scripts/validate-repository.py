@@ -13,6 +13,7 @@ from generate_third_party_notices import (
     load_bundle_notice_configuration,
     validate_override_configuration,
 )
+from verify_coverage_v1 import validate_coverage_files
 
 try:
     from jsonschema import Draft202012Validator, FormatChecker
@@ -322,6 +323,7 @@ def validate_capability_documentation(capability: dict[str, object]) -> None:
 def validate() -> None:
     schema_count, schema_instance_count, format_check_count = validate_schema_contracts()
     catalog = load_json("capabilities/catalog.json")
+    coverage_summary = validate_coverage_files()
     tool_catalog = load_json("tools/catalog.json")
     runtime_catalog = load_json("runtimes/catalog.json")
     bundle_manifest = load_json("packaging/bundle-manifest.json")
@@ -368,6 +370,8 @@ def validate() -> None:
         "deny.toml",
         "licenses/cargo-overrides.json",
         "licenses/NotoSansCJK-OFL.txt",
+        "capabilities/coverage-v1.json",
+        "capabilities/reference-inventories/offline-offline-reference-2.475.json",
         "tools/catalog.json",
         "profiles/local-core.json",
     }
@@ -577,6 +581,7 @@ def validate() -> None:
         f"{len(skill_ids)} skills, {len(tool_ids)} tools, "
         f"{len(provider_ids)} runtime providers, "
         f"{len(dependency_notice_overrides)} license overrides, "
+        f"coverage {coverage_summary.achieved_weight}/{coverage_summary.target_weight}, "
         f"and profile {profile.get('id')}"
     )
 
