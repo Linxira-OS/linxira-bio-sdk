@@ -158,6 +158,15 @@
       "output_formats": ["csv", "tsv", "json", "jsonl", "xlsx"]
     },
     {
+      "id": "table.manipulate.v1",
+      "status": "available",
+      "category": "data-management",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["csv", "tsv", "json"]
+    },
+    {
       "id": "system.worker.v1",
       "status": "available",
       "category": "system",

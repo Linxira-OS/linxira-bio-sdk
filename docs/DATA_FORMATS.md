@@ -10,8 +10,8 @@ means that an analysis capability is available.
 | --- | --- | --- | --- | --- |
 | FASTA | Yes | Sequence records | `sequence.stats.v1` | Plain, gzip, and BGZF |
 | FASTQ | Yes | Read records | `fastq.qc.v1`, `fastq.trim.v1`, `fastq.adapter.v1` | QC plus FASTQ output for 3' quality trimming and adapter removal; plain, gzip, and BGZF input |
-| CSV | Yes | Parsed table | `expression.matrix.qc.v1` | Rectangular expression matrices; quoted and multiline preview fields supported |
-| TSV | Yes | Parsed table | `expression.matrix.qc.v1` | Rectangular expression matrices |
+| CSV | Yes | Parsed table | `expression.matrix.qc.v1`, `table.manipulate.v1` | Rectangular expression matrices; quoted and multiline preview fields supported; row/column manipulation supported |
+| TSV | Yes | Parsed table | `expression.matrix.qc.v1`, `table.manipulate.v1` | Rectangular expression matrices; row/column manipulation supported |
 | BED | Yes | Interval rows | `interval.intersect.v1`, `interval.merge.v1`, `interval.subtract.v1` | Pairwise half-open overlap summary plus BED3 merge/subtract outputs |
 | GFF3 | Yes | Feature rows | None | Inspection only |
 | GTF | Yes | Feature rows | None | Inspection only |

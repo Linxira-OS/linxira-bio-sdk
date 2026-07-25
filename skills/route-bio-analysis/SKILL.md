@@ -46,8 +46,10 @@ a replacement script silently.
   `analyze-variant-statistics` only for supported VCF summaries; BCF remains
   recognized but unsupported.
 - Rectangular CSV/TSV expression matrix QC: use `analyze-expression-matrix`.
-  Differential expression, sparse containers, RNA-seq workflows, and
-  single-cell analysis remain external or planned.
+  Use `manipulate-bio-tables` for local CSV/TSV row filtering, column
+  selection, column dropping, row skipping, row limiting, and delimiter
+  conversion. Differential expression, sparse containers, RNA-seq workflows,
+  and single-cell analysis remain external or planned.
 - PDB coordinate summaries and explicitly requested AlphaFold pLDDT from PDB
   B-factors: use `analyze-pdb-structure`. The native GUI can preview PDB and
   mmCIF coordinates in three representation modes and export the current view

@@ -261,6 +261,7 @@ const MAX_CONCURRENT_INSPECTIONS: usize = 2;
 const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "dataset.inspect.v1",
     "table.export.v1",
+    "table.manipulate.v1",
     "sequence.stats.v1",
     "fastq.qc.v1",
     "fastq.trim.v1",
@@ -1475,6 +1476,7 @@ impl BioApp {
                     "interval.merge.v1",
                     "interval.subtract.v1",
                     "expression.matrix.qc.v1",
+                    "table.manipulate.v1",
                     "structure.pdb.summary.v1",
                 ] {
                     ui.selectable_value(
@@ -2226,6 +2228,10 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             capability: "expression.matrix.qc.v1",
             input_role: "matrix",
         }),
+        ("table.manipulate.v1", "csv" | "tsv") => Some(AnalysisRoute {
+            capability: "table.manipulate.v1",
+            input_role: "table",
+        }),
         ("variant.stats.v1", "vcf") => Some(AnalysisRoute {
             capability: "variant.stats.v1",
             input_role: "vcf",
@@ -2246,6 +2252,7 @@ fn capability_output_extension(capability: &str) -> Option<&'static str> {
     match capability {
         "fastq.trim.v1" | "fastq.adapter.v1" => Some("fastq"),
         "interval.merge.v1" | "interval.subtract.v1" => Some("bed"),
+        "table.manipulate.v1" => Some("tsv"),
         _ => None,
     }
 }
@@ -2864,6 +2871,7 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "variant.stats.v1" => language.text("变异统计", "Variant statistics"),
         "alignment.qc.v1" => language.text("比对质量控制", "Alignment quality control"),
         "expression.matrix.qc.v1" => language.text("表达矩阵", "Expression matrix"),
+        "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
         _ => language.text("未知能力", "Unknown capability"),
     }
@@ -3314,6 +3322,16 @@ fn metric_label(key: &str, language: Language) -> &str {
         "zero_percent" => "零值百分比",
         "duplicate_feature_id_count" => "重复特征标识数",
         "samples" => "各样本指标",
+        "input_rows" => "输入行数",
+        "output_rows" => "输出行数",
+        "skipped_rows" => "跳过行数",
+        "filtered_rows" => "过滤行数",
+        "input_columns" => "输入列数",
+        "output_columns" => "输出列数",
+        "input_delimiter" => "输入分隔符",
+        "output_delimiter" => "输出分隔符",
+        "selected_columns" => "保留列",
+        "dropped_columns" => "删除列",
         "left_interval_count" => "左侧区间数",
         "right_interval_count" => "右侧区间数",
         "input_interval_count" => "输入区间数",
@@ -3371,6 +3389,7 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "expression.matrix.qc.v1" => {
             language.text("表达矩阵质量控制", "Expression matrix quality control")
         }
+        "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "variant.stats.v1" => language.text("VCF 变异统计", "VCF variant statistics"),
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
         "environment.audit.v1" => language.text("环境审计", "Environment audit"),
@@ -3395,6 +3414,12 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("table.export.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/table.export.v1/en-US.md"
+        )),
+        ("table.manipulate.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/table.manipulate.v1/zh-CN.md"
+        )),
+        ("table.manipulate.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/table.manipulate.v1/en-US.md"
         )),
         ("sequence.stats.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/sequence.stats.v1/zh-CN.md"
@@ -4025,11 +4050,22 @@ mod tests {
             analysis_route_for_capability("interval.merge.v1", "fasta"),
             None
         );
+        assert_eq!(
+            analysis_route_for_capability("table.manipulate.v1", "tsv"),
+            Some(AnalysisRoute {
+                capability: "table.manipulate.v1",
+                input_role: "table",
+            })
+        );
         assert!(!capability_requires_secondary("interval.merge.v1"));
         assert!(capability_requires_secondary("interval.subtract.v1"));
         assert_eq!(
             capability_output_extension("interval.merge.v1"),
             Some("bed")
+        );
+        assert_eq!(
+            capability_output_extension("table.manipulate.v1"),
+            Some("tsv")
         );
         assert_eq!(capability_output_extension("sequence.stats.v1"), None);
 

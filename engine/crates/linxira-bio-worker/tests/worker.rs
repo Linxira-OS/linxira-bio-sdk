@@ -299,6 +299,75 @@ fn exports_a_table_through_the_worker() {
 }
 
 #[test]
+fn manipulates_tables_through_the_worker() {
+    let root = workspace_root();
+    let result_dir = root.join("target/test-results");
+    std::fs::create_dir_all(&result_dir).expect("create table result directory");
+    let outputs = [
+        result_dir.join("table-manipulate.tsv"),
+        result_dir.join("table-manipulate-v2.tsv"),
+    ];
+    for path in &outputs {
+        if path.exists() {
+            std::fs::remove_file(path).expect("remove stale table output");
+        }
+    }
+
+    let cases = [
+        (
+            "table-manipulate.json",
+            "gene_id\tsample_b\ngene_1\t0\ngene_2\t5\ngene_3\tNA\n",
+        ),
+        (
+            "table-manipulate-v2.json",
+            "gene_id\tsample_a\tsample_b\ngene_1\t10\t0\ngene_2\t20\t5\n",
+        ),
+    ];
+
+    for (index, (fixture, expected_table)) in cases.iter().enumerate() {
+        let request = root.join("tests/fixtures/jobs").join(fixture);
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(request)
+            .output()
+            .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
+        assert!(
+            output.status.success(),
+            "{fixture}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid table manipulation result");
+        assert_eq!(result["status"], "ok", "{fixture}");
+        assert_eq!(result["capability"], "table.manipulate.v1", "{fixture}");
+        assert_eq!(result["result"]["input_rows"], 4, "{fixture}");
+        assert_eq!(
+            std::fs::read_to_string(&outputs[index]).expect("table output"),
+            *expected_table,
+            "{fixture}"
+        );
+        if fixture.ends_with("-v2.json") {
+            assert_eq!(result["schema_version"], "2", "{fixture}");
+            assert_eq!(result["artifacts"][0]["role"], "table", "{fixture}");
+            assert_eq!(result["artifacts"][0]["kind"], "table", "{fixture}");
+            assert_eq!(result["artifacts"][0]["format"], "tsv", "{fixture}");
+            assert_eq!(
+                result["artifacts"][0]["media_type"], "text/tab-separated-values",
+                "{fixture}"
+            );
+            assert_eq!(
+                result["artifacts"][0]["sha256"].as_str().map(str::len),
+                Some(64),
+                "{fixture}"
+            );
+        }
+    }
+
+    for path in outputs {
+        std::fs::remove_file(path).expect("remove table output");
+    }
+}
+
+#[test]
 fn executes_fastq_qc_job() {
     let request = workspace_root().join("tests/fixtures/jobs/fastq-qc.json");
     let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))

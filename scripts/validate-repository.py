@@ -371,7 +371,7 @@ def validate() -> None:
         "licenses/cargo-overrides.json",
         "licenses/NotoSansCJK-OFL.txt",
         "capabilities/coverage-v1.json",
-        "capabilities/reference-inventories/offline-offline-reference.json",
+        "capabilities/reference-inventories/offline-offline-offline-reference.json",
         "tools/catalog.json",
         "profiles/local-core.json",
     }
