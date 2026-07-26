@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/eggnog-normalization.v1.json",
+  "title": "Linxira Bio normalized eggNOG-mapper annotations",
+  "type": "object",
+  "required": ["input_row_count", "query_count", "go_association_count", "kegg_association_count", "output_path", "records", "warnings"],
+  "properties": {
+    "input_row_count": {"type": "integer", "minimum": 1},
+    "query_count": {"type": "integer", "minimum": 1},
+    "go_association_count": {"type": "integer", "minimum": 0},
+    "kegg_association_count": {"type": "integer", "minimum": 0},
+    "output_path": {"type": "string", "minLength": 1},
+    "records": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/record"}},
+    "warnings": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "nullableString": {"type": ["string", "null"]},
+    "stringArray": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "record": {
+      "type": "object",
+      "required": ["query_id", "seed_ortholog", "evalue", "score", "orthologous_groups", "annotation_level", "cog_categories", "description", "preferred_name", "go_terms", "ec_numbers", "kegg_orthologs", "kegg_pathways"],
+      "properties": {
+        "query_id": {"type": "string", "minLength": 1},
+        "seed_ortholog": {"$ref": "#/$defs/nullableString"},
+        "evalue": {"type": ["number", "null"], "minimum": 0},
+        "score": {"type": ["number", "null"]},
+        "orthologous_groups": {"$ref": "#/$defs/stringArray"},
+        "annotation_level": {"$ref": "#/$defs/nullableString"},
+        "cog_categories": {"$ref": "#/$defs/stringArray"},
+        "description": {"$ref": "#/$defs/nullableString"},
+        "preferred_name": {"$ref": "#/$defs/nullableString"},
+        "go_terms": {"$ref": "#/$defs/stringArray"},
+        "ec_numbers": {"$ref": "#/$defs/stringArray"},
+        "kegg_orthologs": {"$ref": "#/$defs/stringArray"},
+        "kegg_pathways": {"$ref": "#/$defs/stringArray"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

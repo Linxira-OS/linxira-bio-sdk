@@ -1,0 +1,19 @@
+gene_id	term_id	term_name	namespace
+g1	GO:0000001	Process A	go
+g2	GO:0000001	Process A	go
+g4	GO:0000001	Process A	go
+g3	GO:0000002	Process B	go
+g5	GO:0000002	Process B	go
+g3	GO:0000003	Function C	go
+g6	GO:0000003	Function C	go
+g1	map00010	Pathway A	kegg
+g2	map00010	Pathway A	kegg
+g6	map00010	Pathway A	kegg
+g3	map00020	Pathway B	kegg
+g7	map00020	Pathway B	kegg
+g1	custom:stress	Stress response	custom
+g2	custom:stress	Stress response	custom
+g3	custom:stress	Stress response	custom
+g8	custom:stress	Stress response	custom
+g4	custom:transport	Transport	custom
+g5	custom:transport	Transport	custom

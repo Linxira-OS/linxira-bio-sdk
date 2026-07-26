@@ -509,6 +509,51 @@
       "output_formats": ["newick", "json"]
     },
     {
+      "id": "annotation.go.normalize.v1",
+      "status": "available",
+      "category": "functional-annotation",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio annotation go <input.csv|tsv> <output.tsv> --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["tsv", "json"]
+    },
+    {
+      "id": "annotation.eggnog.normalize.v1",
+      "status": "available",
+      "category": "functional-annotation",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio annotation eggnog <input.tsv> <output.tsv> --json",
+      "input_formats": ["eggnog-annotations"],
+      "output_formats": ["tsv", "json"]
+    },
+    {
+      "id": "enrichment.overrepresentation.v1",
+      "status": "available",
+      "category": "functional-enrichment",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio enrichment custom <genes.txt|tsv> <associations.tsv> --json",
+      "input_formats": ["identifier-list", "csv", "tsv"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "enrichment.go.v1",
+      "status": "available",
+      "category": "functional-enrichment",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio enrichment go <genes.txt|tsv> <associations.tsv> --json",
+      "input_formats": ["identifier-list", "csv", "tsv"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "enrichment.kegg.v1",
+      "status": "available",
+      "category": "functional-enrichment",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio enrichment kegg <genes.txt|tsv> <associations.tsv> --json",
+      "input_formats": ["identifier-list", "csv", "tsv"],
+      "output_formats": ["json"]
+    },
+    {
       "id": "protein.af2.predict.v1",
       "status": "planned",
       "category": "structural-biology",

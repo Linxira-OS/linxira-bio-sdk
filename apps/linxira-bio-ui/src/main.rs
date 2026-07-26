@@ -273,6 +273,11 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "annotation.gxf.normalize.v1",
     "annotation.gene-position.v1",
     "annotation.sequence.extract.v1",
+    "annotation.go.normalize.v1",
+    "annotation.eggnog.normalize.v1",
+    "enrichment.overrepresentation.v1",
+    "enrichment.go.v1",
+    "enrichment.kegg.v1",
     "genome.gene-density.v1",
     "interval.intersect.v1",
     "interval.merge.v1",
@@ -325,6 +330,11 @@ struct BioApp {
     selected_capability: String,
     annotation_feature_type: String,
     annotation_sort: bool,
+    go_gene_column: String,
+    go_term_column: String,
+    enrichment_min_overlap: u64,
+    enrichment_max_terms: usize,
+    enrichment_include_genes: bool,
     gene_density_feature_type: String,
     gene_density_window_size: u64,
     gene_density_step_size: u64,
@@ -398,6 +408,11 @@ impl BioApp {
             selected_capability: "sequence.stats.v1".to_owned(),
             annotation_feature_type: "gene".to_owned(),
             annotation_sort: false,
+            go_gene_column: String::new(),
+            go_term_column: String::new(),
+            enrichment_min_overlap: 1,
+            enrichment_max_terms: 100,
+            enrichment_include_genes: false,
             gene_density_feature_type: "gene".to_owned(),
             gene_density_window_size: 1_000_000,
             gene_density_step_size: 1_000_000,
@@ -809,6 +824,20 @@ impl BioApp {
                     Value::String(self.annotation_feature_type.clone()),
                 );
             }
+            if route.capability == "annotation.go.normalize.v1" {
+                if !self.go_gene_column.trim().is_empty() {
+                    parameters.insert(
+                        "gene_column".to_owned(),
+                        Value::String(self.go_gene_column.trim().to_owned()),
+                    );
+                }
+                if !self.go_term_column.trim().is_empty() {
+                    parameters.insert(
+                        "go_column".to_owned(),
+                        Value::String(self.go_term_column.trim().to_owned()),
+                    );
+                }
+            }
             if route.capability == "phylogeny.tree.transform.v1"
                 && !self.phylogeny_reroot_label.trim().is_empty()
             {
@@ -880,6 +909,16 @@ impl BioApp {
             request.parameters = serde_json::json!({
                 "include_items": false,
                 "max_intersections": 50,
+            });
+        }
+        if matches!(
+            route.capability,
+            "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1"
+        ) {
+            request.parameters = serde_json::json!({
+                "min_overlap": self.enrichment_min_overlap,
+                "max_terms": self.enrichment_max_terms,
+                "include_genes": self.enrichment_include_genes,
             });
         }
         if route.capability == "genome.gene-density.v1" {
@@ -1686,6 +1725,11 @@ impl BioApp {
                     "annotation.gxf.normalize.v1",
                     "annotation.gene-position.v1",
                     "annotation.sequence.extract.v1",
+                    "annotation.go.normalize.v1",
+                    "annotation.eggnog.normalize.v1",
+                    "enrichment.overrepresentation.v1",
+                    "enrichment.go.v1",
+                    "enrichment.kegg.v1",
                     "genome.gene-density.v1",
                     "variant.stats.v1",
                     "variant.filter.v1",
@@ -1777,6 +1821,15 @@ impl BioApp {
                         self.text("反向相似性结果", "Reverse similarity result"),
                         self.text("没有其他可用 BLAST 结果", "No other BLAST result available"),
                     ),
+                    "enrichment.overrepresentation.v1"
+                    | "enrichment.go.v1"
+                    | "enrichment.kegg.v1" => (
+                        self.text("功能关联表", "Association table"),
+                        self.text(
+                            "没有可用 CSV/TSV 关联表",
+                            "No CSV/TSV association table available",
+                        ),
+                    ),
                     _ => (
                         self.text("右侧 BED", "Right BED"),
                         self.text("没有其他 BED", "No other BED"),
@@ -1834,6 +1887,32 @@ impl BioApp {
                             );
                         }
                     });
+            });
+        }
+        if self.selected_capability == "annotation.go.normalize.v1" {
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text(
+                    "基因列（留空自动识别）",
+                    "Gene column (blank for auto-detect)",
+                ));
+                ui.text_edit_singleline(&mut self.go_gene_column);
+                ui.label(self.text("GO 列（留空自动识别）", "GO column (blank for auto-detect)"));
+                ui.text_edit_singleline(&mut self.go_term_column);
+            });
+        }
+        if matches!(
+            self.selected_capability.as_str(),
+            "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1"
+        ) {
+            ui.add_space(8.0);
+            let include_genes_label = self.text("结果包含命中基因", "Include overlapping genes");
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("最小重叠数", "Minimum overlap"));
+                ui.add(egui::DragValue::new(&mut self.enrichment_min_overlap).range(1..=u64::MAX));
+                ui.label(self.text("最多报告条目", "Maximum reported terms"));
+                ui.add(egui::DragValue::new(&mut self.enrichment_max_terms).range(1..=100_000));
+                ui.checkbox(&mut self.enrichment_include_genes, include_genes_label);
             });
         }
         if self.selected_capability == "genome.gene-density.v1" {
@@ -2799,6 +2878,27 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             },
             input_role: "matrix",
         }),
+        ("annotation.go.normalize.v1" | "annotation.eggnog.normalize.v1", "csv" | "tsv") => {
+            Some(AnalysisRoute {
+                capability: if capability == "annotation.go.normalize.v1" {
+                    "annotation.go.normalize.v1"
+                } else {
+                    "annotation.eggnog.normalize.v1"
+                },
+                input_role: "annotations",
+            })
+        }
+        (
+            "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1",
+            "csv" | "tsv",
+        ) => Some(AnalysisRoute {
+            capability: match capability {
+                "enrichment.overrepresentation.v1" => "enrichment.overrepresentation.v1",
+                "enrichment.go.v1" => "enrichment.go.v1",
+                _ => "enrichment.kegg.v1",
+            },
+            input_role: "genes",
+        }),
         ("set.venn.v1" | "set.upset.v1", "csv" | "tsv") => Some(AnalysisRoute {
             capability: if capability == "set.venn.v1" {
                 "set.venn.v1"
@@ -2880,6 +2980,9 @@ fn secondary_input_format(capability: &str) -> Option<&'static str> {
         "primer.epcr.v1" => Some("tsv"),
         "structure.superpose.v1" => Some("structure"),
         "similarity.reciprocal.v1" => Some("blast"),
+        "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1" => {
+            Some("table")
+        }
         _ => None,
     }
 }
@@ -2891,6 +2994,7 @@ fn secondary_input_matches(capability: &str, format: &str) -> bool {
             format.trim().to_ascii_lowercase().as_str(),
             "blast-tabular" | "blast-xml"
         ),
+        Some("table") => matches!(format.trim().to_ascii_lowercase().as_str(), "csv" | "tsv"),
         Some(required) => format.trim().eq_ignore_ascii_case(required),
         None => false,
     }
@@ -2904,6 +3008,9 @@ fn secondary_input_role(capability: &str) -> Option<&'static str> {
         "primer.epcr.v1" => Some("primers"),
         "structure.superpose.v1" => Some("mobile"),
         "similarity.reciprocal.v1" => Some("reverse"),
+        "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1" => {
+            Some("associations")
+        }
         _ => None,
     }
 }
@@ -2916,6 +3023,7 @@ fn capability_output_extension(capability: &str) -> Option<&'static str> {
         "annotation.gxf.normalize.v1" => Some("gff3"),
         "annotation.gene-position.v1" => Some("tsv"),
         "annotation.sequence.extract.v1" => Some("fasta"),
+        "annotation.go.normalize.v1" | "annotation.eggnog.normalize.v1" => Some("tsv"),
         "sequence.kmer.count.v1" | "primer.epcr.v1" => Some("tsv"),
         "expression.normalize.v1" => Some("tsv"),
         "variant.filter.v1" | "variant.normalize.v1" => Some("vcf"),
@@ -3553,6 +3661,17 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "annotation.sequence.extract.v1" => {
             language.text("按注释提取序列", "Annotation-guided extraction")
         }
+        "annotation.go.normalize.v1" => {
+            language.text("GO 注释规范化", "GO annotation normalization")
+        }
+        "annotation.eggnog.normalize.v1" => {
+            language.text("eggNOG 注释规范化", "eggNOG annotation normalization")
+        }
+        "enrichment.overrepresentation.v1" => {
+            language.text("通用过度富集分析", "Generic over-representation analysis")
+        }
+        "enrichment.go.v1" => language.text("GO 富集分析", "GO enrichment analysis"),
+        "enrichment.kegg.v1" => language.text("KEGG 富集分析", "KEGG enrichment analysis"),
         "genome.gene-density.v1" => language.text("基因组特征密度", "Genome feature density"),
         "expression.matrix.qc.v1" => language.text("表达矩阵", "Expression matrix"),
         "expression.normalize.v1" => language.text("表达矩阵标准化", "Expression normalization"),
@@ -4219,6 +4338,17 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "annotation.sequence.extract.v1" => {
             language.text("按注释提取序列", "Annotation-guided sequence extraction")
         }
+        "annotation.go.normalize.v1" => {
+            language.text("GO 注释规范化", "GO annotation normalization")
+        }
+        "annotation.eggnog.normalize.v1" => {
+            language.text("eggNOG 注释规范化", "eggNOG annotation normalization")
+        }
+        "enrichment.overrepresentation.v1" => {
+            language.text("通用过度富集分析", "Generic over-representation analysis")
+        }
+        "enrichment.go.v1" => language.text("GO 富集分析", "GO enrichment analysis"),
+        "enrichment.kegg.v1" => language.text("KEGG 富集分析", "KEGG enrichment analysis"),
         "genome.gene-density.v1" => language.text("基因组特征密度", "Genome feature density"),
         "interval.intersect.v1" => language.text("BED 区间相交", "BED interval intersection"),
         "interval.merge.v1" => language.text("BED 区间合并", "BED interval merge"),
@@ -4349,6 +4479,36 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("annotation.sequence.extract.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/annotation.sequence.extract.v1/en-US.md"
+        )),
+        ("annotation.go.normalize.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/annotation.go.normalize.v1/zh-CN.md"
+        )),
+        ("annotation.go.normalize.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/annotation.go.normalize.v1/en-US.md"
+        )),
+        ("annotation.eggnog.normalize.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/annotation.eggnog.normalize.v1/zh-CN.md"
+        )),
+        ("annotation.eggnog.normalize.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/annotation.eggnog.normalize.v1/en-US.md"
+        )),
+        ("enrichment.overrepresentation.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/enrichment.overrepresentation.v1/zh-CN.md"
+        )),
+        ("enrichment.overrepresentation.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/enrichment.overrepresentation.v1/en-US.md"
+        )),
+        ("enrichment.go.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/enrichment.go.v1/zh-CN.md"
+        )),
+        ("enrichment.go.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/enrichment.go.v1/en-US.md"
+        )),
+        ("enrichment.kegg.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/enrichment.kegg.v1/zh-CN.md"
+        )),
+        ("enrichment.kegg.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/enrichment.kegg.v1/en-US.md"
         )),
         ("genome.gene-density.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/genome.gene-density.v1/zh-CN.md"
@@ -4942,7 +5102,7 @@ mod tests {
         generation_matches, importable_file_path, inspection_is_runnable, inspection_state,
         load_dependency_notices_from, looks_like_drive_relative_path, new_job_id,
         notice_platform_target_pair_is_valid, render_dependency_notice_report,
-        secondary_input_matches,
+        secondary_input_matches, secondary_input_role,
     };
     use linxira_bio_protocol::ExecutionMode;
     use serde_json::json;
@@ -5240,6 +5400,45 @@ mod tests {
         assert!(!capability_requires_secondary("set.venn.v1"));
         assert!(!capability_requires_secondary("set.upset.v1"));
         assert!(!capability_requires_secondary("protein.properties.v1"));
+    }
+
+    #[test]
+    fn functional_annotation_and_enrichment_routes_use_explicit_roles() {
+        for capability in [
+            "annotation.go.normalize.v1",
+            "annotation.eggnog.normalize.v1",
+        ] {
+            assert_eq!(
+                analysis_route_for_capability(capability, "tsv"),
+                Some(AnalysisRoute {
+                    capability,
+                    input_role: "annotations",
+                })
+            );
+            assert_eq!(capability_output_extension(capability), Some("tsv"));
+        }
+
+        for capability in [
+            "enrichment.overrepresentation.v1",
+            "enrichment.go.v1",
+            "enrichment.kegg.v1",
+        ] {
+            assert_eq!(
+                analysis_route_for_capability(capability, "csv"),
+                Some(AnalysisRoute {
+                    capability,
+                    input_role: "genes",
+                })
+            );
+            assert!(capability_requires_secondary(capability));
+            assert!(secondary_input_matches(capability, "csv"));
+            assert!(secondary_input_matches(capability, "tsv"));
+            assert_eq!(secondary_input_role(capability), Some("associations"));
+            assert_eq!(capability_output_extension(capability), None);
+        }
+
+        assert!(analysis_route_for_capability("annotation.go.normalize.v1", "fasta").is_none());
+        assert!(!secondary_input_matches("enrichment.go.v1", "fasta"));
     }
 
     #[test]

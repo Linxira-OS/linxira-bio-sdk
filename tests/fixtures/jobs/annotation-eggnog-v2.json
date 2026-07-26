@@ -1,0 +1,13 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-annotation-eggnog-v2",
+  "capability": "annotation.eggnog.normalize.v1",
+  "inputs": [{
+    "artifact_id": "input-annotations",
+    "role": "annotations",
+    "cardinality": "single",
+    "files": [{"file_id": "input-annotations-1", "path": "../functional/eggnog.tsv", "format": "tsv", "compression": "none", "size_bytes": 424, "sha256": "61c98ac4aacb35b428e608b8e4f12b2fe28532e4f89ca9db00eef10c8758d836"}]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/eggnog-normalized-v2.tsv"}
+}

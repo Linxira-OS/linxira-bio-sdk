@@ -1,0 +1,12 @@
+{
+  "analysis_type": "kegg",
+  "query_input_count": 4,
+  "query_mapped_count": 3,
+  "query_unmapped_count": 1,
+  "background_gene_count": 5,
+  "tested_term_count": 1,
+  "reported_term_count": 1,
+  "omitted_term_count": 0,
+  "terms": [{"term_id": "map00010", "term_name": "Pathway A", "namespace": "kegg", "overlap_count": 2, "query_gene_count": 3, "background_term_count": 3, "background_gene_count": 5, "fold_enrichment": 1.1111111111, "p_value": 0.7, "adjusted_p_value": 0.7, "overlap_genes": ["g1", "g2"]}],
+  "warnings": ["1 query identifiers were absent from the association universe"]
+}

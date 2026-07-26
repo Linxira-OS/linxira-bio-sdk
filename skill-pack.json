@@ -92,6 +92,18 @@
       ]
     },
     {
+      "id": "analyze-functional-enrichment",
+      "path": "skills/analyze-functional-enrichment",
+      "kind": "executable",
+      "capabilities": [
+        "annotation.go.normalize.v1",
+        "annotation.eggnog.normalize.v1",
+        "enrichment.overrepresentation.v1",
+        "enrichment.go.v1",
+        "enrichment.kegg.v1"
+      ]
+    },
+    {
       "id": "intersect-genomic-intervals",
       "path": "skills/intersect-genomic-intervals",
       "kind": "executable",

@@ -1,0 +1,6 @@
+query	GOs	description
+g1	GO:0000001,GO:0000002	first protein
+g2	GO:0000001	second protein
+g3	GO:0000002;GO:0000003	third protein
+g3	GO:0000003	duplicate association
+g4	-	without GO terms

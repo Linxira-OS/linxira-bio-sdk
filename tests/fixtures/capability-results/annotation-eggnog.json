@@ -1,0 +1,23 @@
+{
+  "input_row_count": 1,
+  "query_count": 1,
+  "go_association_count": 2,
+  "kegg_association_count": 2,
+  "output_path": "eggnog-normalized.tsv",
+  "records": [{
+    "query_id": "g1",
+    "seed_ortholog": "seed1",
+    "evalue": 1e-40,
+    "score": 120,
+    "orthologous_groups": ["OG1@1"],
+    "annotation_level": "Bacteria",
+    "cog_categories": ["C", "E"],
+    "description": "Example enzyme A",
+    "preferred_name": "enzA",
+    "go_terms": ["GO:0000001", "GO:0000002"],
+    "ec_numbers": ["1.1.1.1"],
+    "kegg_orthologs": ["ko:K00001"],
+    "kegg_pathways": ["map00010"]
+  }],
+  "warnings": []
+}

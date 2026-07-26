@@ -10,8 +10,8 @@ means that an analysis capability is available.
 | --- | --- | --- | --- | --- |
 | FASTA | Yes | Sequence records | `sequence.stats.v1`, `sequence.kmer.count.v1`, `primer.epcr.v1`, `variant.normalize.v1` reference, `protein.properties.v1` | Plain, gzip, and BGZF; protein properties reject gap, stop, digit, and unsupported symbols |
 | FASTQ | Yes | Read records | `fastq.qc.v1`, `fastq.trim.v1`, `fastq.adapter.v1` | QC plus FASTQ output for 3' quality trimming and adapter removal; plain, gzip, and BGZF input |
-| CSV | Yes | Parsed table | `expression.matrix.qc.v1`, `expression.normalize.v1`, `expression.pca.v1`, `expression.cluster.v1`, `expression.heatmap.v1`, `table.manipulate.v1`, `set.venn.v1`, `set.upset.v1` | Rectangular expression analysis, general table manipulation, and named-column exact set-overlap analysis |
-| TSV | Yes | Parsed table | `expression.matrix.qc.v1`, `expression.normalize.v1`, `expression.pca.v1`, `expression.cluster.v1`, `expression.heatmap.v1`, `table.manipulate.v1`, `set.venn.v1`, `set.upset.v1` | Rectangular expression analysis, row/column manipulation, and named-column exact set-overlap analysis |
+| CSV | Yes | Parsed table | `expression.matrix.qc.v1`, `expression.normalize.v1`, `expression.pca.v1`, `expression.cluster.v1`, `expression.heatmap.v1`, `table.manipulate.v1`, `set.venn.v1`, `set.upset.v1`, functional annotation normalization, and enrichment | Rectangular expression analysis, general table manipulation, named-column exact set overlap, GO/eggNOG normalization, and generic/GO/KEGG over-representation analysis |
+| TSV | Yes | Parsed table | `expression.matrix.qc.v1`, `expression.normalize.v1`, `expression.pca.v1`, `expression.cluster.v1`, `expression.heatmap.v1`, `table.manipulate.v1`, `set.venn.v1`, `set.upset.v1`, `annotation.go.normalize.v1`, `annotation.eggnog.normalize.v1`, `enrichment.overrepresentation.v1`, `enrichment.go.v1`, `enrichment.kegg.v1` | Rectangular expression analysis, row/column manipulation, named-column exact set overlap, normalized association tables, and local enrichment analysis |
 | BED | Yes | Interval rows | `interval.intersect.v1`, `interval.merge.v1`, `interval.subtract.v1` | Pairwise half-open overlap summary plus BED3 merge/subtract outputs |
 | GFF3 | Yes | Feature rows | `annotation.gxf.stats.v1`, `annotation.gxf.normalize.v1`, `annotation.gene-position.v1`, `annotation.sequence.extract.v1`, `genome.gene-density.v1` | Strict nine-column parsing, gzip input, normalization, coordinate tables, reference-guided FASTA extraction, and sliding-window feature density |
 | GTF | Yes | Feature rows | `annotation.gxf.stats.v1`, `annotation.gxf.normalize.v1`, `annotation.gene-position.v1`, `annotation.sequence.extract.v1`, `genome.gene-density.v1` | GTF attributes can be normalized to GFF3 and used for coordinate, sequence-extraction, or feature-density analysis |
@@ -33,6 +33,31 @@ Content takes precedence over a misleading filename extension. A supported
 preview is capped at 200 records or 10 MiB of uncompressed payload and is not
 proof that the remainder of a file is valid. Binary files report truncation
 against their actual payload size.
+
+## Functional Annotation And Enrichment
+
+`annotation.go.normalize.v1` accepts CSV/TSV tables, auto-detects common gene
+and GO columns or accepts explicit column names, splits multi-valued GO cells,
+deduplicates gene-term associations, and writes a stable TSV association map.
+`annotation.eggnog.normalize.v1` accepts the standard eggNOG-mapper annotation
+table and writes one deterministic normalized TSV record per query.
+
+The three enrichment capabilities take two local inputs: an identifier list as
+`genes` and a normalized association table as `associations`. The identifier
+list is deliberately narrow: one identifier per non-empty line, with an
+optional first-line header named `gene`, `gene_id`, `id`, or `identifier`.
+It is not treated as an arbitrary spreadsheet. The association table contains
+at least `gene_id` and `term_id`, with optional `term_name` and `namespace`.
+
+- `enrichment.overrepresentation.v1` tests all namespaces.
+- `enrichment.go.v1` restricts associations to the GO namespace or `GO:` terms.
+- `enrichment.kegg.v1` restricts associations to the KEGG namespace or KEGG-like terms.
+
+All three run locally with a one-sided hypergeometric upper-tail test,
+Benjamini-Hochberg correction, fold enrichment, bounded result counts, and
+explicit mapped/unmapped query accounting. They do not download ontology or
+pathway databases and do not infer an experimental background beyond the
+provided association universe.
 
 ## Result Export
 
@@ -62,6 +87,14 @@ including the header.
 可解析命中并进行双向最佳命中分析，InterProScan TSV 和 HMMER domtblout 可解析蛋白结构域，
 Newick 可统计拓扑并执行确定性的重命名、重定根和 `.nwk` 输出；BAM、BCF、CRAM、H5AD
 等二进制格式仅识别，不会伪装成可用能力。
+
+CSV/TSV 现已支持 GO 关联表规范化、标准 eggNOG-mapper 注释规范化，以及通用、GO、
+KEGG 三类本地过度富集分析。富集分析使用两份输入：`genes` 是每个非空行一个标识符的
+窄格式列表，首行只允许使用 `gene`、`gene_id`、`id` 或 `identifier` 作为可选表头；
+`associations` 至少包含 `gene_id` 和 `term_id`，还可包含 `term_name` 与 `namespace`。
+统计采用单侧超几何上尾检验、Benjamini-Hochberg 校正和富集倍数，并明确报告已映射与
+未映射查询标识符。软件不会自动下载本体或通路数据库，也不会在用户提供的关联全集之外
+推断实验背景。
 
 预览最多读取 200 条记录或 10 MiB 解压后内容。表格默认导出 CSV，也支持 TSV、
 JSON、逐行对象 JSONL 和 XLSX。需要保留 VCF、BED、GFF3 等领域语义时，应保留
