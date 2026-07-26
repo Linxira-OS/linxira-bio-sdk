@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/expression-normalization.v1.json",
+  "title": "Linxira Bio expression normalization result",
+  "type": "object",
+  "required": ["method", "feature_count", "sample_count", "pseudocount", "samples", "warnings"],
+  "properties": {
+    "method": {"enum": ["cpm", "log2-cpm", "median-ratio"]},
+    "feature_count": {"type": "integer", "minimum": 1},
+    "sample_count": {"type": "integer", "minimum": 1},
+    "pseudocount": {"type": ["number", "null"], "minimum": 0},
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sample", "input_total", "scale_factor", "output_total"],
+        "properties": {
+          "sample": {"type": "string", "minLength": 1},
+          "input_total": {"type": "number", "minimum": 0},
+          "scale_factor": {"type": "number", "exclusiveMinimum": 0},
+          "output_total": {"type": "number"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

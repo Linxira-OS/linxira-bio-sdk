@@ -95,7 +95,13 @@
       "id": "analyze-expression-matrix",
       "path": "skills/analyze-expression-matrix",
       "kind": "executable",
-      "capabilities": ["expression.matrix.qc.v1"]
+      "capabilities": [
+        "expression.matrix.qc.v1",
+        "expression.normalize.v1",
+        "expression.pca.v1",
+        "expression.cluster.v1",
+        "expression.heatmap.v1"
+      ]
     },
     {
       "id": "manipulate-bio-tables",

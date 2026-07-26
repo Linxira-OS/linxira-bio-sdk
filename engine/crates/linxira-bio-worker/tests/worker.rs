@@ -765,6 +765,48 @@ fn executes_expression_matrix_qc_job() {
     assert_eq!(result["result"]["sample_count"], 3);
 }
 
+#[test]
+fn executes_v2_expression_analysis_fixtures() {
+    let root = workspace_root();
+    let output_path = root.join("target/test-results/expression-normalize-v2.tsv");
+    std::fs::create_dir_all(output_path.parent().expect("output parent"))
+        .expect("create expression result directory");
+    if output_path.exists() {
+        std::fs::remove_file(&output_path).expect("remove stale normalized matrix");
+    }
+    let cases = [
+        ("expression-normalize-v2.json", "expression.normalize.v1"),
+        ("expression-pca-v2.json", "expression.pca.v1"),
+        ("expression-cluster-v2.json", "expression.cluster.v1"),
+        ("expression-heatmap-v2.json", "expression.heatmap.v1"),
+    ];
+    for (fixture, capability) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(root.join("tests/fixtures/jobs").join(fixture))
+            .output()
+            .unwrap_or_else(|error| panic!("run {capability}: {error}"));
+        assert!(
+            output.status.success(),
+            "{capability}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid expression result");
+        assert_eq!(result["schema_version"], "2", "{capability}");
+        assert_eq!(result["status"], "ok", "{capability}");
+        assert_eq!(result["capability"], capability, "{capability}");
+        assert_eq!(
+            result["provenance"]["input_sha256"]
+                .as_object()
+                .map(|hashes| hashes.len()),
+            Some(1),
+            "{capability}"
+        );
+    }
+    assert!(output_path.exists());
+    std::fs::remove_file(output_path).expect("remove normalized expression output");
+}
+
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/expression-cluster.v1.json",
+  "title": "Linxira Bio expression clustering result",
+  "type": "object",
+  "required": ["feature_count", "sample_count", "scaled_features", "samples", "features", "warnings"],
+  "properties": {
+    "feature_count": {"type": "integer", "minimum": 1},
+    "sample_count": {"type": "integer", "minimum": 1},
+    "scaled_features": {"type": "boolean"},
+    "samples": {"$ref": "#/$defs/axis"},
+    "features": {"$ref": "#/$defs/axis"},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "axis": {
+      "type": "object",
+      "required": ["requested_clusters", "populated_clusters", "iterations", "converged", "within_cluster_sum_squares", "cluster_sizes", "assignments"],
+      "properties": {
+        "requested_clusters": {"type": "integer", "minimum": 1},
+        "populated_clusters": {"type": "integer", "minimum": 1},
+        "iterations": {"type": "integer", "minimum": 1},
+        "converged": {"type": "boolean"},
+        "within_cluster_sum_squares": {"type": "number", "minimum": 0},
+        "cluster_sizes": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0}},
+        "assignments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["label", "cluster", "distance_to_centroid"],
+            "properties": {
+              "label": {"type": "string", "minLength": 1},
+              "cluster": {"type": "integer", "minimum": 1},
+              "distance_to_centroid": {"type": "number", "minimum": 0}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

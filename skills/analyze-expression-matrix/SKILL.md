@@ -1,12 +1,12 @@
 ---
 name: analyze-expression-matrix
-description: Validate and summarize local rectangular CSV or TSV expression matrices with the executable expression.matrix.qc.v1 capability. Use for dimensions, missingness, sparsity, duplicate features, negative values, per-sample totals, means, and detected-feature counts before downstream bulk-expression analysis.
+description: Validate, normalize, reduce, cluster, and prepare native heatmaps for local rectangular CSV or TSV bulk-expression matrices with expression.matrix.qc.v1, expression.normalize.v1, expression.pca.v1, expression.cluster.v1, and expression.heatmap.v1. Use for matrix QC, CPM or median-ratio normalization, exploratory PCA, deterministic sample or feature clustering, and clustered heatmap preparation.
 ---
 
 # Analyze Expression Matrix
 
-Run dependency-free matrix QC locally before selecting an R, Python, or native
-downstream expression workflow.
+Run deterministic Rust matrix analysis locally before selecting a statistical
+differential-expression workflow.
 
 ## Run
 
@@ -14,11 +14,23 @@ downstream expression workflow.
 2. Confirm the first column contains feature identifiers and all remaining
    columns represent samples.
 3. Run `linxira-bio expression matrix-qc <matrix.csv|tsv> --json`.
-4. Preserve the capability version, input hash, delimiter, warnings, and result.
+4. Reject or resolve missing values and duplicate feature identifiers before
+   using downstream capabilities.
+5. Select one operation:
+   - normalize: `linxira-bio expression normalize <matrix> <output.tsv>
+     --method cpm|log2-cpm|median-ratio --json`;
+   - PCA: `linxira-bio expression pca <matrix> --components 2 [--scale]
+     --json`;
+   - clustering: `linxira-bio expression cluster <matrix>
+     --sample-clusters N --feature-clusters N --json`;
+   - heatmap: `linxira-bio expression heatmap <matrix> --top-features N
+     --json`.
+6. Preserve the capability version, input hash, options, warnings, and result.
 
-For an artifact-aware agent job, invoke `expression.matrix.qc.v1` with one
-input whose role is `matrix`, format is `csv` or `tsv`, and execution mode is
-`local-cpu`.
+For an artifact-aware agent job, invoke the selected capability with one input
+whose role is `matrix`, format is `csv` or `tsv`, and execution mode is
+`local-cpu`. Normalization also requires `parameters.output` and emits a TSV
+artifact.
 
 ## Validate And Interpret
 
@@ -27,11 +39,15 @@ input whose role is `matrix`, format is `csv` or `tsv`, and execution mode is
   by limited detection, while missing values indicate absent cells.
 - Treat duplicate feature identifiers as an ambiguity requiring aggregation or
   disambiguation before model fitting.
-- Treat negative values as evidence of a transformed matrix; do not pass them
-  to raw-count methods such as DESeq2.
+- Treat negative values as evidence of a transformed matrix; normalization
+  requires non-negative input.
 - Compare per-sample totals and detected-feature counts for library-size or
   sample-quality outliers without assigning significance thresholds silently.
+- Use CPM only for library-size adjustment. Use log2-CPM for exploration and
+  retain raw counts for count-based models.
+- Treat PCA, clustering, and heatmaps as exploratory. Do not infer biological
+  groups or statistical significance from them alone.
 
-This capability performs QC only. Use a locked and validated R workflow for
-differential expression and preserve the design formula, contrasts, package
-versions, normalization, and multiple-testing method.
+Differential expression remains separate. Use a locked and validated workflow
+and preserve the design formula, contrasts, package versions, normalization,
+and multiple-testing method.

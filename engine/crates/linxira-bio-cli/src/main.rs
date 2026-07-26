@@ -11,7 +11,13 @@ use linxira_bio_core::environment::{
     EnvironmentAudit, EnvironmentMode, EnvironmentPlan, EnvironmentPlanOptions, PlanActionState,
     audit_environment, parse_environment_mode, plan_environment_with_options,
 };
-use linxira_bio_core::expression::{ExpressionMatrixQc, expression_matrix_qc_path};
+use linxira_bio_core::expression::{
+    ExpressionClusterOptions, ExpressionClusterResult, ExpressionHeatmapOptions,
+    ExpressionHeatmapResult, ExpressionMatrixQc, ExpressionNormalizeOptions, ExpressionPcaOptions,
+    ExpressionPcaResult, expression_cluster_path, expression_heatmap_path,
+    expression_matrix_qc_path, expression_pca_path, normalize_expression_matrix_path,
+    parse_expression_normalization_method,
+};
 use linxira_bio_core::fastq::{FastqQcMetrics, FastqQcOptions, QualityEncodingMode, fastq_qc_path};
 use linxira_bio_core::fastq_transform::{
     FastqAdapterOptions, FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
@@ -243,6 +249,24 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if expression == "expression" && matrix_qc == "matrix-qc" && json == "--json" =>
         {
             print_expression_matrix_qc(path, true)
+        }
+        [expression, normalize, arguments @ ..]
+            if expression == "expression" && normalize == "normalize" =>
+        {
+            print_expression_normalize(arguments)
+        }
+        [expression, pca, arguments @ ..] if expression == "expression" && pca == "pca" => {
+            print_expression_pca(arguments)
+        }
+        [expression, cluster, arguments @ ..]
+            if expression == "expression" && cluster == "cluster" =>
+        {
+            print_expression_cluster(arguments)
+        }
+        [expression, heatmap, arguments @ ..]
+            if expression == "expression" && heatmap == "heatmap" =>
+        {
+            print_expression_heatmap(arguments)
         }
         [structure, pdb, arguments @ ..] if structure == "structure" && pdb == "pdb" => {
             print_pdb_summary(arguments)
@@ -1666,6 +1690,214 @@ fn print_expression_matrix_qc_text(metrics: &ExpressionMatrixQc) {
     }
 }
 
+fn print_expression_normalize(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = ExpressionNormalizeOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--method" => {
+                index += 1;
+                options.method = parse_expression_normalization_method(
+                    arguments.get(index).ok_or("--method requires a value")?,
+                )?;
+            }
+            "--pseudocount" => {
+                index += 1;
+                options.pseudocount =
+                    parse_finite_f64(arguments.get(index), "--pseudocount", Some(0.0))?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown expression normalize option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "expression normalize")?,
+        }
+        index += 1;
+    }
+    let input = input.ok_or("expression normalize requires an input matrix path")?;
+    let output = output.ok_or("expression normalize requires an output TSV path")?;
+    let output = Path::new(output);
+    let summary = normalize_expression_matrix_path(Path::new(input), output, &options)?;
+    print_sequence_transform_result(
+        "expression-normalize",
+        "expression.normalize.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
+fn print_expression_pca(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut path = None;
+    let mut options = ExpressionPcaOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--components" => {
+                index += 1;
+                options.components = parse_sequence_usize(arguments.get(index), "--components")?;
+            }
+            "--scale" => options.scale_features = true,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown expression PCA option: {value}").into());
+            }
+            value if path.is_none() => path = Some(value),
+            value => return Err(format!("unexpected expression PCA argument: {value}").into()),
+        }
+        index += 1;
+    }
+    let path = path.ok_or("expression pca requires an input matrix path")?;
+    let result = expression_pca_path(Path::new(path), &options)?;
+    if json {
+        print_analysis_json("expression-pca", "expression.pca.v1", result)
+    } else {
+        print_expression_pca_text(&result);
+        Ok(())
+    }
+}
+
+fn print_expression_cluster(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut path = None;
+    let mut options = ExpressionClusterOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--sample-clusters" => {
+                index += 1;
+                options.sample_clusters =
+                    parse_sequence_usize(arguments.get(index), "--sample-clusters")?;
+            }
+            "--feature-clusters" => {
+                index += 1;
+                options.feature_clusters =
+                    parse_sequence_usize(arguments.get(index), "--feature-clusters")?;
+            }
+            "--max-iterations" => {
+                index += 1;
+                options.max_iterations =
+                    parse_sequence_usize(arguments.get(index), "--max-iterations")?;
+            }
+            "--no-scale" => options.scale_features = false,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown expression cluster option: {value}").into());
+            }
+            value if path.is_none() => path = Some(value),
+            value => return Err(format!("unexpected expression cluster argument: {value}").into()),
+        }
+        index += 1;
+    }
+    let path = path.ok_or("expression cluster requires an input matrix path")?;
+    let result = expression_cluster_path(Path::new(path), &options)?;
+    if json {
+        print_analysis_json("expression-cluster", "expression.cluster.v1", result)
+    } else {
+        print_expression_cluster_text(&result);
+        Ok(())
+    }
+}
+
+fn print_expression_heatmap(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut path = None;
+    let mut options = ExpressionHeatmapOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--top-features" => {
+                index += 1;
+                options.top_variable_features =
+                    parse_sequence_usize(arguments.get(index), "--top-features")?;
+            }
+            "--no-scale" => options.scale_rows = false,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown expression heatmap option: {value}").into());
+            }
+            value if path.is_none() => path = Some(value),
+            value => return Err(format!("unexpected expression heatmap argument: {value}").into()),
+        }
+        index += 1;
+    }
+    let path = path.ok_or("expression heatmap requires an input matrix path")?;
+    let result = expression_heatmap_path(Path::new(path), &options)?;
+    if json {
+        print_analysis_json("expression-heatmap", "expression.heatmap.v1", result)
+    } else {
+        print_expression_heatmap_text(&result);
+        Ok(())
+    }
+}
+
+fn parse_finite_f64(
+    value: Option<&String>,
+    option: &str,
+    minimum: Option<f64>,
+) -> Result<f64, Box<dyn Error>> {
+    let value = value.ok_or_else(|| format!("{option} requires a value"))?;
+    let parsed = value
+        .parse::<f64>()
+        .map_err(|_| format!("{option} requires a number, got {value:?}"))?;
+    if !parsed.is_finite() {
+        return Err(format!("{option} must be finite").into());
+    }
+    if minimum.is_some_and(|minimum| parsed < minimum) {
+        return Err(format!("{option} must be at least {}", minimum.unwrap_or_default()).into());
+    }
+    Ok(parsed)
+}
+
+fn print_expression_pca_text(result: &ExpressionPcaResult) {
+    println!("feature_count\t{}", result.feature_count);
+    println!("sample_count\t{}", result.sample_count);
+    println!("scaled_features\t{}", result.scaled_features);
+    println!("total_variance\t{:.6}", result.total_variance);
+    for component in &result.components {
+        println!(
+            "component\tPC{}\t{:.6}\t{:.6}",
+            component.component, component.eigenvalue, component.explained_variance_percent
+        );
+    }
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_expression_cluster_text(result: &ExpressionClusterResult) {
+    println!("feature_count\t{}", result.feature_count);
+    println!("sample_count\t{}", result.sample_count);
+    println!("scaled_features\t{}", result.scaled_features);
+    println!(
+        "sample_clusters\t{}\t{:.6}",
+        result.samples.populated_clusters, result.samples.within_cluster_sum_squares
+    );
+    println!(
+        "feature_clusters\t{}\t{:.6}",
+        result.features.populated_clusters, result.features.within_cluster_sum_squares
+    );
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_expression_heatmap_text(result: &ExpressionHeatmapResult) {
+    println!("input_feature_count\t{}", result.input_feature_count);
+    println!("selected_feature_count\t{}", result.selected_feature_count);
+    println!("sample_count\t{}", result.sample_count);
+    println!("scaled_rows\t{}", result.scaled_rows);
+    println!("minimum_value\t{:.6}", result.minimum_value);
+    println!("maximum_value\t{:.6}", result.maximum_value);
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
 fn print_pdb_summary(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     let mut path = None;
     let mut json = false;
@@ -1953,6 +2185,10 @@ fn usage() -> &'static str {
         "  linxira-bio interval merge <input.bed[.gz]> <output.bed> [--max-gap N] [--json]\n",
         "  linxira-bio interval subtract <left.bed[.gz]> <right.bed[.gz]> <output.bed> [--json]\n",
         "  linxira-bio expression matrix-qc <matrix.csv|tsv[.gz]> [--json]\n",
+        "  linxira-bio expression normalize <matrix.csv|tsv[.gz]> <output.tsv> [--method cpm|log2-cpm|median-ratio] [--pseudocount X] [--json]\n",
+        "  linxira-bio expression pca <matrix.csv|tsv[.gz]> [--components N] [--scale] [--json]\n",
+        "  linxira-bio expression cluster <matrix.csv|tsv[.gz]> [--sample-clusters N] [--feature-clusters N] [--max-iterations N] [--no-scale] [--json]\n",
+        "  linxira-bio expression heatmap <matrix.csv|tsv[.gz]> [--top-features N] [--no-scale] [--json]\n",
         "  linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> [--select-column NAME ...] [--drop-column NAME ...] [--filter-column NAME --filter-op equals|contains|non-empty [--filter-value VALUE]] [--skip-rows N] [--limit N] [--delimiter csv|tsv] [--output-delimiter csv|tsv] [--json]\n",
         "  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n",
         "  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"

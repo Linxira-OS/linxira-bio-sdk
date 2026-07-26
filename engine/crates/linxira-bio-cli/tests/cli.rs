@@ -649,6 +649,54 @@ fn summarizes_expression_matrix_as_json() {
 }
 
 #[test]
+fn runs_expression_normalization_pca_clustering_and_heatmap() {
+    let root = workspace_root();
+    let input = root.join("tests/fixtures/expression-matrix/analysis.tsv");
+    let temp = temporary_directory("expression-analysis");
+    let normalized = temp.join("normalized.tsv");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["expression", "normalize"])
+        .arg(&input)
+        .arg(&normalized)
+        .args(["--method", "log2-cpm", "--pseudocount", "1", "--json"])
+        .output()
+        .expect("run expression normalization");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid normalization result");
+    assert_eq!(result["capability"], "expression.normalize.v1");
+    assert_eq!(result["result"]["method"], "log2-cpm");
+    assert!(normalized.exists());
+
+    for (command, capability, expected_field) in [
+        ("pca", "expression.pca.v1", "components"),
+        ("cluster", "expression.cluster.v1", "samples"),
+        ("heatmap", "expression.heatmap.v1", "values"),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+            .args(["expression", command])
+            .arg(&input)
+            .arg("--json")
+            .output()
+            .unwrap_or_else(|error| panic!("run {command}: {error}"));
+        assert!(
+            output.status.success(),
+            "{command}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid expression analysis result");
+        assert_eq!(result["capability"], capability);
+        assert!(result["result"].get(expected_field).is_some());
+    }
+    fs::remove_dir_all(temp).expect("remove expression analysis directory");
+}
+
+#[test]
 fn manipulates_delimited_tables_as_json() {
     let root = workspace_root();
     let temp = temporary_directory("table-manipulate");

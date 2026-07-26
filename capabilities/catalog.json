@@ -356,6 +356,42 @@
       "output_formats": ["json"]
     },
     {
+      "id": "expression.normalize.v1",
+      "status": "available",
+      "category": "expression",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio expression normalize <matrix.csv|tsv> <output.tsv> --method cpm --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["json", "tsv"]
+    },
+    {
+      "id": "expression.pca.v1",
+      "status": "available",
+      "category": "expression",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio expression pca <matrix.csv|tsv> --components 2 --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "expression.cluster.v1",
+      "status": "available",
+      "category": "expression",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio expression cluster <matrix.csv|tsv> --sample-clusters 2 --feature-clusters 4 --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "expression.heatmap.v1",
+      "status": "available",
+      "category": "visualization",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio expression heatmap <matrix.csv|tsv> --top-features 50 --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["json"]
+    },
+    {
       "id": "protein.af2.predict.v1",
       "status": "planned",
       "category": "structural-biology",

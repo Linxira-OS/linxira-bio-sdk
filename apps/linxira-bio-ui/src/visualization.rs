@@ -20,6 +20,13 @@ struct LineSeries {
     points: Vec<(f64, f64)>,
 }
 
+#[derive(Clone)]
+struct ScatterPoint {
+    label: String,
+    x: f64,
+    y: f64,
+}
+
 enum ChartSpec {
     Bars {
         title: String,
@@ -30,6 +37,20 @@ enum ChartSpec {
         title: String,
         series: Vec<LineSeries>,
         percent: bool,
+    },
+    Scatter {
+        title: String,
+        x_label: String,
+        y_label: String,
+        points: Vec<ScatterPoint>,
+    },
+    Heatmap {
+        title: String,
+        row_labels: Vec<String>,
+        column_labels: Vec<String>,
+        values: Vec<Vec<f64>>,
+        minimum: f64,
+        maximum: f64,
     },
 }
 
@@ -60,6 +81,28 @@ pub fn show_analysis_charts(
                 series,
                 percent,
             } => show_line_chart(ui, title, series, *percent, zh_cn),
+            ChartSpec::Scatter {
+                title,
+                x_label,
+                y_label,
+                points,
+            } => show_scatter_chart(ui, title, x_label, y_label, points),
+            ChartSpec::Heatmap {
+                title,
+                row_labels,
+                column_labels,
+                values,
+                minimum,
+                maximum,
+            } => show_heatmap(
+                ui,
+                title,
+                row_labels,
+                column_labels,
+                values,
+                *minimum,
+                *maximum,
+            ),
         }
     }
     true
@@ -78,6 +121,10 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         "interval.merge.v1" => interval_merge_charts(payload, zh_cn),
         "interval.subtract.v1" => interval_subtract_charts(payload, zh_cn),
         "expression.matrix.qc.v1" => expression_charts(payload, zh_cn),
+        "expression.normalize.v1" => expression_normalization_charts(payload, zh_cn),
+        "expression.pca.v1" => expression_pca_charts(payload, zh_cn),
+        "expression.cluster.v1" => expression_cluster_charts(payload, zh_cn),
+        "expression.heatmap.v1" => expression_heatmap_charts(payload, zh_cn),
         "table.manipulate.v1" => table_manipulate_charts(payload, zh_cn),
         "variant.stats.v1" => variant_charts(payload, zh_cn),
         "variant.filter.v1" => variant_filter_charts(payload, zh_cn),
@@ -446,6 +493,184 @@ fn expression_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
         ],
         false,
     )
+}
+
+fn expression_normalization_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let mut input_totals = Vec::new();
+    let mut output_totals = Vec::new();
+    let mut scale_factors = Vec::new();
+    for sample in payload
+        .get("samples")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let Some(label) = sample.get("sample").and_then(Value::as_str) else {
+            continue;
+        };
+        if let Some(value) = number(sample, "input_total") {
+            input_totals.push(BarValue {
+                label: label.to_owned(),
+                value,
+            });
+        }
+        if let Some(value) = number(sample, "output_total") {
+            output_totals.push(BarValue {
+                label: label.to_owned(),
+                value,
+            });
+        }
+        if let Some(value) = number(sample, "scale_factor") {
+            scale_factors.push(BarValue {
+                label: label.to_owned(),
+                value,
+            });
+        }
+    }
+    sort_and_limit(&mut input_totals, 20);
+    sort_and_limit(&mut output_totals, 20);
+    sort_and_limit(&mut scale_factors, 20);
+    bar_specs(
+        [
+            (
+                localized(zh_cn, "标准化前样本总量", "Input sample totals"),
+                input_totals,
+            ),
+            (
+                localized(zh_cn, "标准化后样本总量", "Output sample totals"),
+                output_totals,
+            ),
+            (
+                localized(zh_cn, "样本缩放因子", "Sample scale factors"),
+                scale_factors,
+            ),
+        ],
+        false,
+    )
+}
+
+fn expression_pca_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let mut charts = Vec::new();
+    let variance = payload
+        .get("components")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|component| {
+            Some(BarValue {
+                label: format!("PC{}", component.get("component")?.as_u64()?),
+                value: number(component, "explained_variance_percent")?,
+            })
+        })
+        .collect::<Vec<_>>();
+    if !variance.is_empty() {
+        charts.push(ChartSpec::Bars {
+            title: localized(zh_cn, "主成分解释方差", "Explained variance by component").to_owned(),
+            values: variance,
+            percent: true,
+        });
+    }
+    let points = payload
+        .get("samples")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|sample| {
+            let scores = sample.get("scores")?.as_array()?;
+            Some(ScatterPoint {
+                label: sample.get("sample")?.as_str()?.to_owned(),
+                x: scores.first()?.as_f64()?,
+                y: scores.get(1)?.as_f64()?,
+            })
+        })
+        .collect::<Vec<_>>();
+    if !points.is_empty() {
+        charts.push(ChartSpec::Scatter {
+            title: localized(zh_cn, "样本 PCA", "Sample PCA").to_owned(),
+            x_label: "PC1".to_owned(),
+            y_label: "PC2".to_owned(),
+            points,
+        });
+    }
+    charts
+}
+
+fn expression_cluster_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let cluster_sizes = |axis: &str| {
+        payload
+            .get(axis)
+            .and_then(|axis| axis.get("cluster_sizes"))
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .enumerate()
+            .filter_map(|(index, value)| {
+                Some(BarValue {
+                    label: format!("C{}", index + 1),
+                    value: value.as_f64()?,
+                })
+            })
+            .collect::<Vec<_>>()
+    };
+    bar_specs(
+        [
+            (
+                localized(zh_cn, "样本簇大小", "Sample cluster sizes"),
+                cluster_sizes("samples"),
+            ),
+            (
+                localized(zh_cn, "特征簇大小", "Feature cluster sizes"),
+                cluster_sizes("features"),
+            ),
+        ],
+        false,
+    )
+}
+
+fn expression_heatmap_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let row_labels = payload
+        .get("row_labels")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|value| value.as_str().map(str::to_owned))
+        .collect::<Vec<_>>();
+    let column_labels = payload
+        .get("column_labels")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|value| value.as_str().map(str::to_owned))
+        .collect::<Vec<_>>();
+    let values = payload
+        .get("values")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|row| {
+            row.as_array()?
+                .iter()
+                .map(Value::as_f64)
+                .collect::<Option<Vec<_>>>()
+        })
+        .collect::<Vec<_>>();
+    let minimum = number(payload, "minimum_value").unwrap_or(-1.0);
+    let maximum = number(payload, "maximum_value").unwrap_or(1.0);
+    if row_labels.is_empty()
+        || column_labels.is_empty()
+        || values.len() != row_labels.len()
+        || values.iter().any(|row| row.len() != column_labels.len())
+    {
+        return Vec::new();
+    }
+    vec![ChartSpec::Heatmap {
+        title: localized(zh_cn, "聚类表达热图", "Clustered expression heatmap").to_owned(),
+        row_labels,
+        column_labels,
+        values,
+        minimum,
+        maximum,
+    }]
 }
 
 fn table_manipulate_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
@@ -1065,6 +1290,228 @@ fn line_series_shape(points: Vec<egui::Pos2>, color: egui::Color32) -> Option<eg
     }
 }
 
+fn show_scatter_chart(
+    ui: &mut egui::Ui,
+    title: &str,
+    x_label: &str,
+    y_label: &str,
+    points: &[ScatterPoint],
+) {
+    ui.label(egui::RichText::new(title).strong());
+    if points.is_empty() {
+        return;
+    }
+    let desired = egui::vec2(ui.available_width().min(760.0), 340.0);
+    let (rect, response) = ui.allocate_exact_size(desired, egui::Sense::hover());
+    let plot = egui::Rect::from_min_max(
+        egui::pos2(rect.left() + 52.0, rect.top() + 16.0),
+        egui::pos2(rect.right() - 16.0, rect.bottom() - 38.0),
+    );
+    let painter = ui.painter_at(rect);
+    let x_min = points
+        .iter()
+        .map(|point| point.x)
+        .min_by(f64::total_cmp)
+        .unwrap_or(0.0);
+    let x_max = points
+        .iter()
+        .map(|point| point.x)
+        .max_by(f64::total_cmp)
+        .unwrap_or(1.0);
+    let y_min = points
+        .iter()
+        .map(|point| point.y)
+        .min_by(f64::total_cmp)
+        .unwrap_or(0.0);
+    let y_max = points
+        .iter()
+        .map(|point| point.y)
+        .max_by(f64::total_cmp)
+        .unwrap_or(1.0);
+    let x_padding = ((x_max - x_min).abs() * 0.08).max(1e-9);
+    let y_padding = ((y_max - y_min).abs() * 0.08).max(1e-9);
+    let x_low = x_min - x_padding;
+    let x_high = x_max + x_padding;
+    let y_low = y_min - y_padding;
+    let y_high = y_max + y_padding;
+    let grid = ui.visuals().widgets.noninteractive.bg_stroke.color;
+    for step in 0..=4 {
+        let fraction = step as f32 / 4.0;
+        let x = egui::lerp(plot.left()..=plot.right(), fraction);
+        let y = egui::lerp(plot.bottom()..=plot.top(), fraction);
+        painter.line_segment(
+            [egui::pos2(x, plot.top()), egui::pos2(x, plot.bottom())],
+            egui::Stroke::new(0.7, grid),
+        );
+        painter.line_segment(
+            [egui::pos2(plot.left(), y), egui::pos2(plot.right(), y)],
+            egui::Stroke::new(0.7, grid),
+        );
+    }
+    painter.text(
+        egui::pos2(plot.center().x, rect.bottom()),
+        egui::Align2::CENTER_BOTTOM,
+        x_label,
+        egui::FontId::proportional(11.0),
+        ui.visuals().text_color(),
+    );
+    painter.text(
+        egui::pos2(rect.left(), plot.center().y),
+        egui::Align2::LEFT_CENTER,
+        y_label,
+        egui::FontId::proportional(11.0),
+        ui.visuals().text_color(),
+    );
+
+    let to_screen = |point: &ScatterPoint| {
+        egui::pos2(
+            plot.left() + plot.width() * ((point.x - x_low) / (x_high - x_low)) as f32,
+            plot.bottom() - plot.height() * ((point.y - y_low) / (y_high - y_low)) as f32,
+        )
+    };
+    let hover = response.hover_pos();
+    let mut hovered = None;
+    for point in points {
+        let position = to_screen(point);
+        painter.circle_filled(position, 4.2, GREEN);
+        if hover.is_some_and(|hover| hover.distance(position) <= 8.0) {
+            hovered = Some((point, position));
+        }
+    }
+    if let Some((point, position)) = hovered {
+        painter.text(
+            position + egui::vec2(7.0, -7.0),
+            egui::Align2::LEFT_BOTTOM,
+            format!("{} ({:.3}, {:.3})", point.label, point.x, point.y),
+            egui::FontId::monospace(10.0),
+            ui.visuals().text_color(),
+        );
+    }
+    response.on_hover_cursor(egui::CursorIcon::Crosshair);
+}
+
+#[allow(clippy::too_many_arguments)]
+fn show_heatmap(
+    ui: &mut egui::Ui,
+    title: &str,
+    row_labels: &[String],
+    column_labels: &[String],
+    values: &[Vec<f64>],
+    minimum: f64,
+    maximum: f64,
+) {
+    ui.label(egui::RichText::new(title).strong());
+    if row_labels.is_empty() || column_labels.is_empty() {
+        return;
+    }
+    let desired = egui::vec2(ui.available_width().min(900.0), 430.0);
+    let (rect, response) = ui.allocate_exact_size(desired, egui::Sense::hover());
+    let plot = egui::Rect::from_min_max(
+        egui::pos2(rect.left() + 105.0, rect.top() + 42.0),
+        egui::pos2(rect.right() - 18.0, rect.bottom() - 18.0),
+    );
+    let painter = ui.painter_at(rect);
+    let cell_width = plot.width() / column_labels.len() as f32;
+    let cell_height = plot.height() / row_labels.len() as f32;
+    for (row_index, row) in values.iter().enumerate() {
+        for (column_index, value) in row.iter().enumerate() {
+            let cell = egui::Rect::from_min_max(
+                egui::pos2(
+                    plot.left() + column_index as f32 * cell_width,
+                    plot.top() + row_index as f32 * cell_height,
+                ),
+                egui::pos2(
+                    plot.left() + (column_index + 1) as f32 * cell_width,
+                    plot.top() + (row_index + 1) as f32 * cell_height,
+                ),
+            );
+            painter.rect_filled(cell, 0.0, heatmap_color(*value, minimum, maximum));
+        }
+    }
+    painter.rect_stroke(
+        plot,
+        0.0,
+        egui::Stroke::new(1.0, ui.visuals().text_color()),
+        egui::StrokeKind::Inside,
+    );
+    let row_step = row_labels.len().div_ceil(20).max(1);
+    for (index, label) in row_labels.iter().enumerate().step_by(row_step) {
+        painter.text(
+            egui::pos2(
+                plot.left() - 5.0,
+                plot.top() + (index as f32 + 0.5) * cell_height,
+            ),
+            egui::Align2::RIGHT_CENTER,
+            shorten_label(label, 15),
+            egui::FontId::monospace(9.0),
+            ui.visuals().text_color(),
+        );
+    }
+    let column_step = column_labels.len().div_ceil(12).max(1);
+    for (index, label) in column_labels.iter().enumerate().step_by(column_step) {
+        painter.text(
+            egui::pos2(
+                plot.left() + (index as f32 + 0.5) * cell_width,
+                plot.top() - 5.0,
+            ),
+            egui::Align2::CENTER_BOTTOM,
+            shorten_label(label, 10),
+            egui::FontId::monospace(9.0),
+            ui.visuals().text_color(),
+        );
+    }
+    if let Some(pointer) = response
+        .hover_pos()
+        .filter(|pointer| plot.contains(*pointer))
+    {
+        let column = (((pointer.x - plot.left()) / cell_width).floor() as usize)
+            .min(column_labels.len() - 1);
+        let row =
+            (((pointer.y - plot.top()) / cell_height).floor() as usize).min(row_labels.len() - 1);
+        painter.text(
+            pointer + egui::vec2(8.0, -8.0),
+            egui::Align2::LEFT_BOTTOM,
+            format!(
+                "{} × {}: {:.4}",
+                row_labels[row], column_labels[column], values[row][column]
+            ),
+            egui::FontId::monospace(10.0),
+            ui.visuals().text_color(),
+        );
+    }
+    response.on_hover_cursor(egui::CursorIcon::Crosshair);
+}
+
+fn heatmap_color(value: f64, minimum: f64, maximum: f64) -> egui::Color32 {
+    let negative_extent = minimum.abs().max(1e-12);
+    let positive_extent = maximum.abs().max(1e-12);
+    let intensity = if value < 0.0 {
+        (value.abs() / negative_extent).clamp(0.0, 1.0)
+    } else {
+        (value / positive_extent).clamp(0.0, 1.0)
+    } as f32;
+    let white = egui::Rgba::from_rgb(0.97, 0.97, 0.96);
+    let target = if value < 0.0 {
+        egui::Rgba::from_rgb(0.18, 0.42, 0.72)
+    } else {
+        egui::Rgba::from_rgb(0.78, 0.23, 0.20)
+    };
+    egui::Color32::from(egui::lerp(white..=target, intensity))
+}
+
+fn shorten_label(label: &str, maximum: usize) -> String {
+    if label.chars().count() <= maximum {
+        label.to_owned()
+    } else {
+        let mut shortened = label
+            .chars()
+            .take(maximum.saturating_sub(1))
+            .collect::<String>();
+        shortened.push('…');
+        shortened
+    }
+}
+
 fn number(value: &Value, key: &str) -> Option<f64> {
     value.get(key).and_then(Value::as_f64)
 }
@@ -1226,6 +1673,34 @@ mod tests {
             panic!("expected sample bar chart");
         };
         assert_eq!(values[0].label, "b");
+    }
+
+    #[test]
+    fn expression_pca_and_heatmap_build_native_chart_specs() {
+        let pca = json!({
+            "components": [
+                {"component": 1, "explained_variance_percent": 80.0},
+                {"component": 2, "explained_variance_percent": 15.0}
+            ],
+            "samples": [
+                {"sample": "a", "scores": [-2.0, 0.5]},
+                {"sample": "b", "scores": [2.0, -0.5]}
+            ]
+        });
+        let charts = chart_specs(&pca, Some("expression.pca.v1"), false);
+        assert_eq!(charts.len(), 2);
+        assert!(matches!(charts[1], ChartSpec::Scatter { .. }));
+
+        let heatmap = json!({
+            "row_labels": ["g1", "g2"],
+            "column_labels": ["s1", "s2"],
+            "values": [[-1.0, 1.0], [1.0, -1.0]],
+            "minimum_value": -1.0,
+            "maximum_value": 1.0
+        });
+        let charts = chart_specs(&heatmap, Some("expression.heatmap.v1"), true);
+        assert_eq!(charts.len(), 1);
+        assert!(matches!(charts[0], ChartSpec::Heatmap { .. }));
     }
 
     #[test]

@@ -277,6 +277,10 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "interval.merge.v1",
     "interval.subtract.v1",
     "expression.matrix.qc.v1",
+    "expression.normalize.v1",
+    "expression.pca.v1",
+    "expression.cluster.v1",
+    "expression.heatmap.v1",
     "variant.stats.v1",
     "variant.filter.v1",
     "variant.normalize.v1",
@@ -314,6 +318,15 @@ struct BioApp {
     variant_filter_min_qual: f64,
     variant_filter_pass_only: bool,
     variant_filter_min_dp: u64,
+    expression_normalization_method: String,
+    expression_pseudocount: f64,
+    expression_pca_components: usize,
+    expression_pca_scale: bool,
+    expression_sample_clusters: usize,
+    expression_feature_clusters: usize,
+    expression_cluster_scale: bool,
+    expression_heatmap_top_features: usize,
+    expression_heatmap_scale: bool,
     interpret_pdb_b_factors_as_plddt: bool,
     job_history: Vec<JobRecord>,
     analysis_job_id: Option<String>,
@@ -366,6 +379,15 @@ impl BioApp {
             variant_filter_min_qual: 20.0,
             variant_filter_pass_only: true,
             variant_filter_min_dp: 0,
+            expression_normalization_method: "cpm".to_owned(),
+            expression_pseudocount: 1.0,
+            expression_pca_components: 2,
+            expression_pca_scale: false,
+            expression_sample_clusters: 2,
+            expression_feature_clusters: 4,
+            expression_cluster_scale: true,
+            expression_heatmap_top_features: 50,
+            expression_heatmap_scale: true,
             interpret_pdb_b_factors_as_plddt: false,
             job_history: Vec::new(),
             analysis_job_id: None,
@@ -774,7 +796,37 @@ impl BioApp {
                     );
                 }
             }
+            if route.capability == "expression.normalize.v1" {
+                parameters.insert(
+                    "method".to_owned(),
+                    Value::String(self.expression_normalization_method.clone()),
+                );
+                parameters.insert(
+                    "pseudocount".to_owned(),
+                    serde_json::json!(self.expression_pseudocount),
+                );
+            }
             request.parameters = Value::Object(parameters);
+        }
+        if route.capability == "expression.pca.v1" {
+            request.parameters = serde_json::json!({
+                "components": self.expression_pca_components,
+                "scale_features": self.expression_pca_scale,
+            });
+        }
+        if route.capability == "expression.cluster.v1" {
+            request.parameters = serde_json::json!({
+                "sample_clusters": self.expression_sample_clusters,
+                "feature_clusters": self.expression_feature_clusters,
+                "max_iterations": 100,
+                "scale_features": self.expression_cluster_scale,
+            });
+        }
+        if route.capability == "expression.heatmap.v1" {
+            request.parameters = serde_json::json!({
+                "top_variable_features": self.expression_heatmap_top_features,
+                "scale_rows": self.expression_heatmap_scale,
+            });
         }
         if route.capability == "structure.pdb.summary.v1" {
             request.parameters = serde_json::json!({
@@ -1553,6 +1605,10 @@ impl BioApp {
                     "interval.merge.v1",
                     "interval.subtract.v1",
                     "expression.matrix.qc.v1",
+                    "expression.normalize.v1",
+                    "expression.pca.v1",
+                    "expression.cluster.v1",
+                    "expression.heatmap.v1",
                     "table.manipulate.v1",
                     "structure.pdb.summary.v1",
                 ] {
@@ -1694,6 +1750,62 @@ impl BioApp {
                 ui.checkbox(&mut self.variant_filter_pass_only, pass_only_label);
                 ui.label(self.text("最低 INFO/DP（0=不限制）", "Minimum INFO/DP (0=off)"));
                 ui.add(egui::DragValue::new(&mut self.variant_filter_min_dp));
+            });
+        }
+        if self.selected_capability == "expression.normalize.v1" {
+            ui.add_space(8.0);
+            let method_label = self.text("标准化方法", "Normalization method");
+            ui.horizontal(|ui| {
+                ui.label(method_label);
+                egui::ComboBox::from_id_salt("expression-normalization-method")
+                    .selected_text(&self.expression_normalization_method)
+                    .show_ui(ui, |ui| {
+                        for method in ["cpm", "log2-cpm", "median-ratio"] {
+                            ui.selectable_value(
+                                &mut self.expression_normalization_method,
+                                method.to_owned(),
+                                method,
+                            );
+                        }
+                    });
+                if self.expression_normalization_method == "log2-cpm" {
+                    ui.label(self.text("伪计数", "Pseudocount"));
+                    ui.add(
+                        egui::DragValue::new(&mut self.expression_pseudocount)
+                            .range(0.0..=1_000_000.0),
+                    );
+                }
+            });
+        }
+        if self.selected_capability == "expression.pca.v1" {
+            ui.add_space(8.0);
+            let scale_label = self.text("按特征标准化", "Scale features");
+            ui.horizontal(|ui| {
+                ui.label(self.text("主成分数", "Components"));
+                ui.add(egui::DragValue::new(&mut self.expression_pca_components).range(1..=50));
+                ui.checkbox(&mut self.expression_pca_scale, scale_label);
+            });
+        }
+        if self.selected_capability == "expression.cluster.v1" {
+            ui.add_space(8.0);
+            let scale_label = self.text("按特征标准化", "Scale features");
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("样本簇", "Sample clusters"));
+                ui.add(egui::DragValue::new(&mut self.expression_sample_clusters).range(1..=100));
+                ui.label(self.text("特征簇", "Feature clusters"));
+                ui.add(egui::DragValue::new(&mut self.expression_feature_clusters).range(1..=100));
+                ui.checkbox(&mut self.expression_cluster_scale, scale_label);
+            });
+        }
+        if self.selected_capability == "expression.heatmap.v1" {
+            ui.add_space(8.0);
+            let scale_label = self.text("按行 z-score", "Row z-score");
+            ui.horizontal(|ui| {
+                ui.label(self.text("高变特征数", "Top variable features"));
+                ui.add(
+                    egui::DragValue::new(&mut self.expression_heatmap_top_features).range(1..=200),
+                );
+                ui.checkbox(&mut self.expression_heatmap_scale, scale_label);
             });
         }
         if self.selected_capability == "structure.pdb.summary.v1" {
@@ -2418,8 +2530,21 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             capability: "interval.subtract.v1",
             input_role: "left-bed",
         }),
-        ("expression.matrix.qc.v1", "csv" | "tsv") => Some(AnalysisRoute {
-            capability: "expression.matrix.qc.v1",
+        (
+            "expression.matrix.qc.v1"
+            | "expression.normalize.v1"
+            | "expression.pca.v1"
+            | "expression.cluster.v1"
+            | "expression.heatmap.v1",
+            "csv" | "tsv",
+        ) => Some(AnalysisRoute {
+            capability: match capability {
+                "expression.matrix.qc.v1" => "expression.matrix.qc.v1",
+                "expression.normalize.v1" => "expression.normalize.v1",
+                "expression.pca.v1" => "expression.pca.v1",
+                "expression.cluster.v1" => "expression.cluster.v1",
+                _ => "expression.heatmap.v1",
+            },
             input_role: "matrix",
         }),
         ("table.manipulate.v1", "csv" | "tsv") => Some(AnalysisRoute {
@@ -2477,6 +2602,7 @@ fn capability_output_extension(capability: &str) -> Option<&'static str> {
         "annotation.gene-position.v1" => Some("tsv"),
         "annotation.sequence.extract.v1" => Some("fasta"),
         "sequence.kmer.count.v1" | "primer.epcr.v1" => Some("tsv"),
+        "expression.normalize.v1" => Some("tsv"),
         "variant.filter.v1" | "variant.normalize.v1" => Some("vcf"),
         _ => None,
     }
@@ -3108,6 +3234,10 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
             language.text("按注释提取序列", "Annotation-guided extraction")
         }
         "expression.matrix.qc.v1" => language.text("表达矩阵", "Expression matrix"),
+        "expression.normalize.v1" => language.text("表达矩阵标准化", "Expression normalization"),
+        "expression.pca.v1" => language.text("表达矩阵 PCA", "Expression PCA"),
+        "expression.cluster.v1" => language.text("表达矩阵聚类", "Expression clustering"),
+        "expression.heatmap.v1" => language.text("聚类表达热图", "Clustered expression heatmap"),
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
         _ => language.text("未知能力", "Unknown capability"),
@@ -3583,6 +3713,37 @@ fn metric_label(key: &str, language: Language) -> &str {
         "zero_percent" => "零值百分比",
         "duplicate_feature_id_count" => "重复特征标识数",
         "samples" => "各样本指标",
+        "method" => "方法",
+        "pseudocount" => "伪计数",
+        "input_total" => "输入总量",
+        "output_total" => "输出总量",
+        "scale_factor" => "缩放因子",
+        "scaled_features" => "已按特征标准化",
+        "total_variance" => "总方差",
+        "components" => "主成分",
+        "component" => "主成分编号",
+        "eigenvalue" => "特征值",
+        "explained_variance_percent" => "解释方差百分比",
+        "top_positive_loadings" => "最强正载荷",
+        "top_negative_loadings" => "最强负载荷",
+        "scores" => "主成分得分",
+        "features" => "各特征聚类",
+        "requested_clusters" => "请求簇数",
+        "populated_clusters" => "非空簇数",
+        "iterations" => "迭代次数",
+        "converged" => "已收敛",
+        "within_cluster_sum_squares" => "簇内平方和",
+        "cluster_sizes" => "各簇大小",
+        "assignments" => "聚类分配",
+        "distance_to_centroid" => "到质心距离",
+        "input_feature_count" => "输入特征数",
+        "selected_feature_count" => "所选特征数",
+        "scaled_rows" => "已按行标准化",
+        "minimum_value" => "最小值",
+        "maximum_value" => "最大值",
+        "row_labels" => "行标签",
+        "column_labels" => "列标签",
+        "values" => "热图数值",
         "input_rows" => "输入行数",
         "output_rows" => "输出行数",
         "skipped_rows" => "跳过行数",
@@ -3683,6 +3844,10 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "expression.matrix.qc.v1" => {
             language.text("表达矩阵质量控制", "Expression matrix quality control")
         }
+        "expression.normalize.v1" => language.text("表达矩阵标准化", "Expression normalization"),
+        "expression.pca.v1" => language.text("表达矩阵 PCA", "Expression PCA"),
+        "expression.cluster.v1" => language.text("表达矩阵聚类", "Expression clustering"),
+        "expression.heatmap.v1" => language.text("聚类表达热图", "Clustered expression heatmap"),
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "variant.stats.v1" => language.text("VCF 变异统计", "VCF variant statistics"),
         "variant.filter.v1" => language.text("VCF 基础过滤", "Basic VCF filtering"),
@@ -3808,6 +3973,30 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("expression.matrix.qc.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/expression.matrix.qc.v1/en-US.md"
+        )),
+        ("expression.normalize.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/expression.normalize.v1/zh-CN.md"
+        )),
+        ("expression.normalize.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/expression.normalize.v1/en-US.md"
+        )),
+        ("expression.pca.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/expression.pca.v1/zh-CN.md"
+        )),
+        ("expression.pca.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/expression.pca.v1/en-US.md"
+        )),
+        ("expression.cluster.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/expression.cluster.v1/zh-CN.md"
+        )),
+        ("expression.cluster.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/expression.cluster.v1/en-US.md"
+        )),
+        ("expression.heatmap.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/expression.heatmap.v1/zh-CN.md"
+        )),
+        ("expression.heatmap.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/expression.heatmap.v1/en-US.md"
         )),
         ("variant.stats.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/variant.stats.v1/zh-CN.md"

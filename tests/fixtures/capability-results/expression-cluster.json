@@ -1,0 +1,30 @@
+{
+  "feature_count": 2,
+  "sample_count": 2,
+  "scaled_features": true,
+  "samples": {
+    "requested_clusters": 2,
+    "populated_clusters": 2,
+    "iterations": 2,
+    "converged": true,
+    "within_cluster_sum_squares": 0.0,
+    "cluster_sizes": [1, 1],
+    "assignments": [
+      {"label": "s1", "cluster": 1, "distance_to_centroid": 0.0},
+      {"label": "s2", "cluster": 2, "distance_to_centroid": 0.0}
+    ]
+  },
+  "features": {
+    "requested_clusters": 2,
+    "populated_clusters": 2,
+    "iterations": 2,
+    "converged": true,
+    "within_cluster_sum_squares": 0.0,
+    "cluster_sizes": [1, 1],
+    "assignments": [
+      {"label": "gene_a", "cluster": 1, "distance_to_centroid": 0.0},
+      {"label": "gene_b", "cluster": 2, "distance_to_centroid": 0.0}
+    ]
+  },
+  "warnings": []
+}
