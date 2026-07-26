@@ -1,0 +1,11 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-reciprocal-best-hits-v2",
+  "capability": "similarity.reciprocal.v1",
+  "inputs": [
+    {"artifact_id": "input-forward", "role": "forward", "cardinality": "single", "files": [{"file_id": "input-forward-1", "path": "../similarity/forward.tsv", "format": "blast-tabular", "compression": "none", "size_bytes": 149, "sha256": "1185ffec63b16d745a09e40fcb8427d1ac7fe49eb0aa97c482f36f65fd10381f"}]},
+    {"artifact_id": "input-reverse", "role": "reverse", "cardinality": "single", "files": [{"file_id": "input-reverse-1", "path": "../similarity/reverse.tsv", "format": "blast-tabular", "compression": "none", "size_bytes": 148, "sha256": "8eb6f4f5c3744604bb8799e62214166e1cac3401ea2cc94eedc5b9c25527fae7"}]}
+  ],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"max_evalue": 0.00001, "min_identity_percent": 70.0}
+}

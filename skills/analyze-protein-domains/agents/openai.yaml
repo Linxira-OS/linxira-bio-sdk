@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Protein Domains"
+  short_description: "Parse local protein domain annotation results"
+  default_prompt: "Use $analyze-protein-domains to parse and validate local protein domain result files."

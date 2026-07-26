@@ -11,7 +11,7 @@
       "enum": [
         "fasta", "fastq", "csv", "tsv", "bed", "gff3", "gtf", "vcf",
         "sam", "bam", "bcf", "cram", "genbank", "embl", "h5ad", "loom", "hdf5",
-        "rds", "pdb", "mmcif", "xlsx", "json", "jsonl", "parquet", "zip",
+        "rds", "pdb", "mmcif", "blast-tabular", "blast-xml", "protein-domains", "newick", "xlsx", "json", "jsonl", "parquet", "zip",
         "unknown"
       ]
     },

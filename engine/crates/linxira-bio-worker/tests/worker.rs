@@ -960,6 +960,86 @@ fn executes_v2_expression_analysis_fixtures() {
     std::fs::remove_file(output_path).expect("remove normalized expression output");
 }
 
+#[test]
+fn executes_similarity_domain_density_and_tree_v2_fixtures() {
+    let root = workspace_root();
+    let tree_output = root.join("target/test-results/phylogeny-tree-v2.nwk");
+    std::fs::create_dir_all(tree_output.parent().expect("tree output parent"))
+        .expect("create tree output directory");
+    if tree_output.exists() {
+        std::fs::remove_file(&tree_output).expect("remove stale tree output");
+    }
+
+    let cases = [
+        (
+            "blast-parse-v2.json",
+            "similarity.blast.parse.v1",
+            "record_count",
+            3,
+            1,
+        ),
+        (
+            "reciprocal-best-hits-v2.json",
+            "similarity.reciprocal.v1",
+            "reciprocal_pair_count",
+            2,
+            2,
+        ),
+        (
+            "protein-domain-parse-v2.json",
+            "protein.domain.parse.v1",
+            "hit_count",
+            3,
+            1,
+        ),
+        (
+            "gene-density-v2.json",
+            "genome.gene-density.v1",
+            "selected_feature_count",
+            2,
+            1,
+        ),
+        (
+            "phylogeny-tree-v2.json",
+            "phylogeny.tree.transform.v1",
+            "leaf_count",
+            4,
+            1,
+        ),
+    ];
+
+    for (fixture, capability, field, expected, expected_hashes) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(root.join("tests/fixtures/jobs").join(fixture))
+            .output()
+            .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
+        assert!(
+            output.status.success(),
+            "{fixture}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid analysis result");
+        assert_eq!(result["schema_version"], "2", "{fixture}");
+        assert_eq!(result["status"], "ok", "{fixture}");
+        assert_eq!(result["capability"], capability, "{fixture}");
+        assert_eq!(result["result"][field], expected, "{fixture}");
+        assert_eq!(
+            result["provenance"]["input_sha256"]
+                .as_object()
+                .map(serde_json::Map::len),
+            Some(expected_hashes),
+            "{fixture}"
+        );
+    }
+
+    assert!(tree_output.exists());
+    let tree_text = std::fs::read_to_string(&tree_output).expect("read transformed tree");
+    assert!(tree_text.contains("sampleA"));
+    assert_eq!(tree_text.matches(';').count(), 1);
+    std::fs::remove_file(tree_output).expect("remove transformed tree output");
+}
+
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")

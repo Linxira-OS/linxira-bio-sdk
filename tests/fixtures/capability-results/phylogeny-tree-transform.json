@@ -1,0 +1,10 @@
+{
+  "leaf_count": 4,
+  "internal_node_count": 4,
+  "max_depth": 4,
+  "total_branch_length": 2.1,
+  "rerooted": true,
+  "relabeled_count": 0,
+  "output": "tree-transformed.nwk",
+  "warnings": []
+}

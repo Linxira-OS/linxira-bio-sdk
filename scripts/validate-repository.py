@@ -38,6 +38,7 @@ except KeyError as error:
 
 SCHEMA_FILES = (
     "schemas/alignment-qc.schema.json",
+    "schemas/blast-parse.schema.json",
     "schemas/analysis-result-v2.schema.json",
     "schemas/analysis-result.schema.json",
     "schemas/artifact.schema.json",
@@ -50,10 +51,14 @@ SCHEMA_FILES = (
     "schemas/expression-matrix-qc.schema.json",
     "schemas/expression-normalization.schema.json",
     "schemas/expression-pca.schema.json",
+    "schemas/gene-density.schema.json",
     "schemas/interval-intersect.schema.json",
     "schemas/job-request-v2.schema.json",
     "schemas/job-request.schema.json",
+    "schemas/phylogeny-tree-transform.schema.json",
+    "schemas/protein-domain-parse.schema.json",
     "schemas/protein-properties.schema.json",
+    "schemas/reciprocal-best-hits.schema.json",
     "schemas/runtime-catalog.schema.json",
     "schemas/runtime-lock.schema.json",
     "schemas/set-upset.schema.json",
@@ -81,6 +86,10 @@ CATALOG_AND_MANIFEST_CONTRACTS = (
 
 CAPABILITY_RESULT_CONTRACTS = (
     (
+        "tests/fixtures/capability-results/blast-parse.json",
+        "schemas/blast-parse.schema.json",
+    ),
+    (
         "tests/fixtures/capability-results/expression-normalization.json",
         "schemas/expression-normalization.schema.json",
     ),
@@ -97,6 +106,18 @@ CAPABILITY_RESULT_CONTRACTS = (
         "schemas/expression-heatmap.schema.json",
     ),
     (
+        "tests/fixtures/capability-results/gene-density.json",
+        "schemas/gene-density.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/phylogeny-tree-transform.json",
+        "schemas/phylogeny-tree-transform.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/protein-domain-parse.json",
+        "schemas/protein-domain-parse.schema.json",
+    ),
+    (
         "tests/fixtures/capability-results/set-venn.json",
         "schemas/set-venn.schema.json",
     ),
@@ -107,6 +128,10 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/protein-properties.json",
         "schemas/protein-properties.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/reciprocal-best-hits.json",
+        "schemas/reciprocal-best-hits.schema.json",
     ),
     (
         "tests/fixtures/capability-results/structure-mmcif-summary.json",

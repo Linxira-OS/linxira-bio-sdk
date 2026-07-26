@@ -78,7 +78,17 @@
         "annotation.gxf.stats.v1",
         "annotation.gxf.normalize.v1",
         "annotation.gene-position.v1",
-        "annotation.sequence.extract.v1"
+        "annotation.sequence.extract.v1",
+        "genome.gene-density.v1"
+      ]
+    },
+    {
+      "id": "analyze-sequence-similarity",
+      "path": "skills/analyze-sequence-similarity",
+      "kind": "executable",
+      "capabilities": [
+        "similarity.blast.parse.v1",
+        "similarity.reciprocal.v1"
       ]
     },
     {
@@ -114,6 +124,18 @@
       "path": "skills/analyze-protein-properties",
       "kind": "executable",
       "capabilities": ["protein.properties.v1"]
+    },
+    {
+      "id": "analyze-protein-domains",
+      "path": "skills/analyze-protein-domains",
+      "kind": "executable",
+      "capabilities": ["protein.domain.parse.v1"]
+    },
+    {
+      "id": "transform-phylogenetic-trees",
+      "path": "skills/transform-phylogenetic-trees",
+      "kind": "executable",
+      "capabilities": ["phylogeny.tree.transform.v1"]
     },
     {
       "id": "manipulate-bio-tables",

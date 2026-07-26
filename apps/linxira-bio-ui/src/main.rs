@@ -273,6 +273,7 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "annotation.gxf.normalize.v1",
     "annotation.gene-position.v1",
     "annotation.sequence.extract.v1",
+    "genome.gene-density.v1",
     "interval.intersect.v1",
     "interval.merge.v1",
     "interval.subtract.v1",
@@ -284,6 +285,10 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "set.venn.v1",
     "set.upset.v1",
     "protein.properties.v1",
+    "similarity.blast.parse.v1",
+    "similarity.reciprocal.v1",
+    "protein.domain.parse.v1",
+    "phylogeny.tree.transform.v1",
     "variant.stats.v1",
     "variant.filter.v1",
     "variant.normalize.v1",
@@ -320,6 +325,9 @@ struct BioApp {
     selected_capability: String,
     annotation_feature_type: String,
     annotation_sort: bool,
+    gene_density_feature_type: String,
+    gene_density_window_size: u64,
+    gene_density_step_size: u64,
     kmer_size: usize,
     kmer_canonical: bool,
     epcr_max_amplicon: usize,
@@ -342,6 +350,9 @@ struct BioApp {
     structure_geometry_atom_count: usize,
     structure_geometry_atoms: [String; 4],
     structure_superpose_atom: String,
+    similarity_max_evalue: f64,
+    similarity_min_identity_percent: f64,
+    phylogeny_reroot_label: String,
     job_history: Vec<JobRecord>,
     analysis_job_id: Option<String>,
     export_status: String,
@@ -387,6 +398,9 @@ impl BioApp {
             selected_capability: "sequence.stats.v1".to_owned(),
             annotation_feature_type: "gene".to_owned(),
             annotation_sort: false,
+            gene_density_feature_type: "gene".to_owned(),
+            gene_density_window_size: 1_000_000,
+            gene_density_step_size: 1_000_000,
             kmer_size: 21,
             kmer_canonical: true,
             epcr_max_amplicon: 5_000,
@@ -414,6 +428,9 @@ impl BioApp {
                 "A/2/N".to_owned(),
             ],
             structure_superpose_atom: "CA".to_owned(),
+            similarity_max_evalue: 1e-5,
+            similarity_min_identity_percent: 30.0,
+            phylogeny_reroot_label: String::new(),
             job_history: Vec::new(),
             analysis_job_id: None,
             export_status: String::new(),
@@ -792,6 +809,14 @@ impl BioApp {
                     Value::String(self.annotation_feature_type.clone()),
                 );
             }
+            if route.capability == "phylogeny.tree.transform.v1"
+                && !self.phylogeny_reroot_label.trim().is_empty()
+            {
+                parameters.insert(
+                    "reroot_label".to_owned(),
+                    Value::String(self.phylogeny_reroot_label.trim().to_owned()),
+                );
+            }
             if route.capability == "sequence.kmer.count.v1" {
                 parameters.insert("k".to_owned(), serde_json::json!(self.kmer_size));
                 parameters.insert("canonical".to_owned(), Value::Bool(self.kmer_canonical));
@@ -855,6 +880,19 @@ impl BioApp {
             request.parameters = serde_json::json!({
                 "include_items": false,
                 "max_intersections": 50,
+            });
+        }
+        if route.capability == "genome.gene-density.v1" {
+            request.parameters = serde_json::json!({
+                "feature_types": [self.gene_density_feature_type.trim()],
+                "window_size": self.gene_density_window_size,
+                "step_size": self.gene_density_step_size,
+            });
+        }
+        if route.capability == "similarity.reciprocal.v1" {
+            request.parameters = serde_json::json!({
+                "max_evalue": self.similarity_max_evalue,
+                "min_identity_percent": self.similarity_min_identity_percent,
             });
         }
         if route.capability == "structure.pdb.summary.v1" {
@@ -1648,6 +1686,7 @@ impl BioApp {
                     "annotation.gxf.normalize.v1",
                     "annotation.gene-position.v1",
                     "annotation.sequence.extract.v1",
+                    "genome.gene-density.v1",
                     "variant.stats.v1",
                     "variant.filter.v1",
                     "variant.normalize.v1",
@@ -1662,6 +1701,10 @@ impl BioApp {
                     "set.venn.v1",
                     "set.upset.v1",
                     "protein.properties.v1",
+                    "similarity.blast.parse.v1",
+                    "similarity.reciprocal.v1",
+                    "protein.domain.parse.v1",
+                    "phylogeny.tree.transform.v1",
                     "table.manipulate.v1",
                     "structure.pdb.summary.v1",
                     "structure.mmcif.summary.v1",
@@ -1730,6 +1773,10 @@ impl BioApp {
                             "No other PDB/mmCIF structure available",
                         ),
                     ),
+                    "similarity.reciprocal.v1" => (
+                        self.text("反向相似性结果", "Reverse similarity result"),
+                        self.text("没有其他可用 BLAST 结果", "No other BLAST result available"),
+                    ),
                     _ => (
                         self.text("右侧 BED", "Right BED"),
                         self.text("没有其他 BED", "No other BED"),
@@ -1787,6 +1834,43 @@ impl BioApp {
                             );
                         }
                     });
+            });
+        }
+        if self.selected_capability == "genome.gene-density.v1" {
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("特征类型", "Feature type"));
+                ui.text_edit_singleline(&mut self.gene_density_feature_type);
+                ui.label(self.text("窗口大小", "Window size"));
+                ui.add(
+                    egui::DragValue::new(&mut self.gene_density_window_size).range(1..=u64::MAX),
+                );
+                ui.label(self.text("步长", "Step size"));
+                ui.add(egui::DragValue::new(&mut self.gene_density_step_size).range(1..=u64::MAX));
+            });
+        }
+        if self.selected_capability == "similarity.reciprocal.v1" {
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("最大 e-value", "Maximum e-value"));
+                ui.add(
+                    egui::DragValue::new(&mut self.similarity_max_evalue)
+                        .range(0.0..=1.0)
+                        .speed(0.000001),
+                );
+                ui.label(self.text("最低相似度（%）", "Minimum identity (%)"));
+                ui.add(
+                    egui::DragValue::new(&mut self.similarity_min_identity_percent)
+                        .range(0.0..=100.0)
+                        .speed(0.1),
+                );
+            });
+        }
+        if self.selected_capability == "phylogeny.tree.transform.v1" {
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.label(self.text("外群叶标签（可选）", "Outgroup leaf label (optional)"));
+                ui.text_edit_singleline(&mut self.phylogeny_reroot_label);
             });
         }
         if self.selected_capability == "sequence.kmer.count.v1" {
@@ -2001,6 +2085,12 @@ impl BioApp {
                     self.text(
                         "注释序列提取需要再导入一个检查通过的参考 FASTA。",
                         "Annotation extraction requires another validated reference FASTA.",
+                    )
+                    .to_owned()
+                } else if secondary_format == Some("blast") {
+                    self.text(
+                        "双向最佳命中需要再导入一个检查通过的反向 BLAST 结果。",
+                        "Reciprocal best-hit analysis requires another validated reverse BLAST result.",
                     )
                     .to_owned()
                 } else {
@@ -2616,6 +2706,18 @@ fn analysis_route_for_format(format: &str) -> Option<AnalysisRoute> {
             capability: "structure.mmcif.summary.v1",
             input_role: "structure",
         }),
+        "blast-tabular" | "blast-xml" => Some(AnalysisRoute {
+            capability: "similarity.blast.parse.v1",
+            input_role: "blast",
+        }),
+        "protein-domains" => Some(AnalysisRoute {
+            capability: "protein.domain.parse.v1",
+            input_role: "domains",
+        }),
+        "newick" => Some(AnalysisRoute {
+            capability: "phylogeny.tree.transform.v1",
+            input_role: "tree",
+        }),
         _ => None,
     }
 }
@@ -2655,14 +2757,16 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             "annotation.gxf.stats.v1"
             | "annotation.gxf.normalize.v1"
             | "annotation.gene-position.v1"
-            | "annotation.sequence.extract.v1",
+            | "annotation.sequence.extract.v1"
+            | "genome.gene-density.v1",
             "gff3" | "gtf",
         ) => Some(AnalysisRoute {
             capability: match capability {
                 "annotation.gxf.stats.v1" => "annotation.gxf.stats.v1",
                 "annotation.gxf.normalize.v1" => "annotation.gxf.normalize.v1",
                 "annotation.gene-position.v1" => "annotation.gene-position.v1",
-                _ => "annotation.sequence.extract.v1",
+                "annotation.sequence.extract.v1" => "annotation.sequence.extract.v1",
+                _ => "genome.gene-density.v1",
             },
             input_role: "annotation",
         }),
@@ -2706,6 +2810,22 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
         ("protein.properties.v1", "fasta") => Some(AnalysisRoute {
             capability: "protein.properties.v1",
             input_role: "fasta",
+        }),
+        ("similarity.blast.parse.v1", "blast-tabular" | "blast-xml") => Some(AnalysisRoute {
+            capability: "similarity.blast.parse.v1",
+            input_role: "blast",
+        }),
+        ("similarity.reciprocal.v1", "blast-tabular" | "blast-xml") => Some(AnalysisRoute {
+            capability: "similarity.reciprocal.v1",
+            input_role: "forward",
+        }),
+        ("protein.domain.parse.v1", "protein-domains") => Some(AnalysisRoute {
+            capability: "protein.domain.parse.v1",
+            input_role: "domains",
+        }),
+        ("phylogeny.tree.transform.v1", "newick") => Some(AnalysisRoute {
+            capability: "phylogeny.tree.transform.v1",
+            input_role: "tree",
         }),
         ("table.manipulate.v1", "csv" | "tsv") => Some(AnalysisRoute {
             capability: "table.manipulate.v1",
@@ -2759,6 +2879,7 @@ fn secondary_input_format(capability: &str) -> Option<&'static str> {
         "variant.normalize.v1" => Some("fasta"),
         "primer.epcr.v1" => Some("tsv"),
         "structure.superpose.v1" => Some("structure"),
+        "similarity.reciprocal.v1" => Some("blast"),
         _ => None,
     }
 }
@@ -2766,6 +2887,10 @@ fn secondary_input_format(capability: &str) -> Option<&'static str> {
 fn secondary_input_matches(capability: &str, format: &str) -> bool {
     match secondary_input_format(capability) {
         Some("structure") => matches!(format.trim().to_ascii_lowercase().as_str(), "pdb" | "mmcif"),
+        Some("blast") => matches!(
+            format.trim().to_ascii_lowercase().as_str(),
+            "blast-tabular" | "blast-xml"
+        ),
         Some(required) => format.trim().eq_ignore_ascii_case(required),
         None => false,
     }
@@ -2778,6 +2903,7 @@ fn secondary_input_role(capability: &str) -> Option<&'static str> {
         "variant.normalize.v1" => Some("reference"),
         "primer.epcr.v1" => Some("primers"),
         "structure.superpose.v1" => Some("mobile"),
+        "similarity.reciprocal.v1" => Some("reverse"),
         _ => None,
     }
 }
@@ -2793,6 +2919,7 @@ fn capability_output_extension(capability: &str) -> Option<&'static str> {
         "sequence.kmer.count.v1" | "primer.epcr.v1" => Some("tsv"),
         "expression.normalize.v1" => Some("tsv"),
         "variant.filter.v1" | "variant.normalize.v1" => Some("vcf"),
+        "phylogeny.tree.transform.v1" => Some("nwk"),
         _ => None,
     }
 }
@@ -3393,6 +3520,10 @@ fn format_hint(path: &Path) -> &'static str {
         "rds" => "rds",
         "pdb" => "pdb",
         "cif" | "mmcif" => "mmcif",
+        "blast" | "m8" => "blast-tabular",
+        "xml" => "blast-xml",
+        "domtblout" => "protein-domains",
+        "nwk" | "newick" | "tree" | "tre" => "newick",
         "xlsx" => "xlsx",
         "zip" => "zip",
         _ => "unknown",
@@ -3422,6 +3553,7 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "annotation.sequence.extract.v1" => {
             language.text("按注释提取序列", "Annotation-guided extraction")
         }
+        "genome.gene-density.v1" => language.text("基因组特征密度", "Genome feature density"),
         "expression.matrix.qc.v1" => language.text("表达矩阵", "Expression matrix"),
         "expression.normalize.v1" => language.text("表达矩阵标准化", "Expression normalization"),
         "expression.pca.v1" => language.text("表达矩阵 PCA", "Expression PCA"),
@@ -3430,6 +3562,14 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "set.venn.v1" => language.text("2–6 集合 Venn 分析", "Two-to-six-set Venn analysis"),
         "set.upset.v1" => language.text("多集合 UpSet 分析", "Multi-set UpSet analysis"),
         "protein.properties.v1" => language.text("蛋白理化性质", "Protein properties"),
+        "similarity.blast.parse.v1" => language.text("BLAST 结果解析", "BLAST result parsing"),
+        "similarity.reciprocal.v1" => language.text("双向最佳命中", "Reciprocal best hits"),
+        "protein.domain.parse.v1" => {
+            language.text("蛋白结构域结果解析", "Protein domain result parsing")
+        }
+        "phylogeny.tree.transform.v1" => {
+            language.text("系统发育树转换", "Phylogeny tree transform")
+        }
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
         "structure.mmcif.summary.v1" => language.text("mmCIF 结构摘要", "mmCIF structure summary"),
@@ -4079,6 +4219,7 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "annotation.sequence.extract.v1" => {
             language.text("按注释提取序列", "Annotation-guided sequence extraction")
         }
+        "genome.gene-density.v1" => language.text("基因组特征密度", "Genome feature density"),
         "interval.intersect.v1" => language.text("BED 区间相交", "BED interval intersection"),
         "interval.merge.v1" => language.text("BED 区间合并", "BED interval merge"),
         "interval.subtract.v1" => language.text("BED 区间扣除", "BED interval subtraction"),
@@ -4092,6 +4233,14 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "set.venn.v1" => language.text("2–6 集合 Venn 分析", "Two-to-six-set Venn analysis"),
         "set.upset.v1" => language.text("多集合 UpSet 分析", "Multi-set UpSet analysis"),
         "protein.properties.v1" => language.text("蛋白理化性质", "Protein properties"),
+        "similarity.blast.parse.v1" => language.text("BLAST 结果解析", "BLAST result parsing"),
+        "similarity.reciprocal.v1" => language.text("双向最佳命中", "Reciprocal best hits"),
+        "protein.domain.parse.v1" => {
+            language.text("蛋白结构域结果解析", "Protein domain result parsing")
+        }
+        "phylogeny.tree.transform.v1" => {
+            language.text("系统发育树转换", "Phylogeny tree transform")
+        }
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "variant.stats.v1" => language.text("VCF 变异统计", "VCF variant statistics"),
         "variant.filter.v1" => language.text("VCF 基础过滤", "Basic VCF filtering"),
@@ -4201,6 +4350,12 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         ("annotation.sequence.extract.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/annotation.sequence.extract.v1/en-US.md"
         )),
+        ("genome.gene-density.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/genome.gene-density.v1/zh-CN.md"
+        )),
+        ("genome.gene-density.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/genome.gene-density.v1/en-US.md"
+        )),
         ("interval.intersect.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/interval.intersect.v1/zh-CN.md"
         )),
@@ -4266,6 +4421,30 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("protein.properties.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/protein.properties.v1/en-US.md"
+        )),
+        ("similarity.blast.parse.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/similarity.blast.parse.v1/zh-CN.md"
+        )),
+        ("similarity.blast.parse.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/similarity.blast.parse.v1/en-US.md"
+        )),
+        ("similarity.reciprocal.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/similarity.reciprocal.v1/zh-CN.md"
+        )),
+        ("similarity.reciprocal.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/similarity.reciprocal.v1/en-US.md"
+        )),
+        ("protein.domain.parse.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/protein.domain.parse.v1/zh-CN.md"
+        )),
+        ("protein.domain.parse.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/protein.domain.parse.v1/en-US.md"
+        )),
+        ("phylogeny.tree.transform.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/phylogeny.tree.transform.v1/zh-CN.md"
+        )),
+        ("phylogeny.tree.transform.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/phylogeny.tree.transform.v1/en-US.md"
         )),
         ("variant.stats.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/variant.stats.v1/zh-CN.md"
@@ -4876,7 +5055,95 @@ mod tests {
                 input_role: "structure",
             })
         );
+        assert_eq!(
+            analysis_route_for_format("blast-tabular"),
+            Some(AnalysisRoute {
+                capability: "similarity.blast.parse.v1",
+                input_role: "blast",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_format("blast-xml"),
+            Some(AnalysisRoute {
+                capability: "similarity.blast.parse.v1",
+                input_role: "blast",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_format("protein-domains"),
+            Some(AnalysisRoute {
+                capability: "protein.domain.parse.v1",
+                input_role: "domains",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_format("newick"),
+            Some(AnalysisRoute {
+                capability: "phylogeny.tree.transform.v1",
+                input_role: "tree",
+            })
+        );
         assert_eq!(analysis_route_for_format("bam"), None);
+    }
+
+    #[test]
+    fn similarity_domain_density_and_tree_routes_enforce_their_contracts() {
+        assert_eq!(
+            analysis_route_for_capability("similarity.blast.parse.v1", "blast-xml"),
+            Some(AnalysisRoute {
+                capability: "similarity.blast.parse.v1",
+                input_role: "blast",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_capability("similarity.reciprocal.v1", "blast-tabular"),
+            Some(AnalysisRoute {
+                capability: "similarity.reciprocal.v1",
+                input_role: "forward",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_capability("protein.domain.parse.v1", "protein-domains"),
+            Some(AnalysisRoute {
+                capability: "protein.domain.parse.v1",
+                input_role: "domains",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_capability("genome.gene-density.v1", "gff3"),
+            Some(AnalysisRoute {
+                capability: "genome.gene-density.v1",
+                input_role: "annotation",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_capability("phylogeny.tree.transform.v1", "newick"),
+            Some(AnalysisRoute {
+                capability: "phylogeny.tree.transform.v1",
+                input_role: "tree",
+            })
+        );
+
+        assert!(capability_requires_secondary("similarity.reciprocal.v1"));
+        assert!(secondary_input_matches(
+            "similarity.reciprocal.v1",
+            "blast-xml"
+        ));
+        assert!(!secondary_input_matches("similarity.reciprocal.v1", "tsv"));
+        assert!(!capability_requires_secondary("protein.domain.parse.v1"));
+        assert_eq!(
+            capability_output_extension("phylogeny.tree.transform.v1"),
+            Some("nwk")
+        );
+
+        let output =
+            derived_analysis_output_path("trees/input.nwk", "phylogeny.tree.transform.v1", "nwk");
+        let output_name = output
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("derived Newick output name");
+        assert!(output_name.starts_with("input.phylogeny-tree-transform."));
+        assert!(output_name.ends_with(".nwk"));
     }
 
     #[test]

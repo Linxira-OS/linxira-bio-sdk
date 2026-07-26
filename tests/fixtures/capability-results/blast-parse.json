@@ -1,0 +1,15 @@
+{
+  "format": "blast-tabular-outfmt6",
+  "record_count": 3,
+  "query_count": 2,
+  "subject_count": 2,
+  "min_evalue": 1e-50,
+  "max_bit_score": 200.0,
+  "mean_identity_percent": 89.0,
+  "hits": [
+    {"query_id": "geneA", "subject_id": "protein1", "percent_identity": 95.0, "alignment_length": 100, "mismatch_count": 5, "gap_open_count": 0, "query_start": 1, "query_end": 100, "subject_start": 1, "subject_end": 100, "evalue": 1e-50, "bit_score": 200.0},
+    {"query_id": "geneA", "subject_id": "protein2", "percent_identity": 90.0, "alignment_length": 100, "mismatch_count": 10, "gap_open_count": 0, "query_start": 1, "query_end": 100, "subject_start": 1, "subject_end": 100, "evalue": 1e-20, "bit_score": 150.0},
+    {"query_id": "geneB", "subject_id": "protein2", "percent_identity": 82.0, "alignment_length": 90, "mismatch_count": 16, "gap_open_count": 0, "query_start": 1, "query_end": 90, "subject_start": 5, "subject_end": 94, "evalue": 1e-12, "bit_score": 120.0}
+  ],
+  "warnings": []
+}

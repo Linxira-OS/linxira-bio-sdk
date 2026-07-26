@@ -40,8 +40,9 @@ a replacement script silently.
 - BED interval operations: use `intersect-genomic-intervals` for overlap
   summaries, BED3 merge, and BED3 subtraction.
 - GFF3/GTF annotation statistics, GTF-to-GFF3 normalization, feature position
-  tables, and reference-guided gene/transcript/CDS/exon/UTR/promoter extraction:
-  use `analyze-genome-annotations`. Annotation joins, closest-feature lookup,
+  tables, gene-density profiles, and reference-guided
+  gene/transcript/CDS/exon/UTR/promoter extraction: use
+  `analyze-genome-annotations`. Annotation joins, closest-feature lookup,
   ontology validation, and automatic relationship repair remain planned.
 - SAM text mapping QC: use `analyze-sam-quality`. BAM, CRAM, pileup, coverage,
   and advanced mapping reports still require a maintained native workflow.
@@ -63,6 +64,16 @@ a replacement script silently.
   `analyze-protein-properties` for composition, molecular weight, theoretical
   pI, charge, aromaticity, GRAVY, and extinction coefficients. Ambiguous
   sequences deliberately return null derived values.
+- Completed BLAST outfmt 6, outfmt 7, or legacy XML1 result files: use
+  `analyze-sequence-similarity` for parsing or reciprocal best-hit analysis.
+  Running the search and building a sequence database remain external native
+  workflows.
+- Completed InterProScan TSV or HMMER domtblout files: use
+  `analyze-protein-domains`. Domain search execution and database downloads
+  remain external native workflows.
+- Newick normalization, label mapping, summaries, and single-leaf rerooting:
+  use `transform-phylogenetic-trees`. Tree inference and publication rendering
+  remain external or planned.
 - PDB coordinate summaries and explicitly requested AlphaFold pLDDT from PDB
   B-factors: use `analyze-pdb-structure`.
 - PDB/mmCIF coordinate-derived sequence, residue contacts, atom geometry, and

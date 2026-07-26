@@ -1,0 +1,8 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-blast-parse",
+  "capability": "similarity.blast.parse.v1",
+  "inputs": {"blast": "../similarity/forward.tsv"},
+  "execution": {"mode": "local-cpu"},
+  "parameters": {}
+}

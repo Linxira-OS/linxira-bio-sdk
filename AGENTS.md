@@ -24,7 +24,10 @@ the agent skills that select and validate them.
 - Read `skills/analyze-sam-quality/SKILL.md` for the implemented SAM-text
   `alignment.qc.v1` capability; BAM and CRAM still require native tools.
 - Read `skills/analyze-genome-annotations/SKILL.md` for implemented GFF3/GTF
-  statistics, normalization, position-table, and reference-guided extraction.
+  statistics, normalization, position-table, gene-density, and
+  reference-guided extraction.
+- Read `skills/analyze-sequence-similarity/SKILL.md` for implemented BLAST
+  result parsing and reciprocal best-hit analysis.
 - Read `skills/intersect-genomic-intervals/SKILL.md` for the implemented BED
   `interval.intersect.v1`, `interval.merge.v1`, and
   `interval.subtract.v1` capabilities.
@@ -35,6 +38,10 @@ the agent skills that select and validate them.
   UpSet analysis of biological identifier-set tables.
 - Read `skills/analyze-protein-properties/SKILL.md` for implemented local
   protein FASTA physicochemical properties.
+- Read `skills/analyze-protein-domains/SKILL.md` for implemented InterProScan
+  TSV and HMMER domtblout parsing.
+- Read `skills/transform-phylogenetic-trees/SKILL.md` for implemented Newick
+  normalization, label mapping, and single-leaf rerooting.
 - Read `skills/manipulate-bio-tables/SKILL.md` for the implemented CSV/TSV
   `table.manipulate.v1` capability.
 - Read `skills/analyze-variant-statistics/SKILL.md` for the implemented

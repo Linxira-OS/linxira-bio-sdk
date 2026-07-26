@@ -4,9 +4,9 @@
 
 use linxira_bio_core::alignment::sam_qc_path;
 use linxira_bio_core::annotation::{
-    AnnotationExtractOptions, AnnotationNormalizeOptions, GenePositionOptions,
+    AnnotationExtractOptions, AnnotationNormalizeOptions, GeneDensityOptions, GenePositionOptions,
     annotation_gene_positions_path, annotation_stats_path, extract_annotation_sequences_path,
-    normalize_annotation_path,
+    gene_density_path, normalize_annotation_path,
 };
 use linxira_bio_core::coordinate::{
     AtomSelector, ContactMapOptions, SuperpositionOptions, extract_structure_sequences_path,
@@ -17,6 +17,7 @@ use linxira_bio_core::dataset::{
     DatasetCompression, DatasetFormat, DatasetInspectionOptions, DetectionConfidence,
     inspect_dataset_with_options,
 };
+use linxira_bio_core::domain::parse_protein_domains_path;
 use linxira_bio_core::environment::{
     EnvironmentMode, EnvironmentPlanOptions, audit_environment, parse_environment_mode,
     plan_environment_with_options,
@@ -38,6 +39,7 @@ use linxira_bio_core::fastq_transform::{
 use linxira_bio_core::interval::{
     IntervalMergeOptions, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
+use linxira_bio_core::phylogeny::{TreeTransformOptions, transform_newick_path};
 use linxira_bio_core::protein::protein_properties_path;
 use linxira_bio_core::sequence::fasta_stats_path;
 use linxira_bio_core::sequence_analysis::{
@@ -52,6 +54,9 @@ use linxira_bio_core::sequence_transform::{
     reverse_complement_fasta_path, split_fasta_path, table_to_fasta_path, translate_fasta_path,
 };
 use linxira_bio_core::set_analysis::{SetAnalysisOptions, upset_analysis_path, venn_analysis_path};
+use linxira_bio_core::similarity::{
+    ReciprocalBestHitOptions, parse_blast_path, reciprocal_best_hits_path,
+};
 use linxira_bio_core::structure::{PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::table::{
     TableDelimiter, TableFilter, TableManipulateOptions, manipulate_table_path,
@@ -110,6 +115,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "annotation.gxf.normalize.v1" => run_annotation_normalize(base_directory, request),
         "annotation.gene-position.v1" => run_annotation_positions(base_directory, request),
         "annotation.sequence.extract.v1" => run_annotation_extract(base_directory, request),
+        "genome.gene-density.v1" => run_gene_density(base_directory, request),
         "environment.audit.v1" => run_environment_audit(request),
         "environment.plan.v1" => run_environment_plan(base_directory, request),
         "dataset.inspect.v1" => run_dataset_inspection(base_directory, request),
@@ -143,7 +149,11 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "primer.epcr.v1" => run_primer_epcr(base_directory, request),
         "set.venn.v1" => run_set_venn(base_directory, request),
         "set.upset.v1" => run_set_upset(base_directory, request),
+        "similarity.blast.parse.v1" => run_blast_parse(base_directory, request),
+        "similarity.reciprocal.v1" => run_reciprocal_best_hits(base_directory, request),
         "protein.properties.v1" => run_protein_properties(base_directory, request),
+        "protein.domain.parse.v1" => run_protein_domains(base_directory, request),
+        "phylogeny.tree.transform.v1" => run_phylogeny_tree(base_directory, request),
         "structure.pdb.summary.v1" => run_pdb_summary(base_directory, request),
         "structure.mmcif.summary.v1" => run_mmcif_summary(base_directory, request),
         "structure.sequence.extract.v1" => run_structure_sequence(base_directory, request),
@@ -306,6 +316,18 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                     format: Some(BioDataFormat::Fasta),
                     media_type: Some("text/x-fasta"),
                 },
+            )
+        }
+        "genome.gene-density.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "annotation")?;
+            let result = gene_density_path(input, gene_density_options(&request.parameters)?)?;
+            serialize_v2_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "gene-density-warning",
             )
         }
         "environment.audit.v1" => {
@@ -853,6 +875,35 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 upset_analysis_path(input, set_analysis_options(&request.parameters)?)?,
             )
         }
+        "similarity.blast.parse.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "blast")?;
+            let result = parse_blast_path(input)?;
+            serialize_v2_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "blast-parse-warning",
+            )
+        }
+        "similarity.reciprocal.v1" => {
+            let forward = resolve_v2_single_input(base_directory, &request, "forward")?;
+            let reverse = resolve_v2_single_input(base_directory, &request, "reverse")?;
+            let result = reciprocal_best_hits_path(
+                forward,
+                reverse,
+                reciprocal_best_hit_options(&request.parameters)?,
+            )?;
+            serialize_v2_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "reciprocal-best-hit-warning",
+            )
+        }
         "protein.properties.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "fasta")?;
             let properties = protein_properties_path(input)?;
@@ -875,6 +926,45 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 }));
             finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
             Ok(serde_json::to_string(&result)?)
+        }
+        "protein.domain.parse.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "domains")?;
+            let result = parse_protein_domains_path(input)?;
+            serialize_v2_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "protein-domain-warning",
+            )
+        }
+        "phylogeny.tree.transform.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "tree")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = transform_newick_path(
+                input,
+                &output,
+                tree_transform_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "phylogeny-tree-warning",
+                FileArtifactSpec {
+                    artifact_id: "transformed-tree",
+                    role: "tree",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Unknown),
+                    media_type: Some("text/x-newick"),
+                },
+            )
         }
         "structure.pdb.summary.v1" => {
             let path = resolve_v2_single_input(base_directory, &request, "pdb")?;
@@ -1047,6 +1137,10 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             &["annotation", "fasta"],
             &["output", "feature_type", "promoter_length"],
         ),
+        "genome.gene-density.v1" => (
+            &["annotation"],
+            &["feature_types", "window_size", "step_size"],
+        ),
         "environment.audit.v1" => (&[], &[]),
         "environment.plan.v1" => (&[], &["profile", "mode", "project_root"]),
         "dataset.inspect.v1" => (&["file"], &["max_preview_records", "max_preview_bytes"]),
@@ -1144,7 +1238,14 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             &["output", "min_amplicon", "max_amplicon", "max_hits"],
         ),
         "set.venn.v1" | "set.upset.v1" => (&["table"], &["include_items", "max_intersections"]),
+        "similarity.blast.parse.v1" => (&["blast"], &[]),
+        "similarity.reciprocal.v1" => (
+            &["forward", "reverse"],
+            &["max_evalue", "min_identity_percent"],
+        ),
         "protein.properties.v1" => (&["fasta"], &[]),
+        "protein.domain.parse.v1" => (&["domains"], &[]),
+        "phylogeny.tree.transform.v1" => (&["tree"], &["output", "reroot_label", "label_map"]),
         "structure.pdb.summary.v1" => (&["pdb"], &["interpret_b_factors_as_plddt"]),
         "structure.mmcif.summary.v1" | "structure.sequence.extract.v1" => (&["structure"], &[]),
         "structure.contact-map.v1" => (
@@ -1300,6 +1401,50 @@ where
     Ok(serde_json::to_string(&result)?)
 }
 
+fn serialize_v2_file_artifact_result_with_warnings<T>(
+    request: &JobRequestV2,
+    base_directory: &Path,
+    verified_inputs: &BTreeMap<String, String>,
+    value: T,
+    warnings: &[String],
+    diagnostic_code: &str,
+    artifact: FileArtifactSpec,
+) -> WorkerResult<String>
+where
+    T: serde::Serialize,
+{
+    let mut result = AnalysisResultV2::ok(
+        request.job_id.clone(),
+        request.capability.clone(),
+        value,
+        ExecutionMode::LocalCpu,
+    );
+    result
+        .diagnostics
+        .extend(warnings.iter().map(|message| Diagnostic {
+            code: diagnostic_code.to_owned(),
+            severity: DiagnosticSeverity::Warning,
+            message: message.clone(),
+            artifact_id: None,
+            line: None,
+            record: None,
+            hint: None,
+        }));
+    result.artifacts.push(OutputArtifact {
+        artifact_id: artifact.artifact_id.to_owned(),
+        role: artifact.role.to_owned(),
+        kind: artifact.kind,
+        path: artifact.path.to_string_lossy().into_owned(),
+        format: artifact.format,
+        media_type: artifact.media_type.map(str::to_owned),
+        size_bytes: Some(std::fs::metadata(&artifact.path)?.len()),
+        sha256: Some(sha256_file(&artifact.path)?),
+        metadata: Default::default(),
+    });
+    finalize_v2_input_hashes(&mut result, request, base_directory, verified_inputs)?;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn validate_v2_inputs(
     request: &JobRequestV2,
     base_directory: &Path,
@@ -1411,6 +1556,10 @@ fn declared_dataset_format(format: BioDataFormat) -> Option<DatasetFormat> {
         BioDataFormat::Rds => DatasetFormat::Rds,
         BioDataFormat::Pdb => DatasetFormat::Pdb,
         BioDataFormat::Mmcif => DatasetFormat::Mmcif,
+        BioDataFormat::BlastTabular => DatasetFormat::BlastTabular,
+        BioDataFormat::BlastXml => DatasetFormat::BlastXml,
+        BioDataFormat::ProteinDomains => DatasetFormat::ProteinDomains,
+        BioDataFormat::Newick => DatasetFormat::Newick,
         BioDataFormat::Zip => DatasetFormat::Zip,
         BioDataFormat::Genbank
         | BioDataFormat::Embl
@@ -1874,6 +2023,30 @@ fn run_annotation_extract(base_directory: &Path, request: JobRequest) -> WorkerR
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_gene_density(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "annotation",
+        &["feature_types", "window_size", "step_size"],
+    )?;
+    let input = request
+        .inputs
+        .get("annotation")
+        .ok_or("genome.gene-density.v1 requires inputs.annotation")?;
+    let analysis = gene_density_path(
+        resolve_input(base_directory, input),
+        gene_density_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_expression_matrix_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -2307,6 +2480,91 @@ fn run_set_upset(base_directory: &Path, request: JobRequest) -> WorkerResult<Str
     ))?)
 }
 
+fn run_blast_parse(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "blast", &[])?;
+    let input = request
+        .inputs
+        .get("blast")
+        .ok_or("similarity.blast.parse.v1 requires inputs.blast")?;
+    let analysis = parse_blast_path(resolve_input(base_directory, input))?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_reciprocal_best_hits(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["forward", "reverse"],
+        &["max_evalue", "min_identity_percent"],
+    )?;
+    let forward = request
+        .inputs
+        .get("forward")
+        .ok_or("similarity.reciprocal.v1 requires inputs.forward")?;
+    let reverse = request
+        .inputs
+        .get("reverse")
+        .ok_or("similarity.reciprocal.v1 requires inputs.reverse")?;
+    let analysis = reciprocal_best_hits_path(
+        resolve_input(base_directory, forward),
+        resolve_input(base_directory, reverse),
+        reciprocal_best_hit_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_protein_domains(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "domains", &[])?;
+    let input = request
+        .inputs
+        .get("domains")
+        .ok_or("protein.domain.parse.v1 requires inputs.domains")?;
+    let analysis = parse_protein_domains_path(resolve_input(base_directory, input))?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_phylogeny_tree(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "tree", &["output", "reroot_label", "label_map"])?;
+    let input = request
+        .inputs
+        .get("tree")
+        .ok_or("phylogeny.tree.transform.v1 requires inputs.tree")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis =
+        transform_newick_path(input, output, tree_transform_options(&request.parameters)?)?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_protein_properties(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     validate_v1_named_input_contract(&request, "fasta", &[])?;
     let input = request
@@ -2384,6 +2642,66 @@ fn set_analysis_options(parameters: &serde_json::Value) -> WorkerResult<SetAnaly
         options.max_intersections = max_intersections;
     }
     Ok(options)
+}
+
+fn gene_density_options(parameters: &serde_json::Value) -> WorkerResult<GeneDensityOptions> {
+    let mut options = GeneDensityOptions::default();
+    let feature_types = optional_string_array_parameter(parameters, "feature_types")?;
+    if !feature_types.is_empty() {
+        options.feature_types = feature_types;
+    }
+    if let Some(window_size) = optional_parameter_u64(parameters, "window_size")? {
+        if window_size == 0 {
+            return Err("window_size must be positive".into());
+        }
+        options.window_size = window_size;
+    }
+    if let Some(step_size) = optional_parameter_u64(parameters, "step_size")? {
+        if step_size == 0 {
+            return Err("step_size must be positive".into());
+        }
+        options.step_size = step_size;
+    }
+    Ok(options)
+}
+
+fn reciprocal_best_hit_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<ReciprocalBestHitOptions> {
+    let max_evalue = optional_parameter_f64(parameters, "max_evalue")?;
+    if max_evalue.is_some_and(|value| value < 0.0) {
+        return Err("max_evalue must be non-negative".into());
+    }
+    Ok(ReciprocalBestHitOptions {
+        max_evalue,
+        min_identity_percent: optional_parameter_percentage(parameters, "min_identity_percent")?,
+    })
+}
+
+fn tree_transform_options(parameters: &serde_json::Value) -> WorkerResult<TreeTransformOptions> {
+    let reroot_label = optional_parameter_string(parameters, "reroot_label")?
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
+    let mut label_map = BTreeMap::new();
+    if let Some(value) = parameters.get("label_map") {
+        let mapping = value.as_object().ok_or("label_map must be an object")?;
+        for (source, target) in mapping {
+            let source = source.trim();
+            let target = target
+                .as_str()
+                .ok_or("label_map values must be strings")?
+                .trim();
+            if source.is_empty() || target.is_empty() {
+                return Err("label_map keys and values must be non-empty".into());
+            }
+            label_map.insert(source.to_owned(), target.to_owned());
+        }
+    }
+    Ok(TreeTransformOptions {
+        reroot_label,
+        label_map,
+    })
 }
 
 fn expression_normalize_options(

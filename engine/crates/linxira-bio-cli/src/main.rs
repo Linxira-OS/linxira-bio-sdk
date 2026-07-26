@@ -2,9 +2,9 @@
 
 use linxira_bio_core::alignment::{SamQcMetrics, sam_qc_path};
 use linxira_bio_core::annotation::{
-    AnnotationExtractOptions, AnnotationNormalizeOptions, AnnotationStats, GenePositionOptions,
-    annotation_gene_positions_path, annotation_stats_path, extract_annotation_sequences_path,
-    normalize_annotation_path,
+    AnnotationExtractOptions, AnnotationNormalizeOptions, AnnotationStats, GeneDensityOptions,
+    GeneDensityResult, GenePositionOptions, annotation_gene_positions_path, annotation_stats_path,
+    extract_annotation_sequences_path, gene_density_path, normalize_annotation_path,
 };
 use linxira_bio_core::coordinate::{
     ContactMapOptions, MmcifStructureSummary, StructureContactMapResult, StructureGeometryResult,
@@ -13,6 +13,7 @@ use linxira_bio_core::coordinate::{
     parse_atom_selector, structure_contact_map_path, superpose_structures_path,
 };
 use linxira_bio_core::dataset::{DatasetInspection, DatasetSupport, inspect_dataset};
+use linxira_bio_core::domain::{ProteinDomainParseResult, parse_protein_domains_path};
 use linxira_bio_core::environment::{
     EnvironmentAudit, EnvironmentMode, EnvironmentPlan, EnvironmentPlanOptions, PlanActionState,
     audit_environment, parse_environment_mode, plan_environment_with_options,
@@ -33,6 +34,9 @@ use linxira_bio_core::interval::{
     IntervalIntersectStats, IntervalMergeOptions, bed_intersect_path, bed_merge_path,
     bed_subtract_path,
 };
+use linxira_bio_core::phylogeny::{
+    TreeTransformOptions, TreeTransformResult, read_tree_label_map_path, transform_newick_path,
+};
 use linxira_bio_core::protein::{ProteinPropertiesResult, protein_properties_path};
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
 use linxira_bio_core::sequence::{SequenceStats, fasta_stats_path};
@@ -49,6 +53,10 @@ use linxira_bio_core::sequence_transform::{
 };
 use linxira_bio_core::set_analysis::{
     SetAnalysisOptions, UpSetAnalysis, VennAnalysis, upset_analysis_path, venn_analysis_path,
+};
+use linxira_bio_core::similarity::{
+    BlastParseResult, ReciprocalBestHitOptions, ReciprocalBestHitResult, parse_blast_path,
+    reciprocal_best_hits_path,
 };
 use linxira_bio_core::structure::{PdbStructureSummary, PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::table::{
@@ -134,6 +142,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if annotation == "annotation" && extract == "extract" =>
         {
             print_annotation_extract(arguments)
+        }
+        [annotation, gene_density, arguments @ ..]
+            if annotation == "annotation" && gene_density == "gene-density" =>
+        {
+            print_gene_density(arguments)
         }
         [runtime, catalog] if runtime == "runtime" && catalog == "catalog" => {
             print_runtime_catalog(false)
@@ -284,6 +297,14 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         [set, upset, arguments @ ..] if set == "set" && upset == "upset" => {
             print_set_analysis(arguments, false)
         }
+        [similarity, blast_parse, arguments @ ..]
+            if similarity == "similarity" && blast_parse == "blast-parse" =>
+        {
+            print_blast_parse(arguments)
+        }
+        [similarity, rbh, arguments @ ..] if similarity == "similarity" && rbh == "rbh" => {
+            print_reciprocal_best_hits(arguments)
+        }
         [protein, properties, path] if protein == "protein" && properties == "properties" => {
             print_protein_properties(path, false)
         }
@@ -291,6 +312,12 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if protein == "protein" && properties == "properties" && json == "--json" =>
         {
             print_protein_properties(path, true)
+        }
+        [protein, domains, arguments @ ..] if protein == "protein" && domains == "domains" => {
+            print_protein_domains(arguments)
+        }
+        [phylogeny, tree, arguments @ ..] if phylogeny == "phylogeny" && tree == "tree" => {
+            print_phylogeny_tree(arguments)
         }
         [structure, pdb, arguments @ ..] if structure == "structure" && pdb == "pdb" => {
             print_pdb_summary(arguments)
@@ -1065,6 +1092,14 @@ fn parse_sequence_u64(value: Option<&String>, option: &str) -> Result<u64, Box<d
         .map_err(|_| format!("{option} requires a non-negative integer, got {value:?}").into())
 }
 
+fn parse_positive_u64(value: Option<&String>, option: &str) -> Result<u64, Box<dyn Error>> {
+    let parsed = parse_sequence_u64(value, option)?;
+    if parsed == 0 {
+        return Err(format!("{option} must be positive").into());
+    }
+    Ok(parsed)
+}
+
 fn parse_sequence_usize(value: Option<&String>, option: &str) -> Result<usize, Box<dyn Error>> {
     let value = value.ok_or_else(|| format!("{option} requires a value"))?;
     value
@@ -1606,6 +1641,78 @@ fn print_annotation_extract(arguments: &[String]) -> Result<(), Box<dyn Error>> 
         summary,
         json,
     )
+}
+
+fn print_gene_density(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut feature_types = Vec::new();
+    let mut options = GeneDensityOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--feature-type" => {
+                index += 1;
+                feature_types.push(
+                    arguments
+                        .get(index)
+                        .ok_or("--feature-type requires a value")?
+                        .clone(),
+                );
+            }
+            "--window-size" => {
+                index += 1;
+                options.window_size = parse_positive_u64(arguments.get(index), "--window-size")?;
+            }
+            "--step-size" => {
+                index += 1;
+                options.step_size = parse_positive_u64(arguments.get(index), "--step-size")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown annotation gene-density option: {value}").into());
+            }
+            value if input.is_none() => input = Some(value),
+            value => {
+                return Err(format!("unexpected annotation gene-density argument: {value}").into());
+            }
+        }
+        index += 1;
+    }
+    if !feature_types.is_empty() {
+        options.feature_types = feature_types;
+    }
+    let input = input.ok_or("annotation gene-density requires an input GFF3 or GTF path")?;
+    let result = gene_density_path(input, options)?;
+    if json {
+        print_analysis_json_with_warnings(
+            "annotation-gene-density",
+            "genome.gene-density.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_gene_density_text(&result);
+        Ok(())
+    }
+}
+
+fn print_gene_density_text(result: &GeneDensityResult) {
+    println!("input_record_count\t{}", result.input_record_count);
+    println!("selected_feature_count\t{}", result.selected_feature_count);
+    println!("sequence_count\t{}", result.sequence_count);
+    println!("feature_types\t{}", result.feature_types.join(","));
+    println!("window_size\t{}", result.window_size);
+    println!("step_size\t{}", result.step_size);
+    for bin in &result.bins {
+        println!(
+            "bin\t{}\t{}\t{}\t{}\t{:.6}",
+            bin.seqid, bin.start, bin.end, bin.feature_count, bin.features_per_megabase
+        );
+    }
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
 }
 
 fn print_variant_stats_text(stats: &VcfStats) {
@@ -2326,6 +2433,226 @@ fn print_upset_text(result: &UpSetAnalysis) {
     }
 }
 
+fn print_blast_parse(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let (path, json) = parse_single_path_json(arguments, "similarity blast-parse")?;
+    let result = parse_blast_path(path)?;
+    if json {
+        print_analysis_json_with_warnings(
+            "similarity-blast-parse",
+            "similarity.blast.parse.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_blast_parse_text(&result);
+        Ok(())
+    }
+}
+
+fn print_blast_parse_text(result: &BlastParseResult) {
+    println!("format\t{}", result.format);
+    println!("record_count\t{}", result.record_count);
+    println!("query_count\t{}", result.query_count);
+    println!("subject_count\t{}", result.subject_count);
+    for hit in &result.hits {
+        println!(
+            "hit\t{}\t{}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{:.6e}\t{:.6}",
+            hit.query_id,
+            hit.subject_id,
+            hit.percent_identity,
+            hit.alignment_length,
+            hit.query_start,
+            hit.query_end,
+            hit.subject_start,
+            hit.subject_end,
+            hit.evalue,
+            hit.bit_score
+        );
+    }
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_reciprocal_best_hits(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = ReciprocalBestHitOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--max-evalue" => {
+                index += 1;
+                options.max_evalue = Some(parse_finite_f64(
+                    arguments.get(index),
+                    "--max-evalue",
+                    Some(0.0),
+                )?);
+            }
+            "--min-identity" => {
+                index += 1;
+                options.min_identity_percent = Some(parse_sequence_percentage(
+                    arguments.get(index),
+                    "--min-identity",
+                )?);
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown similarity rbh option: {value}").into());
+            }
+            value => paths.push(value),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("similarity rbh requires forward and reverse BLAST result paths".into());
+    }
+    let result = reciprocal_best_hits_path(paths[0], paths[1], options)?;
+    if json {
+        print_analysis_json_with_warnings(
+            "similarity-rbh",
+            "similarity.reciprocal.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_reciprocal_best_hits_text(&result);
+        Ok(())
+    }
+}
+
+fn print_reciprocal_best_hits_text(result: &ReciprocalBestHitResult) {
+    println!("forward_query_count\t{}", result.forward_query_count);
+    println!("reverse_query_count\t{}", result.reverse_query_count);
+    println!("reciprocal_pair_count\t{}", result.reciprocal_pair_count);
+    for pair in &result.pairs {
+        println!(
+            "pair\t{}\t{}\t{:.6e}\t{:.6e}\t{:.6}\t{:.6}\t{:.6}\t{:.6}",
+            pair.left_id,
+            pair.right_id,
+            pair.forward_evalue,
+            pair.reverse_evalue,
+            pair.forward_bit_score,
+            pair.reverse_bit_score,
+            pair.forward_identity_percent,
+            pair.reverse_identity_percent
+        );
+    }
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_protein_domains(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let (path, json) = parse_single_path_json(arguments, "protein domains")?;
+    let result = parse_protein_domains_path(path)?;
+    if json {
+        print_analysis_json_with_warnings(
+            "protein-domains",
+            "protein.domain.parse.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_protein_domains_text(&result);
+        Ok(())
+    }
+}
+
+fn print_protein_domains_text(result: &ProteinDomainParseResult) {
+    println!("format\t{}", result.format);
+    println!("sequence_count\t{}", result.sequence_count);
+    println!("hit_count\t{}", result.hit_count);
+    for hit in &result.hits {
+        println!(
+            "domain\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            hit.sequence_id,
+            hit.source,
+            hit.accession,
+            hit.start,
+            hit.end,
+            hit.evalue
+                .map(|value| format!("{value:.6e}"))
+                .unwrap_or_else(|| "NA".to_owned()),
+            hit.score
+                .map(|value| format!("{value:.6}"))
+                .unwrap_or_else(|| "NA".to_owned())
+        );
+    }
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_phylogeny_tree(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = TreeTransformOptions::default();
+    let mut label_map_path = None;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--reroot" => {
+                index += 1;
+                options.reroot_label = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--reroot requires a leaf label")?
+                        .clone(),
+                );
+            }
+            "--label-map" => {
+                index += 1;
+                label_map_path = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--label-map requires a TSV path")?
+                        .clone(),
+                );
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown phylogeny tree option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "phylogeny tree")?,
+        }
+        index += 1;
+    }
+    let input = input.ok_or("phylogeny tree requires an input Newick path")?;
+    let output = output.ok_or("phylogeny tree requires an output Newick path")?;
+    if let Some(path) = label_map_path {
+        options.label_map = read_tree_label_map_path(path)?;
+    }
+    let result = transform_newick_path(input, output, options)?;
+    if json {
+        print_analysis_json_with_warnings(
+            "phylogeny-tree",
+            "phylogeny.tree.transform.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_phylogeny_tree_text(&result);
+        Ok(())
+    }
+}
+
+fn print_phylogeny_tree_text(result: &TreeTransformResult) {
+    println!("leaf_count\t{}", result.leaf_count);
+    println!("internal_node_count\t{}", result.internal_node_count);
+    println!("max_depth\t{}", result.max_depth);
+    if let Some(length) = result.total_branch_length {
+        println!("total_branch_length\t{length:.6}");
+    }
+    println!("rerooted\t{}", result.rerooted);
+    println!("relabeled_count\t{}", result.relabeled_count);
+    println!("output\t{}", result.output);
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
 fn print_protein_properties(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
     let result = protein_properties_path(path)?;
     if json {
@@ -2603,6 +2930,7 @@ fn usage() -> &'static str {
         "  linxira-bio annotation normalize <input.gff3|gtf[.gz]> <output.gff3> [--sort] [--json]\n",
         "  linxira-bio annotation positions <input.gff3|gtf[.gz]> <output.tsv> [--feature-type TYPE ...] [--json]\n",
         "  linxira-bio annotation extract <input.gff3|gtf[.gz]> <reference.fasta[.gz]> <output.fasta> [--feature-type gene|transcript|cds|exon|utr|five_prime_utr|three_prime_utr|promoter] [--promoter-length N] [--json]\n",
+        "  linxira-bio annotation gene-density <input.gff3|gtf[.gz]> [--feature-type TYPE ...] [--window-size N] [--step-size N] [--json]\n",
         "  linxira-bio variant stats <input.vcf[.gz]> [--json]\n",
         "  linxira-bio variant filter <input.vcf[.gz]> <output.vcf> [--min-qual Q] [--pass-only] [--contig NAME ...] [--min-info-dp N] [--json]\n",
         "  linxira-bio variant normalize <input.vcf[.gz]> <reference.fasta[.gz]> <output.vcf> [--json]\n",
@@ -2616,7 +2944,11 @@ fn usage() -> &'static str {
         "  linxira-bio expression heatmap <matrix.csv|tsv[.gz]> [--top-features N] [--no-scale] [--json]\n",
         "  linxira-bio set venn <sets.csv|tsv[.gz]> [--include-items] [--json]\n",
         "  linxira-bio set upset <sets.csv|tsv[.gz]> [--max-intersections N] [--include-items] [--json]\n",
+        "  linxira-bio similarity blast-parse <blast.tsv|xml[.gz]> [--json]\n",
+        "  linxira-bio similarity rbh <forward.tsv|xml[.gz]> <reverse.tsv|xml[.gz]> [--max-evalue X] [--min-identity P] [--json]\n",
         "  linxira-bio protein properties <proteins.fasta[.gz]> [--json]\n",
+        "  linxira-bio protein domains <interproscan.tsv|hmmer.domtblout[.gz]> [--json]\n",
+        "  linxira-bio phylogeny tree <input.nwk[.gz]> <output.nwk> [--reroot LEAF] [--label-map labels.tsv] [--json]\n",
         "  linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> [--select-column NAME ...] [--drop-column NAME ...] [--filter-column NAME --filter-op equals|contains|non-empty [--filter-value VALUE]] [--skip-rows N] [--limit N] [--delimiter csv|tsv] [--output-delimiter csv|tsv] [--json]\n",
         "  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n",
         "  linxira-bio structure mmcif-summary <input.cif|mmcif[.gz]> [--json]\n",
