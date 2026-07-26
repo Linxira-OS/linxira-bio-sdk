@@ -1,0 +1,20 @@
+{
+  "set_count": 3,
+  "union_size": 6,
+  "set_sizes": [
+    {"name": "control", "count": 3},
+    {"name": "treatment", "count": 4},
+    {"name": "validated", "count": 4}
+  ],
+  "intersection_count": 6,
+  "reported_intersection_count": 6,
+  "omitted_intersection_count": 0,
+  "intersections": [
+    {"sets": ["control", "treatment", "validated"], "degree": 3, "count": 1, "items": []},
+    {"sets": ["control", "treatment"], "degree": 2, "count": 1, "items": []},
+    {"sets": ["control", "validated"], "degree": 2, "count": 1, "items": []},
+    {"sets": ["treatment", "validated"], "degree": 2, "count": 1, "items": []},
+    {"sets": ["treatment"], "degree": 1, "count": 1, "items": []},
+    {"sets": ["validated"], "degree": 1, "count": 1, "items": []}
+  ]
+}

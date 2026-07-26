@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Set Overlaps"
+  short_description: "Count exact Venn and UpSet intersections locally"
+  default_prompt: "Use $analyze-set-overlaps to analyze exact overlaps among local biological identifier sets."

@@ -20,6 +20,10 @@ from generate_third_party_notices import (
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "packaging" / "bundle-manifest.json"
+GENERATED_TREE_NAMES = frozenset(
+    {"__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
+)
+GENERATED_TREE_SUFFIXES = (".pyc", ".pyo")
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -95,6 +99,14 @@ def validate_sources(manifest: dict[str, object]) -> None:
             raise ValueError(f"bundle tree is missing: {relative_path}")
 
 
+def ignore_generated_tree_entries(_directory: str, names: list[str]) -> list[str]:
+    return sorted(
+        name
+        for name in names
+        if name in GENERATED_TREE_NAMES or name.lower().endswith(GENERATED_TREE_SUFFIXES)
+    )
+
+
 def copy_sources(manifest: dict[str, object], staging_root: Path) -> None:
     for relative_path in manifest["include_files"]:
         source = repository_path(relative_path)
@@ -102,7 +114,11 @@ def copy_sources(manifest: dict[str, object], staging_root: Path) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
     for relative_path in manifest["include_trees"]:
-        shutil.copytree(repository_path(relative_path), staging_root / relative_path)
+        shutil.copytree(
+            repository_path(relative_path),
+            staging_root / relative_path,
+            ignore=ignore_generated_tree_entries,
+        )
 
 
 def copy_binaries(

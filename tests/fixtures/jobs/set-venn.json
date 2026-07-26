@@ -1,0 +1,8 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-set-venn",
+  "capability": "set.venn.v1",
+  "inputs": {"table": "../set-analysis/sets.tsv"},
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"include_items": true}
+}

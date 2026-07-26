@@ -392,6 +392,33 @@
       "output_formats": ["json"]
     },
     {
+      "id": "set.venn.v1",
+      "status": "available",
+      "category": "statistical-analysis",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio set venn <sets.csv|tsv> --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "set.upset.v1",
+      "status": "available",
+      "category": "statistical-analysis",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio set upset <sets.csv|tsv> --max-intersections 50 --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "protein.properties.v1",
+      "status": "available",
+      "category": "protein-analysis",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio protein properties <proteins.fasta> --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["json"]
+    },
+    {
       "id": "protein.af2.predict.v1",
       "status": "planned",
       "category": "structural-biology",

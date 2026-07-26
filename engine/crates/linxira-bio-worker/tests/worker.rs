@@ -766,6 +766,54 @@ fn executes_expression_matrix_qc_job() {
 }
 
 #[test]
+fn executes_set_and_protein_analysis_jobs() {
+    let root = workspace_root();
+    let cases = [
+        ("set-venn.json", "set.venn.v1", "set_count", 3),
+        ("set-upset.json", "set.upset.v1", "union_size", 6),
+        (
+            "protein-properties.json",
+            "protein.properties.v1",
+            "sequence_count",
+            2,
+        ),
+        ("set-venn-v2.json", "set.venn.v1", "set_count", 3),
+        ("set-upset-v2.json", "set.upset.v1", "union_size", 6),
+        (
+            "protein-properties-v2.json",
+            "protein.properties.v1",
+            "sequence_count",
+            2,
+        ),
+    ];
+    for (fixture, capability, field, expected) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(root.join("tests/fixtures/jobs").join(fixture))
+            .output()
+            .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
+        assert!(
+            output.status.success(),
+            "{fixture}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid analysis result");
+        assert_eq!(result["status"], "ok", "{fixture}");
+        assert_eq!(result["capability"], capability, "{fixture}");
+        assert_eq!(result["result"][field], expected, "{fixture}");
+        if fixture.ends_with("-v2.json") {
+            assert_eq!(
+                result["provenance"]["input_sha256"]
+                    .as_object()
+                    .map(serde_json::Map::len),
+                Some(1),
+                "{fixture}"
+            );
+        }
+    }
+}
+
+#[test]
 fn executes_v2_expression_analysis_fixtures() {
     let root = workspace_root();
     let output_path = root.join("target/test-results/expression-normalize-v2.tsv");

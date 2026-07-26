@@ -56,6 +56,13 @@ a replacement script silently.
   column dropping, row skipping, row limiting, and delimiter conversion.
   Differential expression, sparse containers, complete RNA-seq workflows, and
   single-cell analysis remain external or planned.
+- Biological identifier-set CSV/TSV tables: use `analyze-set-overlaps` for
+  exact 2–6-set Venn regions or ranked 2–64-set UpSet intersections. Do not
+  infer enrichment or significance from overlap counts alone.
+- Protein FASTA physicochemical characterization: use
+  `analyze-protein-properties` for composition, molecular weight, theoretical
+  pI, charge, aromaticity, GRAVY, and extinction coefficients. Ambiguous
+  sequences deliberately return null derived values.
 - PDB coordinate summaries and explicitly requested AlphaFold pLDDT from PDB
   B-factors: use `analyze-pdb-structure`. The native GUI can preview PDB and
   mmCIF coordinates in three representation modes and export the current view

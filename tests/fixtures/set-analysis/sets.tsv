@@ -1,0 +1,5 @@
+control	treatment	validated
+geneA	geneA	geneA
+geneB	geneC	geneC
+geneD	geneB	geneE
+	geneF	geneD

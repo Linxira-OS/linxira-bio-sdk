@@ -31,6 +31,10 @@ the agent skills that select and validate them.
 - Read `skills/analyze-expression-matrix/SKILL.md` for implemented CSV/TSV
   matrix QC, normalization, PCA, sample/feature clustering, and native
   clustered-heatmap preparation.
+- Read `skills/analyze-set-overlaps/SKILL.md` for implemented exact Venn and
+  UpSet analysis of biological identifier-set tables.
+- Read `skills/analyze-protein-properties/SKILL.md` for implemented local
+  protein FASTA physicochemical properties.
 - Read `skills/manipulate-bio-tables/SKILL.md` for the implemented CSV/TSV
   `table.manipulate.v1` capability.
 - Read `skills/analyze-variant-statistics/SKILL.md` for the implemented
