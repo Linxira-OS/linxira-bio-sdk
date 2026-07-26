@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/structure-geometry.v1.json",
+  "title": "Linxira Bio coordinate geometry result",
+  "type": "object",
+  "required": ["format", "measurement", "units", "value", "atoms"],
+  "properties": {
+    "format": {"enum": ["pdb", "mmcif"]},
+    "measurement": {"enum": ["distance", "angle", "torsion"]},
+    "units": {"enum": ["angstrom", "degree"]},
+    "value": {"type": "number"},
+    "atoms": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["model_id", "chain_id", "residue_id", "residue_name", "atom_name", "x", "y", "z"],
+        "properties": {
+          "model_id": {"type": "string", "minLength": 1},
+          "chain_id": {"type": "string"},
+          "residue_id": {"type": "string", "minLength": 1},
+          "residue_name": {"type": "string", "minLength": 1},
+          "atom_name": {"type": "string", "minLength": 1},
+          "x": {"type": "number"},
+          "y": {"type": "number"},
+          "z": {"type": "number"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "allOf": [
+    {"if": {"properties": {"measurement": {"const": "distance"}}}, "then": {"properties": {"units": {"const": "angstrom"}, "atoms": {"minItems": 2, "maxItems": 2}}}},
+    {"if": {"properties": {"measurement": {"const": "angle"}}}, "then": {"properties": {"units": {"const": "degree"}, "atoms": {"minItems": 3, "maxItems": 3}}}},
+    {"if": {"properties": {"measurement": {"const": "torsion"}}}, "then": {"properties": {"units": {"const": "degree"}, "atoms": {"minItems": 4, "maxItems": 4}}}}
+  ],
+  "additionalProperties": false
+}

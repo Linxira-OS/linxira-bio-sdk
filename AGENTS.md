@@ -42,6 +42,9 @@ the agent skills that select and validate them.
   capabilities.
 - Read `skills/analyze-pdb-structure/SKILL.md` for the implemented
   `structure.pdb.summary.v1` capability and explicit AlphaFold pLDDT handling.
+- Read `skills/analyze-coordinate-structures/SKILL.md` for implemented local
+  mmCIF summaries, coordinate-derived sequences, residue contacts, geometry,
+  and identity-matched structure superposition.
 - Read `skills/inspect-bio-dataset/SKILL.md` before analyzing imported data.
 - Read `skills/export-bio-table/SKILL.md` to export supported result tables.
 - Read `skills/configure-bio-environment/SKILL.md` to audit managed Python, R,

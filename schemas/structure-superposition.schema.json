@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/structure-superposition.v1.json",
+  "title": "Linxira Bio identifier-matched structure superposition result",
+  "type": "object",
+  "required": ["reference_format", "mobile_format", "reference_model_id", "mobile_model_id", "atom_name", "matched_atom_count", "rmsd_before_angstrom", "rmsd_after_angstrom", "rotation", "translation", "warnings"],
+  "properties": {
+    "reference_format": {"enum": ["pdb", "mmcif"]},
+    "mobile_format": {"enum": ["pdb", "mmcif"]},
+    "reference_model_id": {"type": "string", "minLength": 1},
+    "mobile_model_id": {"type": "string", "minLength": 1},
+    "atom_name": {"type": "string", "minLength": 1},
+    "matched_atom_count": {"type": "integer", "minimum": 3},
+    "rmsd_before_angstrom": {"type": "number", "minimum": 0},
+    "rmsd_after_angstrom": {"type": "number", "minimum": 0},
+    "rotation": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}}},
+    "translation": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

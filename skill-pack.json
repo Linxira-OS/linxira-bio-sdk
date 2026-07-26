@@ -138,6 +138,18 @@
       "capabilities": ["structure.pdb.summary.v1"]
     },
     {
+      "id": "analyze-coordinate-structures",
+      "path": "skills/analyze-coordinate-structures",
+      "kind": "executable",
+      "capabilities": [
+        "structure.mmcif.summary.v1",
+        "structure.sequence.extract.v1",
+        "structure.contact-map.v1",
+        "structure.geometry.v1",
+        "structure.superpose.v1"
+      ]
+    },
+    {
       "id": "inspect-bio-dataset",
       "path": "skills/inspect-bio-dataset",
       "kind": "executable",

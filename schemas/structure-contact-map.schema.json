@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/structure-contact-map.v1.json",
+  "title": "Linxira Bio residue contact map result",
+  "type": "object",
+  "required": ["format", "model_id", "atom_name", "cutoff_angstrom", "representative_residue_count", "contact_count", "contacts", "warnings"],
+  "properties": {
+    "format": {"enum": ["pdb", "mmcif"]},
+    "model_id": {"type": "string", "minLength": 1},
+    "atom_name": {"type": "string", "minLength": 1},
+    "cutoff_angstrom": {"type": "number", "exclusiveMinimum": 0, "maximum": 100},
+    "representative_residue_count": {"type": "integer", "minimum": 2},
+    "contact_count": {"type": "integer", "minimum": 0, "maximum": 1000000},
+    "contacts": {"type": "array", "maxItems": 1000000, "items": {"$ref": "#/$defs/contact"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "residue": {
+      "type": "object",
+      "required": ["chain_id", "residue_id", "residue_name", "ordinal"],
+      "properties": {
+        "chain_id": {"type": "string"},
+        "residue_id": {"type": "string", "minLength": 1},
+        "residue_name": {"type": "string", "minLength": 1},
+        "ordinal": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "contact": {
+      "type": "object",
+      "required": ["left", "right", "distance_angstrom", "inter_chain", "sequence_separation"],
+      "properties": {
+        "left": {"$ref": "#/$defs/residue"},
+        "right": {"$ref": "#/$defs/residue"},
+        "distance_angstrom": {"type": "number", "minimum": 0},
+        "inter_chain": {"type": "boolean"},
+        "sequence_separation": {"type": ["integer", "null"], "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

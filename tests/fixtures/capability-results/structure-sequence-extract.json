@@ -1,0 +1,8 @@
+{
+  "format": "pdb",
+  "model_id": "1",
+  "chain_count": 1,
+  "total_residues": 4,
+  "chains": [{"chain_id": "A", "polymer_type": "protein", "sequence": "AGSV", "residue_count": 4, "unknown_residue_count": 0}],
+  "warnings": []
+}

@@ -288,6 +288,11 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "variant.filter.v1",
     "variant.normalize.v1",
     "structure.pdb.summary.v1",
+    "structure.mmcif.summary.v1",
+    "structure.sequence.extract.v1",
+    "structure.contact-map.v1",
+    "structure.geometry.v1",
+    "structure.superpose.v1",
     "environment.audit.v1",
     "environment.plan.v1",
     "runtime.catalog.v1",
@@ -331,6 +336,12 @@ struct BioApp {
     expression_heatmap_top_features: usize,
     expression_heatmap_scale: bool,
     interpret_pdb_b_factors_as_plddt: bool,
+    structure_contact_cutoff: f64,
+    structure_contact_atom: String,
+    structure_contact_include_inter_chain: bool,
+    structure_geometry_atom_count: usize,
+    structure_geometry_atoms: [String; 4],
+    structure_superpose_atom: String,
     job_history: Vec<JobRecord>,
     analysis_job_id: Option<String>,
     export_status: String,
@@ -392,6 +403,17 @@ impl BioApp {
             expression_heatmap_top_features: 50,
             expression_heatmap_scale: true,
             interpret_pdb_b_factors_as_plddt: false,
+            structure_contact_cutoff: 8.0,
+            structure_contact_atom: "CA".to_owned(),
+            structure_contact_include_inter_chain: true,
+            structure_geometry_atom_count: 3,
+            structure_geometry_atoms: [
+                "A/1/N".to_owned(),
+                "A/1/CA".to_owned(),
+                "A/1/C".to_owned(),
+                "A/2/N".to_owned(),
+            ],
+            structure_superpose_atom: "CA".to_owned(),
             job_history: Vec::new(),
             analysis_job_id: None,
             export_status: String::new(),
@@ -732,19 +754,17 @@ impl BioApp {
             let Some(secondary) = self.datasets.get(secondary_index) else {
                 return;
             };
-            let Some(required_format) = secondary_input_format(route.capability) else {
-                return;
-            };
-            let secondary_runnable = dataset_detected_format(secondary) == required_format
-                && secondary
-                    .inspection
-                    .as_ref()
-                    .is_some_and(inspection_is_runnable)
-                && !matches!(
-                    secondary.state,
-                    DatasetState::Inspecting | DatasetState::Invalid
-                )
-                && secondary.path != dataset_path;
+            let secondary_runnable =
+                secondary_input_matches(route.capability, dataset_detected_format(secondary))
+                    && secondary
+                        .inspection
+                        .as_ref()
+                        .is_some_and(inspection_is_runnable)
+                    && !matches!(
+                        secondary.state,
+                        DatasetState::Inspecting | DatasetState::Invalid
+                    )
+                    && secondary.path != dataset_path;
             if !secondary_runnable {
                 return;
             }
@@ -840,6 +860,27 @@ impl BioApp {
         if route.capability == "structure.pdb.summary.v1" {
             request.parameters = serde_json::json!({
                 "interpret_b_factors_as_plddt": self.interpret_pdb_b_factors_as_plddt,
+            });
+        }
+        if route.capability == "structure.contact-map.v1" {
+            request.parameters = serde_json::json!({
+                "cutoff_angstrom": self.structure_contact_cutoff,
+                "atom_name": self.structure_contact_atom.trim(),
+                "include_inter_chain": self.structure_contact_include_inter_chain,
+            });
+        }
+        if route.capability == "structure.geometry.v1" {
+            request.parameters = serde_json::json!({
+                "atoms": self.structure_geometry_atoms
+                    .iter()
+                    .take(self.structure_geometry_atom_count)
+                    .map(|selector| selector.trim())
+                    .collect::<Vec<_>>(),
+            });
+        }
+        if route.capability == "structure.superpose.v1" {
+            request.parameters = serde_json::json!({
+                "atom_name": self.structure_superpose_atom.trim(),
             });
         }
         let capability = route.capability.to_owned();
@@ -1390,14 +1431,14 @@ impl BioApp {
                     DatasetState::Ready.color(),
                     self.text("可检查", "Inspect now"),
                 );
-                ui.label("FASTA, FASTQ, CSV/TSV, BED, GFF3/GTF, VCF, SAM, PDB");
+                ui.label("FASTA, FASTQ, CSV/TSV, BED, GFF3/GTF, VCF, SAM, PDB, mmCIF");
                 ui.label(".gz / BGZF");
                 ui.end_row();
                 ui.colored_label(
                     DatasetState::Warning.color(),
                     self.text("识别但暂不分析", "Recognize only"),
                 );
-                ui.label("BAM, BCF, CRAM, HDF5/H5AD, LOOM, RDS, mmCIF");
+                ui.label("BAM, BCF, CRAM, HDF5/H5AD, LOOM, RDS");
                 ui.label(self.text("保持原文件", "Preserved"));
                 ui.end_row();
                 ui.colored_label(
@@ -1623,6 +1664,11 @@ impl BioApp {
                     "protein.properties.v1",
                     "table.manipulate.v1",
                     "structure.pdb.summary.v1",
+                    "structure.mmcif.summary.v1",
+                    "structure.sequence.extract.v1",
+                    "structure.contact-map.v1",
+                    "structure.geometry.v1",
+                    "structure.superpose.v1",
                 ] {
                     ui.selectable_value(
                         &mut self.selected_capability,
@@ -1641,8 +1687,10 @@ impl BioApp {
             .enumerate()
             .filter(|(index, dataset)| {
                 Some(*index) != primary_index
-                    && secondary_format
-                        .is_some_and(|format| dataset_detected_format(dataset) == format)
+                    && secondary_input_matches(
+                        &self.selected_capability,
+                        dataset_detected_format(dataset),
+                    )
                     && dataset
                         .inspection
                         .as_ref()
@@ -1674,6 +1722,13 @@ impl BioApp {
                     "variant.normalize.v1" | "annotation.sequence.extract.v1" => (
                         self.text("参考 FASTA", "Reference FASTA"),
                         self.text("没有可用 FASTA", "No FASTA available"),
+                    ),
+                    "structure.superpose.v1" => (
+                        self.text("移动结构", "Mobile structure"),
+                        self.text(
+                            "没有其他可用 PDB/mmCIF",
+                            "No other PDB/mmCIF structure available",
+                        ),
                     ),
                     _ => (
                         self.text("右侧 BED", "Right BED"),
@@ -1830,6 +1885,77 @@ impl BioApp {
                 ),
             );
         }
+        if self.selected_capability == "structure.contact-map.v1" {
+            ui.add_space(8.0);
+            let include_inter_chain = self.text("包含链间接触", "Include inter-chain contacts");
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("距离阈值（埃）", "Distance cutoff (angstrom)"));
+                ui.add(
+                    egui::DragValue::new(&mut self.structure_contact_cutoff)
+                        .range(0.1..=1_000.0)
+                        .speed(0.1),
+                );
+                ui.label(self.text("代表原子", "Representative atom"));
+                ui.text_edit_singleline(&mut self.structure_contact_atom);
+                ui.checkbox(
+                    &mut self.structure_contact_include_inter_chain,
+                    include_inter_chain,
+                );
+            });
+        }
+        if self.selected_capability == "structure.geometry.v1" {
+            ui.add_space(8.0);
+            let distance_label = self.text("距离（2 原子）", "Distance (2 atoms)");
+            let angle_label = self.text("角度（3 原子）", "Angle (3 atoms)");
+            let dihedral_label = self.text("扭转角（4 原子）", "Dihedral (4 atoms)");
+            ui.horizontal(|ui| {
+                ui.label(self.text("测量类型", "Measurement"));
+                egui::ComboBox::from_id_salt("structure-geometry-count")
+                    .selected_text(match self.structure_geometry_atom_count {
+                        2 => distance_label,
+                        3 => angle_label,
+                        _ => dihedral_label,
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(
+                            &mut self.structure_geometry_atom_count,
+                            2,
+                            distance_label,
+                        );
+                        ui.selectable_value(
+                            &mut self.structure_geometry_atom_count,
+                            3,
+                            angle_label,
+                        );
+                        ui.selectable_value(
+                            &mut self.structure_geometry_atom_count,
+                            4,
+                            dihedral_label,
+                        );
+                    });
+            });
+            ui.small(self.text(
+                "选择器格式：链/残基/原子，或 模型/链/残基/原子",
+                "Selector: CHAIN/RESIDUE/ATOM or MODEL/CHAIN/RESIDUE/ATOM",
+            ));
+            for index in 0..self.structure_geometry_atom_count {
+                ui.horizontal(|ui| {
+                    ui.label(format!("{} {}", self.text("原子", "Atom"), index + 1));
+                    ui.text_edit_singleline(&mut self.structure_geometry_atoms[index]);
+                });
+            }
+        }
+        if self.selected_capability == "structure.superpose.v1" {
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.label(self.text("匹配原子", "Matched atom"));
+                ui.text_edit_singleline(&mut self.structure_superpose_atom);
+            });
+            ui.small(self.text(
+                "仅按链、残基编号和原子名匹配，不执行序列比对。",
+                "Matches chain, residue ID, and atom name only; no sequence alignment.",
+            ));
+        }
 
         ui.add_space(10.0);
         egui::Grid::new("analysis-settings")
@@ -1865,7 +1991,13 @@ impl BioApp {
                 )
                 .to_owned()
             } else if !secondary_ready {
-                if secondary_format == Some("fasta") {
+                if secondary_format == Some("structure") {
+                    self.text(
+                        "结构叠合需要再导入一个检查通过的 PDB 或 mmCIF 文件。",
+                        "Structure superposition requires another validated PDB or mmCIF file.",
+                    )
+                    .to_owned()
+                } else if secondary_format == Some("fasta") {
                     self.text(
                         "注释序列提取需要再导入一个检查通过的参考 FASTA。",
                         "Annotation extraction requires another validated reference FASTA.",
@@ -2480,6 +2612,10 @@ fn analysis_route_for_format(format: &str) -> Option<AnalysisRoute> {
             capability: "structure.pdb.summary.v1",
             input_role: "pdb",
         }),
+        "mmcif" => Some(AnalysisRoute {
+            capability: "structure.mmcif.summary.v1",
+            input_role: "structure",
+        }),
         _ => None,
     }
 }
@@ -2589,6 +2725,25 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             capability: "structure.pdb.summary.v1",
             input_role: "pdb",
         }),
+        ("structure.mmcif.summary.v1", "mmcif") => Some(AnalysisRoute {
+            capability: "structure.mmcif.summary.v1",
+            input_role: "structure",
+        }),
+        (
+            "structure.sequence.extract.v1" | "structure.contact-map.v1" | "structure.geometry.v1",
+            "pdb" | "mmcif",
+        ) => Some(AnalysisRoute {
+            capability: match capability {
+                "structure.sequence.extract.v1" => "structure.sequence.extract.v1",
+                "structure.contact-map.v1" => "structure.contact-map.v1",
+                _ => "structure.geometry.v1",
+            },
+            input_role: "structure",
+        }),
+        ("structure.superpose.v1", "pdb" | "mmcif") => Some(AnalysisRoute {
+            capability: "structure.superpose.v1",
+            input_role: "reference",
+        }),
         _ => None,
     }
 }
@@ -2603,7 +2758,16 @@ fn secondary_input_format(capability: &str) -> Option<&'static str> {
         "annotation.sequence.extract.v1" => Some("fasta"),
         "variant.normalize.v1" => Some("fasta"),
         "primer.epcr.v1" => Some("tsv"),
+        "structure.superpose.v1" => Some("structure"),
         _ => None,
+    }
+}
+
+fn secondary_input_matches(capability: &str, format: &str) -> bool {
+    match secondary_input_format(capability) {
+        Some("structure") => matches!(format.trim().to_ascii_lowercase().as_str(), "pdb" | "mmcif"),
+        Some(required) => format.trim().eq_ignore_ascii_case(required),
+        None => false,
     }
 }
 
@@ -2613,6 +2777,7 @@ fn secondary_input_role(capability: &str) -> Option<&'static str> {
         "annotation.sequence.extract.v1" => Some("fasta"),
         "variant.normalize.v1" => Some("reference"),
         "primer.epcr.v1" => Some("primers"),
+        "structure.superpose.v1" => Some("mobile"),
         _ => None,
     }
 }
@@ -3267,6 +3432,13 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "protein.properties.v1" => language.text("蛋白理化性质", "Protein properties"),
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
+        "structure.mmcif.summary.v1" => language.text("mmCIF 结构摘要", "mmCIF structure summary"),
+        "structure.sequence.extract.v1" => {
+            language.text("坐标序列提取", "Coordinate sequence extraction")
+        }
+        "structure.contact-map.v1" => language.text("残基接触图", "Residue contact map"),
+        "structure.geometry.v1" => language.text("结构几何测量", "Structure geometry"),
+        "structure.superpose.v1" => language.text("结构刚体叠合", "Structure superposition"),
         _ => language.text("未知能力", "Unknown capability"),
     }
 }
@@ -3823,6 +3995,30 @@ fn metric_label(key: &str, language: Language) -> &str {
         "polymer_atom_count" => "聚合物原子数",
         "hetero_atom_count" => "异质原子数",
         "alphafold_confidence" => "AlphaFold 置信度",
+        "coordinate_units" => "坐标单位",
+        "element_counts" => "元素计数",
+        "bounds" => "坐标边界",
+        "models" => "模型摘要",
+        "model_id" => "模型编号",
+        "chains" => "链序列",
+        "atom_name" => "原子名",
+        "cutoff_angstrom" => "距离阈值（埃）",
+        "representative_residue_count" => "代表残基数",
+        "contact_count" => "接触数",
+        "contacts" => "接触明细",
+        "measurement" => "测量类型",
+        "units" => "单位",
+        "value" => "测量值",
+        "atoms" => "所选原子",
+        "reference_format" => "参考结构格式",
+        "mobile_format" => "移动结构格式",
+        "reference_model_id" => "参考模型编号",
+        "mobile_model_id" => "移动模型编号",
+        "matched_atom_count" => "匹配原子数",
+        "rmsd_before_angstrom" => "拟合前 RMSD（埃）",
+        "rmsd_after_angstrom" => "拟合后 RMSD（埃）",
+        "rotation" => "旋转矩阵",
+        "translation" => "平移向量",
         "pass_record_count" => "PASS 记录数",
         "filtered_record_count" => "过滤记录数",
         "snp_count" => "SNP 等位基因数",
@@ -3903,6 +4099,13 @@ fn document_title(capability: &str, language: Language) -> &'static str {
             language.text("VCF 参考规范化", "Reference-guided VCF normalization")
         }
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
+        "structure.mmcif.summary.v1" => language.text("mmCIF 结构摘要", "mmCIF structure summary"),
+        "structure.sequence.extract.v1" => {
+            language.text("坐标序列提取", "Coordinate sequence extraction")
+        }
+        "structure.contact-map.v1" => language.text("残基接触图", "Residue contact map"),
+        "structure.geometry.v1" => language.text("结构几何测量", "Structure geometry"),
+        "structure.superpose.v1" => language.text("结构刚体叠合", "Structure superposition"),
         "environment.audit.v1" => language.text("环境审计", "Environment audit"),
         "environment.plan.v1" => language.text("环境计划", "Environment plan"),
         "runtime.catalog.v1" => language.text("运行时目录", "Runtime catalog"),
@@ -4087,6 +4290,36 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("structure.pdb.summary.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/structure.pdb.summary.v1/en-US.md"
+        )),
+        ("structure.mmcif.summary.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/structure.mmcif.summary.v1/zh-CN.md"
+        )),
+        ("structure.mmcif.summary.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/structure.mmcif.summary.v1/en-US.md"
+        )),
+        ("structure.sequence.extract.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/structure.sequence.extract.v1/zh-CN.md"
+        )),
+        ("structure.sequence.extract.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/structure.sequence.extract.v1/en-US.md"
+        )),
+        ("structure.contact-map.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/structure.contact-map.v1/zh-CN.md"
+        )),
+        ("structure.contact-map.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/structure.contact-map.v1/en-US.md"
+        )),
+        ("structure.geometry.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/structure.geometry.v1/zh-CN.md"
+        )),
+        ("structure.geometry.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/structure.geometry.v1/en-US.md"
+        )),
+        ("structure.superpose.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/structure.superpose.v1/zh-CN.md"
+        )),
+        ("structure.superpose.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/structure.superpose.v1/en-US.md"
         )),
         ("environment.audit.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/environment.audit.v1/zh-CN.md"
@@ -4530,6 +4763,7 @@ mod tests {
         generation_matches, importable_file_path, inspection_is_runnable, inspection_state,
         load_dependency_notices_from, looks_like_drive_relative_path, new_job_id,
         notice_platform_target_pair_is_valid, render_dependency_notice_report,
+        secondary_input_matches,
     };
     use linxira_bio_protocol::ExecutionMode;
     use serde_json::json;
@@ -4635,6 +4869,13 @@ mod tests {
                 input_role: "pdb",
             })
         );
+        assert_eq!(
+            analysis_route_for_format("mmcif"),
+            Some(AnalysisRoute {
+                capability: "structure.mmcif.summary.v1",
+                input_role: "structure",
+            })
+        );
         assert_eq!(analysis_route_for_format("bam"), None);
     }
 
@@ -4732,6 +4973,29 @@ mod tests {
         assert!(!capability_requires_secondary("set.venn.v1"));
         assert!(!capability_requires_secondary("set.upset.v1"));
         assert!(!capability_requires_secondary("protein.properties.v1"));
+    }
+
+    #[test]
+    fn coordinate_structure_capabilities_route_pdb_and_mmcif() {
+        for format in ["pdb", "mmcif"] {
+            for capability in [
+                "structure.sequence.extract.v1",
+                "structure.contact-map.v1",
+                "structure.geometry.v1",
+                "structure.superpose.v1",
+            ] {
+                assert!(
+                    analysis_route_for_capability(capability, format).is_some(),
+                    "{capability} should accept {format}"
+                );
+            }
+        }
+        assert!(analysis_route_for_capability("structure.mmcif.summary.v1", "mmcif").is_some());
+        assert!(analysis_route_for_capability("structure.mmcif.summary.v1", "pdb").is_none());
+        assert!(capability_requires_secondary("structure.superpose.v1"));
+        assert!(secondary_input_matches("structure.superpose.v1", "pdb"));
+        assert!(secondary_input_matches("structure.superpose.v1", "mmcif"));
+        assert!(!secondary_input_matches("structure.superpose.v1", "fasta"));
     }
 
     #[test]

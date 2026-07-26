@@ -1,0 +1,13 @@
+{
+  "reference_format": "pdb",
+  "mobile_format": "pdb",
+  "reference_model_id": "1",
+  "mobile_model_id": "1",
+  "atom_name": "CA",
+  "matched_atom_count": 4,
+  "rmsd_before_angstrom": 10.246950765959598,
+  "rmsd_after_angstrom": 1.2560739669470201e-15,
+  "rotation": [[-2.220446049250313e-16, 1.0000000000000002, 0.0], [-1.0000000000000002, -2.220446049250313e-16, 0.0], [0.0, 0.0, 1.0]],
+  "translation": [5.000000000000003, 10.0, -2.0],
+  "warnings": ["atoms were matched by chain identifier, residue identifier, and atom name; no sequence alignment was performed"]
+}

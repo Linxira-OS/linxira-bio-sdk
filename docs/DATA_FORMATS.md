@@ -21,8 +21,8 @@ means that an analysis capability is available.
 | BCF, CRAM | Magic bytes only | Binary metadata | None | `recognized-unsupported` |
 | HDF5, H5AD, LOOM | Signature plus extension hints | Binary metadata | None | Domain import is planned |
 | RDS | Magic bytes only | Binary metadata | None | `recognized-unsupported` |
-| PDB | Recognized text structure | 3D GUI and PNG snapshot | `structure.pdb.summary.v1` | Plain or gzip; coordinates and optional explicit pLDDT; GUI infers display bonds only |
-| mmCIF | Recognized text structure | 3D GUI and PNG snapshot | None | Plain or gzip GUI coordinate viewing; analysis remains planned |
+| PDB | Recognized text structure | 3D GUI and PNG snapshot | `structure.pdb.summary.v1`, `structure.sequence.extract.v1`, `structure.contact-map.v1`, `structure.geometry.v1`, `structure.superpose.v1` | Plain, gzip, or BGZF; first-model coordinate analysis except all-model PDB summary; explicit pLDDT remains opt-in |
+| mmCIF | Recognized text structure | 3D GUI and PNG snapshot | `structure.mmcif.summary.v1`, `structure.sequence.extract.v1`, `structure.contact-map.v1`, `structure.geometry.v1`, `structure.superpose.v1` | Plain, gzip, or BGZF; supported `_atom_site` loops; first-model derived analysis except all-model summary |
 | ZIP | Container signature | Archive metadata | None | Never extracted by inspection |
 
 Content takes precedence over a misleading filename extension. A supported
@@ -51,8 +51,9 @@ including the header.
 的生物学分析能力。FASTA、FASTQ、SAM 和 VCF 当前分别可运行序列统计、读段质量
 控制/质量裁剪/接头去除、文本比对质控和变异描述统计；BED 可计算两组区间的半开重叠摘要，CSV/TSV
 可进行矩形表达矩阵质控、标准化、PCA、样本/特征聚类、原生聚类热图和精确集合交集分析，蛋白 FASTA
-可计算长度、组成、分子量、理论等电点、pH 7 电荷、芳香性、GRAVY 和消光系数；PDB 可生成结构摘要和供渲染使用的原子坐标。PDB/mmCIF
-均可在 GUI 中进行有界 3D 预览并导出当前视角 PNG，但 mmCIF 分析仍未实现。GFF3、GTF 已支持
+可计算长度、组成、分子量、理论等电点、pH 7 电荷、芳香性、GRAVY 和消光系数；PDB 可生成结构摘要和显式 pLDDT
+统计，PDB/mmCIF 均可提取坐标序列、计算接触、测量几何并按坐标身份做刚体叠合。两种格式
+均可在 GUI 中进行有界 3D 预览并导出当前视角 PNG。GFF3、GTF 已支持
 统计、规范化、坐标表和参考序列提取；BAM、BCF、CRAM、H5AD 等二进制格式仅识别，不会伪装成可用能力。
 
 预览最多读取 200 条记录或 10 MiB 解压后内容。表格默认导出 CSV，也支持 TSV、

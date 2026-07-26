@@ -58,7 +58,12 @@ SCHEMA_FILES = (
     "schemas/runtime-lock.schema.json",
     "schemas/set-upset.schema.json",
     "schemas/set-venn.schema.json",
+    "schemas/structure-contact-map.schema.json",
+    "schemas/structure-geometry.schema.json",
+    "schemas/structure-mmcif-summary.schema.json",
     "schemas/structure-pdb-summary.schema.json",
+    "schemas/structure-sequence-extract.schema.json",
+    "schemas/structure-superposition.schema.json",
     "schemas/third-party-dependencies.schema.json",
     "schemas/tool-catalog.schema.json",
     "schemas/workflow-pack-catalog.schema.json",
@@ -102,6 +107,26 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/protein-properties.json",
         "schemas/protein-properties.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/structure-mmcif-summary.json",
+        "schemas/structure-mmcif-summary.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/structure-sequence-extract.json",
+        "schemas/structure-sequence-extract.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/structure-contact-map.json",
+        "schemas/structure-contact-map.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/structure-geometry.json",
+        "schemas/structure-geometry.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/structure-superposition.json",
+        "schemas/structure-superposition.schema.json",
     ),
 )
 

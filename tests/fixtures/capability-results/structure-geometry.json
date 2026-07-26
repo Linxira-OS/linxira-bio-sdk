@@ -1,0 +1,11 @@
+{
+  "format": "pdb",
+  "measurement": "angle",
+  "units": "degree",
+  "value": 45.00000000000001,
+  "atoms": [
+    {"model_id": "1", "chain_id": "A", "residue_id": "1", "residue_name": "ALA", "atom_name": "CA", "x": 0.0, "y": 0.0, "z": 0.0},
+    {"model_id": "1", "chain_id": "A", "residue_id": "2", "residue_name": "GLY", "atom_name": "CA", "x": 4.0, "y": 0.0, "z": 0.0},
+    {"model_id": "1", "chain_id": "A", "residue_id": "3", "residue_name": "SER", "atom_name": "CA", "x": 0.0, "y": 4.0, "z": 0.0}
+  ]
+}

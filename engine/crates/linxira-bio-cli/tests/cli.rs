@@ -87,6 +87,89 @@ fn runs_set_and_protein_analysis_as_json() {
 }
 
 #[test]
+fn runs_coordinate_structure_analysis_as_json() {
+    let root = workspace_root().join("tests/fixtures/structure-analysis");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["structure", "mmcif-summary"])
+        .arg(root.join("reference.cif"))
+        .arg("--json")
+        .output()
+        .expect("run mmCIF summary");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("mmCIF JSON");
+    assert_eq!(result["capability"], "structure.mmcif.summary.v1");
+    assert_eq!(result["result"]["atom_count"], 5);
+    assert_eq!(result["warnings"].as_array().map(Vec::len), Some(1));
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["structure", "sequence"])
+        .arg(root.join("reference.pdb"))
+        .arg("--json")
+        .output()
+        .expect("run structure sequence extraction");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("sequence JSON");
+    assert_eq!(result["capability"], "structure.sequence.extract.v1");
+    assert_eq!(result["result"]["chains"][0]["sequence"], "AGSV");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["structure", "contact-map"])
+        .arg(root.join("reference.pdb"))
+        .args(["--cutoff", "6", "--json"])
+        .output()
+        .expect("run contact map");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("contact JSON");
+    assert_eq!(result["capability"], "structure.contact-map.v1");
+    assert_eq!(result["result"]["contact_count"], 6);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["structure", "geometry"])
+        .arg(root.join("reference.pdb"))
+        .args(["--atom", "A/1/CA", "--atom", "A/2/CA", "--json"])
+        .output()
+        .expect("run structure geometry");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("geometry JSON");
+    assert_eq!(result["capability"], "structure.geometry.v1");
+    assert_eq!(result["result"]["value"], 4.0);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["structure", "superpose"])
+        .arg(root.join("reference.pdb"))
+        .arg(root.join("mobile.pdb"))
+        .arg("--json")
+        .output()
+        .expect("run structure superposition");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("superpose JSON");
+    assert_eq!(result["capability"], "structure.superpose.v1");
+    assert_eq!(result["result"]["matched_atom_count"], 4);
+    assert!(result["result"]["rmsd_after_angstrom"].as_f64().unwrap() < 1e-9);
+}
+
+#[test]
 fn runs_kmer_epcr_and_variant_transform_capabilities() {
     let workspace = workspace_root();
     let output_root = temporary_directory("sequence-variant-analysis");

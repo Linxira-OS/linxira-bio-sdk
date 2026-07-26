@@ -335,6 +335,51 @@
       "output_formats": ["json"]
     },
     {
+      "id": "structure.mmcif.summary.v1",
+      "status": "available",
+      "category": "structural-biology",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio structure mmcif-summary <input.cif|mmcif> --json",
+      "input_formats": ["mmcif"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "structure.sequence.extract.v1",
+      "status": "available",
+      "category": "structural-biology",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio structure sequence <input.pdb|cif> --json",
+      "input_formats": ["pdb", "mmcif"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "structure.contact-map.v1",
+      "status": "available",
+      "category": "structural-biology",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio structure contact-map <input.pdb|cif> --cutoff 8 --atom CA --json",
+      "input_formats": ["pdb", "mmcif"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "structure.geometry.v1",
+      "status": "available",
+      "category": "structural-biology",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio structure geometry <input.pdb|cif> --atom CHAIN/RESIDUE/ATOM --atom CHAIN/RESIDUE/ATOM --json",
+      "input_formats": ["pdb", "mmcif"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "structure.superpose.v1",
+      "status": "available",
+      "category": "structural-biology",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio structure superpose <reference.pdb|cif> <mobile.pdb|cif> --atom CA --json",
+      "input_formats": ["pdb", "mmcif"],
+      "output_formats": ["json"]
+    },
+    {
       "id": "sequence.convert.biopython.v1",
       "status": "planned",
       "category": "sequence-io",

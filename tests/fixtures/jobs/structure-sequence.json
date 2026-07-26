@@ -1,0 +1,8 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-structure-sequence",
+  "capability": "structure.sequence.extract.v1",
+  "inputs": {"structure": "../structure-analysis/reference.pdb"},
+  "execution": {"mode": "local-cpu"},
+  "parameters": {}
+}
