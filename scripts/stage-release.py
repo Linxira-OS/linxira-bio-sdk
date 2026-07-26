@@ -49,8 +49,9 @@ def load_manifest() -> dict[str, object]:
 
 
 def repository_path(relative_path: str) -> Path:
-    candidate = (ROOT / relative_path).resolve()
-    if candidate != ROOT and ROOT not in candidate.parents:
+    root = ROOT.resolve()
+    candidate = (root / relative_path).resolve()
+    if candidate != root and root not in candidate.parents:
         raise ValueError(f"bundle path leaves repository: {relative_path}")
     return candidate
 
