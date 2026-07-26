@@ -1,0 +1,8 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-annotation-go",
+  "capability": "annotation.go.normalize.v1",
+  "inputs": {"annotations": "../functional/go-source.tsv"},
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/go-associations.tsv"}
+}

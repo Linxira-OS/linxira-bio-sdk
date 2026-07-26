@@ -1156,6 +1156,81 @@ fn sequence_transforms_reject_invalid_options_and_existing_outputs() {
     fs::remove_dir_all(root).expect("remove sequence transform error directory");
 }
 
+#[test]
+fn functional_annotation_and_enrichment_commands_emit_versioned_json() {
+    let workspace = workspace_root();
+    let fixtures = workspace.join("tests/fixtures/functional");
+    let output_root = temporary_directory("functional-analysis");
+    let go_output = output_root.join("go-associations.tsv");
+    let eggnog_output = output_root.join("eggnog-normalized.tsv");
+
+    let normalization_cases = [
+        (
+            ["annotation", "go"],
+            fixtures.join("go-source.tsv"),
+            go_output.clone(),
+            "annotation.go.normalize.v1",
+            "association_count",
+            5,
+        ),
+        (
+            ["annotation", "eggnog"],
+            fixtures.join("eggnog.tsv"),
+            eggnog_output.clone(),
+            "annotation.eggnog.normalize.v1",
+            "query_count",
+            3,
+        ),
+    ];
+    for (command, input, output_path, capability, field, expected) in normalization_cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+            .args(command)
+            .arg(input)
+            .arg(&output_path)
+            .arg("--json")
+            .output()
+            .expect("run functional normalization command");
+        assert!(
+            output.status.success(),
+            "{capability}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid normalization JSON");
+        assert_eq!(result["schema_version"], "1");
+        assert_eq!(result["capability"], capability);
+        assert_eq!(result["result"][field], expected);
+        assert!(output_path.is_file());
+    }
+
+    for (mode, capability, expected) in [
+        ("custom", "enrichment.overrepresentation.v1", 6),
+        ("go", "enrichment.go.v1", 3),
+        ("kegg", "enrichment.kegg.v1", 2),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+            .args(["enrichment", mode])
+            .arg(fixtures.join("genes.txt"))
+            .arg(fixtures.join("associations.tsv"))
+            .args(["--include-genes", "--max-terms", "10", "--json"])
+            .output()
+            .expect("run enrichment command");
+        assert!(
+            output.status.success(),
+            "{capability}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid enrichment JSON");
+        assert_eq!(result["schema_version"], "1");
+        assert_eq!(result["capability"], capability);
+        assert_eq!(result["result"]["reported_term_count"], expected);
+        assert_eq!(result["result"]["query_unmapped_count"], 1);
+    }
+
+    fs::remove_dir_all(output_root).expect("remove functional analysis directory");
+}
+
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")

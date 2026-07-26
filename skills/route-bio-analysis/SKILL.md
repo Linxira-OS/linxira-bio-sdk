@@ -71,6 +71,10 @@ a replacement script silently.
 - Completed InterProScan TSV or HMMER domtblout files: use
   `analyze-protein-domains`. Domain search execution and database downloads
   remain external native workflows.
+- GO columns, standard eggNOG-mapper annotation tables, gene-to-term mappings,
+  and custom/GO/KEGG over-representation analysis: use
+  `analyze-functional-enrichment`. The association table defines the tested
+  background universe; preserve its source and version.
 - Newick normalization, label mapping, summaries, and single-leaf rerooting:
   use `transform-phylogenetic-trees`. Tree inference and publication rendering
   remain external or planned.

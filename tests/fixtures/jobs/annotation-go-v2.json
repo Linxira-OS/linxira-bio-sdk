@@ -1,0 +1,13 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-annotation-go-v2",
+  "capability": "annotation.go.normalize.v1",
+  "inputs": [{
+    "artifact_id": "input-annotations",
+    "role": "annotations",
+    "cardinality": "single",
+    "files": [{"file_id": "input-annotations-1", "path": "../functional/go-source.tsv", "format": "tsv", "compression": "none", "size_bytes": 187, "sha256": "7ee0ac8e8286e42167b8334ed03a8bb04d6af87cedbdff99f7007dbf5170532f"}]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/go-associations-v2.tsv"}
+}

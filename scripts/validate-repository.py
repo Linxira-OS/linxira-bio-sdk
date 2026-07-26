@@ -38,6 +38,7 @@ except KeyError as error:
 
 SCHEMA_FILES = (
     "schemas/alignment-qc.schema.json",
+    "schemas/annotation-map.schema.json",
     "schemas/blast-parse.schema.json",
     "schemas/analysis-result-v2.schema.json",
     "schemas/analysis-result.schema.json",
@@ -46,6 +47,8 @@ SCHEMA_FILES = (
     "schemas/capability.schema.json",
     "schemas/dataset-manifest.schema.json",
     "schemas/environment-plan.schema.json",
+    "schemas/enrichment.schema.json",
+    "schemas/eggnog-normalization.schema.json",
     "schemas/expression-cluster.schema.json",
     "schemas/expression-heatmap.schema.json",
     "schemas/expression-matrix-qc.schema.json",
@@ -86,12 +89,32 @@ CATALOG_AND_MANIFEST_CONTRACTS = (
 
 CAPABILITY_RESULT_CONTRACTS = (
     (
+        "tests/fixtures/capability-results/annotation-go.json",
+        "schemas/annotation-map.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/annotation-eggnog.json",
+        "schemas/eggnog-normalization.schema.json",
+    ),
+    (
         "tests/fixtures/capability-results/blast-parse.json",
         "schemas/blast-parse.schema.json",
     ),
     (
         "tests/fixtures/capability-results/expression-normalization.json",
         "schemas/expression-normalization.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/enrichment-custom.json",
+        "schemas/enrichment.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/enrichment-go.json",
+        "schemas/enrichment.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/enrichment-kegg.json",
+        "schemas/enrichment.schema.json",
     ),
     (
         "tests/fixtures/capability-results/expression-pca.json",

@@ -28,6 +28,9 @@ the agent skills that select and validate them.
   reference-guided extraction.
 - Read `skills/analyze-sequence-similarity/SKILL.md` for implemented BLAST
   result parsing and reciprocal best-hit analysis.
+- Read `skills/analyze-functional-enrichment/SKILL.md` for implemented GO and
+  eggNOG annotation normalization plus custom, GO, and KEGG
+  over-representation analysis.
 - Read `skills/intersect-genomic-intervals/SKILL.md` for the implemented BED
   `interval.intersect.v1`, `interval.merge.v1`, and
   `interval.subtract.v1` capabilities.

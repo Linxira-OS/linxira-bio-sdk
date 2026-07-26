@@ -1,0 +1,12 @@
+{
+  "analysis_type": "custom",
+  "query_input_count": 4,
+  "query_mapped_count": 3,
+  "query_unmapped_count": 1,
+  "background_gene_count": 8,
+  "tested_term_count": 1,
+  "reported_term_count": 1,
+  "omitted_term_count": 0,
+  "terms": [{"term_id": "custom:stress", "term_name": "Stress response", "namespace": "custom", "overlap_count": 3, "query_gene_count": 3, "background_term_count": 4, "background_gene_count": 8, "fold_enrichment": 2, "p_value": 0.0714285714, "adjusted_p_value": 0.0714285714, "overlap_genes": ["g1", "g2", "g3"]}],
+  "warnings": ["1 query identifiers were absent from the association universe"]
+}

@@ -30,6 +30,11 @@ use linxira_bio_core::fastq_transform::{
     FastqAdapterOptions, FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
     fastq_trim_path,
 };
+use linxira_bio_core::functional::{
+    AnnotationMapResult, EggnogNormalizeResult, EnrichmentKind, EnrichmentOptions,
+    EnrichmentResult, GoAnnotationOptions, normalize_eggnog_path, normalize_go_annotations_path,
+    overrepresentation_path,
+};
 use linxira_bio_core::interval::{
     IntervalIntersectStats, IntervalMergeOptions, bed_intersect_path, bed_merge_path,
     bed_subtract_path,
@@ -147,6 +152,14 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if annotation == "annotation" && gene_density == "gene-density" =>
         {
             print_gene_density(arguments)
+        }
+        [annotation, go, arguments @ ..] if annotation == "annotation" && go == "go" => {
+            print_go_annotations(arguments)
+        }
+        [annotation, eggnog, arguments @ ..]
+            if annotation == "annotation" && eggnog == "eggnog" =>
+        {
+            print_eggnog_annotations(arguments)
         }
         [runtime, catalog] if runtime == "runtime" && catalog == "catalog" => {
             print_runtime_catalog(false)
@@ -296,6 +309,21 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         [set, upset, arguments @ ..] if set == "set" && upset == "upset" => {
             print_set_analysis(arguments, false)
+        }
+        [enrichment, custom, arguments @ ..]
+            if enrichment == "enrichment" && custom == "custom" =>
+        {
+            print_enrichment(
+                arguments,
+                EnrichmentKind::Custom,
+                "enrichment.overrepresentation.v1",
+            )
+        }
+        [enrichment, go, arguments @ ..] if enrichment == "enrichment" && go == "go" => {
+            print_enrichment(arguments, EnrichmentKind::Go, "enrichment.go.v1")
+        }
+        [enrichment, kegg, arguments @ ..] if enrichment == "enrichment" && kegg == "kegg" => {
+            print_enrichment(arguments, EnrichmentKind::Kegg, "enrichment.kegg.v1")
         }
         [similarity, blast_parse, arguments @ ..]
             if similarity == "similarity" && blast_parse == "blast-parse" =>
@@ -1715,6 +1743,174 @@ fn print_gene_density_text(result: &GeneDensityResult) {
     }
 }
 
+fn print_go_annotations(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = GoAnnotationOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--gene-column" => {
+                index += 1;
+                options.gene_column = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--gene-column requires a value")?
+                        .clone(),
+                );
+            }
+            "--go-column" => {
+                index += 1;
+                options.go_column = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--go-column requires a value")?
+                        .clone(),
+                );
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown annotation go option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("annotation go requires <input.csv|tsv> <output.tsv>".into());
+    }
+    let result = normalize_go_annotations_path(&paths[0], &paths[1], &options)?;
+    if json {
+        print_analysis_json_with_warnings(
+            "annotation-go",
+            "annotation.go.normalize.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_annotation_map_text(&result);
+        Ok(())
+    }
+}
+
+fn print_annotation_map_text(result: &AnnotationMapResult) {
+    println!("input_row_count\t{}", result.input_row_count);
+    println!("gene_count\t{}", result.gene_count);
+    println!("term_count\t{}", result.term_count);
+    println!("association_count\t{}", result.association_count);
+    println!("output_path\t{}", result.output_path);
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_eggnog_annotations(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut json = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown annotation eggnog option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+    }
+    if paths.len() != 2 {
+        return Err("annotation eggnog requires <input.tsv> <output.tsv>".into());
+    }
+    let result = normalize_eggnog_path(&paths[0], &paths[1])?;
+    if json {
+        print_analysis_json_with_warnings(
+            "annotation-eggnog",
+            "annotation.eggnog.normalize.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_eggnog_text(&result);
+        Ok(())
+    }
+}
+
+fn print_eggnog_text(result: &EggnogNormalizeResult) {
+    println!("input_row_count\t{}", result.input_row_count);
+    println!("query_count\t{}", result.query_count);
+    println!("go_association_count\t{}", result.go_association_count);
+    println!("kegg_association_count\t{}", result.kegg_association_count);
+    println!("output_path\t{}", result.output_path);
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_enrichment(
+    arguments: &[String],
+    kind: EnrichmentKind,
+    capability: &str,
+) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = EnrichmentOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--min-overlap" => {
+                index += 1;
+                options.min_overlap = parse_positive_u64(arguments.get(index), "--min-overlap")?;
+            }
+            "--max-terms" => {
+                index += 1;
+                options.max_terms = parse_sequence_usize(arguments.get(index), "--max-terms")?;
+            }
+            "--include-genes" => options.include_genes = true,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown enrichment option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("enrichment requires <query-genes.txt|csv|tsv> <associations.csv|tsv>".into());
+    }
+    let result = overrepresentation_path(&paths[0], &paths[1], kind, options)?;
+    if json {
+        print_analysis_json_with_warnings(
+            &format!("enrichment-{}", kind.as_str()),
+            capability,
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_enrichment_text(&result);
+        Ok(())
+    }
+}
+
+fn print_enrichment_text(result: &EnrichmentResult) {
+    println!("analysis_type\t{}", result.analysis_type);
+    println!("query_input_count\t{}", result.query_input_count);
+    println!("query_mapped_count\t{}", result.query_mapped_count);
+    println!("background_gene_count\t{}", result.background_gene_count);
+    println!("tested_term_count\t{}", result.tested_term_count);
+    for term in &result.terms {
+        println!(
+            "term\t{}\t{}\t{}\t{:.6e}\t{:.6e}\t{:.6}",
+            term.term_id,
+            term.term_name.as_deref().unwrap_or_default(),
+            term.overlap_count,
+            term.p_value,
+            term.adjusted_p_value,
+            term.fold_enrichment
+        );
+    }
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
 fn print_variant_stats_text(stats: &VcfStats) {
     println!("record_count\t{}", stats.record_count);
     println!("sample_count\t{}", stats.sample_count);
@@ -2931,6 +3127,8 @@ fn usage() -> &'static str {
         "  linxira-bio annotation positions <input.gff3|gtf[.gz]> <output.tsv> [--feature-type TYPE ...] [--json]\n",
         "  linxira-bio annotation extract <input.gff3|gtf[.gz]> <reference.fasta[.gz]> <output.fasta> [--feature-type gene|transcript|cds|exon|utr|five_prime_utr|three_prime_utr|promoter] [--promoter-length N] [--json]\n",
         "  linxira-bio annotation gene-density <input.gff3|gtf[.gz]> [--feature-type TYPE ...] [--window-size N] [--step-size N] [--json]\n",
+        "  linxira-bio annotation go <input.csv|tsv[.gz]> <output.tsv> [--gene-column NAME] [--go-column NAME] [--json]\n",
+        "  linxira-bio annotation eggnog <input.tsv[.gz]> <output.tsv> [--json]\n",
         "  linxira-bio variant stats <input.vcf[.gz]> [--json]\n",
         "  linxira-bio variant filter <input.vcf[.gz]> <output.vcf> [--min-qual Q] [--pass-only] [--contig NAME ...] [--min-info-dp N] [--json]\n",
         "  linxira-bio variant normalize <input.vcf[.gz]> <reference.fasta[.gz]> <output.vcf> [--json]\n",
@@ -2944,6 +3142,9 @@ fn usage() -> &'static str {
         "  linxira-bio expression heatmap <matrix.csv|tsv[.gz]> [--top-features N] [--no-scale] [--json]\n",
         "  linxira-bio set venn <sets.csv|tsv[.gz]> [--include-items] [--json]\n",
         "  linxira-bio set upset <sets.csv|tsv[.gz]> [--max-intersections N] [--include-items] [--json]\n",
+        "  linxira-bio enrichment custom <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
+        "  linxira-bio enrichment go <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
+        "  linxira-bio enrichment kegg <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
         "  linxira-bio similarity blast-parse <blast.tsv|xml[.gz]> [--json]\n",
         "  linxira-bio similarity rbh <forward.tsv|xml[.gz]> <reverse.tsv|xml[.gz]> [--max-evalue X] [--min-identity P] [--json]\n",
         "  linxira-bio protein properties <proteins.fasta[.gz]> [--json]\n",

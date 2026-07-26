@@ -1,0 +1,11 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-enrichment-go-v2",
+  "capability": "enrichment.go.v1",
+  "inputs": [
+    {"artifact_id": "input-genes", "role": "genes", "cardinality": "single", "files": [{"file_id": "input-genes-1", "path": "../functional/genes.txt", "format": "tsv", "compression": "none", "size_bytes": 25, "sha256": "cb49893268331daa9c0a579df7ac21635034bcc603d6e222752c4e02b58a5321"}]},
+    {"artifact_id": "input-associations", "role": "associations", "cardinality": "single", "files": [{"file_id": "input-associations-1", "path": "../functional/associations.tsv", "format": "tsv", "compression": "none", "size_bytes": 596, "sha256": "c6fc9a1a913356ca1cc8b70c551921a7a9c4873bf36ecdf12d0a31cd6178c7b2"}]}
+  ],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"include_genes": true, "max_terms": 10}
+}

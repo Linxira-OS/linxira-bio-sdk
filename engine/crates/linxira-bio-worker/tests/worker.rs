@@ -1040,6 +1040,133 @@ fn executes_similarity_domain_density_and_tree_v2_fixtures() {
     std::fs::remove_file(tree_output).expect("remove transformed tree output");
 }
 
+#[test]
+fn executes_functional_annotation_and_enrichment_fixtures() {
+    let root = workspace_root();
+    let result_dir = root.join("target/test-results");
+    std::fs::create_dir_all(&result_dir).expect("create functional result directory");
+    let generated_outputs = [
+        result_dir.join("go-associations.tsv"),
+        result_dir.join("go-associations-v2.tsv"),
+        result_dir.join("eggnog-normalized.tsv"),
+        result_dir.join("eggnog-normalized-v2.tsv"),
+    ];
+    for path in &generated_outputs {
+        if path.exists() {
+            std::fs::remove_file(path).expect("remove stale functional output");
+        }
+    }
+
+    let cases = [
+        (
+            "annotation-go.json",
+            "annotation.go.normalize.v1",
+            "association_count",
+            5,
+            1,
+        ),
+        (
+            "annotation-go-v2.json",
+            "annotation.go.normalize.v1",
+            "association_count",
+            5,
+            1,
+        ),
+        (
+            "annotation-eggnog.json",
+            "annotation.eggnog.normalize.v1",
+            "query_count",
+            3,
+            1,
+        ),
+        (
+            "annotation-eggnog-v2.json",
+            "annotation.eggnog.normalize.v1",
+            "query_count",
+            3,
+            1,
+        ),
+        (
+            "enrichment-custom.json",
+            "enrichment.overrepresentation.v1",
+            "reported_term_count",
+            6,
+            2,
+        ),
+        (
+            "enrichment-custom-v2.json",
+            "enrichment.overrepresentation.v1",
+            "reported_term_count",
+            6,
+            2,
+        ),
+        (
+            "enrichment-go.json",
+            "enrichment.go.v1",
+            "reported_term_count",
+            3,
+            2,
+        ),
+        (
+            "enrichment-go-v2.json",
+            "enrichment.go.v1",
+            "reported_term_count",
+            3,
+            2,
+        ),
+        (
+            "enrichment-kegg.json",
+            "enrichment.kegg.v1",
+            "reported_term_count",
+            2,
+            2,
+        ),
+        (
+            "enrichment-kegg-v2.json",
+            "enrichment.kegg.v1",
+            "reported_term_count",
+            2,
+            2,
+        ),
+    ];
+
+    for (fixture, capability, field, expected, expected_hashes) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(root.join("tests/fixtures/jobs").join(fixture))
+            .output()
+            .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
+        assert!(
+            output.status.success(),
+            "{fixture}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid functional result");
+        assert_eq!(result["status"], "ok", "{fixture}");
+        assert_eq!(result["capability"], capability, "{fixture}");
+        assert_eq!(result["result"][field], expected, "{fixture}");
+        if fixture.ends_with("-v2.json") {
+            assert_eq!(result["schema_version"], "2", "{fixture}");
+            assert_eq!(
+                result["provenance"]["input_sha256"]
+                    .as_object()
+                    .map(serde_json::Map::len),
+                Some(expected_hashes),
+                "{fixture}"
+            );
+        }
+    }
+
+    for path in &generated_outputs {
+        assert!(
+            path.exists(),
+            "expected generated output {}",
+            path.display()
+        );
+        std::fs::remove_file(path).expect("remove functional output");
+    }
+}
+
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")

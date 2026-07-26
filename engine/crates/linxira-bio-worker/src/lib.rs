@@ -36,6 +36,10 @@ use linxira_bio_core::fastq_transform::{
     FastqTransformError, FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
     fastq_trim_path,
 };
+use linxira_bio_core::functional::{
+    EnrichmentKind, EnrichmentOptions, GoAnnotationOptions, normalize_eggnog_path,
+    normalize_go_annotations_path, overrepresentation_path,
+};
 use linxira_bio_core::interval::{
     IntervalMergeOptions, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
@@ -116,6 +120,13 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "annotation.gene-position.v1" => run_annotation_positions(base_directory, request),
         "annotation.sequence.extract.v1" => run_annotation_extract(base_directory, request),
         "genome.gene-density.v1" => run_gene_density(base_directory, request),
+        "annotation.go.normalize.v1" => run_go_annotations(base_directory, request),
+        "annotation.eggnog.normalize.v1" => run_eggnog_annotations(base_directory, request),
+        "enrichment.overrepresentation.v1" => {
+            run_enrichment(base_directory, request, EnrichmentKind::Custom)
+        }
+        "enrichment.go.v1" => run_enrichment(base_directory, request, EnrichmentKind::Go),
+        "enrichment.kegg.v1" => run_enrichment(base_directory, request, EnrichmentKind::Kegg),
         "environment.audit.v1" => run_environment_audit(request),
         "environment.plan.v1" => run_environment_plan(base_directory, request),
         "dataset.inspect.v1" => run_dataset_inspection(base_directory, request),
@@ -328,6 +339,71 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 result.clone(),
                 &result.warnings,
                 "gene-density-warning",
+            )
+        }
+        "annotation.go.normalize.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "annotations")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = normalize_go_annotations_path(
+                input,
+                &output,
+                &go_annotation_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result,
+                FileArtifactSpec {
+                    artifact_id: "go-associations",
+                    role: "associations",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "annotation.eggnog.normalize.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "annotations")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = normalize_eggnog_path(input, &output)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result,
+                FileArtifactSpec {
+                    artifact_id: "eggnog-annotations",
+                    role: "annotations",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1" => {
+            let genes = resolve_v2_single_input(base_directory, &request, "genes")?;
+            let associations = resolve_v2_single_input(base_directory, &request, "associations")?;
+            let kind = enrichment_kind(&request.capability)?;
+            let result = overrepresentation_path(
+                genes,
+                associations,
+                kind,
+                enrichment_options(&request.parameters)?,
+            )?;
+            serialize_v2_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "enrichment-warning",
             )
         }
         "environment.audit.v1" => {
@@ -1246,6 +1322,12 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         "protein.properties.v1" => (&["fasta"], &[]),
         "protein.domain.parse.v1" => (&["domains"], &[]),
         "phylogeny.tree.transform.v1" => (&["tree"], &["output", "reroot_label", "label_map"]),
+        "annotation.go.normalize.v1" => (&["annotations"], &["output", "gene_column", "go_column"]),
+        "annotation.eggnog.normalize.v1" => (&["annotations"], &["output"]),
+        "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1" => (
+            &["genes", "associations"],
+            &["min_overlap", "max_terms", "include_genes"],
+        ),
         "structure.pdb.summary.v1" => (&["pdb"], &["interpret_b_factors_as_plddt"]),
         "structure.mmcif.summary.v1" | "structure.sequence.extract.v1" => (&["structure"], &[]),
         "structure.contact-map.v1" => (
@@ -2047,6 +2129,87 @@ fn run_gene_density(base_directory: &Path, request: JobRequest) -> WorkerResult<
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_go_annotations(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "annotations",
+        &["output", "gene_column", "go_column"],
+    )?;
+    let input = request
+        .inputs
+        .get("annotations")
+        .ok_or("annotation.go.normalize.v1 requires inputs.annotations")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis =
+        normalize_go_annotations_path(input, output, &go_annotation_options(&request.parameters)?)?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_eggnog_annotations(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "annotations", &["output"])?;
+    let input = request
+        .inputs
+        .get("annotations")
+        .ok_or("annotation.eggnog.normalize.v1 requires inputs.annotations")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis = normalize_eggnog_path(input, output)?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_enrichment(
+    base_directory: &Path,
+    request: JobRequest,
+    kind: EnrichmentKind,
+) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["genes", "associations"],
+        &["min_overlap", "max_terms", "include_genes"],
+    )?;
+    let genes = request
+        .inputs
+        .get("genes")
+        .ok_or("enrichment requires inputs.genes")?;
+    let associations = request
+        .inputs
+        .get("associations")
+        .ok_or("enrichment requires inputs.associations")?;
+    let analysis = overrepresentation_path(
+        resolve_input(base_directory, genes),
+        resolve_input(base_directory, associations),
+        kind,
+        enrichment_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_expression_matrix_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -2663,6 +2826,42 @@ fn gene_density_options(parameters: &serde_json::Value) -> WorkerResult<GeneDens
         options.step_size = step_size;
     }
     Ok(options)
+}
+
+fn go_annotation_options(parameters: &serde_json::Value) -> WorkerResult<GoAnnotationOptions> {
+    Ok(GoAnnotationOptions {
+        gene_column: optional_parameter_string(parameters, "gene_column")?.map(str::to_owned),
+        go_column: optional_parameter_string(parameters, "go_column")?.map(str::to_owned),
+    })
+}
+
+fn enrichment_options(parameters: &serde_json::Value) -> WorkerResult<EnrichmentOptions> {
+    let mut options = EnrichmentOptions::default();
+    if let Some(value) = optional_parameter_u64(parameters, "min_overlap")? {
+        if value == 0 {
+            return Err("min_overlap must be positive".into());
+        }
+        options.min_overlap = value;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "max_terms")? {
+        if value == 0 {
+            return Err("max_terms must be positive".into());
+        }
+        options.max_terms = value;
+    }
+    if let Some(value) = optional_parameter_bool(parameters, "include_genes")? {
+        options.include_genes = value;
+    }
+    Ok(options)
+}
+
+fn enrichment_kind(capability: &str) -> WorkerResult<EnrichmentKind> {
+    match capability {
+        "enrichment.overrepresentation.v1" => Ok(EnrichmentKind::Custom),
+        "enrichment.go.v1" => Ok(EnrichmentKind::Go),
+        "enrichment.kegg.v1" => Ok(EnrichmentKind::Kegg),
+        _ => Err(format!("unsupported enrichment capability: {capability}").into()),
+    }
 }
 
 fn reciprocal_best_hit_options(

@@ -11,6 +11,7 @@ pub mod environment;
 pub mod expression;
 pub mod fastq;
 pub mod fastq_transform;
+pub mod functional;
 pub mod interval;
 pub mod phylogeny;
 pub mod protein;

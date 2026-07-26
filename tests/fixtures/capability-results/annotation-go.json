@@ -1,0 +1,12 @@
+{
+  "input_row_count": 5,
+  "gene_count": 3,
+  "term_count": 3,
+  "association_count": 5,
+  "output_path": "go-associations.tsv",
+  "associations": [
+    {"gene_id": "g1", "term_id": "GO:0000001", "term_name": null, "namespace": "go"},
+    {"gene_id": "g2", "term_id": "GO:0000001", "term_name": null, "namespace": "go"}
+  ],
+  "warnings": ["1 input rows contained no GO identifiers"]
+}

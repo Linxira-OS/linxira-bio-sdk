@@ -117,6 +117,11 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         "fastq.trim.v1" | "fastq.adapter.v1" => fastq_transform_charts(payload, zh_cn),
         "alignment.qc.v1" => alignment_charts(payload, zh_cn),
         "annotation.gxf.stats.v1" => annotation_charts(payload, zh_cn),
+        "annotation.go.normalize.v1" => go_annotation_map_charts(payload, zh_cn),
+        "annotation.eggnog.normalize.v1" => eggnog_annotation_charts(payload, zh_cn),
+        "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1" => {
+            enrichment_charts(payload, zh_cn)
+        }
         "genome.gene-density.v1" => gene_density_charts(payload, zh_cn),
         "interval.intersect.v1" => interval_charts(payload, zh_cn),
         "interval.merge.v1" => interval_merge_charts(payload, zh_cn),
@@ -148,6 +153,109 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         _ if payload.get("n50").is_some() => sequence_charts(payload, zh_cn),
         _ => Vec::new(),
     }
+}
+
+fn go_annotation_map_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    bar_specs(
+        [(
+            localized(zh_cn, "GO 注释映射摘要", "GO annotation mapping summary"),
+            values_for_keys(
+                payload,
+                &[
+                    ("input_row_count", localized(zh_cn, "输入行", "Input rows")),
+                    ("gene_count", localized(zh_cn, "基因", "Genes")),
+                    ("term_count", localized(zh_cn, "GO 条目", "GO terms")),
+                    (
+                        "association_count",
+                        localized(zh_cn, "关联", "Associations"),
+                    ),
+                ],
+            ),
+        )],
+        false,
+    )
+}
+
+fn eggnog_annotation_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    bar_specs(
+        [(
+            localized(zh_cn, "eggNOG 注释摘要", "eggNOG annotation summary"),
+            values_for_keys(
+                payload,
+                &[
+                    ("input_row_count", localized(zh_cn, "输入行", "Input rows")),
+                    ("query_count", localized(zh_cn, "查询序列", "Queries")),
+                    (
+                        "go_association_count",
+                        localized(zh_cn, "GO 关联", "GO assignments"),
+                    ),
+                    (
+                        "kegg_association_count",
+                        localized(zh_cn, "KEGG 关联", "KEGG assignments"),
+                    ),
+                ],
+            ),
+        )],
+        false,
+    )
+}
+
+fn enrichment_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let mut significance = Vec::new();
+    let mut fold_enrichment = Vec::new();
+    for term in payload
+        .get("terms")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let term_id = term
+            .get("term_id")
+            .and_then(Value::as_str)
+            .unwrap_or("term");
+        let label = term
+            .get("term_name")
+            .and_then(Value::as_str)
+            .filter(|name| !name.trim().is_empty())
+            .map(|name| format!("{name} ({term_id})"))
+            .unwrap_or_else(|| term_id.to_owned());
+        if let Some(adjusted) = number(term, "adjusted_p_value") {
+            significance.push(BarValue {
+                label: label.clone(),
+                value: negative_log10_probability(adjusted),
+            });
+        }
+        if let Some(fold) = number(term, "fold_enrichment").filter(|value| value.is_finite()) {
+            fold_enrichment.push(BarValue { label, value: fold });
+        }
+    }
+    sort_and_limit(&mut significance, 20);
+    sort_and_limit(&mut fold_enrichment, 20);
+    bar_specs(
+        [
+            (
+                localized(
+                    zh_cn,
+                    "富集显著性（-log10 校正 P 值）",
+                    "Enrichment significance (-log10 adjusted p-value)",
+                ),
+                significance,
+            ),
+            (
+                localized(zh_cn, "富集倍数", "Fold enrichment"),
+                fold_enrichment,
+            ),
+        ],
+        false,
+    )
+}
+
+fn negative_log10_probability(value: f64) -> f64 {
+    const MIN_POSITIVE_PROBABILITY: f64 = 1e-300;
+    if !value.is_finite() || value < 0.0 {
+        return 0.0;
+    }
+    -value.clamp(MIN_POSITIVE_PROBABILITY, 1.0).log10()
 }
 
 fn annotation_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
@@ -1936,7 +2044,10 @@ fn format_value(value: f64, percent: bool) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{BarValue, ChartSpec, GREEN, bar_domain, chart_specs, line_series_shape};
+    use super::{
+        BarValue, ChartSpec, GREEN, bar_domain, chart_specs, line_series_shape,
+        negative_log10_probability,
+    };
     use eframe::egui;
     use serde_json::json;
 
@@ -1963,6 +2074,62 @@ mod tests {
         let charts = chart_specs(&payload, Some("annotation.gxf.stats.v1"), true);
         assert_eq!(charts.len(), 2);
         assert!(matches!(charts.first(), Some(ChartSpec::Bars { .. })));
+    }
+
+    #[test]
+    fn functional_annotation_and_enrichment_results_build_native_charts() {
+        let go = json!({
+            "input_row_count": 5,
+            "gene_count": 3,
+            "term_count": 3,
+            "association_count": 5
+        });
+        let eggnog = json!({
+            "input_row_count": 2,
+            "query_count": 2,
+            "go_association_count": 4,
+            "kegg_association_count": 3
+        });
+        let enrichment = json!({
+            "terms": [
+                {
+                    "term_id": "GO:0000001",
+                    "term_name": "Example process",
+                    "adjusted_p_value": 0.0,
+                    "fold_enrichment": 2.5
+                },
+                {
+                    "term_id": "GO:0000002",
+                    "term_name": null,
+                    "adjusted_p_value": 0.05,
+                    "fold_enrichment": 1.2
+                }
+            ]
+        });
+
+        assert_eq!(
+            chart_specs(&go, Some("annotation.go.normalize.v1"), false).len(),
+            1
+        );
+        assert_eq!(
+            chart_specs(&eggnog, Some("annotation.eggnog.normalize.v1"), true).len(),
+            1
+        );
+        let charts = chart_specs(&enrichment, Some("enrichment.go.v1"), false);
+        assert_eq!(charts.len(), 2);
+        let ChartSpec::Bars { values, .. } = &charts[0] else {
+            panic!("expected enrichment significance bars");
+        };
+        assert!(values.iter().all(|value| value.value.is_finite()));
+        assert_eq!(values[0].value, 300.0);
+    }
+
+    #[test]
+    fn enrichment_probability_transform_is_finite_and_bounded() {
+        assert_eq!(negative_log10_probability(0.0), 300.0);
+        assert_eq!(negative_log10_probability(1.0), 0.0);
+        assert_eq!(negative_log10_probability(-1.0), 0.0);
+        assert_eq!(negative_log10_probability(f64::NAN), 0.0);
     }
 
     #[test]
