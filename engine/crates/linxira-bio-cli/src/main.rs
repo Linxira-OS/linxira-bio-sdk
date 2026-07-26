@@ -44,6 +44,11 @@ use linxira_bio_core::phylogeny::{
 };
 use linxira_bio_core::protein::{ProteinPropertiesResult, protein_properties_path};
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
+use linxira_bio_core::scientific_visualization::{
+    AnnotationStructureOptions, DomainArchitectureOptions, EnrichmentPlotStyle,
+    EnrichmentVisualizationOptions, SvgVisualizationResult, render_annotation_structure_svg_path,
+    render_domain_architecture_svg_path, render_enrichment_svg_path,
+};
 use linxira_bio_core::sequence::{SequenceStats, fasta_stats_path};
 use linxira_bio_core::sequence_analysis::{
     EpcrOptions, KmerCountOptions, count_kmers_path, epcr_path,
@@ -160,6 +165,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if annotation == "annotation" && eggnog == "eggnog" =>
         {
             print_eggnog_annotations(arguments)
+        }
+        [annotation, plot, arguments @ ..] if annotation == "annotation" && plot == "plot" => {
+            print_annotation_structure_plot(arguments)
         }
         [runtime, catalog] if runtime == "runtime" && catalog == "catalog" => {
             print_runtime_catalog(false)
@@ -325,6 +333,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         [enrichment, kegg, arguments @ ..] if enrichment == "enrichment" && kegg == "kegg" => {
             print_enrichment(arguments, EnrichmentKind::Kegg, "enrichment.kegg.v1")
         }
+        [enrichment, visualize, arguments @ ..]
+            if enrichment == "enrichment" && visualize == "visualize" =>
+        {
+            print_enrichment_visualization(arguments)
+        }
         [similarity, blast_parse, arguments @ ..]
             if similarity == "similarity" && blast_parse == "blast-parse" =>
         {
@@ -343,6 +356,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         [protein, domains, arguments @ ..] if protein == "protein" && domains == "domains" => {
             print_protein_domains(arguments)
+        }
+        [protein, domain_plot, arguments @ ..]
+            if protein == "protein" && domain_plot == "domain-plot" =>
+        {
+            print_domain_architecture_plot(arguments)
         }
         [phylogeny, tree, arguments @ ..] if phylogeny == "phylogeny" && tree == "tree" => {
             print_phylogeny_tree(arguments)
@@ -1911,6 +1929,200 @@ fn print_enrichment_text(result: &EnrichmentResult) {
     }
 }
 
+fn print_annotation_structure_plot(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = AnnotationStructureOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--feature-id" => {
+                index += 1;
+                options.feature_id = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--feature-id requires a value")?
+                        .clone(),
+                );
+            }
+            "--seqid" => {
+                index += 1;
+                options.seqid = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--seqid requires a value")?
+                        .clone(),
+                );
+            }
+            "--max-features" => {
+                index += 1;
+                options.max_features =
+                    parse_sequence_usize(arguments.get(index), "--max-features")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown annotation plot option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("annotation plot requires <input.gff3|gtf> <output.svg>".into());
+    }
+    if options.feature_id.is_some() && options.seqid.is_some() {
+        return Err("--feature-id and --seqid are mutually exclusive".into());
+    }
+    let result = render_annotation_structure_svg_path(&paths[0], &paths[1], &options)?;
+    print_visualization_result(
+        "annotation-structure-visualization",
+        "annotation.structure.visualize.v1",
+        result,
+        json,
+    )
+}
+
+fn print_domain_architecture_plot(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = DomainArchitectureOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--sequence-id" => {
+                index += 1;
+                options.sequence_id = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--sequence-id requires a value")?
+                        .clone(),
+                );
+            }
+            "--max-sequences" => {
+                index += 1;
+                options.max_sequences =
+                    parse_sequence_usize(arguments.get(index), "--max-sequences")?;
+            }
+            "--max-domains" => {
+                index += 1;
+                options.max_domains = parse_sequence_usize(arguments.get(index), "--max-domains")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown protein domain-plot option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err(
+            "protein domain-plot requires <interproscan.tsv|hmmer.domtblout> <output.svg>".into(),
+        );
+    }
+    let result = render_domain_architecture_svg_path(&paths[0], &paths[1], &options)?;
+    print_visualization_result(
+        "protein-domain-visualization",
+        "protein.domain.visualize.v1",
+        result,
+        json,
+    )
+}
+
+fn print_enrichment_visualization(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut kind = None;
+    let mut analysis_options = EnrichmentOptions::default();
+    let mut visualization_options = EnrichmentVisualizationOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--kind" => {
+                index += 1;
+                kind = Some(match arguments.get(index).map(String::as_str) {
+                    Some("custom") => EnrichmentKind::Custom,
+                    Some("go") => EnrichmentKind::Go,
+                    Some("kegg") => EnrichmentKind::Kegg,
+                    Some(value) => {
+                        return Err(format!("unsupported enrichment kind: {value}").into());
+                    }
+                    None => return Err("--kind requires custom, go, or kegg".into()),
+                });
+            }
+            "--style" => {
+                index += 1;
+                visualization_options.style = match arguments.get(index).map(String::as_str) {
+                    Some("bar") => EnrichmentPlotStyle::Bar,
+                    Some("dot") => EnrichmentPlotStyle::Dot,
+                    Some("network") => EnrichmentPlotStyle::Network,
+                    Some(value) => return Err(format!("unsupported plot style: {value}").into()),
+                    None => return Err("--style requires bar, dot, or network".into()),
+                };
+            }
+            "--min-overlap" => {
+                index += 1;
+                analysis_options.min_overlap =
+                    parse_positive_u64(arguments.get(index), "--min-overlap")?;
+            }
+            "--max-terms" => {
+                index += 1;
+                visualization_options.max_terms =
+                    parse_sequence_usize(arguments.get(index), "--max-terms")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown enrichment visualize option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err(
+            "enrichment visualize requires <genes.txt> <associations.tsv> <output.svg>".into(),
+        );
+    }
+    let kind = kind.ok_or("enrichment visualize requires --kind custom|go|kegg")?;
+    let result = render_enrichment_svg_path(
+        &paths[0],
+        &paths[1],
+        &paths[2],
+        kind,
+        analysis_options,
+        visualization_options,
+    )?;
+    print_visualization_result(
+        "enrichment-visualization",
+        "enrichment.visualize.v1",
+        result,
+        json,
+    )
+}
+
+fn print_visualization_result(
+    job_id: &str,
+    capability: &str,
+    result: SvgVisualizationResult,
+    json: bool,
+) -> Result<(), Box<dyn Error>> {
+    if json {
+        let warnings = result.warnings.clone();
+        print_analysis_json_with_warnings(job_id, capability, result, warnings)
+    } else {
+        println!("visualization_type\t{}", result.visualization_type);
+        println!("output_path\t{}", result.output_path);
+        println!("width\t{}", result.width);
+        println!("height\t{}", result.height);
+        println!("track_count\t{}", result.track_count);
+        println!("glyph_count\t{}", result.glyph_count);
+        for warning in result.warnings {
+            println!("warning\t{warning}");
+        }
+        Ok(())
+    }
+}
+
 fn print_variant_stats_text(stats: &VcfStats) {
     println!("record_count\t{}", stats.record_count);
     println!("sample_count\t{}", stats.sample_count);
@@ -3129,6 +3341,7 @@ fn usage() -> &'static str {
         "  linxira-bio annotation gene-density <input.gff3|gtf[.gz]> [--feature-type TYPE ...] [--window-size N] [--step-size N] [--json]\n",
         "  linxira-bio annotation go <input.csv|tsv[.gz]> <output.tsv> [--gene-column NAME] [--go-column NAME] [--json]\n",
         "  linxira-bio annotation eggnog <input.tsv[.gz]> <output.tsv> [--json]\n",
+        "  linxira-bio annotation plot <input.gff3|gtf[.gz]> <output.svg> [--feature-id ID | --seqid NAME] [--max-features N] [--json]\n",
         "  linxira-bio variant stats <input.vcf[.gz]> [--json]\n",
         "  linxira-bio variant filter <input.vcf[.gz]> <output.vcf> [--min-qual Q] [--pass-only] [--contig NAME ...] [--min-info-dp N] [--json]\n",
         "  linxira-bio variant normalize <input.vcf[.gz]> <reference.fasta[.gz]> <output.vcf> [--json]\n",
@@ -3145,10 +3358,12 @@ fn usage() -> &'static str {
         "  linxira-bio enrichment custom <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
         "  linxira-bio enrichment go <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
         "  linxira-bio enrichment kegg <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
+        "  linxira-bio enrichment visualize <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> <output.svg> --kind custom|go|kegg [--style bar|dot|network] [--min-overlap N] [--max-terms N] [--json]\n",
         "  linxira-bio similarity blast-parse <blast.tsv|xml[.gz]> [--json]\n",
         "  linxira-bio similarity rbh <forward.tsv|xml[.gz]> <reverse.tsv|xml[.gz]> [--max-evalue X] [--min-identity P] [--json]\n",
         "  linxira-bio protein properties <proteins.fasta[.gz]> [--json]\n",
         "  linxira-bio protein domains <interproscan.tsv|hmmer.domtblout[.gz]> [--json]\n",
+        "  linxira-bio protein domain-plot <interproscan.tsv|hmmer.domtblout[.gz]> <output.svg> [--sequence-id ID] [--max-sequences N] [--max-domains N] [--json]\n",
         "  linxira-bio phylogeny tree <input.nwk[.gz]> <output.nwk> [--reroot LEAF] [--label-map labels.tsv] [--json]\n",
         "  linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> [--select-column NAME ...] [--drop-column NAME ...] [--filter-column NAME --filter-op equals|contains|non-empty [--filter-value VALUE]] [--skip-rows N] [--limit N] [--delimiter csv|tsv] [--output-delimiter csv|tsv] [--json]\n",
         "  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n",

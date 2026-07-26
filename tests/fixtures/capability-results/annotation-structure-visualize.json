@@ -1,0 +1,9 @@
+{
+  "visualization_type": "annotation-structure",
+  "output_path": "results/annotation-structure.svg",
+  "width": 1200,
+  "height": 324,
+  "track_count": 6,
+  "glyph_count": 6,
+  "warnings": []
+}

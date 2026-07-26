@@ -86,6 +86,10 @@ a replacement script silently.
   three representation modes and export the current view as PNG. PAE,
   sequence-aligned structural comparison, assembly expansion, and structure
   prediction remain planned.
+- GFF3/GTF annotation structure plots, custom/GO/KEGG enrichment plots,
+  protein-domain architecture tracks, and interactive PDB/mmCIF viewing: use
+  `visualize-bio-results`. Prefer deterministic SVG for reusable artifacts and
+  the native viewer for interactive inspection and PNG snapshots.
 - Missing Python, R, BLAST, DIAMOND, command-line tools, WSL, or GPU runtime:
   `configure-bio-environment` before the domain capability runs.
 - Scheduler, cloud, GPU, or authenticated web service: execution selection

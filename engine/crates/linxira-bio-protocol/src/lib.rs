@@ -114,6 +114,7 @@ pub enum BioDataFormat {
     BlastXml,
     ProteinDomains,
     Newick,
+    Svg,
     Xlsx,
     Json,
     Jsonl,

@@ -1167,6 +1167,117 @@ fn executes_functional_annotation_and_enrichment_fixtures() {
     }
 }
 
+#[test]
+fn executes_scientific_visualization_jobs_and_tracks_svg_artifacts() {
+    let root = workspace_root();
+    let cases = [
+        (
+            "annotation-structure-visualize.json",
+            "annotation.structure.visualize.v1",
+            "annotation-structure.svg",
+            "Annotation structure",
+            false,
+            1,
+        ),
+        (
+            "annotation-structure-visualize-v2.json",
+            "annotation.structure.visualize.v1",
+            "annotation-structure-v2.svg",
+            "Annotation structure",
+            true,
+            1,
+        ),
+        (
+            "enrichment-visualize.json",
+            "enrichment.visualize.v1",
+            "enrichment-network.svg",
+            "Enrichment term-gene network",
+            false,
+            2,
+        ),
+        (
+            "enrichment-visualize-v2.json",
+            "enrichment.visualize.v1",
+            "enrichment-network-v2.svg",
+            "Enrichment term-gene network",
+            true,
+            2,
+        ),
+        (
+            "protein-domain-visualize.json",
+            "protein.domain.visualize.v1",
+            "protein-domains.svg",
+            "Protein domain architecture",
+            false,
+            1,
+        ),
+        (
+            "protein-domain-visualize-v2.json",
+            "protein.domain.visualize.v1",
+            "protein-domains-v2.svg",
+            "Protein domain architecture",
+            true,
+            1,
+        ),
+    ];
+
+    std::fs::create_dir_all(root.join("target/test-results"))
+        .expect("create visualization result directory");
+    for (_, _, output_name, _, _, _) in &cases {
+        let output_path = root.join("target/test-results").join(output_name);
+        if output_path.exists() {
+            std::fs::remove_file(output_path).expect("remove stale visualization output");
+        }
+    }
+
+    for (fixture, capability, output_name, expected_svg_text, is_v2, input_hashes) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(root.join("tests/fixtures/jobs").join(fixture))
+            .output()
+            .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
+        assert!(
+            output.status.success(),
+            "{fixture}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid visualization result");
+        assert_eq!(result["status"], "ok", "{fixture}");
+        assert_eq!(result["capability"], capability, "{fixture}");
+        assert_eq!(result["result"]["width"], 1_200, "{fixture}");
+        assert!(
+            result["result"]["glyph_count"].as_u64().unwrap() > 0,
+            "{fixture}"
+        );
+
+        let output_path = root.join("target/test-results").join(output_name);
+        let svg = std::fs::read_to_string(&output_path).expect("read visualization SVG");
+        assert!(svg.contains(expected_svg_text), "{fixture}");
+        if is_v2 {
+            assert_eq!(result["schema_version"], "2", "{fixture}");
+            assert_eq!(result["artifacts"][0]["kind"], "plot", "{fixture}");
+            assert_eq!(result["artifacts"][0]["format"], "svg", "{fixture}");
+            assert_eq!(
+                result["artifacts"][0]["media_type"], "image/svg+xml",
+                "{fixture}"
+            );
+            assert_eq!(
+                result["artifacts"][0]["sha256"].as_str().map(str::len),
+                Some(64),
+                "{fixture}"
+            );
+            assert_eq!(
+                result["provenance"]["input_sha256"]
+                    .as_object()
+                    .map(serde_json::Map::len),
+                Some(input_hashes),
+                "{fixture}"
+            );
+        }
+        std::fs::remove_file(output_path).expect("remove visualization output");
+    }
+}
+
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")

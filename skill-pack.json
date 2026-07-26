@@ -190,6 +190,17 @@
       "capabilities": ["dataset.inspect.v1"]
     },
     {
+      "id": "visualize-bio-results",
+      "path": "skills/visualize-bio-results",
+      "kind": "executable",
+      "capabilities": [
+        "annotation.structure.visualize.v1",
+        "enrichment.visualize.v1",
+        "protein.domain.visualize.v1",
+        "structure.viewer.v1"
+      ]
+    },
+    {
       "id": "export-bio-table",
       "path": "skills/export-bio-table",
       "kind": "executable",

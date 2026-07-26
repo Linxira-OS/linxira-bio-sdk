@@ -30,6 +30,18 @@ pub struct AnnotationStats {
     pub warnings: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AnnotationVisualFeature {
+    pub seqid: String,
+    pub feature_type: String,
+    pub start: u64,
+    pub end: u64,
+    pub strand: char,
+    pub id: Option<String>,
+    pub label: Option<String>,
+    pub parents: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GeneDensityOptions {
     pub feature_types: Vec<String>,
@@ -264,6 +276,33 @@ pub fn annotation_stats_path(path: impl AsRef<Path>) -> Result<AnnotationStats, 
             .push("annotation input contains no feature records".to_owned());
     }
     Ok(stats)
+}
+
+pub fn annotation_visual_features_path(
+    path: impl AsRef<Path>,
+) -> Result<Vec<AnnotationVisualFeature>, AnnotationError> {
+    let parsed = read_annotation_path(path.as_ref())?;
+    Ok(parsed
+        .records
+        .into_iter()
+        .map(|record| {
+            let id =
+                attribute_first(&record, &["ID", "gene_id", "transcript_id"]).map(str::to_owned);
+            let label = attribute_first(&record, &["Name", "gene_name", "gene", "product", "ID"])
+                .map(str::to_owned);
+            let parents = record.attributes.get("Parent").cloned().unwrap_or_default();
+            AnnotationVisualFeature {
+                seqid: record.seqid,
+                feature_type: record.feature_type,
+                start: record.start,
+                end: record.end,
+                strand: record.strand,
+                id,
+                label,
+                parents,
+            }
+        })
+        .collect())
 }
 
 pub fn gene_density_path(

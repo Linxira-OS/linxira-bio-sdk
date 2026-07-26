@@ -1,0 +1,9 @@
+{
+  "visualization_type": "enrichment-network",
+  "output_path": "results/enrichment-network.svg",
+  "width": 1200,
+  "height": 222,
+  "track_count": 3,
+  "glyph_count": 10,
+  "warnings": ["1 query identifier was absent from the association universe"]
+}

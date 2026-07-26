@@ -1231,6 +1231,96 @@ fn functional_annotation_and_enrichment_commands_emit_versioned_json() {
     fs::remove_dir_all(output_root).expect("remove functional analysis directory");
 }
 
+#[test]
+fn renders_reusable_scientific_svg_artifacts() {
+    let root = workspace_root();
+    let output_root = temporary_directory("scientific-svg");
+    let cases = [
+        (
+            vec![
+                "annotation".to_owned(),
+                "plot".to_owned(),
+                root.join("tests/fixtures/annotation/genes.gff3")
+                    .to_string_lossy()
+                    .into_owned(),
+                output_root
+                    .join("annotation.svg")
+                    .to_string_lossy()
+                    .into_owned(),
+                "--feature-id".to_owned(),
+                "g1".to_owned(),
+                "--json".to_owned(),
+            ],
+            "annotation.structure.visualize.v1",
+            output_root.join("annotation.svg"),
+            "Annotation structure",
+        ),
+        (
+            vec![
+                "protein".to_owned(),
+                "domain-plot".to_owned(),
+                root.join("tests/fixtures/protein-domains/interproscan.tsv")
+                    .to_string_lossy()
+                    .into_owned(),
+                output_root
+                    .join("domains.svg")
+                    .to_string_lossy()
+                    .into_owned(),
+                "--json".to_owned(),
+            ],
+            "protein.domain.visualize.v1",
+            output_root.join("domains.svg"),
+            "Protein domain architecture",
+        ),
+        (
+            vec![
+                "enrichment".to_owned(),
+                "visualize".to_owned(),
+                root.join("tests/fixtures/functional/genes.txt")
+                    .to_string_lossy()
+                    .into_owned(),
+                root.join("tests/fixtures/functional/associations.tsv")
+                    .to_string_lossy()
+                    .into_owned(),
+                output_root
+                    .join("enrichment.svg")
+                    .to_string_lossy()
+                    .into_owned(),
+                "--kind".to_owned(),
+                "go".to_owned(),
+                "--style".to_owned(),
+                "network".to_owned(),
+                "--json".to_owned(),
+            ],
+            "enrichment.visualize.v1",
+            output_root.join("enrichment.svg"),
+            "Enrichment term-gene network",
+        ),
+    ];
+
+    for (arguments, capability, output_path, expected_svg_text) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+            .args(arguments)
+            .output()
+            .unwrap_or_else(|error| panic!("run {capability}: {error}"));
+        assert!(
+            output.status.success(),
+            "{capability}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid visualization JSON");
+        assert_eq!(result["capability"], capability);
+        assert_eq!(result["result"]["width"], 1_200);
+        assert!(result["result"]["glyph_count"].as_u64().unwrap() > 0);
+        let svg = fs::read_to_string(&output_path).expect("read generated SVG");
+        assert!(svg.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg"));
+        assert!(svg.contains(expected_svg_text));
+    }
+
+    fs::remove_dir_all(output_root).expect("remove visualization directory");
+}
+
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")

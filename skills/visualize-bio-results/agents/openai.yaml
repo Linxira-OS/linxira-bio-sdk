@@ -1,0 +1,4 @@
+interface:
+  display_name: "Visualize Bio Results"
+  short_description: "Create local scientific SVG plots and inspect structures"
+  default_prompt: "Use $visualize-bio-results to create a local biological visualization from my validated data."
