@@ -29,6 +29,9 @@ use linxira_bio_core::interval::{
     IntervalMergeOptions, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
 use linxira_bio_core::sequence::fasta_stats_path;
+use linxira_bio_core::sequence_analysis::{
+    EpcrOptions, KmerCountOptions, count_kmers_path, epcr_path,
+};
 use linxira_bio_core::sequence_transform::{
     SequenceExtractOptions, SequenceFilterOptions, SequenceFromTableOptions,
     SequenceIdNormalizeOptions, SequenceMergeOptions, SequenceOrfOptions, SequenceSplitOptions,
@@ -42,6 +45,9 @@ use linxira_bio_core::table::{
     TableDelimiter, TableFilter, TableManipulateOptions, manipulate_table_path,
 };
 use linxira_bio_core::variant::vcf_stats_path;
+use linxira_bio_core::variant_transform::{
+    VariantFilterOptions, filter_vcf_path, normalize_vcf_path,
+};
 use linxira_bio_export::{ExportFormat, ensure_distinct_input_output, export_json_file};
 use linxira_bio_protocol::{
     AnalysisResult, AnalysisResultV2, ArtifactFile, BioDataFormat, CompressionFormat, Diagnostic,
@@ -117,8 +123,12 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "sequence.split.v1" => run_sequence_split(base_directory, request),
         "sequence.to-table.v1" => run_sequence_to_table(base_directory, request),
         "sequence.from-table.v1" => run_sequence_from_table(base_directory, request),
+        "sequence.kmer.count.v1" => run_sequence_kmer_count(base_directory, request),
+        "primer.epcr.v1" => run_primer_epcr(base_directory, request),
         "structure.pdb.summary.v1" => run_pdb_summary(base_directory, request),
         "variant.stats.v1" => run_variant_stats(base_directory, request),
+        "variant.filter.v1" => run_variant_filter(base_directory, request),
+        "variant.normalize.v1" => run_variant_normalize(base_directory, request),
         capability => Err(format!("unsupported capability: {capability}").into()),
     }
 }
@@ -716,6 +726,50 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 },
             )
         }
+        "sequence.kmer.count.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "fasta")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let summary =
+                count_kmers_path(input, &output, &kmer_count_options(&request.parameters)?)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "kmer-count-table",
+                    role: "table",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "primer.epcr.v1" => {
+            let fasta = resolve_v2_single_input(base_directory, &request, "fasta")?;
+            let primers = resolve_v2_single_input(base_directory, &request, "primers")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let summary = epcr_path(fasta, primers, &output, &epcr_options(&request.parameters)?)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "epcr-amplicon-table",
+                    role: "table",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
         "structure.pdb.summary.v1" => {
             let path = resolve_v2_single_input(base_directory, &request, "pdb")?;
             let summary = pdb_summary_path(path, pdb_options(&request.parameters)?)?;
@@ -761,6 +815,53 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 }));
             finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
             Ok(serde_json::to_string(&result)?)
+        }
+        "variant.filter.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "vcf")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let summary = filter_vcf_path(
+                input,
+                &output,
+                &variant_filter_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "filtered-vcf",
+                    role: "vcf",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Vcf),
+                    media_type: Some("text/x-vcf"),
+                },
+            )
+        }
+        "variant.normalize.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "vcf")?;
+            let reference = resolve_v2_single_input(base_directory, &request, "reference")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let summary = normalize_vcf_path(input, reference, &output)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "normalized-vcf",
+                    role: "vcf",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Vcf),
+                    media_type: Some("text/x-vcf"),
+                },
+            )
         }
         capability => Err(format!("unsupported capability: {capability}").into()),
     }
@@ -856,8 +957,24 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
                 "description_column",
             ],
         ),
+        "sequence.kmer.count.v1" => (&["fasta"], &["output", "k", "canonical", "top_n"]),
+        "primer.epcr.v1" => (
+            &["fasta", "primers"],
+            &["output", "min_amplicon", "max_amplicon", "max_hits"],
+        ),
         "structure.pdb.summary.v1" => (&["pdb"], &["interpret_b_factors_as_plddt"]),
         "variant.stats.v1" => (&["vcf"], &[]),
+        "variant.filter.v1" => (
+            &["vcf"],
+            &[
+                "output",
+                "min_qual",
+                "require_pass",
+                "contigs",
+                "min_info_dp",
+            ],
+        ),
+        "variant.normalize.v1" => (&["vcf", "reference"], &["output"]),
         capability => return Err(format!("unsupported capability: {capability}").into()),
     };
 
@@ -1642,6 +1759,76 @@ fn run_variant_stats(base_directory: &Path, request: JobRequest) -> WorkerResult
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_variant_filter(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "vcf",
+        &[
+            "output",
+            "min_qual",
+            "require_pass",
+            "contigs",
+            "min_info_dp",
+        ],
+    )?;
+    let input = resolve_input(
+        base_directory,
+        request
+            .inputs
+            .get("vcf")
+            .ok_or("variant.filter.v1 requires inputs.vcf")?,
+    );
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let summary = filter_vcf_path(
+        &input,
+        &output,
+        &variant_filter_options(&request.parameters)?,
+    )?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_variant_normalize(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(&request, &["vcf", "reference"], &["output"])?;
+    let input = resolve_input(
+        base_directory,
+        request
+            .inputs
+            .get("vcf")
+            .ok_or("variant.normalize.v1 requires inputs.vcf")?,
+    );
+    let reference = resolve_input(
+        base_directory,
+        request
+            .inputs
+            .get("reference")
+            .ok_or("variant.normalize.v1 requires inputs.reference")?,
+    );
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    ensure_distinct_input_output(&reference, &output)?;
+    let summary = normalize_vcf_path(&input, &reference, &output)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_pdb_summary(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -2133,6 +2320,71 @@ fn run_sequence_from_table(base_directory: &Path, request: JobRequest) -> Worker
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_sequence_kmer_count(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_sequence_contract(&request, &["output", "k", "canonical", "top_n"])?;
+    let input = resolve_input(
+        base_directory,
+        request
+            .inputs
+            .get("fasta")
+            .ok_or("sequence.kmer.count.v1 requires inputs.fasta")?,
+    );
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let summary = count_kmers_path(&input, &output, &kmer_count_options(&request.parameters)?)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_primer_epcr(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["fasta", "primers"],
+        &["output", "min_amplicon", "max_amplicon", "max_hits"],
+    )?;
+    let fasta = resolve_input(
+        base_directory,
+        request
+            .inputs
+            .get("fasta")
+            .ok_or("primer.epcr.v1 requires inputs.fasta")?,
+    );
+    let primers = resolve_input(
+        base_directory,
+        request
+            .inputs
+            .get("primers")
+            .ok_or("primer.epcr.v1 requires inputs.primers")?,
+    );
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&fasta, &output)?;
+    ensure_distinct_input_output(&primers, &output)?;
+    let summary = epcr_path(
+        &fasta,
+        &primers,
+        &output,
+        &epcr_options(&request.parameters)?,
+    )?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn execute_sequence_transform_v1<T>(
     base_directory: &Path,
     request: JobRequest,
@@ -2602,6 +2854,43 @@ fn sequence_from_table_options(
     Ok(options)
 }
 
+fn kmer_count_options(parameters: &serde_json::Value) -> WorkerResult<KmerCountOptions> {
+    let mut options = KmerCountOptions::default();
+    if let Some(k) = optional_parameter_usize(parameters, "k")? {
+        options.k = k;
+    }
+    if let Some(canonical) = optional_parameter_bool(parameters, "canonical")? {
+        options.canonical = canonical;
+    }
+    if let Some(top_n) = optional_parameter_usize(parameters, "top_n")? {
+        options.top_n = top_n;
+    }
+    Ok(options)
+}
+
+fn epcr_options(parameters: &serde_json::Value) -> WorkerResult<EpcrOptions> {
+    let mut options = EpcrOptions::default();
+    if let Some(value) = optional_parameter_usize(parameters, "min_amplicon")? {
+        options.min_amplicon = value;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "max_amplicon")? {
+        options.max_amplicon = value;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "max_hits")? {
+        options.max_hits = value;
+    }
+    Ok(options)
+}
+
+fn variant_filter_options(parameters: &serde_json::Value) -> WorkerResult<VariantFilterOptions> {
+    Ok(VariantFilterOptions {
+        min_qual: optional_parameter_f64(parameters, "min_qual")?,
+        require_pass: optional_parameter_bool(parameters, "require_pass")?.unwrap_or(false),
+        contigs: optional_string_array_parameter(parameters, "contigs")?,
+        min_info_dp: optional_parameter_u64(parameters, "min_info_dp")?,
+    })
+}
+
 fn sequence_table_delimiter_option(
     parameters: &serde_json::Value,
 ) -> WorkerResult<Option<SequenceTableDelimiter>> {
@@ -2639,6 +2928,21 @@ fn optional_parameter_u8(parameters: &serde_json::Value, key: &str) -> WorkerRes
     optional_parameter_u64(parameters, key)?
         .map(|value| u8::try_from(value).map_err(|_| format!("{key} must be 0..255").into()))
         .transpose()
+}
+
+fn optional_parameter_f64(parameters: &serde_json::Value, key: &str) -> WorkerResult<Option<f64>> {
+    match parameters.get(key) {
+        Some(value) => {
+            let number = value
+                .as_f64()
+                .ok_or_else(|| format!("{key} must be a number"))?;
+            if !number.is_finite() {
+                return Err(format!("{key} must be finite").into());
+            }
+            Ok(Some(number))
+        }
+        None => Ok(None),
+    }
 }
 
 fn optional_parameter_bool(

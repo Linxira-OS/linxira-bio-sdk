@@ -44,6 +44,98 @@ fn reports_sequence_statistics_as_json() {
 }
 
 #[test]
+fn runs_kmer_epcr_and_variant_transform_capabilities() {
+    let workspace = workspace_root();
+    let output_root = temporary_directory("sequence-variant-analysis");
+
+    let kmer_output = output_root.join("kmers.tsv");
+    let result = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "kmer-count"])
+        .arg(workspace.join("tests/fixtures/sequence-analysis/reference.fa"))
+        .arg(&kmer_output)
+        .args(["--k", "3", "--canonical", "--top-n", "5", "--json"])
+        .output()
+        .expect("run k-mer counting");
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).expect("k-mer JSON");
+    assert_eq!(json["capability"], "sequence.kmer.count.v1");
+    assert_eq!(json["result"]["k"], 3);
+    assert!(kmer_output.exists());
+
+    let epcr_output = output_root.join("amplicons.tsv");
+    let result = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["primer", "epcr"])
+        .arg(workspace.join("tests/fixtures/sequence-analysis/reference.fa"))
+        .arg(workspace.join("tests/fixtures/sequence-analysis/primers.tsv"))
+        .arg(&epcr_output)
+        .args(["--max-amplicon", "100", "--json"])
+        .output()
+        .expect("run ePCR");
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).expect("ePCR JSON");
+    assert_eq!(json["capability"], "primer.epcr.v1");
+    assert!(json["result"]["amplicon_count"].as_u64().unwrap() > 0);
+
+    let filtered_output = output_root.join("filtered.vcf");
+    let input_vcf = workspace.join("tests/fixtures/variant-transform/variants.vcf");
+    let result = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["variant", "filter"])
+        .arg(&input_vcf)
+        .arg(&filtered_output)
+        .args([
+            "--min-qual",
+            "20",
+            "--pass-only",
+            "--min-info-dp",
+            "10",
+            "--json",
+        ])
+        .output()
+        .expect("run VCF filter");
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).expect("filter JSON");
+    assert_eq!(json["capability"], "variant.filter.v1");
+    assert_eq!(json["result"]["output_records"], 2);
+
+    let normalized_output = output_root.join("normalized.vcf");
+    let result = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["variant", "normalize"])
+        .arg(&input_vcf)
+        .arg(workspace.join("tests/fixtures/variant-transform/reference.fa"))
+        .arg(&normalized_output)
+        .arg("--json")
+        .output()
+        .expect("run VCF normalization");
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&result.stdout).expect("normalize JSON");
+    assert_eq!(json["capability"], "variant.normalize.v1");
+    assert_eq!(json["result"]["left_aligned_records"], 1);
+    assert!(
+        fs::read_to_string(&normalized_output)
+            .unwrap()
+            .contains("chr1\t1\tins1\tA\tAA")
+    );
+
+    fs::remove_dir_all(output_root).expect("remove analysis directory");
+}
+
+#[test]
 fn exposes_available_and_planned_capabilities() {
     let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
         .args(["capabilities", "--json"])

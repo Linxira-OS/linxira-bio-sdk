@@ -15,7 +15,8 @@ the agent skills that select and validate them.
   `sequence.reverse-complement.v1`, `sequence.translate.v1`, and
   `sequence.orf.v1`, `sequence.id.normalize.v1`, `sequence.merge.v1`,
   `sequence.split.v1`, `sequence.to-table.v1`, and
-  `sequence.from-table.v1` capabilities.
+  `sequence.from-table.v1`, `sequence.kmer.count.v1`, and `primer.epcr.v1`
+  capabilities.
 - Read `skills/analyze-fastq-quality/SKILL.md` for the implemented
   `fastq.qc.v1` capability.
 - Read `skills/process-fastq-reads/SKILL.md` for the implemented
@@ -32,7 +33,8 @@ the agent skills that select and validate them.
 - Read `skills/manipulate-bio-tables/SKILL.md` for the implemented CSV/TSV
   `table.manipulate.v1` capability.
 - Read `skills/analyze-variant-statistics/SKILL.md` for the implemented
-  `variant.stats.v1` capability.
+  `variant.stats.v1`, `variant.filter.v1`, and `variant.normalize.v1`
+  capabilities.
 - Read `skills/analyze-pdb-structure/SKILL.md` for the implemented
   `structure.pdb.summary.v1` capability and explicit AlphaFold pLDDT handling.
 - Read `skills/inspect-bio-dataset/SKILL.md` before analyzing imported data.

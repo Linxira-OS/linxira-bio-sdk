@@ -23,6 +23,9 @@ use linxira_bio_core::interval::{
 };
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
 use linxira_bio_core::sequence::{SequenceStats, fasta_stats_path};
+use linxira_bio_core::sequence_analysis::{
+    EpcrOptions, KmerCountOptions, count_kmers_path, epcr_path,
+};
 use linxira_bio_core::sequence_transform::{
     SequenceExtractOptions, SequenceFilterOptions, SequenceFromTableOptions,
     SequenceIdNormalizeOptions, SequenceMergeOptions, SequenceOrfOptions, SequenceSplitOptions,
@@ -36,6 +39,9 @@ use linxira_bio_core::table::{
     TableDelimiter, TableFilter, TableManipulateOptions, manipulate_table_path,
 };
 use linxira_bio_core::variant::{VcfStats, vcf_stats_path};
+use linxira_bio_core::variant_transform::{
+    VariantFilterOptions, filter_vcf_path, normalize_vcf_path,
+};
 use linxira_bio_export::export_json_file;
 use linxira_bio_protocol::{AnalysisResult, ExecutionMode};
 use std::env;
@@ -188,6 +194,14 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         {
             print_sequence_from_table(arguments)
         }
+        [sequence, kmer_count, arguments @ ..]
+            if sequence == "sequence" && kmer_count == "kmer-count" =>
+        {
+            print_sequence_kmer_count(arguments)
+        }
+        [primer, epcr, arguments @ ..] if primer == "primer" && epcr == "epcr" => {
+            print_primer_epcr(arguments)
+        }
         [variant, stats, path] if variant == "variant" && stats == "stats" => {
             print_variant_stats(path, false)
         }
@@ -195,6 +209,14 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if variant == "variant" && stats == "stats" && json == "--json" =>
         {
             print_variant_stats(path, true)
+        }
+        [variant, filter, arguments @ ..] if variant == "variant" && filter == "filter" => {
+            print_variant_filter(arguments)
+        }
+        [variant, normalize, arguments @ ..]
+            if variant == "variant" && normalize == "normalize" =>
+        {
+            print_variant_normalize(arguments)
         }
         [interval, intersect, left, right]
             if interval == "interval" && intersect == "intersect" =>
@@ -1017,6 +1039,78 @@ where
     Ok(())
 }
 
+fn print_sequence_kmer_count(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = KmerCountOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--k" => {
+                index += 1;
+                options.k = parse_sequence_usize(arguments.get(index), "--k")?;
+            }
+            "--top-n" => {
+                index += 1;
+                options.top_n = parse_sequence_usize(arguments.get(index), "--top-n")?;
+            }
+            "--canonical" => options.canonical = true,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence kmer-count option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "sequence kmer-count")?,
+        }
+        index += 1;
+    }
+    let (input, output) = require_sequence_paths(input, output, "sequence kmer-count")?;
+    let summary = count_kmers_path(input, output, &options)?;
+    print_sequence_transform_result(
+        "sequence-kmer-count",
+        "sequence.kmer.count.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
+fn print_primer_epcr(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = EpcrOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--min-amplicon" => {
+                index += 1;
+                options.min_amplicon =
+                    parse_sequence_usize(arguments.get(index), "--min-amplicon")?;
+            }
+            "--max-amplicon" => {
+                index += 1;
+                options.max_amplicon =
+                    parse_sequence_usize(arguments.get(index), "--max-amplicon")?;
+            }
+            "--max-hits" => {
+                index += 1;
+                options.max_hits = parse_sequence_usize(arguments.get(index), "--max-hits")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown primer epcr option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err("primer epcr requires <reference.fasta> <primers.tsv> <output.tsv>".into());
+    }
+    let summary = epcr_path(&paths[0], &paths[1], &paths[2], &options)?;
+    print_sequence_transform_result("primer-epcr", "primer.epcr.v1", &paths[2], summary, json)
+}
+
 fn print_fastq_qc(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     let mut path = None;
     let mut json = false;
@@ -1194,6 +1288,80 @@ fn print_variant_stats(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
         print_variant_stats_text(&stats);
     }
     Ok(())
+}
+
+fn print_variant_filter(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = VariantFilterOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--min-qual" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--min-qual requires a value")?;
+                let quality = value
+                    .parse::<f64>()
+                    .map_err(|_| format!("--min-qual requires a number, got {value:?}"))?;
+                if !quality.is_finite() {
+                    return Err("--min-qual must be finite".into());
+                }
+                options.min_qual = Some(quality);
+            }
+            "--pass-only" => options.require_pass = true,
+            "--contig" => {
+                index += 1;
+                options.contigs.push(
+                    arguments
+                        .get(index)
+                        .ok_or("--contig requires a value")?
+                        .clone(),
+                );
+            }
+            "--min-info-dp" => {
+                index += 1;
+                options.min_info_dp =
+                    Some(parse_sequence_u64(arguments.get(index), "--min-info-dp")?);
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown variant filter option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "variant filter")?,
+        }
+        index += 1;
+    }
+    let input = input.ok_or("variant filter requires an input VCF path")?;
+    let output = output.ok_or("variant filter requires an output VCF path")?;
+    let output = Path::new(output);
+    let summary = filter_vcf_path(Path::new(input), output, &options)?;
+    print_sequence_transform_result("variant-filter", "variant.filter.v1", output, summary, json)
+}
+
+fn print_variant_normalize(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut json = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown variant normalize option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+    }
+    if paths.len() != 3 {
+        return Err("variant normalize requires <input.vcf> <reference.fasta> <output.vcf>".into());
+    }
+    let summary = normalize_vcf_path(&paths[0], &paths[1], &paths[2])?;
+    print_sequence_transform_result(
+        "variant-normalize",
+        "variant.normalize.v1",
+        &paths[2],
+        summary,
+        json,
+    )
 }
 
 fn print_annotation_stats(arguments: &[String]) -> Result<(), Box<dyn Error>> {
@@ -1768,6 +1936,8 @@ fn usage() -> &'static str {
         "  linxira-bio sequence split <input.fasta[.gz]> <output-dir> [--records-per-file N] [--prefix PREFIX] [--json]\n",
         "  linxira-bio sequence to-table <input.fasta[.gz]> <output.csv|tsv> [--delimiter csv|tsv] [--no-header] [--json]\n",
         "  linxira-bio sequence from-table <input.csv|tsv[.gz]> <output.fasta> [--delimiter csv|tsv] [--id-column NAME] [--sequence-column NAME] [--description-column NAME|--no-description-column] [--json]\n",
+        "  linxira-bio sequence kmer-count <input.fasta[.gz]> <output.tsv> [--k N] [--canonical] [--top-n N] [--json]\n",
+        "  linxira-bio primer epcr <reference.fasta[.gz]> <primers.tsv> <output.tsv> [--min-amplicon N] [--max-amplicon N] [--max-hits N] [--json]\n",
         "  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n",
         "  linxira-bio fastq trim <input.fastq[.gz]> <output.fastq> [--min-quality N] [--min-length N] [--quality-encoding phred+33|phred+64] [--json]\n",
         "  linxira-bio fastq adapter-trim <input.fastq[.gz]> <output.fastq> [--adapter SEQ ...] [--min-overlap N] [--min-length N] [--json]\n",
@@ -1777,6 +1947,8 @@ fn usage() -> &'static str {
         "  linxira-bio annotation positions <input.gff3|gtf[.gz]> <output.tsv> [--feature-type TYPE ...] [--json]\n",
         "  linxira-bio annotation extract <input.gff3|gtf[.gz]> <reference.fasta[.gz]> <output.fasta> [--feature-type gene|transcript|cds|exon|utr|five_prime_utr|three_prime_utr|promoter] [--promoter-length N] [--json]\n",
         "  linxira-bio variant stats <input.vcf[.gz]> [--json]\n",
+        "  linxira-bio variant filter <input.vcf[.gz]> <output.vcf> [--min-qual Q] [--pass-only] [--contig NAME ...] [--min-info-dp N] [--json]\n",
+        "  linxira-bio variant normalize <input.vcf[.gz]> <reference.fasta[.gz]> <output.vcf> [--json]\n",
         "  linxira-bio interval intersect <left.bed[.gz]> <right.bed[.gz]> [--json]\n",
         "  linxira-bio interval merge <input.bed[.gz]> <output.bed> [--max-gap N] [--json]\n",
         "  linxira-bio interval subtract <left.bed[.gz]> <right.bed[.gz]> <output.bed> [--json]\n",

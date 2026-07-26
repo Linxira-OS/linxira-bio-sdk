@@ -1,6 +1,6 @@
 ---
 name: manipulate-biological-sequences
-description: Run verified local Linxira Bio FASTA sequence-manipulation capabilities. Use for FASTA record or coordinate extraction, length/GC/N filtering, DNA/RNA reverse-complement generation, nucleotide-to-protein translation, deterministic ORF finding, sequence ID normalization, FASTA merge/split, and FASTA-table conversion.
+description: Run verified local Linxira Bio FASTA sequence-manipulation and analysis capabilities. Use for FASTA extraction, filtering, reverse complements, translation, ORFs, ID normalization, merge/split, FASTA-table conversion, exact k-mer counting, and simple exact-match electronic PCR.
 ---
 
 # Manipulate Biological Sequences
@@ -27,6 +27,8 @@ Use these local capabilities instead of writing ad-hoc FASTA scripts.
 - Use `sequence.to-table.v1` to export FASTA records to CSV/TSV columns
   `id`, `description`, `length`, and `sequence`.
 - Use `sequence.from-table.v1` to rebuild FASTA from CSV/TSV columns.
+- Use `sequence.kmer.count.v1` for exact k-mer counts with optional canonical reverse-complement collapsing.
+- Use `primer.epcr.v1` for exact-match primer pairs supplied as TSV columns `id`, `forward`, and `reverse`.
 
 Run `inspect-bio-dataset` first when the input format or compression is not
 already known.
@@ -46,6 +48,8 @@ linxira-bio sequence merge merged.fa part1.fa part2.fa --json
 linxira-bio sequence split INPUT.fa split-dir --records-per-file 1000 --json
 linxira-bio sequence to-table INPUT.fa records.tsv --delimiter tsv --json
 linxira-bio sequence from-table records.tsv OUTPUT.fa --delimiter tsv --json
+linxira-bio sequence kmer-count INPUT.fa kmers.tsv --k 21 --canonical --top-n 50 --json
+linxira-bio primer epcr reference.fa primers.tsv amplicons.tsv --max-amplicon 5000 --json
 ```
 
 When developing inside the source repository, prefix commands with
@@ -66,3 +70,7 @@ When developing inside the source repository, prefix commands with
   pre-existing chunk filenames.
 - For table conversion, preserve the `id`, `description`, `length`, and
   `sequence` column contract unless the user explicitly maps input columns.
+- For k-mer counts, report skipped ambiguous windows and do not interpret the
+  spectrum as a genome-size or error estimate without a separate model.
+- For ePCR, report exact-match and 1-based inclusive coordinate limitations;
+  do not claim experimental amplification success.

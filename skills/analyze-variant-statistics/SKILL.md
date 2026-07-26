@@ -1,12 +1,13 @@
 ---
 name: analyze-variant-statistics
-description: Compute and validate deterministic local VCF summary statistics with the Linxira Bio `variant.stats.v1` capability. Use for plain, gzip, or BGZF VCF record, FILTER, allele-class, contig, transition/transversion, sample, and genotype-missingness summaries.
+description: Run deterministic local Linxira Bio VCF statistics, basic filtering, and reference-guided biallelic small-variant normalization. Use for VCF summaries, QUAL/FILTER/contig/INFO-DP filtering, REF validation, minimal representation, and repeat-aware left alignment.
 ---
 
 # Analyze Variant Statistics
 
-Use the tested streaming Rust capability for a descriptive VCF summary. It
-does not normalize, filter, annotate, or clinically interpret variants.
+Use the tested Rust capabilities for descriptive VCF summaries, basic record
+filters, or reference-guided small-variant normalization. None clinically
+interpret or annotate variants.
 
 ## Run
 
@@ -17,6 +18,8 @@ does not normalize, filter, annotate, or clinically interpret variants.
 
 ```bash
 linxira-bio variant stats INPUT.vcf --json
+linxira-bio variant filter INPUT.vcf OUTPUT.vcf --min-qual 20 --pass-only --min-info-dp 10 --json
+linxira-bio variant normalize INPUT.vcf REFERENCE.fa OUTPUT.vcf --json
 ```
 
 When developing in the source repository, run:
@@ -47,3 +50,13 @@ cargo run -p linxira-bio-cli -- variant stats INPUT.vcf --json
 This summary does not establish call quality, pathogenicity, population
 frequency, sample identity, or clinical meaning. Compare cohorts only after
 normalization, reference-build checks, and equivalent filtering.
+
+## Filter And Normalize Safely
+
+- Treat missing QUAL or `INFO/DP` as failing the corresponding minimum filter.
+- Preserve filter parameters and the output artifact hash with the result.
+- Supply the exact matching reference build for normalization.
+- Expect normalization to reject multiallelic, symbolic, breakend, and
+  spanning-deletion ALT values; split or process them with a maintained native
+  workflow before retrying.
+- Do not treat filtering or normalization as pathogenicity evidence.

@@ -474,10 +474,10 @@ pub struct SequenceFromTableSummary {
 }
 
 #[derive(Debug)]
-struct FastaRecord {
-    header: String,
-    identifier: String,
-    sequence: Vec<u8>,
+pub(crate) struct FastaRecord {
+    pub(crate) header: String,
+    pub(crate) identifier: String,
+    pub(crate) sequence: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -1266,7 +1266,7 @@ fn open_fasta(path: &Path) -> Result<Box<dyn BufRead>, SequenceTransformError> {
     Ok(Box::new(BufReader::new(input)))
 }
 
-fn visit_fasta_path(
+pub(crate) fn visit_fasta_path(
     path: &Path,
     mut visitor: impl FnMut(FastaRecord) -> Result<(), SequenceTransformError>,
 ) -> Result<u64, SequenceTransformError> {
@@ -1366,7 +1366,7 @@ fn trim_ascii(mut value: &[u8]) -> &[u8] {
     value
 }
 
-fn with_new_output<T>(
+pub(crate) fn with_new_output<T>(
     output: &Path,
     operation: impl FnOnce(&mut BufWriter<File>) -> Result<T, SequenceTransformError>,
 ) -> Result<T, SequenceTransformError> {
@@ -1503,7 +1503,7 @@ fn reverse_complement(
         .collect())
 }
 
-fn reverse_complement_dna(sequence: &[u8]) -> Vec<u8> {
+pub(crate) fn reverse_complement_dna(sequence: &[u8]) -> Vec<u8> {
     sequence
         .iter()
         .rev()

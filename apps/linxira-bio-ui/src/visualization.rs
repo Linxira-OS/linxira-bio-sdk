@@ -68,6 +68,8 @@ pub fn show_analysis_charts(
 fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<ChartSpec> {
     match capability.unwrap_or_default() {
         "sequence.stats.v1" => sequence_charts(payload, zh_cn),
+        "sequence.kmer.count.v1" => kmer_charts(payload, zh_cn),
+        "primer.epcr.v1" => epcr_charts(payload, zh_cn),
         "fastq.qc.v1" => fastq_charts(payload, zh_cn),
         "fastq.trim.v1" | "fastq.adapter.v1" => fastq_transform_charts(payload, zh_cn),
         "alignment.qc.v1" => alignment_charts(payload, zh_cn),
@@ -78,6 +80,8 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         "expression.matrix.qc.v1" => expression_charts(payload, zh_cn),
         "table.manipulate.v1" => table_manipulate_charts(payload, zh_cn),
         "variant.stats.v1" => variant_charts(payload, zh_cn),
+        "variant.filter.v1" => variant_filter_charts(payload, zh_cn),
+        "variant.normalize.v1" => variant_normalize_charts(payload, zh_cn),
         "structure.pdb.summary.v1" => structure_charts(payload, zh_cn),
         _ if payload.get("per_cycle").is_some() => fastq_charts(payload, zh_cn),
         _ if payload.get("contig_counts").is_some() => variant_charts(payload, zh_cn),
@@ -727,6 +731,120 @@ fn variant_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
         });
     }
     charts
+}
+
+fn kmer_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let values = payload
+        .get("top_kmers")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| {
+            Some(BarValue {
+                label: entry.get("kmer")?.as_str()?.to_owned(),
+                value: entry.get("count")?.as_f64()?,
+            })
+        })
+        .take(20)
+        .collect::<Vec<_>>();
+    if values.is_empty() {
+        Vec::new()
+    } else {
+        vec![ChartSpec::Bars {
+            title: localized(zh_cn, "高频 k-mer", "Top k-mers").to_owned(),
+            values,
+            percent: false,
+        }]
+    }
+}
+
+fn epcr_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let values = values_for_keys(
+        payload,
+        &[
+            (
+                "primer_pair_count",
+                localized(zh_cn, "输入引物对", "Primer pairs"),
+            ),
+            (
+                "matched_primer_pair_count",
+                localized(zh_cn, "命中引物对", "Matched pairs"),
+            ),
+            ("amplicon_count", localized(zh_cn, "扩增子", "Amplicons")),
+        ],
+    );
+    if values.is_empty() {
+        Vec::new()
+    } else {
+        vec![ChartSpec::Bars {
+            title: localized(zh_cn, "电子 PCR 命中", "Electronic PCR hits").to_owned(),
+            values,
+            percent: false,
+        }]
+    }
+}
+
+fn variant_filter_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let values = values_for_keys(
+        payload,
+        &[
+            ("output_records", localized(zh_cn, "保留", "Retained")),
+            (
+                "rejected_by_qual",
+                localized(zh_cn, "QUAL 淘汰", "QUAL rejected"),
+            ),
+            (
+                "rejected_by_filter",
+                localized(zh_cn, "FILTER 淘汰", "FILTER rejected"),
+            ),
+            (
+                "rejected_by_contig",
+                localized(zh_cn, "染色体淘汰", "Contig rejected"),
+            ),
+            (
+                "rejected_by_info_dp",
+                localized(zh_cn, "DP 淘汰", "DP rejected"),
+            ),
+        ],
+    );
+    if values.is_empty() {
+        Vec::new()
+    } else {
+        vec![ChartSpec::Bars {
+            title: localized(zh_cn, "VCF 过滤结果", "VCF filter outcome").to_owned(),
+            values,
+            percent: false,
+        }]
+    }
+}
+
+fn variant_normalize_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let values = values_for_keys(
+        payload,
+        &[
+            (
+                "reference_validated_records",
+                localized(zh_cn, "参考验证", "Reference validated"),
+            ),
+            (
+                "changed_records",
+                localized(zh_cn, "表示已改变", "Representation changed"),
+            ),
+            (
+                "left_aligned_records",
+                localized(zh_cn, "已左对齐", "Left aligned"),
+            ),
+        ],
+    );
+    if values.is_empty() {
+        Vec::new()
+    } else {
+        vec![ChartSpec::Bars {
+            title: localized(zh_cn, "VCF 规范化", "VCF normalization").to_owned(),
+            values,
+            percent: false,
+        }]
+    }
 }
 
 fn show_bar_chart(ui: &mut egui::Ui, title: &str, values: &[BarValue], percent: bool) {
