@@ -1,0 +1,12 @@
+{
+  "input_feature_count": 3,
+  "selected_feature_count": 2,
+  "sample_count": 2,
+  "scaled_rows": true,
+  "minimum_value": -0.7071067812,
+  "maximum_value": 0.7071067812,
+  "row_labels": ["gene_a", "gene_b"],
+  "column_labels": ["s1", "s2"],
+  "values": [[-0.7071067812, 0.7071067812], [0.7071067812, -0.7071067812]],
+  "warnings": ["selected the 2 most variable features from 3 input features"]
+}

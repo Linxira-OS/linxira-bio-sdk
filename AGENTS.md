@@ -28,8 +28,9 @@ the agent skills that select and validate them.
 - Read `skills/intersect-genomic-intervals/SKILL.md` for the implemented BED
   `interval.intersect.v1`, `interval.merge.v1`, and
   `interval.subtract.v1` capabilities.
-- Read `skills/analyze-expression-matrix/SKILL.md` for the implemented CSV/TSV
-  `expression.matrix.qc.v1` capability.
+- Read `skills/analyze-expression-matrix/SKILL.md` for implemented CSV/TSV
+  matrix QC, normalization, PCA, sample/feature clustering, and native
+  clustered-heatmap preparation.
 - Read `skills/manipulate-bio-tables/SKILL.md` for the implemented CSV/TSV
   `table.manipulate.v1` capability.
 - Read `skills/analyze-variant-statistics/SKILL.md` for the implemented

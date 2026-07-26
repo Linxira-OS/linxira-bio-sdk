@@ -16,7 +16,12 @@ use linxira_bio_core::environment::{
     EnvironmentMode, EnvironmentPlanOptions, audit_environment, parse_environment_mode,
     plan_environment_with_options,
 };
-use linxira_bio_core::expression::expression_matrix_qc_path;
+use linxira_bio_core::expression::{
+    ExpressionClusterOptions, ExpressionHeatmapOptions, ExpressionNormalizeOptions,
+    ExpressionPcaOptions, expression_cluster_path, expression_heatmap_path,
+    expression_matrix_qc_path, expression_pca_path, normalize_expression_matrix_path,
+    parse_expression_normalization_method,
+};
 use linxira_bio_core::fastq::{
     DEFAULT_MAX_CYCLES, FastqQcOptions, QualityEncodingMode, fastq_qc_path,
 };
@@ -105,6 +110,10 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "fastq.trim.v1" => run_fastq_trim(base_directory, request),
         "fastq.adapter.v1" => run_fastq_adapter_trim(base_directory, request),
         "expression.matrix.qc.v1" => run_expression_matrix_qc(base_directory, request),
+        "expression.normalize.v1" => run_expression_normalize(base_directory, request),
+        "expression.pca.v1" => run_expression_pca(base_directory, request),
+        "expression.cluster.v1" => run_expression_cluster(base_directory, request),
+        "expression.heatmap.v1" => run_expression_heatmap(base_directory, request),
         "interval.intersect.v1" => run_interval_intersect(base_directory, request),
         "interval.merge.v1" => run_interval_merge(base_directory, request),
         "interval.subtract.v1" => run_interval_subtract(base_directory, request),
@@ -424,6 +433,47 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 }));
             finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
             Ok(serde_json::to_string(&result)?)
+        }
+        "expression.normalize.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "matrix")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_distinct_input_output(&input, &output)?;
+            let options = expression_normalize_options(&request.parameters)?;
+            let summary = normalize_expression_matrix_path(&input, &output, &options)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "normalized-expression-matrix",
+                    role: "matrix",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "expression.pca.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "matrix")?;
+            let result = expression_pca_path(input, &expression_pca_options(&request.parameters)?)?;
+            serialize_v2_result(&request, base_directory, &verified_inputs, result)
+        }
+        "expression.cluster.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "matrix")?;
+            let result =
+                expression_cluster_path(input, &expression_cluster_options(&request.parameters)?)?;
+            serialize_v2_result(&request, base_directory, &verified_inputs, result)
+        }
+        "expression.heatmap.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "matrix")?;
+            let result =
+                expression_heatmap_path(input, &expression_heatmap_options(&request.parameters)?)?;
+            serialize_v2_result(&request, base_directory, &verified_inputs, result)
         }
         "interval.intersect.v1" => {
             let left = resolve_v2_single_input(base_directory, &request, "left-bed")?;
@@ -891,6 +941,18 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             &["output", "adapter", "adapters", "min_overlap", "min_length"],
         ),
         "expression.matrix.qc.v1" => (&["matrix"], &[]),
+        "expression.normalize.v1" => (&["matrix"], &["output", "method", "pseudocount"]),
+        "expression.pca.v1" => (&["matrix"], &["components", "scale_features"]),
+        "expression.cluster.v1" => (
+            &["matrix"],
+            &[
+                "sample_clusters",
+                "feature_clusters",
+                "max_iterations",
+                "scale_features",
+            ],
+        ),
+        "expression.heatmap.v1" => (&["matrix"], &["top_variable_features", "scale_rows"]),
         "interval.intersect.v1" => (&["left-bed", "right-bed"], &[]),
         "interval.merge.v1" => (&["bed"], &["output", "max_gap"]),
         "interval.subtract.v1" => (&["left-bed", "right-bed"], &["output"]),
@@ -1668,6 +1730,106 @@ fn run_expression_matrix_qc(base_directory: &Path, request: JobRequest) -> Worke
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_expression_normalize(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(&request, &["matrix"], &["output", "method", "pseudocount"])?;
+    let input = request
+        .inputs
+        .get("matrix")
+        .ok_or("expression.normalize.v1 requires inputs.matrix")?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let summary = normalize_expression_matrix_path(
+        input,
+        output,
+        &expression_normalize_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = summary.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_expression_pca(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(&request, &["matrix"], &["components", "scale_features"])?;
+    let input = request
+        .inputs
+        .get("matrix")
+        .ok_or("expression.pca.v1 requires inputs.matrix")?;
+    let analysis = expression_pca_path(
+        resolve_input(base_directory, input),
+        &expression_pca_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_expression_cluster(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["matrix"],
+        &[
+            "sample_clusters",
+            "feature_clusters",
+            "max_iterations",
+            "scale_features",
+        ],
+    )?;
+    let input = request
+        .inputs
+        .get("matrix")
+        .ok_or("expression.cluster.v1 requires inputs.matrix")?;
+    let analysis = expression_cluster_path(
+        resolve_input(base_directory, input),
+        &expression_cluster_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_expression_heatmap(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["matrix"],
+        &["top_variable_features", "scale_rows"],
+    )?;
+    let input = request
+        .inputs
+        .get("matrix")
+        .ok_or("expression.heatmap.v1 requires inputs.matrix")?;
+    let analysis = expression_heatmap_path(
+        resolve_input(base_directory, input),
+        &expression_heatmap_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_interval_intersect(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let left = request
         .inputs
@@ -1858,6 +2020,80 @@ fn pdb_options(parameters: &serde_json::Value) -> WorkerResult<PdbSummaryOptions
     Ok(PdbSummaryOptions {
         interpret_b_factors_as_plddt,
     })
+}
+
+fn expression_normalize_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<ExpressionNormalizeOptions> {
+    let mut options = ExpressionNormalizeOptions::default();
+    if let Some(method) = optional_parameter_string(parameters, "method")? {
+        options.method = parse_expression_normalization_method(method)?;
+    }
+    if let Some(pseudocount) = optional_parameter_f64(parameters, "pseudocount")? {
+        if pseudocount < 0.0 {
+            return Err("pseudocount must be non-negative".into());
+        }
+        options.pseudocount = pseudocount;
+    }
+    Ok(options)
+}
+
+fn expression_pca_options(parameters: &serde_json::Value) -> WorkerResult<ExpressionPcaOptions> {
+    let mut options = ExpressionPcaOptions::default();
+    if let Some(components) = optional_parameter_usize(parameters, "components")? {
+        if components == 0 {
+            return Err("components must be at least 1".into());
+        }
+        options.components = components;
+    }
+    if let Some(scale) = optional_parameter_bool(parameters, "scale_features")? {
+        options.scale_features = scale;
+    }
+    Ok(options)
+}
+
+fn expression_cluster_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<ExpressionClusterOptions> {
+    let mut options = ExpressionClusterOptions::default();
+    if let Some(value) = optional_parameter_usize(parameters, "sample_clusters")? {
+        if value == 0 {
+            return Err("sample_clusters must be at least 1".into());
+        }
+        options.sample_clusters = value;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "feature_clusters")? {
+        if value == 0 {
+            return Err("feature_clusters must be at least 1".into());
+        }
+        options.feature_clusters = value;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "max_iterations")? {
+        if value == 0 || value > 10_000 {
+            return Err("max_iterations must be between 1 and 10000".into());
+        }
+        options.max_iterations = value;
+    }
+    if let Some(scale) = optional_parameter_bool(parameters, "scale_features")? {
+        options.scale_features = scale;
+    }
+    Ok(options)
+}
+
+fn expression_heatmap_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<ExpressionHeatmapOptions> {
+    let mut options = ExpressionHeatmapOptions::default();
+    if let Some(value) = optional_parameter_usize(parameters, "top_variable_features")? {
+        if value == 0 || value > 200 {
+            return Err("top_variable_features must be between 1 and 200".into());
+        }
+        options.top_variable_features = value;
+    }
+    if let Some(scale) = optional_parameter_bool(parameters, "scale_rows")? {
+        options.scale_rows = scale;
+    }
+    Ok(options)
 }
 
 fn fastq_options_v1(request: &JobRequest) -> WorkerResult<FastqQcOptions> {

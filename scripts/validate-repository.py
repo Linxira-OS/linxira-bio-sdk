@@ -45,7 +45,11 @@ SCHEMA_FILES = (
     "schemas/capability.schema.json",
     "schemas/dataset-manifest.schema.json",
     "schemas/environment-plan.schema.json",
+    "schemas/expression-cluster.schema.json",
+    "schemas/expression-heatmap.schema.json",
     "schemas/expression-matrix-qc.schema.json",
+    "schemas/expression-normalization.schema.json",
+    "schemas/expression-pca.schema.json",
     "schemas/interval-intersect.schema.json",
     "schemas/job-request-v2.schema.json",
     "schemas/job-request.schema.json",
@@ -65,6 +69,25 @@ CATALOG_AND_MANIFEST_CONTRACTS = (
     ("packaging/bundle-manifest.json", "schemas/bundle-manifest.schema.json"),
     ("tests/fixtures/notices/minimal.json", "schemas/third-party-dependencies.schema.json"),
     ("workflows/catalog.json", "schemas/workflow-pack-catalog.schema.json"),
+)
+
+CAPABILITY_RESULT_CONTRACTS = (
+    (
+        "tests/fixtures/capability-results/expression-normalization.json",
+        "schemas/expression-normalization.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/expression-pca.json",
+        "schemas/expression-pca.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/expression-cluster.json",
+        "schemas/expression-cluster.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/expression-heatmap.json",
+        "schemas/expression-heatmap.schema.json",
+    ),
 )
 
 JOB_SCHEMAS = {
@@ -245,6 +268,10 @@ def validate_schema_contracts() -> tuple[int, int, int]:
 
     validated_instances = 0
     for instance_path, schema_path in CATALOG_AND_MANIFEST_CONTRACTS:
+        validate_json_instance(ROOT / instance_path, schema_path, schemas[schema_path])
+        validated_instances += 1
+
+    for instance_path, schema_path in CAPABILITY_RESULT_CONTRACTS:
         validate_json_instance(ROOT / instance_path, schema_path, schemas[schema_path])
         validated_instances += 1
 
