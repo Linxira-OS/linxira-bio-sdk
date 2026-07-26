@@ -273,11 +273,13 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "annotation.gxf.normalize.v1",
     "annotation.gene-position.v1",
     "annotation.sequence.extract.v1",
+    "annotation.structure.visualize.v1",
     "annotation.go.normalize.v1",
     "annotation.eggnog.normalize.v1",
     "enrichment.overrepresentation.v1",
     "enrichment.go.v1",
     "enrichment.kegg.v1",
+    "enrichment.visualize.v1",
     "genome.gene-density.v1",
     "interval.intersect.v1",
     "interval.merge.v1",
@@ -293,11 +295,13 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "similarity.blast.parse.v1",
     "similarity.reciprocal.v1",
     "protein.domain.parse.v1",
+    "protein.domain.visualize.v1",
     "phylogeny.tree.transform.v1",
     "variant.stats.v1",
     "variant.filter.v1",
     "variant.normalize.v1",
     "structure.pdb.summary.v1",
+    "structure.viewer.v1",
     "structure.mmcif.summary.v1",
     "structure.sequence.extract.v1",
     "structure.contact-map.v1",
@@ -330,11 +334,16 @@ struct BioApp {
     selected_capability: String,
     annotation_feature_type: String,
     annotation_sort: bool,
+    annotation_visual_feature_id: String,
+    annotation_visual_seqid: String,
+    annotation_visual_max_features: usize,
     go_gene_column: String,
     go_term_column: String,
     enrichment_min_overlap: u64,
     enrichment_max_terms: usize,
     enrichment_include_genes: bool,
+    enrichment_visual_kind: String,
+    enrichment_visual_style: String,
     gene_density_feature_type: String,
     gene_density_window_size: u64,
     gene_density_step_size: u64,
@@ -360,6 +369,9 @@ struct BioApp {
     structure_geometry_atom_count: usize,
     structure_geometry_atoms: [String; 4],
     structure_superpose_atom: String,
+    protein_domain_visual_sequence_id: String,
+    protein_domain_visual_max_sequences: usize,
+    protein_domain_visual_max_domains: usize,
     similarity_max_evalue: f64,
     similarity_min_identity_percent: f64,
     phylogeny_reroot_label: String,
@@ -408,11 +420,16 @@ impl BioApp {
             selected_capability: "sequence.stats.v1".to_owned(),
             annotation_feature_type: "gene".to_owned(),
             annotation_sort: false,
+            annotation_visual_feature_id: String::new(),
+            annotation_visual_seqid: String::new(),
+            annotation_visual_max_features: 100,
             go_gene_column: String::new(),
             go_term_column: String::new(),
             enrichment_min_overlap: 1,
             enrichment_max_terms: 100,
             enrichment_include_genes: false,
+            enrichment_visual_kind: "go".to_owned(),
+            enrichment_visual_style: "bar".to_owned(),
             gene_density_feature_type: "gene".to_owned(),
             gene_density_window_size: 1_000_000,
             gene_density_step_size: 1_000_000,
@@ -443,6 +460,9 @@ impl BioApp {
                 "A/2/N".to_owned(),
             ],
             structure_superpose_atom: "CA".to_owned(),
+            protein_domain_visual_sequence_id: String::new(),
+            protein_domain_visual_max_sequences: 30,
+            protein_domain_visual_max_domains: 500,
             similarity_max_evalue: 1e-5,
             similarity_min_identity_percent: 30.0,
             phylogeny_reroot_label: String::new(),
@@ -824,6 +844,23 @@ impl BioApp {
                     Value::String(self.annotation_feature_type.clone()),
                 );
             }
+            if route.capability == "annotation.structure.visualize.v1" {
+                if !self.annotation_visual_feature_id.trim().is_empty() {
+                    parameters.insert(
+                        "feature_id".to_owned(),
+                        Value::String(self.annotation_visual_feature_id.trim().to_owned()),
+                    );
+                } else if !self.annotation_visual_seqid.trim().is_empty() {
+                    parameters.insert(
+                        "seqid".to_owned(),
+                        Value::String(self.annotation_visual_seqid.trim().to_owned()),
+                    );
+                }
+                parameters.insert(
+                    "max_features".to_owned(),
+                    serde_json::json!(self.annotation_visual_max_features),
+                );
+            }
             if route.capability == "annotation.go.normalize.v1" {
                 if !self.go_gene_column.trim().is_empty() {
                     parameters.insert(
@@ -881,6 +918,40 @@ impl BioApp {
                 parameters.insert(
                     "pseudocount".to_owned(),
                     serde_json::json!(self.expression_pseudocount),
+                );
+            }
+            if route.capability == "protein.domain.visualize.v1" {
+                if !self.protein_domain_visual_sequence_id.trim().is_empty() {
+                    parameters.insert(
+                        "sequence_id".to_owned(),
+                        Value::String(self.protein_domain_visual_sequence_id.trim().to_owned()),
+                    );
+                }
+                parameters.insert(
+                    "max_sequences".to_owned(),
+                    serde_json::json!(self.protein_domain_visual_max_sequences),
+                );
+                parameters.insert(
+                    "max_domains".to_owned(),
+                    serde_json::json!(self.protein_domain_visual_max_domains),
+                );
+            }
+            if route.capability == "enrichment.visualize.v1" {
+                parameters.insert(
+                    "kind".to_owned(),
+                    Value::String(self.enrichment_visual_kind.clone()),
+                );
+                parameters.insert(
+                    "style".to_owned(),
+                    Value::String(self.enrichment_visual_style.clone()),
+                );
+                parameters.insert(
+                    "min_overlap".to_owned(),
+                    serde_json::json!(self.enrichment_min_overlap),
+                );
+                parameters.insert(
+                    "max_terms".to_owned(),
+                    serde_json::json!(self.enrichment_max_terms),
                 );
             }
             request.parameters = Value::Object(parameters);
@@ -1725,11 +1796,13 @@ impl BioApp {
                     "annotation.gxf.normalize.v1",
                     "annotation.gene-position.v1",
                     "annotation.sequence.extract.v1",
+                    "annotation.structure.visualize.v1",
                     "annotation.go.normalize.v1",
                     "annotation.eggnog.normalize.v1",
                     "enrichment.overrepresentation.v1",
                     "enrichment.go.v1",
                     "enrichment.kegg.v1",
+                    "enrichment.visualize.v1",
                     "genome.gene-density.v1",
                     "variant.stats.v1",
                     "variant.filter.v1",
@@ -1748,6 +1821,7 @@ impl BioApp {
                     "similarity.blast.parse.v1",
                     "similarity.reciprocal.v1",
                     "protein.domain.parse.v1",
+                    "protein.domain.visualize.v1",
                     "phylogeny.tree.transform.v1",
                     "table.manipulate.v1",
                     "structure.pdb.summary.v1",
@@ -1823,7 +1897,8 @@ impl BioApp {
                     ),
                     "enrichment.overrepresentation.v1"
                     | "enrichment.go.v1"
-                    | "enrichment.kegg.v1" => (
+                    | "enrichment.kegg.v1"
+                    | "enrichment.visualize.v1" => (
                         self.text("功能关联表", "Association table"),
                         self.text(
                             "没有可用 CSV/TSV 关联表",
@@ -1889,6 +1964,23 @@ impl BioApp {
                     });
             });
         }
+        if self.selected_capability == "annotation.structure.visualize.v1" {
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("特征 ID（优先）", "Feature ID (preferred)"));
+                ui.text_edit_singleline(&mut self.annotation_visual_feature_id);
+                ui.label(self.text("序列 ID", "Sequence ID"));
+                ui.text_edit_singleline(&mut self.annotation_visual_seqid);
+                ui.label(self.text("最多特征", "Maximum features"));
+                ui.add(
+                    egui::DragValue::new(&mut self.annotation_visual_max_features).range(1..=2_000),
+                );
+            });
+            ui.small(self.text(
+                "填写特征 ID 时忽略序列 ID；留空则自动选择首个基因或转录本。",
+                "Feature ID takes precedence over sequence ID; leave both blank for automatic locus selection.",
+            ));
+        }
         if self.selected_capability == "annotation.go.normalize.v1" {
             ui.add_space(8.0);
             ui.horizontal_wrapped(|ui| {
@@ -1913,6 +2005,56 @@ impl BioApp {
                 ui.label(self.text("最多报告条目", "Maximum reported terms"));
                 ui.add(egui::DragValue::new(&mut self.enrichment_max_terms).range(1..=100_000));
                 ui.checkbox(&mut self.enrichment_include_genes, include_genes_label);
+            });
+        }
+        if self.selected_capability == "enrichment.visualize.v1" {
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("富集类型", "Enrichment kind"));
+                egui::ComboBox::from_id_salt("enrichment-visual-kind")
+                    .selected_text(&self.enrichment_visual_kind)
+                    .show_ui(ui, |ui| {
+                        for kind in ["custom", "go", "kegg"] {
+                            ui.selectable_value(
+                                &mut self.enrichment_visual_kind,
+                                kind.to_owned(),
+                                kind,
+                            );
+                        }
+                    });
+                ui.label(self.text("图形", "Plot"));
+                egui::ComboBox::from_id_salt("enrichment-visual-style")
+                    .selected_text(&self.enrichment_visual_style)
+                    .show_ui(ui, |ui| {
+                        for style in ["bar", "dot", "network"] {
+                            ui.selectable_value(
+                                &mut self.enrichment_visual_style,
+                                style.to_owned(),
+                                style,
+                            );
+                        }
+                    });
+                ui.label(self.text("最小重叠数", "Minimum overlap"));
+                ui.add(egui::DragValue::new(&mut self.enrichment_min_overlap).range(1..=u64::MAX));
+                ui.label(self.text("最多条目", "Maximum terms"));
+                ui.add(egui::DragValue::new(&mut self.enrichment_max_terms).range(1..=2_000));
+            });
+        }
+        if self.selected_capability == "protein.domain.visualize.v1" {
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("序列 ID（可选）", "Sequence ID (optional)"));
+                ui.text_edit_singleline(&mut self.protein_domain_visual_sequence_id);
+                ui.label(self.text("最多序列", "Maximum sequences"));
+                ui.add(
+                    egui::DragValue::new(&mut self.protein_domain_visual_max_sequences)
+                        .range(1..=2_000),
+                );
+                ui.label(self.text("最多结构域", "Maximum domains"));
+                ui.add(
+                    egui::DragValue::new(&mut self.protein_domain_visual_max_domains)
+                        .range(1..=2_000),
+                );
             });
         }
         if self.selected_capability == "genome.gene-density.v1" {
@@ -2837,6 +2979,7 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             | "annotation.gxf.normalize.v1"
             | "annotation.gene-position.v1"
             | "annotation.sequence.extract.v1"
+            | "annotation.structure.visualize.v1"
             | "genome.gene-density.v1",
             "gff3" | "gtf",
         ) => Some(AnalysisRoute {
@@ -2845,6 +2988,7 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
                 "annotation.gxf.normalize.v1" => "annotation.gxf.normalize.v1",
                 "annotation.gene-position.v1" => "annotation.gene-position.v1",
                 "annotation.sequence.extract.v1" => "annotation.sequence.extract.v1",
+                "annotation.structure.visualize.v1" => "annotation.structure.visualize.v1",
                 _ => "genome.gene-density.v1",
             },
             input_role: "annotation",
@@ -2899,6 +3043,10 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             },
             input_role: "genes",
         }),
+        ("enrichment.visualize.v1", "csv" | "tsv") => Some(AnalysisRoute {
+            capability: "enrichment.visualize.v1",
+            input_role: "genes",
+        }),
         ("set.venn.v1" | "set.upset.v1", "csv" | "tsv") => Some(AnalysisRoute {
             capability: if capability == "set.venn.v1" {
                 "set.venn.v1"
@@ -2921,6 +3069,10 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
         }),
         ("protein.domain.parse.v1", "protein-domains") => Some(AnalysisRoute {
             capability: "protein.domain.parse.v1",
+            input_role: "domains",
+        }),
+        ("protein.domain.visualize.v1", "protein-domains") => Some(AnalysisRoute {
+            capability: "protein.domain.visualize.v1",
             input_role: "domains",
         }),
         ("phylogeny.tree.transform.v1", "newick") => Some(AnalysisRoute {
@@ -2980,9 +3132,10 @@ fn secondary_input_format(capability: &str) -> Option<&'static str> {
         "primer.epcr.v1" => Some("tsv"),
         "structure.superpose.v1" => Some("structure"),
         "similarity.reciprocal.v1" => Some("blast"),
-        "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1" => {
-            Some("table")
-        }
+        "enrichment.overrepresentation.v1"
+        | "enrichment.go.v1"
+        | "enrichment.kegg.v1"
+        | "enrichment.visualize.v1" => Some("table"),
         _ => None,
     }
 }
@@ -3008,9 +3161,10 @@ fn secondary_input_role(capability: &str) -> Option<&'static str> {
         "primer.epcr.v1" => Some("primers"),
         "structure.superpose.v1" => Some("mobile"),
         "similarity.reciprocal.v1" => Some("reverse"),
-        "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1" => {
-            Some("associations")
-        }
+        "enrichment.overrepresentation.v1"
+        | "enrichment.go.v1"
+        | "enrichment.kegg.v1"
+        | "enrichment.visualize.v1" => Some("associations"),
         _ => None,
     }
 }
@@ -3028,6 +3182,9 @@ fn capability_output_extension(capability: &str) -> Option<&'static str> {
         "expression.normalize.v1" => Some("tsv"),
         "variant.filter.v1" | "variant.normalize.v1" => Some("vcf"),
         "phylogeny.tree.transform.v1" => Some("nwk"),
+        "annotation.structure.visualize.v1"
+        | "enrichment.visualize.v1"
+        | "protein.domain.visualize.v1" => Some("svg"),
         _ => None,
     }
 }
@@ -3661,6 +3818,9 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "annotation.sequence.extract.v1" => {
             language.text("按注释提取序列", "Annotation-guided extraction")
         }
+        "annotation.structure.visualize.v1" => {
+            language.text("注释结构图", "Annotation structure plot")
+        }
         "annotation.go.normalize.v1" => {
             language.text("GO 注释规范化", "GO annotation normalization")
         }
@@ -3672,6 +3832,7 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         }
         "enrichment.go.v1" => language.text("GO 富集分析", "GO enrichment analysis"),
         "enrichment.kegg.v1" => language.text("KEGG 富集分析", "KEGG enrichment analysis"),
+        "enrichment.visualize.v1" => language.text("富集结果绘图", "Enrichment visualization"),
         "genome.gene-density.v1" => language.text("基因组特征密度", "Genome feature density"),
         "expression.matrix.qc.v1" => language.text("表达矩阵", "Expression matrix"),
         "expression.normalize.v1" => language.text("表达矩阵标准化", "Expression normalization"),
@@ -3686,11 +3847,15 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "protein.domain.parse.v1" => {
             language.text("蛋白结构域结果解析", "Protein domain result parsing")
         }
+        "protein.domain.visualize.v1" => {
+            language.text("蛋白结构域架构图", "Protein domain architecture plot")
+        }
         "phylogeny.tree.transform.v1" => {
             language.text("系统发育树转换", "Phylogeny tree transform")
         }
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
+        "structure.viewer.v1" => language.text("交互式结构查看器", "Interactive structure viewer"),
         "structure.mmcif.summary.v1" => language.text("mmCIF 结构摘要", "mmCIF structure summary"),
         "structure.sequence.extract.v1" => {
             language.text("坐标序列提取", "Coordinate sequence extraction")
@@ -4338,6 +4503,9 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "annotation.sequence.extract.v1" => {
             language.text("按注释提取序列", "Annotation-guided sequence extraction")
         }
+        "annotation.structure.visualize.v1" => {
+            language.text("注释结构可视化", "Annotation structure visualization")
+        }
         "annotation.go.normalize.v1" => {
             language.text("GO 注释规范化", "GO annotation normalization")
         }
@@ -4349,6 +4517,7 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         }
         "enrichment.go.v1" => language.text("GO 富集分析", "GO enrichment analysis"),
         "enrichment.kegg.v1" => language.text("KEGG 富集分析", "KEGG enrichment analysis"),
+        "enrichment.visualize.v1" => language.text("富集结果可视化", "Enrichment visualization"),
         "genome.gene-density.v1" => language.text("基因组特征密度", "Genome feature density"),
         "interval.intersect.v1" => language.text("BED 区间相交", "BED interval intersection"),
         "interval.merge.v1" => language.text("BED 区间合并", "BED interval merge"),
@@ -4368,6 +4537,10 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "protein.domain.parse.v1" => {
             language.text("蛋白结构域结果解析", "Protein domain result parsing")
         }
+        "protein.domain.visualize.v1" => language.text(
+            "蛋白结构域架构图",
+            "Protein domain architecture visualization",
+        ),
         "phylogeny.tree.transform.v1" => {
             language.text("系统发育树转换", "Phylogeny tree transform")
         }
@@ -4378,6 +4551,7 @@ fn document_title(capability: &str, language: Language) -> &'static str {
             language.text("VCF 参考规范化", "Reference-guided VCF normalization")
         }
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
+        "structure.viewer.v1" => language.text("交互式结构查看器", "Interactive structure viewer"),
         "structure.mmcif.summary.v1" => language.text("mmCIF 结构摘要", "mmCIF structure summary"),
         "structure.sequence.extract.v1" => {
             language.text("坐标序列提取", "Coordinate sequence extraction")
@@ -4480,6 +4654,12 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         ("annotation.sequence.extract.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/annotation.sequence.extract.v1/en-US.md"
         )),
+        ("annotation.structure.visualize.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/annotation.structure.visualize.v1/zh-CN.md"
+        )),
+        ("annotation.structure.visualize.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/annotation.structure.visualize.v1/en-US.md"
+        )),
         ("annotation.go.normalize.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/annotation.go.normalize.v1/zh-CN.md"
         )),
@@ -4509,6 +4689,12 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("enrichment.kegg.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/enrichment.kegg.v1/en-US.md"
+        )),
+        ("enrichment.visualize.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/enrichment.visualize.v1/zh-CN.md"
+        )),
+        ("enrichment.visualize.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/enrichment.visualize.v1/en-US.md"
         )),
         ("genome.gene-density.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/genome.gene-density.v1/zh-CN.md"
@@ -4600,6 +4786,12 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         ("protein.domain.parse.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/protein.domain.parse.v1/en-US.md"
         )),
+        ("protein.domain.visualize.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/protein.domain.visualize.v1/zh-CN.md"
+        )),
+        ("protein.domain.visualize.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/protein.domain.visualize.v1/en-US.md"
+        )),
         ("phylogeny.tree.transform.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/phylogeny.tree.transform.v1/zh-CN.md"
         )),
@@ -4629,6 +4821,12 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("structure.pdb.summary.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/structure.pdb.summary.v1/en-US.md"
+        )),
+        ("structure.viewer.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/structure.viewer.v1/zh-CN.md"
+        )),
+        ("structure.viewer.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/structure.viewer.v1/en-US.md"
         )),
         ("structure.mmcif.summary.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/structure.mmcif.summary.v1/zh-CN.md"
@@ -5439,6 +5637,47 @@ mod tests {
 
         assert!(analysis_route_for_capability("annotation.go.normalize.v1", "fasta").is_none());
         assert!(!secondary_input_matches("enrichment.go.v1", "fasta"));
+    }
+
+    #[test]
+    fn scientific_visualization_routes_produce_svg_outputs() {
+        assert_eq!(
+            analysis_route_for_capability("annotation.structure.visualize.v1", "gff3"),
+            Some(AnalysisRoute {
+                capability: "annotation.structure.visualize.v1",
+                input_role: "annotation",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_capability("protein.domain.visualize.v1", "protein-domains"),
+            Some(AnalysisRoute {
+                capability: "protein.domain.visualize.v1",
+                input_role: "domains",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_capability("enrichment.visualize.v1", "tsv"),
+            Some(AnalysisRoute {
+                capability: "enrichment.visualize.v1",
+                input_role: "genes",
+            })
+        );
+        assert!(capability_requires_secondary("enrichment.visualize.v1"));
+        assert_eq!(
+            secondary_input_role("enrichment.visualize.v1"),
+            Some("associations")
+        );
+        for capability in [
+            "annotation.structure.visualize.v1",
+            "enrichment.visualize.v1",
+            "protein.domain.visualize.v1",
+        ] {
+            assert_eq!(capability_output_extension(capability), Some("svg"));
+        }
+        assert!(
+            analysis_route_for_capability("annotation.structure.visualize.v1", "fasta").is_none()
+        );
+        assert!(analysis_route_for_capability("protein.domain.visualize.v1", "csv").is_none());
     }
 
     #[test]

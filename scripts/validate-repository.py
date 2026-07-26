@@ -72,6 +72,7 @@ SCHEMA_FILES = (
     "schemas/structure-pdb-summary.schema.json",
     "schemas/structure-sequence-extract.schema.json",
     "schemas/structure-superposition.schema.json",
+    "schemas/svg-visualization.schema.json",
     "schemas/third-party-dependencies.schema.json",
     "schemas/tool-catalog.schema.json",
     "schemas/workflow-pack-catalog.schema.json",
@@ -88,6 +89,10 @@ CATALOG_AND_MANIFEST_CONTRACTS = (
 )
 
 CAPABILITY_RESULT_CONTRACTS = (
+    (
+        "tests/fixtures/capability-results/annotation-structure-visualize.json",
+        "schemas/svg-visualization.schema.json",
+    ),
     (
         "tests/fixtures/capability-results/annotation-go.json",
         "schemas/annotation-map.schema.json",
@@ -117,6 +122,10 @@ CAPABILITY_RESULT_CONTRACTS = (
         "schemas/enrichment.schema.json",
     ),
     (
+        "tests/fixtures/capability-results/enrichment-visualize.json",
+        "schemas/svg-visualization.schema.json",
+    ),
+    (
         "tests/fixtures/capability-results/expression-pca.json",
         "schemas/expression-pca.schema.json",
     ),
@@ -139,6 +148,10 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/protein-domain-parse.json",
         "schemas/protein-domain-parse.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/protein-domain-visualize.json",
+        "schemas/svg-visualization.schema.json",
     ),
     (
         "tests/fixtures/capability-results/set-venn.json",

@@ -1,0 +1,24 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-annotation-structure-visualize-v2",
+  "capability": "annotation.structure.visualize.v1",
+  "inputs": [{
+    "artifact_id": "input-annotation",
+    "role": "annotation",
+    "cardinality": "single",
+    "files": [{
+      "file_id": "input-annotation-1",
+      "path": "../annotation/genes.gff3",
+      "format": "gff3",
+      "compression": "none",
+      "size_bytes": 430,
+      "sha256": "a6c5c002782efd728e9b84152be747ad3efdae2fc193e5736b7694edcb52f850"
+    }]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {
+    "output": "../../../target/test-results/annotation-structure-v2.svg",
+    "feature_id": "g1",
+    "max_features": 20
+  }
+}

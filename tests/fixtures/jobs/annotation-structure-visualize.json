@@ -1,0 +1,12 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-annotation-structure-visualize",
+  "capability": "annotation.structure.visualize.v1",
+  "inputs": {"annotation": "../annotation/genes.gff3"},
+  "execution": {"mode": "local-cpu"},
+  "parameters": {
+    "output": "../../../target/test-results/annotation-structure.svg",
+    "feature_id": "g1",
+    "max_features": 20
+  }
+}

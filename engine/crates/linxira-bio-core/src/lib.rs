@@ -16,6 +16,7 @@ pub mod interval;
 pub mod phylogeny;
 pub mod protein;
 pub mod runtime;
+pub mod scientific_visualization;
 pub mod sequence;
 pub mod sequence_analysis;
 pub mod sequence_transform;

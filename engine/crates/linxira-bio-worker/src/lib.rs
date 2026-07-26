@@ -45,6 +45,11 @@ use linxira_bio_core::interval::{
 };
 use linxira_bio_core::phylogeny::{TreeTransformOptions, transform_newick_path};
 use linxira_bio_core::protein::protein_properties_path;
+use linxira_bio_core::scientific_visualization::{
+    AnnotationStructureOptions, DomainArchitectureOptions, EnrichmentPlotStyle,
+    EnrichmentVisualizationOptions, render_annotation_structure_svg_path,
+    render_domain_architecture_svg_path, render_enrichment_svg_path,
+};
 use linxira_bio_core::sequence::fasta_stats_path;
 use linxira_bio_core::sequence_analysis::{
     EpcrOptions, KmerCountOptions, count_kmers_path, epcr_path,
@@ -122,11 +127,15 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "genome.gene-density.v1" => run_gene_density(base_directory, request),
         "annotation.go.normalize.v1" => run_go_annotations(base_directory, request),
         "annotation.eggnog.normalize.v1" => run_eggnog_annotations(base_directory, request),
+        "annotation.structure.visualize.v1" => {
+            run_annotation_structure_visualization(base_directory, request)
+        }
         "enrichment.overrepresentation.v1" => {
             run_enrichment(base_directory, request, EnrichmentKind::Custom)
         }
         "enrichment.go.v1" => run_enrichment(base_directory, request, EnrichmentKind::Go),
         "enrichment.kegg.v1" => run_enrichment(base_directory, request, EnrichmentKind::Kegg),
+        "enrichment.visualize.v1" => run_enrichment_visualization(base_directory, request),
         "environment.audit.v1" => run_environment_audit(request),
         "environment.plan.v1" => run_environment_plan(base_directory, request),
         "dataset.inspect.v1" => run_dataset_inspection(base_directory, request),
@@ -164,6 +173,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "similarity.reciprocal.v1" => run_reciprocal_best_hits(base_directory, request),
         "protein.properties.v1" => run_protein_properties(base_directory, request),
         "protein.domain.parse.v1" => run_protein_domains(base_directory, request),
+        "protein.domain.visualize.v1" => run_protein_domain_visualization(base_directory, request),
         "phylogeny.tree.transform.v1" => run_phylogeny_tree(base_directory, request),
         "structure.pdb.summary.v1" => run_pdb_summary(base_directory, request),
         "structure.mmcif.summary.v1" => run_mmcif_summary(base_directory, request),
@@ -387,6 +397,33 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 },
             )
         }
+        "annotation.structure.visualize.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "annotation")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = render_annotation_structure_svg_path(
+                input,
+                &output,
+                &annotation_structure_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "annotation-visualization-warning",
+                FileArtifactSpec {
+                    artifact_id: "annotation-structure-plot",
+                    role: "plot",
+                    kind: OutputArtifactKind::Plot,
+                    path: output,
+                    format: Some(BioDataFormat::Svg),
+                    media_type: Some("image/svg+xml"),
+                },
+            )
+        }
         "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1" => {
             let genes = resolve_v2_single_input(base_directory, &request, "genes")?;
             let associations = resolve_v2_single_input(base_directory, &request, "associations")?;
@@ -404,6 +441,37 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 result.clone(),
                 &result.warnings,
                 "enrichment-warning",
+            )
+        }
+        "enrichment.visualize.v1" => {
+            let genes = resolve_v2_single_input(base_directory, &request, "genes")?;
+            let associations = resolve_v2_single_input(base_directory, &request, "associations")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = render_enrichment_svg_path(
+                genes,
+                associations,
+                &output,
+                visualization_enrichment_kind(&request.parameters)?,
+                enrichment_options(&request.parameters)?,
+                enrichment_visualization_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "enrichment-visualization-warning",
+                FileArtifactSpec {
+                    artifact_id: "enrichment-plot",
+                    role: "plot",
+                    kind: OutputArtifactKind::Plot,
+                    path: output,
+                    format: Some(BioDataFormat::Svg),
+                    media_type: Some("image/svg+xml"),
+                },
             )
         }
         "environment.audit.v1" => {
@@ -1015,6 +1083,33 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 "protein-domain-warning",
             )
         }
+        "protein.domain.visualize.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "domains")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = render_domain_architecture_svg_path(
+                input,
+                &output,
+                &domain_architecture_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "protein-domain-visualization-warning",
+                FileArtifactSpec {
+                    artifact_id: "protein-domain-plot",
+                    role: "plot",
+                    kind: OutputArtifactKind::Plot,
+                    path: output,
+                    format: Some(BioDataFormat::Svg),
+                    media_type: Some("image/svg+xml"),
+                },
+            )
+        }
         "phylogeny.tree.transform.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "tree")?;
             let output = required_sequence_output(&request.parameters, &request.capability)?;
@@ -1321,12 +1416,24 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         ),
         "protein.properties.v1" => (&["fasta"], &[]),
         "protein.domain.parse.v1" => (&["domains"], &[]),
+        "protein.domain.visualize.v1" => (
+            &["domains"],
+            &["output", "sequence_id", "max_sequences", "max_domains"],
+        ),
         "phylogeny.tree.transform.v1" => (&["tree"], &["output", "reroot_label", "label_map"]),
         "annotation.go.normalize.v1" => (&["annotations"], &["output", "gene_column", "go_column"]),
         "annotation.eggnog.normalize.v1" => (&["annotations"], &["output"]),
+        "annotation.structure.visualize.v1" => (
+            &["annotation"],
+            &["output", "feature_id", "seqid", "max_features"],
+        ),
         "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1" => (
             &["genes", "associations"],
             &["min_overlap", "max_terms", "include_genes"],
+        ),
+        "enrichment.visualize.v1" => (
+            &["genes", "associations"],
+            &["output", "kind", "style", "min_overlap", "max_terms"],
         ),
         "structure.pdb.summary.v1" => (&["pdb"], &["interpret_b_factors_as_plddt"]),
         "structure.mmcif.summary.v1" | "structure.sequence.extract.v1" => (&["structure"], &[]),
@@ -1645,6 +1752,7 @@ fn declared_dataset_format(format: BioDataFormat) -> Option<DatasetFormat> {
         BioDataFormat::Zip => DatasetFormat::Zip,
         BioDataFormat::Genbank
         | BioDataFormat::Embl
+        | BioDataFormat::Svg
         | BioDataFormat::Xlsx
         | BioDataFormat::Json
         | BioDataFormat::Jsonl
@@ -2210,6 +2318,79 @@ fn run_enrichment(
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_annotation_structure_visualization(
+    base_directory: &Path,
+    request: JobRequest,
+) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "annotation",
+        &["output", "feature_id", "seqid", "max_features"],
+    )?;
+    let input = request
+        .inputs
+        .get("annotation")
+        .ok_or("annotation.structure.visualize.v1 requires inputs.annotation")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis = render_annotation_structure_svg_path(
+        input,
+        output,
+        &annotation_structure_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_enrichment_visualization(
+    base_directory: &Path,
+    request: JobRequest,
+) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["genes", "associations"],
+        &["output", "kind", "style", "min_overlap", "max_terms"],
+    )?;
+    let genes = request
+        .inputs
+        .get("genes")
+        .ok_or("enrichment.visualize.v1 requires inputs.genes")?;
+    let associations = request
+        .inputs
+        .get("associations")
+        .ok_or("enrichment.visualize.v1 requires inputs.associations")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let genes = resolve_input(base_directory, genes);
+    let associations = resolve_input(base_directory, associations);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&genes, &output)?;
+    ensure_distinct_input_output(&associations, &output)?;
+    let analysis = render_enrichment_svg_path(
+        genes,
+        associations,
+        output,
+        visualization_enrichment_kind(&request.parameters)?,
+        enrichment_options(&request.parameters)?,
+        enrichment_visualization_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_expression_matrix_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -2706,6 +2887,38 @@ fn run_protein_domains(base_directory: &Path, request: JobRequest) -> WorkerResu
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_protein_domain_visualization(
+    base_directory: &Path,
+    request: JobRequest,
+) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "domains",
+        &["output", "sequence_id", "max_sequences", "max_domains"],
+    )?;
+    let input = request
+        .inputs
+        .get("domains")
+        .ok_or("protein.domain.visualize.v1 requires inputs.domains")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis = render_domain_architecture_svg_path(
+        input,
+        output,
+        &domain_architecture_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_phylogeny_tree(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     validate_v1_named_input_contract(&request, "tree", &["output", "reroot_label", "label_map"])?;
     let input = request
@@ -2853,6 +3066,68 @@ fn enrichment_options(parameters: &serde_json::Value) -> WorkerResult<Enrichment
         options.include_genes = value;
     }
     Ok(options)
+}
+
+fn annotation_structure_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<AnnotationStructureOptions> {
+    let feature_id = optional_parameter_string(parameters, "feature_id")?.map(str::to_owned);
+    let seqid = optional_parameter_string(parameters, "seqid")?.map(str::to_owned);
+    if feature_id.is_some() && seqid.is_some() {
+        return Err("feature_id and seqid are mutually exclusive".into());
+    }
+    let mut options = AnnotationStructureOptions {
+        feature_id,
+        seqid,
+        ..Default::default()
+    };
+    if let Some(value) = optional_parameter_usize(parameters, "max_features")? {
+        options.max_features = value;
+    }
+    Ok(options)
+}
+
+fn domain_architecture_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<DomainArchitectureOptions> {
+    let mut options = DomainArchitectureOptions {
+        sequence_id: optional_parameter_string(parameters, "sequence_id")?.map(str::to_owned),
+        ..Default::default()
+    };
+    if let Some(value) = optional_parameter_usize(parameters, "max_sequences")? {
+        options.max_sequences = value;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "max_domains")? {
+        options.max_domains = value;
+    }
+    Ok(options)
+}
+
+fn visualization_enrichment_kind(parameters: &serde_json::Value) -> WorkerResult<EnrichmentKind> {
+    match optional_parameter_string(parameters, "kind")? {
+        Some("custom") => Ok(EnrichmentKind::Custom),
+        Some("go") => Ok(EnrichmentKind::Go),
+        Some("kegg") => Ok(EnrichmentKind::Kegg),
+        Some(value) => Err(format!("kind must be custom, go, or kegg, got {value:?}").into()),
+        None => Err("enrichment visualization requires string parameter kind".into()),
+    }
+}
+
+fn enrichment_visualization_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<EnrichmentVisualizationOptions> {
+    let style = match optional_parameter_string(parameters, "style")? {
+        Some("bar") | None => EnrichmentPlotStyle::Bar,
+        Some("dot") => EnrichmentPlotStyle::Dot,
+        Some("network") => EnrichmentPlotStyle::Network,
+        Some(value) => {
+            return Err(format!("style must be bar, dot, or network, got {value:?}").into());
+        }
+    };
+    Ok(EnrichmentVisualizationOptions {
+        style,
+        max_terms: optional_parameter_usize(parameters, "max_terms")?.unwrap_or(30),
+    })
 }
 
 fn enrichment_kind(capability: &str) -> WorkerResult<EnrichmentKind> {

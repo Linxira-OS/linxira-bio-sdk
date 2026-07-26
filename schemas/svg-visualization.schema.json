@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/svg-visualization.v1.json",
+  "title": "Linxira Bio deterministic SVG visualization result",
+  "type": "object",
+  "required": [
+    "visualization_type",
+    "output_path",
+    "width",
+    "height",
+    "track_count",
+    "glyph_count",
+    "warnings"
+  ],
+  "properties": {
+    "visualization_type": {
+      "enum": [
+        "annotation-structure",
+        "protein-domain-architecture",
+        "enrichment-bar",
+        "enrichment-dot",
+        "enrichment-network"
+      ]
+    },
+    "output_path": {"type": "string", "minLength": 1},
+    "width": {"type": "integer", "minimum": 1},
+    "height": {"type": "integer", "minimum": 1},
+    "track_count": {"type": "integer", "minimum": 1},
+    "glyph_count": {"type": "integer", "minimum": 1},
+    "warnings": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "additionalProperties": false
+}

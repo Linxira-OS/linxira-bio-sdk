@@ -1,0 +1,9 @@
+{
+  "visualization_type": "protein-domain-architecture",
+  "output_path": "results/protein-domains.svg",
+  "width": 1200,
+  "height": 248,
+  "track_count": 2,
+  "glyph_count": 3,
+  "warnings": []
+}

@@ -55,6 +55,9 @@ the agent skills that select and validate them.
 - Read `skills/analyze-coordinate-structures/SKILL.md` for implemented local
   mmCIF summaries, coordinate-derived sequences, residue contacts, geometry,
   and identity-matched structure superposition.
+- Read `skills/visualize-bio-results/SKILL.md` for implemented annotation,
+  enrichment, and protein-domain SVG plots plus the native interactive
+  PDB/mmCIF structure viewer.
 - Read `skills/inspect-bio-dataset/SKILL.md` before analyzing imported data.
 - Read `skills/export-bio-table/SKILL.md` to export supported result tables.
 - Read `skills/configure-bio-environment/SKILL.md` to audit managed Python, R,

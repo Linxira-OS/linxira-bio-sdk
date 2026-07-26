@@ -212,6 +212,15 @@
       "output_formats": ["fasta", "json"]
     },
     {
+      "id": "annotation.structure.visualize.v1",
+      "status": "available",
+      "category": "scientific-visualization",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio annotation plot <input.gff3|gtf> <output.svg> --json",
+      "input_formats": ["gff3", "gtf"],
+      "output_formats": ["svg", "json"]
+    },
+    {
       "id": "genome.gene-density.v1",
       "status": "available",
       "category": "genome-annotation",
@@ -342,6 +351,16 @@
       "command": "linxira-bio structure pdb <input.pdb> --json",
       "input_formats": ["pdb"],
       "output_formats": ["json"]
+    },
+    {
+      "id": "structure.viewer.v1",
+      "status": "available",
+      "category": "structural-biology",
+      "default_execution": "local-gpu",
+      "fallback_execution": ["local-cpu"],
+      "command": "linxira-bio-ui <input.pdb|mmcif>",
+      "input_formats": ["pdb", "mmcif"],
+      "output_formats": ["png"]
     },
     {
       "id": "structure.mmcif.summary.v1",
@@ -500,6 +519,15 @@
       "output_formats": ["json"]
     },
     {
+      "id": "protein.domain.visualize.v1",
+      "status": "available",
+      "category": "scientific-visualization",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio protein domain-plot <interproscan.tsv|hmmer.domtblout> <output.svg> --json",
+      "input_formats": ["interproscan-tsv", "hmmer-domtblout"],
+      "output_formats": ["svg", "json"]
+    },
+    {
       "id": "phylogeny.tree.transform.v1",
       "status": "available",
       "category": "phylogenetics",
@@ -552,6 +580,15 @@
       "command": "linxira-bio enrichment kegg <genes.txt|tsv> <associations.tsv> --json",
       "input_formats": ["identifier-list", "csv", "tsv"],
       "output_formats": ["json"]
+    },
+    {
+      "id": "enrichment.visualize.v1",
+      "status": "available",
+      "category": "scientific-visualization",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio enrichment visualize <genes.txt|tsv> <associations.tsv> <output.svg> --kind go --style bar --json",
+      "input_formats": ["identifier-list", "csv", "tsv"],
+      "output_formats": ["svg", "json"]
     },
     {
       "id": "protein.af2.predict.v1",
