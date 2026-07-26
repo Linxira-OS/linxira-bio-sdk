@@ -125,6 +125,8 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         "expression.pca.v1" => expression_pca_charts(payload, zh_cn),
         "expression.cluster.v1" => expression_cluster_charts(payload, zh_cn),
         "expression.heatmap.v1" => expression_heatmap_charts(payload, zh_cn),
+        "set.venn.v1" | "set.upset.v1" => set_analysis_charts(payload, zh_cn),
+        "protein.properties.v1" => protein_properties_charts(payload, zh_cn),
         "table.manipulate.v1" => table_manipulate_charts(payload, zh_cn),
         "variant.stats.v1" => variant_charts(payload, zh_cn),
         "variant.filter.v1" => variant_filter_charts(payload, zh_cn),
@@ -699,6 +701,103 @@ fn table_manipulate_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
             (
                 localized(zh_cn, "表格列处理", "Table column handling"),
                 columns,
+            ),
+        ],
+        false,
+    )
+}
+
+fn set_analysis_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let set_sizes = payload
+        .get("set_sizes")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| {
+            Some(BarValue {
+                label: entry.get("name")?.as_str()?.to_owned(),
+                value: entry.get("count")?.as_f64()?,
+            })
+        })
+        .take(64)
+        .collect::<Vec<_>>();
+    let intersections = payload
+        .get("intersections")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| {
+            let label = entry
+                .get("sets")?
+                .as_array()?
+                .iter()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>()
+                .join(" ∩ ");
+            Some(BarValue {
+                label,
+                value: entry.get("count")?.as_f64()?,
+            })
+        })
+        .take(24)
+        .collect::<Vec<_>>();
+    bar_specs(
+        [
+            (localized(zh_cn, "集合大小", "Set sizes"), set_sizes),
+            (
+                localized(zh_cn, "精确交集大小", "Exact intersection sizes"),
+                intersections,
+            ),
+        ],
+        false,
+    )
+}
+
+fn protein_properties_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let records = payload
+        .get("records")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(24)
+        .collect::<Vec<_>>();
+    let lengths = records
+        .iter()
+        .filter_map(|entry| {
+            Some(BarValue {
+                label: entry.get("id")?.as_str()?.to_owned(),
+                value: entry.get("length")?.as_f64()?,
+            })
+        })
+        .collect::<Vec<_>>();
+    let molecular_weights = records
+        .iter()
+        .filter_map(|entry| {
+            Some(BarValue {
+                label: entry.get("id")?.as_str()?.to_owned(),
+                value: entry.get("molecular_weight_da")?.as_f64()?,
+            })
+        })
+        .collect::<Vec<_>>();
+    let isoelectric_points = records
+        .iter()
+        .filter_map(|entry| {
+            Some(BarValue {
+                label: entry.get("id")?.as_str()?.to_owned(),
+                value: entry.get("isoelectric_point")?.as_f64()?,
+            })
+        })
+        .collect::<Vec<_>>();
+    bar_specs(
+        [
+            (localized(zh_cn, "蛋白长度", "Protein lengths"), lengths),
+            (
+                localized(zh_cn, "分子量（Da）", "Molecular weight (Da)"),
+                molecular_weights,
+            ),
+            (
+                localized(zh_cn, "等电点", "Isoelectric point"),
+                isoelectric_points,
             ),
         ],
         false,
@@ -1744,6 +1843,58 @@ mod tests {
         assert_eq!(title, "Table row handling");
         assert_eq!(values[0].label, "Input rows");
         assert_eq!(values[3].value, 2.0);
+    }
+
+    #[test]
+    fn set_analysis_builds_size_and_exact_intersection_charts() {
+        let payload = json!({
+            "set_sizes": [
+                {"name": "control", "count": 3},
+                {"name": "treated", "count": 4}
+            ],
+            "intersections": [
+                {"sets": ["control", "treated"], "degree": 2, "count": 2},
+                {"sets": ["treated"], "degree": 1, "count": 2}
+            ]
+        });
+        let charts = chart_specs(&payload, Some("set.upset.v1"), false);
+        assert_eq!(charts.len(), 2);
+        let ChartSpec::Bars { title, values, .. } = &charts[1] else {
+            panic!("expected exact-intersection bar chart");
+        };
+        assert_eq!(title, "Exact intersection sizes");
+        assert_eq!(values[0].label, "control ∩ treated");
+        assert_eq!(values[0].value, 2.0);
+    }
+
+    #[test]
+    fn protein_properties_builds_length_mass_and_pi_charts() {
+        let payload = json!({
+            "records": [
+                {
+                    "id": "protein-a",
+                    "length": 120,
+                    "molecular_weight_da": 13500.0,
+                    "isoelectric_point": 6.2
+                },
+                {
+                    "id": "ambiguous",
+                    "length": 20,
+                    "molecular_weight_da": null,
+                    "isoelectric_point": null
+                }
+            ]
+        });
+        let charts = chart_specs(&payload, Some("protein.properties.v1"), true);
+        assert_eq!(charts.len(), 3);
+        let ChartSpec::Bars { values, .. } = &charts[0] else {
+            panic!("expected protein-length chart");
+        };
+        assert_eq!(values.len(), 2);
+        let ChartSpec::Bars { values, .. } = &charts[1] else {
+            panic!("expected protein-mass chart");
+        };
+        assert_eq!(values.len(), 1);
     }
 
     #[test]

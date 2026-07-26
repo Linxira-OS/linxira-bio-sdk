@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Protein Properties"
+  short_description: "Calculate local protein sequence properties"
+  default_prompt: "Use $analyze-protein-properties to calculate physicochemical properties for a local protein FASTA."

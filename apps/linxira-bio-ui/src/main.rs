@@ -281,6 +281,9 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "expression.pca.v1",
     "expression.cluster.v1",
     "expression.heatmap.v1",
+    "set.venn.v1",
+    "set.upset.v1",
+    "protein.properties.v1",
     "variant.stats.v1",
     "variant.filter.v1",
     "variant.normalize.v1",
@@ -826,6 +829,12 @@ impl BioApp {
             request.parameters = serde_json::json!({
                 "top_variable_features": self.expression_heatmap_top_features,
                 "scale_rows": self.expression_heatmap_scale,
+            });
+        }
+        if matches!(route.capability, "set.venn.v1" | "set.upset.v1") {
+            request.parameters = serde_json::json!({
+                "include_items": false,
+                "max_intersections": 50,
             });
         }
         if route.capability == "structure.pdb.summary.v1" {
@@ -1609,6 +1618,9 @@ impl BioApp {
                     "expression.pca.v1",
                     "expression.cluster.v1",
                     "expression.heatmap.v1",
+                    "set.venn.v1",
+                    "set.upset.v1",
+                    "protein.properties.v1",
                     "table.manipulate.v1",
                     "structure.pdb.summary.v1",
                 ] {
@@ -2547,6 +2559,18 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             },
             input_role: "matrix",
         }),
+        ("set.venn.v1" | "set.upset.v1", "csv" | "tsv") => Some(AnalysisRoute {
+            capability: if capability == "set.venn.v1" {
+                "set.venn.v1"
+            } else {
+                "set.upset.v1"
+            },
+            input_role: "table",
+        }),
+        ("protein.properties.v1", "fasta") => Some(AnalysisRoute {
+            capability: "protein.properties.v1",
+            input_role: "fasta",
+        }),
         ("table.manipulate.v1", "csv" | "tsv") => Some(AnalysisRoute {
             capability: "table.manipulate.v1",
             input_role: "table",
@@ -3238,6 +3262,9 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "expression.pca.v1" => language.text("表达矩阵 PCA", "Expression PCA"),
         "expression.cluster.v1" => language.text("表达矩阵聚类", "Expression clustering"),
         "expression.heatmap.v1" => language.text("聚类表达热图", "Clustered expression heatmap"),
+        "set.venn.v1" => language.text("2–6 集合 Venn 分析", "Two-to-six-set Venn analysis"),
+        "set.upset.v1" => language.text("多集合 UpSet 分析", "Multi-set UpSet analysis"),
+        "protein.properties.v1" => language.text("蛋白理化性质", "Protein properties"),
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
         _ => language.text("未知能力", "Unknown capability"),
@@ -3744,6 +3771,24 @@ fn metric_label(key: &str, language: Language) -> &str {
         "row_labels" => "行标签",
         "column_labels" => "列标签",
         "values" => "热图数值",
+        "set_count" => "集合数",
+        "union_size" => "并集大小",
+        "set_sizes" => "各集合大小",
+        "intersection_count" => "精确交集总数",
+        "reported_intersection_count" => "已返回交集数",
+        "omitted_intersection_count" => "省略交集数",
+        "intersections" => "精确交集",
+        "total_residues" => "总残基数",
+        "standard_residue_count" => "标准残基数",
+        "ambiguous_residue_count" => "歧义/非标准残基数",
+        "composition" => "残基组成",
+        "molecular_weight_da" => "分子量（Da）",
+        "isoelectric_point" => "理论等电点",
+        "charge_at_ph7" => "pH 7 净电荷",
+        "aromaticity_percent" => "芳香性百分比",
+        "gravy" => "GRAVY",
+        "extinction_coefficient_reduced" => "还原态消光系数",
+        "extinction_coefficient_oxidized" => "氧化态消光系数",
         "input_rows" => "输入行数",
         "output_rows" => "输出行数",
         "skipped_rows" => "跳过行数",
@@ -3848,6 +3893,9 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "expression.pca.v1" => language.text("表达矩阵 PCA", "Expression PCA"),
         "expression.cluster.v1" => language.text("表达矩阵聚类", "Expression clustering"),
         "expression.heatmap.v1" => language.text("聚类表达热图", "Clustered expression heatmap"),
+        "set.venn.v1" => language.text("2–6 集合 Venn 分析", "Two-to-six-set Venn analysis"),
+        "set.upset.v1" => language.text("多集合 UpSet 分析", "Multi-set UpSet analysis"),
+        "protein.properties.v1" => language.text("蛋白理化性质", "Protein properties"),
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "variant.stats.v1" => language.text("VCF 变异统计", "VCF variant statistics"),
         "variant.filter.v1" => language.text("VCF 基础过滤", "Basic VCF filtering"),
@@ -3997,6 +4045,24 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("expression.heatmap.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/expression.heatmap.v1/en-US.md"
+        )),
+        ("set.venn.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/set.venn.v1/zh-CN.md"
+        )),
+        ("set.venn.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/set.venn.v1/en-US.md"
+        )),
+        ("set.upset.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/set.upset.v1/zh-CN.md"
+        )),
+        ("set.upset.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/set.upset.v1/en-US.md"
+        )),
+        ("protein.properties.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/protein.properties.v1/zh-CN.md"
+        )),
+        ("protein.properties.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/protein.properties.v1/en-US.md"
         )),
         ("variant.stats.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/variant.stats.v1/zh-CN.md"
@@ -4633,6 +4699,39 @@ mod tests {
             .expect("derived output name");
         assert!(output_name.starts_with("regions.interval-subtract."));
         assert!(output_name.ends_with(".bed"));
+    }
+
+    #[test]
+    fn set_and_protein_capabilities_route_only_supported_inputs() {
+        assert_eq!(
+            analysis_route_for_capability("set.venn.v1", "csv"),
+            Some(AnalysisRoute {
+                capability: "set.venn.v1",
+                input_role: "table",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_capability("set.upset.v1", "tsv"),
+            Some(AnalysisRoute {
+                capability: "set.upset.v1",
+                input_role: "table",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_capability("protein.properties.v1", "fasta"),
+            Some(AnalysisRoute {
+                capability: "protein.properties.v1",
+                input_role: "fasta",
+            })
+        );
+        assert_eq!(analysis_route_for_capability("set.venn.v1", "fasta"), None);
+        assert_eq!(
+            analysis_route_for_capability("protein.properties.v1", "csv"),
+            None
+        );
+        assert!(!capability_requires_secondary("set.venn.v1"));
+        assert!(!capability_requires_secondary("set.upset.v1"));
+        assert!(!capability_requires_secondary("protein.properties.v1"));
     }
 
     #[test]

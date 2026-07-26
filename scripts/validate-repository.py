@@ -53,8 +53,11 @@ SCHEMA_FILES = (
     "schemas/interval-intersect.schema.json",
     "schemas/job-request-v2.schema.json",
     "schemas/job-request.schema.json",
+    "schemas/protein-properties.schema.json",
     "schemas/runtime-catalog.schema.json",
     "schemas/runtime-lock.schema.json",
+    "schemas/set-upset.schema.json",
+    "schemas/set-venn.schema.json",
     "schemas/structure-pdb-summary.schema.json",
     "schemas/third-party-dependencies.schema.json",
     "schemas/tool-catalog.schema.json",
@@ -87,6 +90,18 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/expression-heatmap.json",
         "schemas/expression-heatmap.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/set-venn.json",
+        "schemas/set-venn.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/set-upset.json",
+        "schemas/set-upset.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/protein-properties.json",
+        "schemas/protein-properties.schema.json",
     ),
 )
 

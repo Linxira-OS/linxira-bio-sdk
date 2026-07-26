@@ -44,6 +44,49 @@ fn reports_sequence_statistics_as_json() {
 }
 
 #[test]
+fn runs_set_and_protein_analysis_as_json() {
+    let root = workspace_root();
+    let set_input = root.join("tests/fixtures/set-analysis/sets.tsv");
+    for (command, capability) in [("venn", "set.venn.v1"), ("upset", "set.upset.v1")] {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+            .args(["set", command])
+            .arg(&set_input)
+            .args(["--include-items", "--json"])
+            .output()
+            .expect("run set analysis");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid set JSON");
+        assert_eq!(result["capability"], capability);
+        assert_eq!(result["result"]["set_count"], 3);
+        assert_eq!(result["result"]["union_size"], 6);
+    }
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["protein", "properties"])
+        .arg(root.join("tests/fixtures/protein/proteins.fa"))
+        .arg("--json")
+        .output()
+        .expect("run protein properties");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid protein JSON");
+    assert_eq!(result["capability"], "protein.properties.v1");
+    assert_eq!(result["result"]["sequence_count"], 2);
+    assert!(result["result"]["records"][0]["molecular_weight_da"].is_number());
+    assert!(result["result"]["records"][1]["molecular_weight_da"].is_null());
+    assert_eq!(result["warnings"].as_array().map(Vec::len), Some(1));
+}
+
+#[test]
 fn runs_kmer_epcr_and_variant_transform_capabilities() {
     let workspace = workspace_root();
     let output_root = temporary_directory("sequence-variant-analysis");

@@ -104,6 +104,18 @@
       ]
     },
     {
+      "id": "analyze-set-overlaps",
+      "path": "skills/analyze-set-overlaps",
+      "kind": "executable",
+      "capabilities": ["set.venn.v1", "set.upset.v1"]
+    },
+    {
+      "id": "analyze-protein-properties",
+      "path": "skills/analyze-protein-properties",
+      "kind": "executable",
+      "capabilities": ["protein.properties.v1"]
+    },
+    {
       "id": "manipulate-bio-tables",
       "path": "skills/manipulate-bio-tables",
       "kind": "executable",

@@ -8,10 +8,10 @@ means that an analysis capability is available.
 
 | Format | Content detection | Bounded preview | Available analysis | Current boundary |
 | --- | --- | --- | --- | --- |
-| FASTA | Yes | Sequence records | `sequence.stats.v1`, `sequence.kmer.count.v1`, `primer.epcr.v1`, `variant.normalize.v1` reference | Plain, gzip, and BGZF |
+| FASTA | Yes | Sequence records | `sequence.stats.v1`, `sequence.kmer.count.v1`, `primer.epcr.v1`, `variant.normalize.v1` reference, `protein.properties.v1` | Plain, gzip, and BGZF; protein properties reject gap, stop, digit, and unsupported symbols |
 | FASTQ | Yes | Read records | `fastq.qc.v1`, `fastq.trim.v1`, `fastq.adapter.v1` | QC plus FASTQ output for 3' quality trimming and adapter removal; plain, gzip, and BGZF input |
-| CSV | Yes | Parsed table | `expression.matrix.qc.v1`, `expression.normalize.v1`, `expression.pca.v1`, `expression.cluster.v1`, `expression.heatmap.v1`, `table.manipulate.v1` | Rectangular expression QC, normalization, PCA, clustering, native heatmap preview, and general row/column manipulation |
-| TSV | Yes | Parsed table | `expression.matrix.qc.v1`, `expression.normalize.v1`, `expression.pca.v1`, `expression.cluster.v1`, `expression.heatmap.v1`, `table.manipulate.v1` | Rectangular expression QC and exploratory analysis plus row/column manipulation |
+| CSV | Yes | Parsed table | `expression.matrix.qc.v1`, `expression.normalize.v1`, `expression.pca.v1`, `expression.cluster.v1`, `expression.heatmap.v1`, `table.manipulate.v1`, `set.venn.v1`, `set.upset.v1` | Rectangular expression analysis, general table manipulation, and named-column exact set-overlap analysis |
+| TSV | Yes | Parsed table | `expression.matrix.qc.v1`, `expression.normalize.v1`, `expression.pca.v1`, `expression.cluster.v1`, `expression.heatmap.v1`, `table.manipulate.v1`, `set.venn.v1`, `set.upset.v1` | Rectangular expression analysis, row/column manipulation, and named-column exact set-overlap analysis |
 | BED | Yes | Interval rows | `interval.intersect.v1`, `interval.merge.v1`, `interval.subtract.v1` | Pairwise half-open overlap summary plus BED3 merge/subtract outputs |
 | GFF3 | Yes | Feature rows | `annotation.gxf.stats.v1`, `annotation.gxf.normalize.v1`, `annotation.gene-position.v1`, `annotation.sequence.extract.v1` | Strict nine-column parsing, gzip input, normalization, coordinate tables, and reference-guided FASTA extraction |
 | GTF | Yes | Feature rows | `annotation.gxf.stats.v1`, `annotation.gxf.normalize.v1`, `annotation.gene-position.v1`, `annotation.sequence.extract.v1` | GTF attributes can be normalized to GFF3 and used for coordinate or sequence extraction |
@@ -50,7 +50,8 @@ including the header.
 “识别”“预览”“可执行分析”和“导出”是四种不同承诺。文件被识别并不代表已有可运行
 的生物学分析能力。FASTA、FASTQ、SAM 和 VCF 当前分别可运行序列统计、读段质量
 控制/质量裁剪/接头去除、文本比对质控和变异描述统计；BED 可计算两组区间的半开重叠摘要，CSV/TSV
-可进行矩形表达矩阵质控、标准化、PCA、样本/特征聚类和原生聚类热图，PDB 可生成结构摘要和供渲染使用的原子坐标。PDB/mmCIF
+可进行矩形表达矩阵质控、标准化、PCA、样本/特征聚类、原生聚类热图和精确集合交集分析，蛋白 FASTA
+可计算长度、组成、分子量、理论等电点、pH 7 电荷、芳香性、GRAVY 和消光系数；PDB 可生成结构摘要和供渲染使用的原子坐标。PDB/mmCIF
 均可在 GUI 中进行有界 3D 预览并导出当前视角 PNG，但 mmCIF 分析仍未实现。GFF3、GTF 已支持
 统计、规范化、坐标表和参考序列提取；BAM、BCF、CRAM、H5AD 等二进制格式仅识别，不会伪装成可用能力。
 

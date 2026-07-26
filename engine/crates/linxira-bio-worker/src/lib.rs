@@ -33,6 +33,7 @@ use linxira_bio_core::fastq_transform::{
 use linxira_bio_core::interval::{
     IntervalMergeOptions, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
+use linxira_bio_core::protein::protein_properties_path;
 use linxira_bio_core::sequence::fasta_stats_path;
 use linxira_bio_core::sequence_analysis::{
     EpcrOptions, KmerCountOptions, count_kmers_path, epcr_path,
@@ -45,6 +46,7 @@ use linxira_bio_core::sequence_transform::{
     find_orfs_fasta_path, merge_fasta_paths, normalize_fasta_ids_path, parse_sequence_region_spec,
     reverse_complement_fasta_path, split_fasta_path, table_to_fasta_path, translate_fasta_path,
 };
+use linxira_bio_core::set_analysis::{SetAnalysisOptions, upset_analysis_path, venn_analysis_path};
 use linxira_bio_core::structure::{PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::table::{
     TableDelimiter, TableFilter, TableManipulateOptions, manipulate_table_path,
@@ -134,6 +136,9 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "sequence.from-table.v1" => run_sequence_from_table(base_directory, request),
         "sequence.kmer.count.v1" => run_sequence_kmer_count(base_directory, request),
         "primer.epcr.v1" => run_primer_epcr(base_directory, request),
+        "set.venn.v1" => run_set_venn(base_directory, request),
+        "set.upset.v1" => run_set_upset(base_directory, request),
+        "protein.properties.v1" => run_protein_properties(base_directory, request),
         "structure.pdb.summary.v1" => run_pdb_summary(base_directory, request),
         "variant.stats.v1" => run_variant_stats(base_directory, request),
         "variant.filter.v1" => run_variant_filter(base_directory, request),
@@ -820,6 +825,47 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 },
             )
         }
+        "set.venn.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "table")?;
+            serialize_v2_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                venn_analysis_path(input, set_analysis_options(&request.parameters)?)?,
+            )
+        }
+        "set.upset.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "table")?;
+            serialize_v2_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                upset_analysis_path(input, set_analysis_options(&request.parameters)?)?,
+            )
+        }
+        "protein.properties.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "fasta")?;
+            let properties = protein_properties_path(input)?;
+            let mut result = AnalysisResultV2::ok(
+                request.job_id.clone(),
+                request.capability.clone(),
+                properties.clone(),
+                ExecutionMode::LocalCpu,
+            );
+            result
+                .diagnostics
+                .extend(properties.warnings.iter().map(|message| Diagnostic {
+                    code: "protein-properties-warning".to_owned(),
+                    severity: DiagnosticSeverity::Warning,
+                    message: message.clone(),
+                    artifact_id: None,
+                    line: None,
+                    record: None,
+                    hint: None,
+                }));
+            finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
+            Ok(serde_json::to_string(&result)?)
+        }
         "structure.pdb.summary.v1" => {
             let path = resolve_v2_single_input(base_directory, &request, "pdb")?;
             let summary = pdb_summary_path(path, pdb_options(&request.parameters)?)?;
@@ -1024,6 +1070,8 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             &["fasta", "primers"],
             &["output", "min_amplicon", "max_amplicon", "max_hits"],
         ),
+        "set.venn.v1" | "set.upset.v1" => (&["table"], &["include_items", "max_intersections"]),
+        "protein.properties.v1" => (&["fasta"], &[]),
         "structure.pdb.summary.v1" => (&["pdb"], &["interpret_b_factors_as_plddt"]),
         "variant.stats.v1" => (&["vcf"], &[]),
         "variant.filter.v1" => (
@@ -2010,6 +2058,59 @@ fn run_pdb_summary(base_directory: &Path, request: JobRequest) -> WorkerResult<S
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_set_venn(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "table", &["include_items", "max_intersections"])?;
+    let input = request
+        .inputs
+        .get("table")
+        .ok_or("set.venn.v1 requires inputs.table")?;
+    let result = venn_analysis_path(
+        resolve_input(base_directory, input),
+        set_analysis_options(&request.parameters)?,
+    )?;
+    Ok(serde_json::to_string(&AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        result,
+        ExecutionMode::LocalCpu,
+    ))?)
+}
+
+fn run_set_upset(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "table", &["include_items", "max_intersections"])?;
+    let input = request
+        .inputs
+        .get("table")
+        .ok_or("set.upset.v1 requires inputs.table")?;
+    let result = upset_analysis_path(
+        resolve_input(base_directory, input),
+        set_analysis_options(&request.parameters)?,
+    )?;
+    Ok(serde_json::to_string(&AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        result,
+        ExecutionMode::LocalCpu,
+    ))?)
+}
+
+fn run_protein_properties(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "fasta", &[])?;
+    let input = request
+        .inputs
+        .get("fasta")
+        .ok_or("protein.properties.v1 requires inputs.fasta")?;
+    let properties = protein_properties_path(resolve_input(base_directory, input))?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        properties.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = properties.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn pdb_options(parameters: &serde_json::Value) -> WorkerResult<PdbSummaryOptions> {
     let interpret_b_factors_as_plddt = match parameters.get("interpret_b_factors_as_plddt") {
         Some(value) => value
@@ -2020,6 +2121,17 @@ fn pdb_options(parameters: &serde_json::Value) -> WorkerResult<PdbSummaryOptions
     Ok(PdbSummaryOptions {
         interpret_b_factors_as_plddt,
     })
+}
+
+fn set_analysis_options(parameters: &serde_json::Value) -> WorkerResult<SetAnalysisOptions> {
+    let mut options = SetAnalysisOptions::default();
+    if let Some(include_items) = optional_parameter_bool(parameters, "include_items")? {
+        options.include_items = include_items;
+    }
+    if let Some(max_intersections) = optional_parameter_usize(parameters, "max_intersections")? {
+        options.max_intersections = max_intersections;
+    }
+    Ok(options)
 }
 
 fn expression_normalize_options(

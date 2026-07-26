@@ -27,6 +27,7 @@ use linxira_bio_core::interval::{
     IntervalIntersectStats, IntervalMergeOptions, bed_intersect_path, bed_merge_path,
     bed_subtract_path,
 };
+use linxira_bio_core::protein::{ProteinPropertiesResult, protein_properties_path};
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
 use linxira_bio_core::sequence::{SequenceStats, fasta_stats_path};
 use linxira_bio_core::sequence_analysis::{
@@ -39,6 +40,9 @@ use linxira_bio_core::sequence_transform::{
     fasta_to_table_path, filter_fasta_path, find_orfs_fasta_path, merge_fasta_paths,
     normalize_fasta_ids_path, parse_sequence_region_spec, reverse_complement_fasta_path,
     split_fasta_path, table_to_fasta_path, translate_fasta_path,
+};
+use linxira_bio_core::set_analysis::{
+    SetAnalysisOptions, UpSetAnalysis, VennAnalysis, upset_analysis_path, venn_analysis_path,
 };
 use linxira_bio_core::structure::{PdbStructureSummary, PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::table::{
@@ -267,6 +271,20 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if expression == "expression" && heatmap == "heatmap" =>
         {
             print_expression_heatmap(arguments)
+        }
+        [set, venn, arguments @ ..] if set == "set" && venn == "venn" => {
+            print_set_analysis(arguments, true)
+        }
+        [set, upset, arguments @ ..] if set == "set" && upset == "upset" => {
+            print_set_analysis(arguments, false)
+        }
+        [protein, properties, path] if protein == "protein" && properties == "properties" => {
+            print_protein_properties(path, false)
+        }
+        [protein, properties, path, json]
+            if protein == "protein" && properties == "properties" && json == "--json" =>
+        {
+            print_protein_properties(path, true)
         }
         [structure, pdb, arguments @ ..] if structure == "structure" && pdb == "pdb" => {
             print_pdb_summary(arguments)
@@ -1945,6 +1963,119 @@ fn print_pdb_summary_text(summary: &PdbStructureSummary) {
     }
 }
 
+fn print_set_analysis(arguments: &[String], venn: bool) -> Result<(), Box<dyn Error>> {
+    let mut path = None;
+    let mut options = SetAnalysisOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--include-items" => options.include_items = true,
+            "--max-intersections" => {
+                index += 1;
+                options.max_intersections =
+                    parse_sequence_usize(arguments.get(index), "--max-intersections")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown set analysis option: {value}").into());
+            }
+            value if path.is_none() => path = Some(value),
+            value => return Err(format!("unexpected set analysis argument: {value}").into()),
+        }
+        index += 1;
+    }
+    let path = path.ok_or("set analysis requires an input CSV/TSV path")?;
+    if venn {
+        let result = venn_analysis_path(path, options)?;
+        if json {
+            print_analysis_json("set-venn", "set.venn.v1", result)?;
+        } else {
+            print_venn_text(&result);
+        }
+    } else {
+        let result = upset_analysis_path(path, options)?;
+        if json {
+            print_analysis_json("set-upset", "set.upset.v1", result)?;
+        } else {
+            print_upset_text(&result);
+        }
+    }
+    Ok(())
+}
+
+fn print_venn_text(result: &VennAnalysis) {
+    println!("set_count\t{}", result.set_count);
+    println!("union_size\t{}", result.union_size);
+    for set in &result.set_sizes {
+        println!("set\t{}\t{}", set.name, set.count);
+    }
+    for intersection in &result.intersections {
+        println!(
+            "intersection\t{}\t{}",
+            intersection.sets.join("&"),
+            intersection.count
+        );
+    }
+}
+
+fn print_upset_text(result: &UpSetAnalysis) {
+    println!("set_count\t{}", result.set_count);
+    println!("union_size\t{}", result.union_size);
+    println!("intersection_count\t{}", result.intersection_count);
+    for intersection in &result.intersections {
+        println!(
+            "intersection\t{}\t{}",
+            intersection.sets.join("&"),
+            intersection.count
+        );
+    }
+}
+
+fn print_protein_properties(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let result = protein_properties_path(path)?;
+    if json {
+        let mut envelope = AnalysisResult::ok(
+            "protein-properties",
+            "protein.properties.v1",
+            result.clone(),
+            ExecutionMode::LocalCpu,
+        );
+        envelope.warnings = result.warnings;
+        println!("{}", serde_json::to_string(&envelope)?);
+    } else {
+        print_protein_properties_text(&result);
+    }
+    Ok(())
+}
+
+fn print_protein_properties_text(result: &ProteinPropertiesResult) {
+    println!("sequence_count\t{}", result.sequence_count);
+    println!("total_residues\t{}", result.total_residues);
+    for protein in &result.records {
+        println!(
+            "protein\t{}\t{}\t{}\t{}\t{}",
+            protein.id,
+            protein.length,
+            protein
+                .molecular_weight_da
+                .map(|value| format!("{value:.6}"))
+                .unwrap_or_else(|| "NA".to_owned()),
+            protein
+                .isoelectric_point
+                .map(|value| format!("{value:.6}"))
+                .unwrap_or_else(|| "NA".to_owned()),
+            protein
+                .gravy
+                .map(|value| format!("{value:.6}"))
+                .unwrap_or_else(|| "NA".to_owned())
+        );
+    }
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
 fn print_dataset_inspection(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
     let inspection = inspect_dataset(Path::new(path))?;
     if json {
@@ -2189,6 +2320,9 @@ fn usage() -> &'static str {
         "  linxira-bio expression pca <matrix.csv|tsv[.gz]> [--components N] [--scale] [--json]\n",
         "  linxira-bio expression cluster <matrix.csv|tsv[.gz]> [--sample-clusters N] [--feature-clusters N] [--max-iterations N] [--no-scale] [--json]\n",
         "  linxira-bio expression heatmap <matrix.csv|tsv[.gz]> [--top-features N] [--no-scale] [--json]\n",
+        "  linxira-bio set venn <sets.csv|tsv[.gz]> [--include-items] [--json]\n",
+        "  linxira-bio set upset <sets.csv|tsv[.gz]> [--max-intersections N] [--include-items] [--json]\n",
+        "  linxira-bio protein properties <proteins.fasta[.gz]> [--json]\n",
         "  linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> [--select-column NAME ...] [--drop-column NAME ...] [--filter-column NAME --filter-op equals|contains|non-empty [--filter-value VALUE]] [--skip-rows N] [--limit N] [--delimiter csv|tsv] [--output-delimiter csv|tsv] [--json]\n",
         "  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n",
         "  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
