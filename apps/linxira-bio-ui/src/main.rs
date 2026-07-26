@@ -263,6 +263,8 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "table.export.v1",
     "table.manipulate.v1",
     "sequence.stats.v1",
+    "sequence.kmer.count.v1",
+    "primer.epcr.v1",
     "fastq.qc.v1",
     "fastq.trim.v1",
     "fastq.adapter.v1",
@@ -276,6 +278,8 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "interval.subtract.v1",
     "expression.matrix.qc.v1",
     "variant.stats.v1",
+    "variant.filter.v1",
+    "variant.normalize.v1",
     "structure.pdb.summary.v1",
     "environment.audit.v1",
     "environment.plan.v1",
@@ -304,6 +308,12 @@ struct BioApp {
     selected_capability: String,
     annotation_feature_type: String,
     annotation_sort: bool,
+    kmer_size: usize,
+    kmer_canonical: bool,
+    epcr_max_amplicon: usize,
+    variant_filter_min_qual: f64,
+    variant_filter_pass_only: bool,
+    variant_filter_min_dp: u64,
     interpret_pdb_b_factors_as_plddt: bool,
     job_history: Vec<JobRecord>,
     analysis_job_id: Option<String>,
@@ -350,6 +360,12 @@ impl BioApp {
             selected_capability: "sequence.stats.v1".to_owned(),
             annotation_feature_type: "gene".to_owned(),
             annotation_sort: false,
+            kmer_size: 21,
+            kmer_canonical: true,
+            epcr_max_amplicon: 5_000,
+            variant_filter_min_qual: 20.0,
+            variant_filter_pass_only: true,
+            variant_filter_min_dp: 0,
             interpret_pdb_b_factors_as_plddt: false,
             job_history: Vec::new(),
             analysis_job_id: None,
@@ -730,6 +746,33 @@ impl BioApp {
                     "feature_type".to_owned(),
                     Value::String(self.annotation_feature_type.clone()),
                 );
+            }
+            if route.capability == "sequence.kmer.count.v1" {
+                parameters.insert("k".to_owned(), serde_json::json!(self.kmer_size));
+                parameters.insert("canonical".to_owned(), Value::Bool(self.kmer_canonical));
+                parameters.insert("top_n".to_owned(), serde_json::json!(50));
+            }
+            if route.capability == "primer.epcr.v1" {
+                parameters.insert(
+                    "max_amplicon".to_owned(),
+                    serde_json::json!(self.epcr_max_amplicon),
+                );
+            }
+            if route.capability == "variant.filter.v1" {
+                parameters.insert(
+                    "min_qual".to_owned(),
+                    serde_json::json!(self.variant_filter_min_qual),
+                );
+                parameters.insert(
+                    "require_pass".to_owned(),
+                    Value::Bool(self.variant_filter_pass_only),
+                );
+                if self.variant_filter_min_dp > 0 {
+                    parameters.insert(
+                        "min_info_dp".to_owned(),
+                        serde_json::json!(self.variant_filter_min_dp),
+                    );
+                }
             }
             request.parameters = Value::Object(parameters);
         }
@@ -1493,6 +1536,8 @@ impl BioApp {
             .show_ui(ui, |ui| {
                 for capability in [
                     "sequence.stats.v1",
+                    "sequence.kmer.count.v1",
+                    "primer.epcr.v1",
                     "fastq.qc.v1",
                     "fastq.trim.v1",
                     "fastq.adapter.v1",
@@ -1502,6 +1547,8 @@ impl BioApp {
                     "annotation.gene-position.v1",
                     "annotation.sequence.extract.v1",
                     "variant.stats.v1",
+                    "variant.filter.v1",
+                    "variant.normalize.v1",
                     "interval.intersect.v1",
                     "interval.merge.v1",
                     "interval.subtract.v1",
@@ -1551,11 +1598,21 @@ impl BioApp {
         if requires_secondary {
             ui.add_space(10.0);
             ui.horizontal(|ui| {
-                ui.label(if secondary_format == Some("fasta") {
-                    self.text("参考 FASTA", "Reference FASTA")
-                } else {
-                    self.text("右侧 BED", "Right BED")
-                });
+                let (secondary_label, missing_label) = match self.selected_capability.as_str() {
+                    "primer.epcr.v1" => (
+                        self.text("引物 TSV", "Primer TSV"),
+                        self.text("没有可用引物 TSV", "No primer TSV available"),
+                    ),
+                    "variant.normalize.v1" | "annotation.sequence.extract.v1" => (
+                        self.text("参考 FASTA", "Reference FASTA"),
+                        self.text("没有可用 FASTA", "No FASTA available"),
+                    ),
+                    _ => (
+                        self.text("右侧 BED", "Right BED"),
+                        self.text("没有其他 BED", "No other BED"),
+                    ),
+                };
+                ui.label(secondary_label);
                 egui::ComboBox::from_id_salt("secondary-analysis-dataset")
                     .selected_text(
                         self.secondary_dataset
@@ -1565,13 +1622,7 @@ impl BioApp {
                                     .find(|(index, _)| *index == selected)
                                     .map(|(_, name)| name.as_str())
                             })
-                            .unwrap_or_else(|| {
-                                if secondary_format == Some("fasta") {
-                                    self.text("没有可用 FASTA", "No FASTA available")
-                                } else {
-                                    self.text("没有其他 BED", "No other BED")
-                                }
-                            }),
+                            .unwrap_or(missing_label),
                     )
                     .width(300.0)
                     .show_ui(ui, |ui| {
@@ -1613,6 +1664,36 @@ impl BioApp {
                             );
                         }
                     });
+            });
+        }
+        if self.selected_capability == "sequence.kmer.count.v1" {
+            ui.add_space(8.0);
+            let canonical_label = self.text("合并反向互补", "Canonical reverse complement");
+            ui.horizontal(|ui| {
+                ui.label("k");
+                ui.add(egui::DragValue::new(&mut self.kmer_size).range(1..=31));
+                ui.checkbox(&mut self.kmer_canonical, canonical_label);
+            });
+        }
+        if self.selected_capability == "primer.epcr.v1" {
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.label(self.text("最大扩增子长度", "Maximum amplicon length"));
+                ui.add(egui::DragValue::new(&mut self.epcr_max_amplicon).range(1..=10_000_000));
+            });
+        }
+        if self.selected_capability == "variant.filter.v1" {
+            ui.add_space(8.0);
+            let pass_only_label = self.text("仅保留 PASS", "PASS only");
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("最低 QUAL", "Minimum QUAL"));
+                ui.add(
+                    egui::DragValue::new(&mut self.variant_filter_min_qual)
+                        .range(-1_000.0..=1_000_000.0),
+                );
+                ui.checkbox(&mut self.variant_filter_pass_only, pass_only_label);
+                ui.label(self.text("最低 INFO/DP（0=不限制）", "Minimum INFO/DP (0=off)"));
+                ui.add(egui::DragValue::new(&mut self.variant_filter_min_dp));
             });
         }
         if self.selected_capability == "structure.pdb.summary.v1" {
@@ -2286,6 +2367,14 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             capability: "sequence.stats.v1",
             input_role: "fasta",
         }),
+        ("sequence.kmer.count.v1", "fasta") => Some(AnalysisRoute {
+            capability: "sequence.kmer.count.v1",
+            input_role: "fasta",
+        }),
+        ("primer.epcr.v1", "fasta") => Some(AnalysisRoute {
+            capability: "primer.epcr.v1",
+            input_role: "fasta",
+        }),
         ("fastq.qc.v1", "fastq") => Some(AnalysisRoute {
             capability: "fastq.qc.v1",
             input_role: "fastq",
@@ -2337,10 +2426,16 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             capability: "table.manipulate.v1",
             input_role: "table",
         }),
-        ("variant.stats.v1", "vcf") => Some(AnalysisRoute {
-            capability: "variant.stats.v1",
-            input_role: "vcf",
-        }),
+        ("variant.stats.v1" | "variant.filter.v1" | "variant.normalize.v1", "vcf") => {
+            Some(AnalysisRoute {
+                capability: match capability {
+                    "variant.stats.v1" => "variant.stats.v1",
+                    "variant.filter.v1" => "variant.filter.v1",
+                    _ => "variant.normalize.v1",
+                },
+                input_role: "vcf",
+            })
+        }
         ("structure.pdb.summary.v1", "pdb") => Some(AnalysisRoute {
             capability: "structure.pdb.summary.v1",
             input_role: "pdb",
@@ -2357,6 +2452,8 @@ fn secondary_input_format(capability: &str) -> Option<&'static str> {
     match capability {
         "interval.intersect.v1" | "interval.subtract.v1" => Some("bed"),
         "annotation.sequence.extract.v1" => Some("fasta"),
+        "variant.normalize.v1" => Some("fasta"),
+        "primer.epcr.v1" => Some("tsv"),
         _ => None,
     }
 }
@@ -2365,6 +2462,8 @@ fn secondary_input_role(capability: &str) -> Option<&'static str> {
     match capability {
         "interval.intersect.v1" | "interval.subtract.v1" => Some("right-bed"),
         "annotation.sequence.extract.v1" => Some("fasta"),
+        "variant.normalize.v1" => Some("reference"),
+        "primer.epcr.v1" => Some("primers"),
         _ => None,
     }
 }
@@ -2377,6 +2476,8 @@ fn capability_output_extension(capability: &str) -> Option<&'static str> {
         "annotation.gxf.normalize.v1" => Some("gff3"),
         "annotation.gene-position.v1" => Some("tsv"),
         "annotation.sequence.extract.v1" => Some("fasta"),
+        "sequence.kmer.count.v1" | "primer.epcr.v1" => Some("tsv"),
+        "variant.filter.v1" | "variant.normalize.v1" => Some("vcf"),
         _ => None,
     }
 }
@@ -2986,6 +3087,8 @@ fn format_hint(path: &Path) -> &'static str {
 fn capability_title(capability: &str, language: Language) -> &'static str {
     match capability {
         "sequence.stats.v1" => language.text("FASTA 序列统计", "FASTA sequence statistics"),
+        "sequence.kmer.count.v1" => language.text("精确 k-mer 计数", "Exact k-mer counting"),
+        "primer.epcr.v1" => language.text("简单电子 PCR", "Simple electronic PCR"),
         "fastq.qc.v1" => language.text("FASTQ 质量控制", "FASTQ quality control"),
         "fastq.trim.v1" => language.text("FASTQ 质量裁剪", "FASTQ quality trimming"),
         "fastq.adapter.v1" => language.text("FASTQ 接头去除", "FASTQ adapter removal"),
@@ -2993,6 +3096,10 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "interval.merge.v1" => language.text("BED 区间合并", "BED interval merge"),
         "interval.subtract.v1" => language.text("BED 区间扣除", "BED interval subtraction"),
         "variant.stats.v1" => language.text("变异统计", "Variant statistics"),
+        "variant.filter.v1" => language.text("VCF 基础过滤", "Basic VCF filtering"),
+        "variant.normalize.v1" => {
+            language.text("VCF 参考规范化", "Reference-guided VCF normalization")
+        }
         "alignment.qc.v1" => language.text("比对质量控制", "Alignment quality control"),
         "annotation.gxf.stats.v1" => language.text("注释统计", "Annotation statistics"),
         "annotation.gxf.normalize.v1" => language.text("注释规范化", "Annotation normalization"),
@@ -3524,6 +3631,27 @@ fn metric_label(key: &str, language: Language) -> &str {
         "called_genotype_count" => "已检出基因型数",
         "missing_genotype_rate" => "基因型缺失率",
         "contig_counts" => "各染色体记录数",
+        "k" => "k-mer 长度",
+        "canonical" => "合并反向互补",
+        "total_windows" => "候选窗口数",
+        "counted_windows" => "已计数窗口数",
+        "skipped_ambiguous_windows" => "跳过歧义窗口数",
+        "distinct_kmers" => "不同 k-mer 数",
+        "top_kmers" => "高频 k-mer",
+        "primer_pair_count" => "引物对数",
+        "matched_primer_pair_count" => "命中引物对数",
+        "amplicon_count" => "扩增子数",
+        "min_amplicon" => "最小扩增子长度",
+        "max_amplicon" => "最大扩增子长度",
+        "input_records" => "输入记录数",
+        "output_records" => "输出记录数",
+        "rejected_by_qual" => "QUAL 淘汰数",
+        "rejected_by_filter" => "FILTER 淘汰数",
+        "rejected_by_contig" => "染色体淘汰数",
+        "rejected_by_info_dp" => "INFO/DP 淘汰数",
+        "changed_records" => "已规范化记录数",
+        "left_aligned_records" => "已左对齐记录数",
+        "reference_validated_records" => "参考验证记录数",
         _ => key,
     }
 }
@@ -3533,6 +3661,8 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "dataset.inspect.v1" => language.text("数据集检查", "Dataset inspection"),
         "table.export.v1" => language.text("表格导出", "Table export"),
         "sequence.stats.v1" => language.text("FASTA 序列统计", "FASTA sequence statistics"),
+        "sequence.kmer.count.v1" => language.text("精确 k-mer 计数", "Exact k-mer counting"),
+        "primer.epcr.v1" => language.text("简单电子 PCR", "Simple electronic PCR"),
         "fastq.qc.v1" => language.text("FASTQ 质量控制", "FASTQ quality control"),
         "fastq.trim.v1" => language.text("FASTQ 质量裁剪", "FASTQ quality trimming"),
         "fastq.adapter.v1" => language.text("FASTQ 接头去除", "FASTQ adapter removal"),
@@ -3555,6 +3685,10 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         }
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "variant.stats.v1" => language.text("VCF 变异统计", "VCF variant statistics"),
+        "variant.filter.v1" => language.text("VCF 基础过滤", "Basic VCF filtering"),
+        "variant.normalize.v1" => {
+            language.text("VCF 参考规范化", "Reference-guided VCF normalization")
+        }
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
         "environment.audit.v1" => language.text("环境审计", "Environment audit"),
         "environment.plan.v1" => language.text("环境计划", "Environment plan"),
@@ -3590,6 +3724,18 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("sequence.stats.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/sequence.stats.v1/en-US.md"
+        )),
+        ("sequence.kmer.count.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/sequence.kmer.count.v1/zh-CN.md"
+        )),
+        ("sequence.kmer.count.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/sequence.kmer.count.v1/en-US.md"
+        )),
+        ("primer.epcr.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/primer.epcr.v1/zh-CN.md"
+        )),
+        ("primer.epcr.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/primer.epcr.v1/en-US.md"
         )),
         ("fastq.qc.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/fastq.qc.v1/zh-CN.md"
@@ -3668,6 +3814,18 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("variant.stats.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/variant.stats.v1/en-US.md"
+        )),
+        ("variant.filter.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/variant.filter.v1/zh-CN.md"
+        )),
+        ("variant.filter.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/variant.filter.v1/en-US.md"
+        )),
+        ("variant.normalize.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/variant.normalize.v1/zh-CN.md"
+        )),
+        ("variant.normalize.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/variant.normalize.v1/en-US.md"
         )),
         ("structure.pdb.summary.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/structure.pdb.summary.v1/zh-CN.md"

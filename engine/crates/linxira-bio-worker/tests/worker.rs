@@ -259,6 +259,72 @@ fn executes_v2_sequence_utility_fixtures() {
 }
 
 #[test]
+fn executes_v2_kmer_epcr_and_variant_transform_fixtures() {
+    let root = workspace_root();
+    let cases = [
+        (
+            "sequence-kmer-count-v2.json",
+            "sequence.kmer.count.v1",
+            "sequence-kmer-count-v2.tsv",
+            "table",
+        ),
+        (
+            "primer-epcr-v2.json",
+            "primer.epcr.v1",
+            "primer-epcr-v2.tsv",
+            "table",
+        ),
+        (
+            "variant-filter-v2.json",
+            "variant.filter.v1",
+            "variant-filter-v2.vcf",
+            "domain-file",
+        ),
+        (
+            "variant-normalize-v2.json",
+            "variant.normalize.v1",
+            "variant-normalize-v2.vcf",
+            "domain-file",
+        ),
+    ];
+    std::fs::create_dir_all(root.join("target/test-results"))
+        .expect("create analysis result directory");
+    for (_, _, output_name, _) in cases {
+        let output_path = root.join("target/test-results").join(output_name);
+        if output_path.exists() {
+            std::fs::remove_file(output_path).expect("remove stale analysis output");
+        }
+    }
+
+    for (fixture, capability, output_name, artifact_kind) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(root.join("tests/fixtures/jobs").join(fixture))
+            .output()
+            .unwrap_or_else(|error| panic!("run {capability}: {error}"));
+        assert!(
+            output.status.success(),
+            "{capability}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid v2 result");
+        assert_eq!(result["schema_version"], "2", "{capability}");
+        assert_eq!(result["status"], "ok", "{capability}");
+        assert_eq!(result["capability"], capability, "{capability}");
+        assert_eq!(
+            result["artifacts"][0]["kind"], artifact_kind,
+            "{capability}"
+        );
+        assert!(root.join("target/test-results").join(output_name).exists());
+    }
+
+    for (_, _, output_name, _) in cases {
+        std::fs::remove_file(root.join("target/test-results").join(output_name))
+            .expect("remove analysis output");
+    }
+}
+
+#[test]
 fn returns_structured_v2_validation_errors_from_the_binary() {
     let request = temporary_request_path("v2-validation-error");
     std::fs::write(

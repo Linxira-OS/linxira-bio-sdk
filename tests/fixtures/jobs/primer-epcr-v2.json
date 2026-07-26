@@ -1,0 +1,38 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-primer-epcr-v2",
+  "capability": "primer.epcr.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-fasta",
+      "role": "fasta",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "input-fasta-1",
+        "path": "../sequence-analysis/reference.fa",
+        "format": "fasta",
+        "compression": "none",
+        "size_bytes": 41,
+        "sha256": "85c6aa5f070b2e8450cc2c70fb0756f21985bf78fa9089bfdcfc31150739aa0c"
+      }]
+    },
+    {
+      "artifact_id": "input-primers",
+      "role": "primers",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "input-primers-1",
+        "path": "../sequence-analysis/primers.tsv",
+        "format": "tsv",
+        "compression": "none",
+        "size_bytes": 49,
+        "sha256": "eb1614073bbe0dd1ba69a51c520c2643c47c6d5109c214c84a0c930743236fbe"
+      }]
+    }
+  ],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {
+    "output": "../../../target/test-results/primer-epcr-v2.tsv",
+    "max_amplicon": 100
+  }
+}

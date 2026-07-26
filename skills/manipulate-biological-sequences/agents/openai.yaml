@@ -1,4 +1,4 @@
 interface:
   display_name: "Manipulate Biological Sequences"
-  short_description: "Run verified FASTA sequence tools"
-  default_prompt: "Use $manipulate-biological-sequences to extract, filter, transform, merge, split, or table-convert FASTA data."
+  short_description: "Run verified FASTA, k-mer, and ePCR tools"
+  default_prompt: "Use $manipulate-biological-sequences to transform FASTA data, count exact k-mers, or run exact-match electronic PCR."

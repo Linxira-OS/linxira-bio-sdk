@@ -135,6 +135,24 @@
       "output_formats": ["fasta", "json"]
     },
     {
+      "id": "sequence.kmer.count.v1",
+      "status": "available",
+      "category": "sequence-algorithms",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence kmer-count <input.fasta> <output.tsv> --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["tsv", "json"]
+    },
+    {
+      "id": "primer.epcr.v1",
+      "status": "available",
+      "category": "sequence-algorithms",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio primer epcr <reference.fasta> <primers.tsv> <output.tsv> --json",
+      "input_formats": ["fasta", "tsv"],
+      "output_formats": ["tsv", "json"]
+    },
+    {
       "id": "dataset.inspect.v1",
       "status": "available",
       "category": "data-management",
@@ -288,6 +306,24 @@
       "command": "linxira-bio variant stats <input.vcf> --json",
       "input_formats": ["vcf"],
       "output_formats": ["json"]
+    },
+    {
+      "id": "variant.filter.v1",
+      "status": "available",
+      "category": "variant-calling",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio variant filter <input.vcf> <output.vcf> --json",
+      "input_formats": ["vcf"],
+      "output_formats": ["vcf", "json"]
+    },
+    {
+      "id": "variant.normalize.v1",
+      "status": "available",
+      "category": "variant-calling",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio variant normalize <input.vcf> <reference.fasta> <output.vcf> --json",
+      "input_formats": ["vcf", "fasta"],
+      "output_formats": ["vcf", "json"]
     },
     {
       "id": "structure.pdb.summary.v1",

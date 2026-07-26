@@ -8,14 +8,14 @@ means that an analysis capability is available.
 
 | Format | Content detection | Bounded preview | Available analysis | Current boundary |
 | --- | --- | --- | --- | --- |
-| FASTA | Yes | Sequence records | `sequence.stats.v1` | Plain, gzip, and BGZF |
+| FASTA | Yes | Sequence records | `sequence.stats.v1`, `sequence.kmer.count.v1`, `primer.epcr.v1`, `variant.normalize.v1` reference | Plain, gzip, and BGZF |
 | FASTQ | Yes | Read records | `fastq.qc.v1`, `fastq.trim.v1`, `fastq.adapter.v1` | QC plus FASTQ output for 3' quality trimming and adapter removal; plain, gzip, and BGZF input |
 | CSV | Yes | Parsed table | `expression.matrix.qc.v1`, `table.manipulate.v1` | Rectangular expression matrices; quoted and multiline preview fields supported; row/column manipulation supported |
 | TSV | Yes | Parsed table | `expression.matrix.qc.v1`, `table.manipulate.v1` | Rectangular expression matrices; row/column manipulation supported |
 | BED | Yes | Interval rows | `interval.intersect.v1`, `interval.merge.v1`, `interval.subtract.v1` | Pairwise half-open overlap summary plus BED3 merge/subtract outputs |
 | GFF3 | Yes | Feature rows | `annotation.gxf.stats.v1`, `annotation.gxf.normalize.v1`, `annotation.gene-position.v1`, `annotation.sequence.extract.v1` | Strict nine-column parsing, gzip input, normalization, coordinate tables, and reference-guided FASTA extraction |
 | GTF | Yes | Feature rows | `annotation.gxf.stats.v1`, `annotation.gxf.normalize.v1`, `annotation.gene-position.v1`, `annotation.sequence.extract.v1` | GTF attributes can be normalized to GFF3 and used for coordinate or sequence extraction |
-| VCF | Yes | Variant rows | `variant.stats.v1` | Plain, gzip, and BGZF; no BCF |
+| VCF | Yes | Variant rows | `variant.stats.v1`, `variant.filter.v1`, `variant.normalize.v1` | Plain, gzip, and BGZF input; VCF text output; no BCF |
 | SAM | Yes | Alignment rows | `alignment.qc.v1` | Text SAM flag and mapping QC; plain or gzip |
 | BAM | Magic bytes only | Binary metadata | None | `recognized-unsupported` |
 | BCF, CRAM | Magic bytes only | Binary metadata | None | `recognized-unsupported` |

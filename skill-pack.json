@@ -47,7 +47,9 @@
         "sequence.merge.v1",
         "sequence.split.v1",
         "sequence.to-table.v1",
-        "sequence.from-table.v1"
+        "sequence.from-table.v1",
+        "sequence.kmer.count.v1",
+        "primer.epcr.v1"
       ]
     },
     {
@@ -105,7 +107,11 @@
       "id": "analyze-variant-statistics",
       "path": "skills/analyze-variant-statistics",
       "kind": "executable",
-      "capabilities": ["variant.stats.v1"]
+      "capabilities": [
+        "variant.stats.v1",
+        "variant.filter.v1",
+        "variant.normalize.v1"
+      ]
     },
     {
       "id": "analyze-pdb-structure",

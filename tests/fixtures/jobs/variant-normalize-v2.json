@@ -1,0 +1,37 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-variant-normalize-v2",
+  "capability": "variant.normalize.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-vcf",
+      "role": "vcf",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "input-vcf-1",
+        "path": "../variant-transform/variants.vcf",
+        "format": "vcf",
+        "compression": "none",
+        "size_bytes": 211,
+        "sha256": "ee7eeecdbf548d82d4d6ab82c280efc2cddf57b5321489fe6b326fe0947227d5"
+      }]
+    },
+    {
+      "artifact_id": "input-reference",
+      "role": "reference",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "input-reference-1",
+        "path": "../variant-transform/reference.fa",
+        "format": "fasta",
+        "compression": "none",
+        "size_bytes": 38,
+        "sha256": "2c59d05fe0d377d5603f821529664402fc9f35519f0c787d53b28a1134655b69"
+      }]
+    }
+  ],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {
+    "output": "../../../target/test-results/variant-normalize-v2.vcf"
+  }
+}

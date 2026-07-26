@@ -36,6 +36,7 @@ a replacement script silently.
   coordinate extraction, filtering, reverse-complement generation,
   translation, ORF finding, ID normalization, merge/split, and FASTA-table
   conversion.
+  Use the same sequence skill for exact k-mer counting and exact-match ePCR.
 - BED interval operations: use `intersect-genomic-intervals` for overlap
   summaries, BED3 merge, and BED3 subtraction.
 - GFF3/GTF annotation statistics, GTF-to-GFF3 normalization, feature position
@@ -44,8 +45,9 @@ a replacement script silently.
   ontology validation, and automatic relationship repair remain planned.
 - SAM text mapping QC: use `analyze-sam-quality`. BAM, CRAM, pileup, coverage,
   and advanced mapping reports still require a maintained native workflow.
-- VCF, BCF, variants, genotypes, and normalization: variant skills. Use
-  `analyze-variant-statistics` only for supported VCF summaries; BCF remains
+- VCF, BCF, variants, genotypes, and normalization: use
+  `analyze-variant-statistics` for supported VCF summaries, basic filters, and
+  reference-guided biallelic small-variant normalization. BCF remains
   recognized but unsupported.
 - Rectangular CSV/TSV expression matrix QC: use `analyze-expression-matrix`.
   Use `manipulate-bio-tables` for local CSV/TSV row filtering, column

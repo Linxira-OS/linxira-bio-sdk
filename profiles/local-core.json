@@ -36,6 +36,8 @@
     "sequence.split.v1",
     "sequence.to-table.v1",
     "sequence.from-table.v1",
+    "sequence.kmer.count.v1",
+    "primer.epcr.v1",
     "fastq.qc.v1",
     "fastq.trim.v1",
     "fastq.adapter.v1",
@@ -50,6 +52,8 @@
     "expression.matrix.qc.v1",
     "table.manipulate.v1",
     "variant.stats.v1",
+    "variant.filter.v1",
+    "variant.normalize.v1",
     "structure.pdb.summary.v1",
     "dataset.inspect.v1",
     "table.export.v1"

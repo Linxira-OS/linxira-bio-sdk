@@ -1,0 +1,25 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-variant-filter-v2",
+  "capability": "variant.filter.v1",
+  "inputs": [{
+    "artifact_id": "input-vcf",
+    "role": "vcf",
+    "cardinality": "single",
+    "files": [{
+      "file_id": "input-vcf-1",
+      "path": "../variant-transform/variants.vcf",
+      "format": "vcf",
+      "compression": "none",
+      "size_bytes": 211,
+      "sha256": "ee7eeecdbf548d82d4d6ab82c280efc2cddf57b5321489fe6b326fe0947227d5"
+    }]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {
+    "output": "../../../target/test-results/variant-filter-v2.vcf",
+    "min_qual": 20,
+    "require_pass": true,
+    "min_info_dp": 10
+  }
+}
