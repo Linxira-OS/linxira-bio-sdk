@@ -1,0 +1,3 @@
+protein1	0123456789abcdef	120	Pfam	PF00001	Example catalytic domain	5	70	42.5	T	2026-07-26	IPR000001	Example fold	GO:0003824|GO:0008152	Reactome:R-HSA-123
+protein1	0123456789abcdef	120	SMART	SM00002	Example binding domain	75	110	18.0	T	2026-07-26	-	-	-	-
+protein2	fedcba9876543210	90	CDD	cd00003	Example conserved region	10	80	31.25	T	2026-07-26	IPR000003	Conserved region	GO:0005515	-

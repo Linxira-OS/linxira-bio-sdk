@@ -1,6 +1,6 @@
 ---
 name: analyze-genome-annotations
-description: Analyze and transform local GFF3 or GTF genome annotations with executable statistics, normalization, position-table, and reference-guided sequence-extraction capabilities. Use for annotation QC, feature counts, GTF-to-GFF3 normalization, gene or transcript coordinate tables, and extraction of genes, transcripts, CDS, exons, UTRs, or promoters from a matching FASTA reference.
+description: Analyze and transform local GFF3 or GTF genome annotations with executable statistics, normalization, position-table, feature-density, and reference-guided sequence-extraction capabilities. Use for annotation QC, feature counts, sliding-window gene density, GTF-to-GFF3 normalization, coordinate tables, and extraction of genes, transcripts, CDS, exons, UTRs, or promoters from a matching FASTA reference.
 ---
 
 # Analyze Genome Annotations
@@ -13,6 +13,7 @@ Inspect imported data before execution. Use the deterministic Rust capabilities 
 - Use `annotation.gxf.normalize.v1` to convert valid GFF3/GTF records into canonical GFF3. Set `sort=true` only when coordinate ordering is required.
 - Use `annotation.gene-position.v1` to emit a TSV coordinate table. The default feature type is `gene`; pass `feature_types` for transcripts or other records.
 - Use `annotation.sequence.extract.v1` with both `annotation` and `fasta` inputs to extract `gene`, `transcript`, `cds`, `exon`, `utr`, `five_prime_utr`, `three_prime_utr`, or `promoter` sequences.
+- Use `genome.gene-density.v1` for sliding-window counts and features-per-megabase summaries. The default feature type is `gene`.
 
 ## Validate inputs
 
@@ -29,6 +30,7 @@ For schema v2, use role `annotation` for GFF3/GTF, role `fasta` for the referenc
 - `feature_types`: string array for the position table.
 - `feature_type`: extraction target.
 - `promoter_length`: positive integer; default `1000`.
+- `window_size` and `step_size`: positive integers for gene density; both default to `1000000`.
 
 ## Interpret results
 
@@ -38,6 +40,7 @@ For schema v2, use role `annotation` for GFF3/GTF, role `fasta` for the referenc
 - Minus-strand multi-segment features are reverse-complemented into biological 5-prime to 3-prime orientation.
 - Promoters are upstream of the annotated gene start on `+` and downstream of the gene end on `-`; extraction clips against available reference sequence.
 - Report warnings and skipped or missing-reference counts. Do not present an empty output as a successful biological finding.
+- Gene density currently infers each sequence length from the maximum annotation end coordinate; always preserve this warning in reports.
 
 ## Limits
 

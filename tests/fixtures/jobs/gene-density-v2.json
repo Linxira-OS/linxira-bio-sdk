@@ -1,0 +1,13 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-gene-density-v2",
+  "capability": "genome.gene-density.v1",
+  "inputs": [{
+    "artifact_id": "input-annotation",
+    "role": "annotation",
+    "cardinality": "single",
+    "files": [{"file_id": "input-annotation-1", "path": "../annotation/genes.gff3", "format": "gff3", "compression": "none", "size_bytes": 430, "sha256": "a6c5c002782efd728e9b84152be747ad3efdae2fc193e5736b7694edcb52f850"}]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"feature_types": ["gene"], "window_size": 100, "step_size": 100}
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/reciprocal-best-hits.v1.json",
+  "title": "Linxira Bio reciprocal best-hit result",
+  "type": "object",
+  "required": ["forward_query_count", "reverse_query_count", "reciprocal_pair_count", "forward_unpaired_count", "reverse_unpaired_count", "pairs", "warnings"],
+  "properties": {
+    "forward_query_count": {"type": "integer", "minimum": 0, "maximum": 2000000},
+    "reverse_query_count": {"type": "integer", "minimum": 0, "maximum": 2000000},
+    "reciprocal_pair_count": {"type": "integer", "minimum": 0, "maximum": 2000000},
+    "forward_unpaired_count": {"type": "integer", "minimum": 0, "maximum": 2000000},
+    "reverse_unpaired_count": {"type": "integer", "minimum": 0, "maximum": 2000000},
+    "pairs": {"type": "array", "maxItems": 2000000, "items": {"$ref": "#/$defs/pair"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "pair": {
+      "type": "object",
+      "required": ["left_id", "right_id", "forward_evalue", "reverse_evalue", "forward_bit_score", "reverse_bit_score", "forward_identity_percent", "reverse_identity_percent"],
+      "properties": {
+        "left_id": {"type": "string", "minLength": 1},
+        "right_id": {"type": "string", "minLength": 1},
+        "forward_evalue": {"type": "number", "minimum": 0},
+        "reverse_evalue": {"type": "number", "minimum": 0},
+        "forward_bit_score": {"type": "number"},
+        "reverse_bit_score": {"type": "number"},
+        "forward_identity_percent": {"type": "number", "minimum": 0, "maximum": 100},
+        "reverse_identity_percent": {"type": "number", "minimum": 0, "maximum": 100}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

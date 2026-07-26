@@ -1,0 +1,13 @@
+{
+  "format": "interproscan-tsv",
+  "sequence_count": 2,
+  "hit_count": 3,
+  "source_counts": {"CDD": 1, "Pfam": 1, "SMART": 1},
+  "accession_counts": {"PF00001": 1, "SM00002": 1, "cd00003": 1},
+  "hits": [
+    {"sequence_id": "protein1", "sequence_length": 120, "source": "Pfam", "accession": "PF00001", "name": "Example catalytic domain", "start": 5, "end": 70, "evalue": null, "score": 42.5, "interpro_accession": "IPR000001", "interpro_description": "Example fold", "go_terms": ["GO:0003824", "GO:0008152"], "pathways": ["Reactome:R-HSA-123"]},
+    {"sequence_id": "protein1", "sequence_length": 120, "source": "SMART", "accession": "SM00002", "name": "Example binding domain", "start": 75, "end": 110, "evalue": null, "score": 18.0, "interpro_accession": null, "interpro_description": null, "go_terms": [], "pathways": []},
+    {"sequence_id": "protein2", "sequence_length": 90, "source": "CDD", "accession": "cd00003", "name": "Example conserved region", "start": 10, "end": 80, "evalue": null, "score": 31.25, "interpro_accession": "IPR000003", "interpro_description": "Conserved region", "go_terms": ["GO:0005515"], "pathways": []}
+  ],
+  "warnings": []
+}

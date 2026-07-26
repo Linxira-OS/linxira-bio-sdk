@@ -1,0 +1,13 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-blast-parse-v2",
+  "capability": "similarity.blast.parse.v1",
+  "inputs": [{
+    "artifact_id": "input-blast",
+    "role": "blast",
+    "cardinality": "single",
+    "files": [{"file_id": "input-blast-1", "path": "../similarity/forward.tsv", "format": "blast-tabular", "compression": "none", "size_bytes": 149, "sha256": "1185ffec63b16d745a09e40fcb8427d1ac7fe49eb0aa97c482f36f65fd10381f"}]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {}
+}

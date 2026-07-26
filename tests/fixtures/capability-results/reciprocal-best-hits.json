@@ -1,0 +1,12 @@
+{
+  "forward_query_count": 2,
+  "reverse_query_count": 2,
+  "reciprocal_pair_count": 2,
+  "forward_unpaired_count": 0,
+  "reverse_unpaired_count": 0,
+  "pairs": [
+    {"left_id": "geneA", "right_id": "protein1", "forward_evalue": 1e-50, "reverse_evalue": 1e-45, "forward_bit_score": 200.0, "reverse_bit_score": 190.0, "forward_identity_percent": 95.0, "reverse_identity_percent": 94.0},
+    {"left_id": "geneB", "right_id": "protein2", "forward_evalue": 1e-12, "reverse_evalue": 1e-13, "forward_bit_score": 120.0, "reverse_bit_score": 125.0, "forward_identity_percent": 82.0, "reverse_identity_percent": 83.0}
+  ],
+  "warnings": []
+}

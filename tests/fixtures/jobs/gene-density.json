@@ -1,0 +1,8 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-gene-density",
+  "capability": "genome.gene-density.v1",
+  "inputs": {"annotation": "../annotation/genes.gff3"},
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"feature_types": ["gene"], "window_size": 100, "step_size": 100}
+}

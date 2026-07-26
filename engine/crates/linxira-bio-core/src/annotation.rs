@@ -10,6 +10,8 @@ use std::path::{Path, PathBuf};
 pub const MAX_ANNOTATION_DECOMPRESSED_BYTES: u64 = 512 * 1024 * 1024;
 pub const MAX_ANNOTATION_RECORDS: usize = 2_000_000;
 pub const DEFAULT_PROMOTER_LENGTH: u64 = 1_000;
+pub const DEFAULT_GENE_DENSITY_WINDOW: u64 = 1_000_000;
+pub const MAX_GENE_DENSITY_BINS: usize = 2_000_000;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct AnnotationStats {
@@ -25,6 +27,44 @@ pub struct AnnotationStats {
     pub sequence_counts: BTreeMap<String, u64>,
     pub source_counts: BTreeMap<String, u64>,
     pub strand_counts: BTreeMap<String, u64>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeneDensityOptions {
+    pub feature_types: Vec<String>,
+    pub window_size: u64,
+    pub step_size: u64,
+}
+
+impl Default for GeneDensityOptions {
+    fn default() -> Self {
+        Self {
+            feature_types: vec!["gene".to_owned()],
+            window_size: DEFAULT_GENE_DENSITY_WINDOW,
+            step_size: DEFAULT_GENE_DENSITY_WINDOW,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct GeneDensityBin {
+    pub seqid: String,
+    pub start: u64,
+    pub end: u64,
+    pub feature_count: u64,
+    pub features_per_megabase: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct GeneDensityResult {
+    pub input_record_count: u64,
+    pub selected_feature_count: u64,
+    pub sequence_count: u64,
+    pub feature_types: Vec<String>,
+    pub window_size: u64,
+    pub step_size: u64,
+    pub bins: Vec<GeneDensityBin>,
     pub warnings: Vec<String>,
 }
 
@@ -224,6 +264,163 @@ pub fn annotation_stats_path(path: impl AsRef<Path>) -> Result<AnnotationStats, 
             .push("annotation input contains no feature records".to_owned());
     }
     Ok(stats)
+}
+
+pub fn gene_density_path(
+    path: impl AsRef<Path>,
+    options: GeneDensityOptions,
+) -> Result<GeneDensityResult, AnnotationError> {
+    if options.feature_types.is_empty() {
+        return Err(AnnotationError::InvalidOption(
+            "gene-density feature_types must not be empty".to_owned(),
+        ));
+    }
+    if options.window_size == 0 || options.step_size == 0 {
+        return Err(AnnotationError::InvalidOption(
+            "gene-density window_size and step_size must be positive".to_owned(),
+        ));
+    }
+    let selected_types = options
+        .feature_types
+        .iter()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty())
+        .collect::<BTreeSet<_>>();
+    if selected_types.is_empty() {
+        return Err(AnnotationError::InvalidOption(
+            "gene-density feature_types must contain a non-empty name".to_owned(),
+        ));
+    }
+    let parsed = read_annotation_path(path.as_ref())?;
+    let mut lengths = BTreeMap::<String, u64>::new();
+    for record in &parsed.records {
+        lengths
+            .entry(record.seqid.clone())
+            .and_modify(|length| *length = (*length).max(record.end))
+            .or_insert(record.end);
+    }
+    let mut differences = BTreeMap::<String, Vec<i64>>::new();
+    let mut total_bins = 0_usize;
+    for (seqid, length) in &lengths {
+        let bin_count_u64 = length
+            .saturating_sub(1)
+            .checked_div(options.step_size)
+            .and_then(|value| value.checked_add(1))
+            .ok_or(AnnotationError::LimitExceeded {
+                resource: "gene-density bin count",
+                limit: MAX_GENE_DENSITY_BINS as u64,
+            })?;
+        let bin_count =
+            usize::try_from(bin_count_u64).map_err(|_| AnnotationError::LimitExceeded {
+                resource: "gene-density bin count",
+                limit: MAX_GENE_DENSITY_BINS as u64,
+            })?;
+        total_bins = total_bins
+            .checked_add(bin_count)
+            .ok_or(AnnotationError::LimitExceeded {
+                resource: "gene-density bin count",
+                limit: MAX_GENE_DENSITY_BINS as u64,
+            })?;
+        if total_bins > MAX_GENE_DENSITY_BINS {
+            return Err(AnnotationError::LimitExceeded {
+                resource: "gene-density bin count",
+                limit: MAX_GENE_DENSITY_BINS as u64,
+            });
+        }
+        differences.insert(seqid.clone(), vec![0; bin_count.saturating_add(1)]);
+    }
+    let mut selected_feature_count = 0_u64;
+    for record in &parsed.records {
+        if !selected_types.contains(&record.feature_type.to_ascii_lowercase()) {
+            continue;
+        }
+        selected_feature_count = checked_add(selected_feature_count, 1)?;
+        let Some(diff) = differences.get_mut(&record.seqid) else {
+            continue;
+        };
+        let first = record
+            .start
+            .saturating_sub(options.window_size)
+            .div_ceil(options.step_size);
+        let last = record.end.saturating_sub(1) / options.step_size;
+        let first = usize::try_from(first).map_err(|_| AnnotationError::LimitExceeded {
+            resource: "gene-density bin index",
+            limit: MAX_GENE_DENSITY_BINS as u64,
+        })?;
+        let last = usize::try_from(last).map_err(|_| AnnotationError::LimitExceeded {
+            resource: "gene-density bin index",
+            limit: MAX_GENE_DENSITY_BINS as u64,
+        })?;
+        if first < diff.len().saturating_sub(1) {
+            diff[first] = diff[first]
+                .checked_add(1)
+                .ok_or(AnnotationError::LimitExceeded {
+                    resource: "gene-density feature count",
+                    limit: u64::MAX,
+                })?;
+            let after = last.saturating_add(1).min(diff.len() - 1);
+            diff[after] = diff[after]
+                .checked_sub(1)
+                .ok_or(AnnotationError::LimitExceeded {
+                    resource: "gene-density feature count",
+                    limit: u64::MAX,
+                })?;
+        }
+    }
+    let mut bins = Vec::with_capacity(total_bins);
+    for (seqid, length) in &lengths {
+        let diff = differences
+            .get(seqid)
+            .expect("difference array exists for every sequence");
+        let mut active = 0_i64;
+        for (index, change) in diff.iter().take(diff.len().saturating_sub(1)).enumerate() {
+            active = active
+                .checked_add(*change)
+                .ok_or(AnnotationError::LimitExceeded {
+                    resource: "gene-density feature count",
+                    limit: u64::MAX,
+                })?;
+            let start = (index as u64)
+                .checked_mul(options.step_size)
+                .and_then(|value| value.checked_add(1))
+                .ok_or(AnnotationError::LimitExceeded {
+                    resource: "gene-density coordinate",
+                    limit: u64::MAX,
+                })?;
+            let end = start
+                .saturating_add(options.window_size.saturating_sub(1))
+                .min(*length);
+            let width = end.saturating_sub(start).saturating_add(1);
+            let feature_count = u64::try_from(active).map_err(|_| {
+                AnnotationError::InvalidOption(
+                    "gene-density internal overlap count became negative".to_owned(),
+                )
+            })?;
+            bins.push(GeneDensityBin {
+                seqid: seqid.clone(),
+                start,
+                end,
+                feature_count,
+                features_per_megabase: feature_count as f64 * 1_000_000.0 / width as f64,
+            });
+        }
+    }
+    let mut warnings = vec![
+        "sequence lengths were inferred from the maximum annotation end coordinate".to_owned(),
+    ];
+    if selected_feature_count == 0 {
+        warnings.push("no annotation records matched the requested feature types".to_owned());
+    }
+    Ok(GeneDensityResult {
+        input_record_count: parsed.records.len() as u64,
+        selected_feature_count,
+        sequence_count: lengths.len() as u64,
+        feature_types: selected_types.into_iter().collect(),
+        window_size: options.window_size,
+        step_size: options.step_size,
+        bins,
+        warnings,
+    })
 }
 
 pub fn normalize_annotation_path(
@@ -1051,7 +1248,9 @@ fn reverse_complement_in_place(sequence: &mut [u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
     use std::io::Cursor;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     const GFF: &str = "##gff-version 3\nchr1\tsrc\tgene\t2\t12\t.\t+\t.\tID=g1;Name=Gene1\nchr1\tsrc\tmRNA\t2\t12\t.\t+\t.\tID=t1;Parent=g1\nchr1\tsrc\texon\t2\t4\t.\t+\t.\tParent=t1\nchr1\tsrc\texon\t9\t12\t.\t+\t.\tParent=t1\n";
 
@@ -1110,5 +1309,34 @@ mod tests {
             read_annotation(Cursor::new(input)),
             Err(AnnotationError::MalformedRecord { .. })
         ));
+    }
+
+    #[test]
+    fn computes_overlapping_gene_density_windows() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("linxira-density-{stamp}.gff3"));
+        fs::write(
+            &path,
+            "chr1\tsrc\tgene\t2\t6\t.\t+\t.\tID=g1\nchr1\tsrc\tgene\t9\t12\t.\t+\t.\tID=g2\nchr1\tsrc\texon\t2\t3\t.\t+\t.\tParent=g1\n",
+        )
+        .expect("write density fixture");
+        let result = gene_density_path(
+            &path,
+            GeneDensityOptions {
+                feature_types: vec!["gene".to_owned()],
+                window_size: 6,
+                step_size: 4,
+            },
+        )
+        .expect("compute gene density");
+        fs::remove_file(path).expect("remove density fixture");
+        assert_eq!(result.selected_feature_count, 2);
+        assert_eq!(result.bins.len(), 3);
+        assert_eq!(result.bins[0].feature_count, 1);
+        assert_eq!(result.bins[1].feature_count, 2);
+        assert_eq!(result.bins[2].feature_count, 1);
     }
 }

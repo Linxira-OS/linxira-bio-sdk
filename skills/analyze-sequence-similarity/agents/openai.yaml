@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Sequence Similarity"
+  short_description: "Parse similarity results and find reciprocal hits"
+  default_prompt: "Use $analyze-sequence-similarity to parse local similarity results or calculate reciprocal best hits."

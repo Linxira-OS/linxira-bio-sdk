@@ -212,6 +212,15 @@
       "output_formats": ["fasta", "json"]
     },
     {
+      "id": "genome.gene-density.v1",
+      "status": "available",
+      "category": "genome-annotation",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio annotation gene-density <input.gff3|gtf> --json",
+      "input_formats": ["gff3", "gtf"],
+      "output_formats": ["json"]
+    },
+    {
       "id": "table.manipulate.v1",
       "status": "available",
       "category": "data-management",
@@ -462,6 +471,42 @@
       "command": "linxira-bio protein properties <proteins.fasta> --json",
       "input_formats": ["fasta"],
       "output_formats": ["json"]
+    },
+    {
+      "id": "similarity.blast.parse.v1",
+      "status": "available",
+      "category": "sequence-similarity",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio similarity blast-parse <blast.tsv|xml> --json",
+      "input_formats": ["blast-outfmt6", "blast-outfmt7", "blast-xml1"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "similarity.reciprocal.v1",
+      "status": "available",
+      "category": "comparative-genomics",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio similarity rbh <forward.tsv|xml> <reverse.tsv|xml> --json",
+      "input_formats": ["blast-outfmt6", "blast-outfmt7", "blast-xml1"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "protein.domain.parse.v1",
+      "status": "available",
+      "category": "protein-analysis",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio protein domains <interproscan.tsv|hmmer.domtblout> --json",
+      "input_formats": ["interproscan-tsv", "hmmer-domtblout"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "phylogeny.tree.transform.v1",
+      "status": "available",
+      "category": "phylogenetics",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio phylogeny tree <input.nwk> <output.nwk> --json",
+      "input_formats": ["newick"],
+      "output_formats": ["newick", "json"]
     },
     {
       "id": "protein.af2.predict.v1",

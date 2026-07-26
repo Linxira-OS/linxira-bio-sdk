@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/protein-domain-parse.v1.json",
+  "title": "Linxira Bio protein-domain parse result",
+  "type": "object",
+  "required": ["format", "sequence_count", "hit_count", "source_counts", "accession_counts", "hits", "warnings"],
+  "properties": {
+    "format": {"enum": ["interproscan-tsv", "hmmer-domtblout"]},
+    "sequence_count": {"type": "integer", "minimum": 0, "maximum": 2000000},
+    "hit_count": {"type": "integer", "minimum": 0, "maximum": 2000000},
+    "source_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "accession_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "hits": {"type": "array", "maxItems": 2000000, "items": {"$ref": "#/$defs/hit"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "hit": {
+      "type": "object",
+      "required": ["sequence_id", "sequence_length", "source", "accession", "name", "start", "end", "evalue", "score", "interpro_accession", "interpro_description", "go_terms", "pathways"],
+      "properties": {
+        "sequence_id": {"type": "string", "minLength": 1},
+        "sequence_length": {"type": ["integer", "null"], "minimum": 1},
+        "source": {"type": "string", "minLength": 1},
+        "accession": {"type": "string", "minLength": 1},
+        "name": {"type": ["string", "null"]},
+        "start": {"type": "integer", "minimum": 1},
+        "end": {"type": "integer", "minimum": 1},
+        "evalue": {"type": ["number", "null"], "minimum": 0},
+        "score": {"type": ["number", "null"]},
+        "interpro_accession": {"type": ["string", "null"]},
+        "interpro_description": {"type": ["string", "null"]},
+        "go_terms": {"type": "array", "items": {"type": "string"}},
+        "pathways": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

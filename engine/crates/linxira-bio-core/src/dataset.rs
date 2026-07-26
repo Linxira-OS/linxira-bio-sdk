@@ -50,6 +50,10 @@ pub enum DatasetFormat {
     Rds,
     Pdb,
     Mmcif,
+    BlastTabular,
+    BlastXml,
+    ProteinDomains,
+    Newick,
     Unknown,
 }
 
@@ -75,6 +79,10 @@ impl DatasetFormat {
             Self::Rds => "rds",
             Self::Pdb => "pdb",
             Self::Mmcif => "mmcif",
+            Self::BlastTabular => "blast-tabular",
+            Self::BlastXml => "blast-xml",
+            Self::ProteinDomains => "protein-domains",
+            Self::Newick => "newick",
             Self::Unknown => "unknown",
         }
     }
@@ -471,6 +479,10 @@ fn detect_from_extension(path: &Path) -> Option<Detection> {
         "rds" | "rda" | "rdata" => DatasetFormat::Rds,
         "pdb" | "ent" => DatasetFormat::Pdb,
         "cif" | "mmcif" => DatasetFormat::Mmcif,
+        "blast" | "m8" => DatasetFormat::BlastTabular,
+        "xml" => DatasetFormat::BlastXml,
+        "domtblout" => DatasetFormat::ProteinDomains,
+        "nwk" | "newick" | "tree" | "tre" => DatasetFormat::Newick,
         _ => return None,
     };
     Some(Detection {
@@ -519,6 +531,10 @@ fn detect_from_content(prefix: &[u8], path: &Path) -> Option<Detection> {
         .collect::<Vec<_>>();
     let first = *nonempty.first()?;
 
+    if looks_like_blast_xml(text) {
+        return high(DatasetFormat::BlastXml);
+    }
+
     if first.starts_with("##fileformat=VCF")
         || nonempty
             .iter()
@@ -543,6 +559,15 @@ fn detect_from_content(prefix: &[u8], path: &Path) -> Option<Detection> {
     }
     if looks_like_sam(&nonempty) {
         return high(DatasetFormat::Sam);
+    }
+    if looks_like_protein_domains(&nonempty) {
+        return high(DatasetFormat::ProteinDomains);
+    }
+    if looks_like_blast_tabular(&nonempty) {
+        return high(DatasetFormat::BlastTabular);
+    }
+    if looks_like_newick(text) {
+        return high(DatasetFormat::Newick);
     }
     if let Some(format) = detect_nine_column_annotation(&nonempty, path) {
         return medium(format);
@@ -690,6 +715,82 @@ fn looks_like_mmcif(lines: &[&str]) -> bool {
             .any(|line| line.starts_with("_atom_site.") || line.starts_with("_entry.id"))
 }
 
+fn looks_like_blast_xml(text: &str) -> bool {
+    let trimmed = text.trim_start();
+    trimmed.starts_with("<BlastOutput")
+        || (trimmed.starts_with("<?xml") && trimmed.contains("<BlastOutput"))
+}
+
+fn looks_like_blast_tabular(lines: &[&str]) -> bool {
+    let records = lines
+        .iter()
+        .filter(|line| !line.starts_with('#'))
+        .take(4)
+        .collect::<Vec<_>>();
+    !records.is_empty()
+        && records.iter().all(|line| {
+            let fields = line.split('\t').collect::<Vec<_>>();
+            fields.len() >= 12
+                && !fields[0].is_empty()
+                && !fields[1].is_empty()
+                && fields[2]
+                    .parse::<f64>()
+                    .is_ok_and(|value| value.is_finite() && (0.0..=100.0).contains(&value))
+                && fields[3].parse::<u64>().is_ok()
+                && fields[6].parse::<u64>().is_ok()
+                && fields[7].parse::<u64>().is_ok()
+                && fields[8].parse::<u64>().is_ok()
+                && fields[9].parse::<u64>().is_ok()
+                && fields[10]
+                    .parse::<f64>()
+                    .is_ok_and(|value| value.is_finite() && value >= 0.0)
+                && fields[11]
+                    .parse::<f64>()
+                    .is_ok_and(|value| value.is_finite())
+        })
+}
+
+fn looks_like_protein_domains(lines: &[&str]) -> bool {
+    let Some(first) = lines.iter().find(|line| !line.starts_with('#')) else {
+        return false;
+    };
+    let tab_fields = first.split('\t').collect::<Vec<_>>();
+    if tab_fields.len() >= 11 {
+        return tab_fields[2].parse::<u64>().is_ok()
+            && tab_fields[6].parse::<u64>().is_ok()
+            && tab_fields[7].parse::<u64>().is_ok()
+            && matches!(tab_fields[9], "T" | "F" | "-");
+    }
+    let fields = first.split_whitespace().collect::<Vec<_>>();
+    fields.len() >= 22
+        && fields[2].parse::<u64>().is_ok()
+        && fields[17].parse::<u64>().is_ok()
+        && fields[18].parse::<u64>().is_ok()
+}
+
+fn looks_like_newick(text: &str) -> bool {
+    let trimmed = text.trim();
+    if !trimmed.ends_with(';') || !trimmed.starts_with('(') {
+        return false;
+    }
+    let mut depth = 0_i64;
+    let mut saw_comma = false;
+    for character in trimmed.chars() {
+        match character {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth < 0 {
+                    return false;
+                }
+            }
+            ',' if depth > 0 => saw_comma = true,
+            _ => {}
+        }
+    }
+    depth == 0 && saw_comma
+}
+
 fn delimited_score(bytes: &[u8], delimiter: u8) -> usize {
     let mut reader = csv::ReaderBuilder::new()
         .delimiter(delimiter)
@@ -769,7 +870,11 @@ fn support_for(format: DatasetFormat) -> DatasetSupport {
         | DatasetFormat::Vcf
         | DatasetFormat::Sam
         | DatasetFormat::Pdb
-        | DatasetFormat::Mmcif => DatasetSupport::Supported,
+        | DatasetFormat::Mmcif
+        | DatasetFormat::BlastTabular
+        | DatasetFormat::BlastXml
+        | DatasetFormat::ProteinDomains
+        | DatasetFormat::Newick => DatasetSupport::Supported,
         DatasetFormat::Bam
         | DatasetFormat::Zip
         | DatasetFormat::Bcf
@@ -809,9 +914,13 @@ fn build_preview(
             warnings: Vec::new(),
             errors: Vec::new(),
         }),
-        DatasetFormat::Pdb | DatasetFormat::Mmcif | DatasetFormat::Unknown => {
-            preview_text(path, compression, options)
-        }
+        DatasetFormat::Pdb
+        | DatasetFormat::Mmcif
+        | DatasetFormat::BlastTabular
+        | DatasetFormat::BlastXml
+        | DatasetFormat::ProteinDomains
+        | DatasetFormat::Newick
+        | DatasetFormat::Unknown => preview_text(path, compression, options),
     }
 }
 
@@ -1794,6 +1903,48 @@ mod tests {
     }
 
     #[test]
+    fn recognizes_similarity_domain_and_tree_content_before_generic_tables() {
+        let cases = [
+            (
+                workspace_fixture("similarity/forward.tsv"),
+                DatasetFormat::BlastTabular,
+            ),
+            (
+                workspace_fixture("protein-domains/interproscan.tsv"),
+                DatasetFormat::ProteinDomains,
+            ),
+            (
+                workspace_fixture("phylogeny/tree.nwk"),
+                DatasetFormat::Newick,
+            ),
+        ];
+
+        for (path, expected) in cases {
+            let inspection = inspect_dataset(&path).expect("inspect domain fixture");
+            assert_eq!(inspection.format, expected, "fixture {}", path.display());
+            assert_eq!(inspection.confidence, DetectionConfidence::High);
+            assert_eq!(inspection.support, DatasetSupport::Supported);
+            assert_eq!(
+                inspection.preview.as_ref().map(|preview| preview.kind),
+                Some(PreviewKind::Text)
+            );
+            assert!(inspection.errors.is_empty());
+        }
+
+        let blast_xml = write_temporary(
+            "blast.xml",
+            br#"<?xml version="1.0"?>
+<BlastOutput><BlastOutput_iterations></BlastOutput_iterations></BlastOutput>
+"#,
+        );
+        let inspection = inspect_dataset(&blast_xml).expect("inspect BLAST XML1");
+        fs::remove_file(&blast_xml).expect("remove BLAST XML fixture");
+        assert_eq!(inspection.format, DatasetFormat::BlastXml);
+        assert_eq!(inspection.confidence, DetectionConfidence::High);
+        assert_eq!(inspection.support, DatasetSupport::Supported);
+    }
+
+    #[test]
     fn content_wins_over_a_misleading_extension() {
         let path = write_temporary("misnamed.csv", b">sequence\nACGT\n");
         let inspection = inspect_dataset(&path).expect("inspect mismatched extension");
@@ -1906,6 +2057,12 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../tests/fixtures/data-inspection")
             .join(name)
+    }
+
+    fn workspace_fixture(path: &str) -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../tests/fixtures")
+            .join(path)
     }
 
     fn write_temporary(name: &str, contents: &[u8]) -> PathBuf {

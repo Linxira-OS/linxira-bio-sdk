@@ -117,6 +117,7 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         "fastq.trim.v1" | "fastq.adapter.v1" => fastq_transform_charts(payload, zh_cn),
         "alignment.qc.v1" => alignment_charts(payload, zh_cn),
         "annotation.gxf.stats.v1" => annotation_charts(payload, zh_cn),
+        "genome.gene-density.v1" => gene_density_charts(payload, zh_cn),
         "interval.intersect.v1" => interval_charts(payload, zh_cn),
         "interval.merge.v1" => interval_merge_charts(payload, zh_cn),
         "interval.subtract.v1" => interval_subtract_charts(payload, zh_cn),
@@ -127,6 +128,10 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         "expression.heatmap.v1" => expression_heatmap_charts(payload, zh_cn),
         "set.venn.v1" | "set.upset.v1" => set_analysis_charts(payload, zh_cn),
         "protein.properties.v1" => protein_properties_charts(payload, zh_cn),
+        "similarity.blast.parse.v1" => blast_parse_charts(payload, zh_cn),
+        "similarity.reciprocal.v1" => reciprocal_hit_charts(payload, zh_cn),
+        "protein.domain.parse.v1" => protein_domain_charts(payload, zh_cn),
+        "phylogeny.tree.transform.v1" => phylogeny_tree_charts(payload, zh_cn),
         "table.manipulate.v1" => table_manipulate_charts(payload, zh_cn),
         "variant.stats.v1" => variant_charts(payload, zh_cn),
         "variant.filter.v1" => variant_filter_charts(payload, zh_cn),
@@ -190,6 +195,183 @@ fn annotation_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
         });
     }
     charts
+}
+
+fn gene_density_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let mut by_sequence = std::collections::BTreeMap::<String, Vec<(f64, f64)>>::new();
+    for bin in payload
+        .get("bins")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let Some(seqid) = bin.get("seqid").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(start) = bin.get("start").and_then(Value::as_f64) else {
+            continue;
+        };
+        let Some(end) = bin.get("end").and_then(Value::as_f64) else {
+            continue;
+        };
+        let Some(density) = bin.get("features_per_megabase").and_then(Value::as_f64) else {
+            continue;
+        };
+        by_sequence
+            .entry(seqid.to_owned())
+            .or_default()
+            .push(((start + end) / 2.0, density));
+    }
+    let series = by_sequence
+        .into_iter()
+        .take(8)
+        .enumerate()
+        .map(|(index, (label, points))| LineSeries {
+            label,
+            color: chart_color(index),
+            points,
+        })
+        .collect::<Vec<_>>();
+    if series.is_empty() {
+        Vec::new()
+    } else {
+        vec![ChartSpec::Lines {
+            title: localized(zh_cn, "滑动窗口特征密度", "Sliding-window feature density")
+                .to_owned(),
+            series,
+            percent: false,
+        }]
+    }
+}
+
+fn blast_parse_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let summary = values_for_keys(
+        payload,
+        &[
+            ("record_count", localized(zh_cn, "命中", "Hits")),
+            ("query_count", localized(zh_cn, "查询", "Queries")),
+            ("subject_count", localized(zh_cn, "目标", "Subjects")),
+        ],
+    );
+    let scores = payload
+        .get("hits")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|hit| {
+            Some(BarValue {
+                label: format!(
+                    "{} → {}",
+                    hit.get("query_id")?.as_str()?,
+                    hit.get("subject_id")?.as_str()?
+                ),
+                value: hit.get("bit_score")?.as_f64()?,
+            })
+        })
+        .take(20)
+        .collect::<Vec<_>>();
+    bar_specs(
+        [
+            (
+                localized(zh_cn, "相似性结果摘要", "Similarity result summary"),
+                summary,
+            ),
+            (
+                localized(zh_cn, "前 20 个 bit score", "First 20 bit scores"),
+                scores,
+            ),
+        ],
+        false,
+    )
+}
+
+fn reciprocal_hit_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let values = payload
+        .get("pairs")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|pair| {
+            Some(BarValue {
+                label: format!(
+                    "{} ↔ {}",
+                    pair.get("left_id")?.as_str()?,
+                    pair.get("right_id")?.as_str()?
+                ),
+                value: pair
+                    .get("forward_identity_percent")?
+                    .as_f64()?
+                    .min(pair.get("reverse_identity_percent")?.as_f64()?),
+            })
+        })
+        .take(30)
+        .collect::<Vec<_>>();
+    if values.is_empty() {
+        Vec::new()
+    } else {
+        vec![ChartSpec::Bars {
+            title: localized(
+                zh_cn,
+                "双向配对最低相似度",
+                "Minimum identity of reciprocal pairs",
+            )
+            .to_owned(),
+            values,
+            percent: true,
+        }]
+    }
+}
+
+fn protein_domain_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let mut sources = payload
+        .get("source_counts")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+        .filter_map(|(source, count)| {
+            Some(BarValue {
+                label: source.clone(),
+                value: count.as_f64()?,
+            })
+        })
+        .collect::<Vec<_>>();
+    sort_and_limit(&mut sources, 20);
+    if sources.is_empty() {
+        Vec::new()
+    } else {
+        vec![ChartSpec::Bars {
+            title: localized(zh_cn, "结构域来源", "Domain sources").to_owned(),
+            values: sources,
+            percent: false,
+        }]
+    }
+}
+
+fn phylogeny_tree_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let values = values_for_keys(
+        payload,
+        &[
+            ("leaf_count", localized(zh_cn, "叶节点", "Leaves")),
+            (
+                "internal_node_count",
+                localized(zh_cn, "内部节点", "Internal nodes"),
+            ),
+            ("max_depth", localized(zh_cn, "最大深度", "Maximum depth")),
+            (
+                "relabeled_count",
+                localized(zh_cn, "重命名节点", "Relabeled nodes"),
+            ),
+        ],
+    );
+    if values.is_empty() {
+        Vec::new()
+    } else {
+        vec![ChartSpec::Bars {
+            title: localized(zh_cn, "系统发育树摘要", "Phylogeny tree summary").to_owned(),
+            values,
+            percent: false,
+        }]
+    }
 }
 
 fn fastq_transform_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
@@ -1822,6 +2004,65 @@ mod tests {
         };
         assert_eq!(values.len(), 2);
         assert_eq!(values[1].value, 0.4);
+    }
+
+    #[test]
+    fn similarity_domain_density_and_tree_results_build_native_charts() {
+        let density = json!({
+            "bins": [
+                {"seqid": "chr1", "start": 1, "end": 100, "features_per_megabase": 20_000.0},
+                {"seqid": "chr1", "start": 101, "end": 200, "features_per_megabase": 10_000.0}
+            ]
+        });
+        let density_charts = chart_specs(&density, Some("genome.gene-density.v1"), false);
+        assert_eq!(density_charts.len(), 1);
+        assert!(matches!(density_charts[0], ChartSpec::Lines { .. }));
+
+        let blast = json!({
+            "record_count": 2,
+            "query_count": 1,
+            "subject_count": 2,
+            "hits": [
+                {"query_id": "q1", "subject_id": "s1", "bit_score": 80.0},
+                {"query_id": "q1", "subject_id": "s2", "bit_score": 60.0}
+            ]
+        });
+        let blast_charts = chart_specs(&blast, Some("similarity.blast.parse.v1"), false);
+        assert_eq!(blast_charts.len(), 2);
+
+        let reciprocal = json!({
+            "pairs": [{
+                "left_id": "q1",
+                "right_id": "s1",
+                "forward_identity_percent": 95.0,
+                "reverse_identity_percent": 92.0
+            }]
+        });
+        let reciprocal_charts = chart_specs(&reciprocal, Some("similarity.reciprocal.v1"), false);
+        let ChartSpec::Bars {
+            values, percent, ..
+        } = &reciprocal_charts[0]
+        else {
+            panic!("expected reciprocal identity bars");
+        };
+        assert!(*percent);
+        assert_eq!(values[0].value, 92.0);
+
+        let domains = json!({"source_counts": {"Pfam": 4, "SMART": 2}});
+        let domain_charts = chart_specs(&domains, Some("protein.domain.parse.v1"), false);
+        assert_eq!(domain_charts.len(), 1);
+
+        let tree = json!({
+            "leaf_count": 4,
+            "internal_node_count": 3,
+            "max_depth": 3,
+            "relabeled_count": 1
+        });
+        let tree_charts = chart_specs(&tree, Some("phylogeny.tree.transform.v1"), true);
+        let ChartSpec::Bars { values, .. } = &tree_charts[0] else {
+            panic!("expected phylogeny summary bars");
+        };
+        assert_eq!(values.len(), 4);
     }
 
     #[test]

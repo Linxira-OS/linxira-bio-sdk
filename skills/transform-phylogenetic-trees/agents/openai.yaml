@@ -1,0 +1,4 @@
+interface:
+  display_name: "Transform Phylogenetic Trees"
+  short_description: "Normalize, relabel, and reroot Newick trees"
+  default_prompt: "Use $transform-phylogenetic-trees to normalize, relabel, or reroot a local Newick tree."

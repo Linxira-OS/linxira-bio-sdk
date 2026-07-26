@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/gene-density.v1.json",
+  "title": "Linxira Bio gene-density result",
+  "type": "object",
+  "required": ["input_record_count", "selected_feature_count", "sequence_count", "feature_types", "window_size", "step_size", "bins", "warnings"],
+  "properties": {
+    "input_record_count": {"type": "integer", "minimum": 0, "maximum": 2000000},
+    "selected_feature_count": {"type": "integer", "minimum": 0, "maximum": 2000000},
+    "sequence_count": {"type": "integer", "minimum": 0},
+    "feature_types": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "window_size": {"type": "integer", "minimum": 1},
+    "step_size": {"type": "integer", "minimum": 1},
+    "bins": {"type": "array", "maxItems": 2000000, "items": {"$ref": "#/$defs/bin"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "bin": {
+      "type": "object",
+      "required": ["seqid", "start", "end", "feature_count", "features_per_megabase"],
+      "properties": {
+        "seqid": {"type": "string", "minLength": 1},
+        "start": {"type": "integer", "minimum": 1},
+        "end": {"type": "integer", "minimum": 1},
+        "feature_count": {"type": "integer", "minimum": 0},
+        "features_per_megabase": {"type": "number", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

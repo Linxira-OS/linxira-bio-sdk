@@ -1,0 +1,8 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-phylogeny-tree",
+  "capability": "phylogeny.tree.transform.v1",
+  "inputs": {"tree": "../phylogeny/tree.nwk"},
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/phylogeny-tree.nwk", "reroot_label": "geneC", "label_map": {"geneA": "sampleA"}}
+}
