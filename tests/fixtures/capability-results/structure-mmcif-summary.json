@@ -1,0 +1,27 @@
+{
+  "format": "mmcif",
+  "coordinate_units": "angstrom",
+  "model_count": 1,
+  "chain_count": 2,
+  "residue_count": 5,
+  "atom_count": 5,
+  "polymer_atom_count": 4,
+  "hetero_atom_count": 1,
+  "element_counts": {"C": 4, "O": 1},
+  "bounds": {
+    "minimum": {"x": 0.0, "y": 0.0, "z": 0.0},
+    "maximum": {"x": 8.0, "y": 8.0, "z": 8.0},
+    "span": {"x": 8.0, "y": 8.0, "z": 8.0},
+    "center": {"x": 4.0, "y": 4.0, "z": 4.0}
+  },
+  "models": [{
+    "model_id": "1",
+    "atom_count": 5,
+    "residue_count": 5,
+    "chains": [
+      {"chain_id": "A", "atom_count": 4, "residue_count": 4, "polymer_residue_count": 4, "hetero_residue_count": 0},
+      {"chain_id": "B", "atom_count": 1, "residue_count": 1, "polymer_residue_count": 0, "hetero_residue_count": 1}
+    ]
+  }],
+  "warnings": ["ignored 1 alternate-location atoms other than blank, A, or 1"]
+}

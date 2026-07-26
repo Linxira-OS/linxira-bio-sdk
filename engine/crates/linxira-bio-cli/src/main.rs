@@ -6,6 +6,12 @@ use linxira_bio_core::annotation::{
     annotation_gene_positions_path, annotation_stats_path, extract_annotation_sequences_path,
     normalize_annotation_path,
 };
+use linxira_bio_core::coordinate::{
+    ContactMapOptions, MmcifStructureSummary, StructureContactMapResult, StructureGeometryResult,
+    StructureSequenceResult, StructureSuperpositionResult, SuperpositionOptions,
+    extract_structure_sequences_path, measure_structure_geometry_path, mmcif_summary_path,
+    parse_atom_selector, structure_contact_map_path, superpose_structures_path,
+};
 use linxira_bio_core::dataset::{DatasetInspection, DatasetSupport, inspect_dataset};
 use linxira_bio_core::environment::{
     EnvironmentAudit, EnvironmentMode, EnvironmentPlan, EnvironmentPlanOptions, PlanActionState,
@@ -289,6 +295,31 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         [structure, pdb, arguments @ ..] if structure == "structure" && pdb == "pdb" => {
             print_pdb_summary(arguments)
         }
+        [structure, mmcif_summary, arguments @ ..]
+            if structure == "structure" && mmcif_summary == "mmcif-summary" =>
+        {
+            print_mmcif_summary(arguments)
+        }
+        [structure, sequence, arguments @ ..]
+            if structure == "structure" && sequence == "sequence" =>
+        {
+            print_structure_sequence(arguments)
+        }
+        [structure, contact_map, arguments @ ..]
+            if structure == "structure" && contact_map == "contact-map" =>
+        {
+            print_structure_contact_map(arguments)
+        }
+        [structure, geometry, arguments @ ..]
+            if structure == "structure" && geometry == "geometry" =>
+        {
+            print_structure_geometry(arguments)
+        }
+        [structure, superpose, arguments @ ..]
+            if structure == "structure" && superpose == "superpose" =>
+        {
+            print_structure_superposition(arguments)
+        }
         _ => Err(usage().into()),
     }
 }
@@ -461,6 +492,21 @@ where
 {
     let result = AnalysisResult::ok(job_id, capability, result, ExecutionMode::LocalCpu);
     println!("{}", serde_json::to_string(&result)?);
+    Ok(())
+}
+
+fn print_analysis_json_with_warnings<T>(
+    job_id: &str,
+    capability: &str,
+    result: T,
+    warnings: Vec<String>,
+) -> Result<(), Box<dyn Error>>
+where
+    T: serde::Serialize,
+{
+    let mut envelope = AnalysisResult::ok(job_id, capability, result, ExecutionMode::LocalCpu);
+    envelope.warnings = warnings;
+    println!("{}", serde_json::to_string(&envelope)?);
     Ok(())
 }
 
@@ -1963,6 +2009,254 @@ fn print_pdb_summary_text(summary: &PdbStructureSummary) {
     }
 }
 
+fn print_mmcif_summary(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let (path, json) = parse_single_path_json(arguments, "structure mmcif-summary")?;
+    let summary = mmcif_summary_path(path)?;
+    if json {
+        print_analysis_json_with_warnings(
+            "structure-mmcif-summary",
+            "structure.mmcif.summary.v1",
+            summary.clone(),
+            summary.warnings,
+        )
+    } else {
+        print_mmcif_summary_text(&summary);
+        Ok(())
+    }
+}
+
+fn print_mmcif_summary_text(summary: &MmcifStructureSummary) {
+    println!("model_count\t{}", summary.model_count);
+    println!("chain_count\t{}", summary.chain_count);
+    println!("residue_count\t{}", summary.residue_count);
+    println!("atom_count\t{}", summary.atom_count);
+    println!("polymer_atom_count\t{}", summary.polymer_atom_count);
+    println!("hetero_atom_count\t{}", summary.hetero_atom_count);
+    for warning in &summary.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_structure_sequence(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let (path, json) = parse_single_path_json(arguments, "structure sequence")?;
+    let result = extract_structure_sequences_path(path)?;
+    if json {
+        print_analysis_json_with_warnings(
+            "structure-sequence",
+            "structure.sequence.extract.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_structure_sequence_text(&result);
+        Ok(())
+    }
+}
+
+fn print_structure_sequence_text(result: &StructureSequenceResult) {
+    println!("model_id\t{}", result.model_id);
+    println!("chain_count\t{}", result.chain_count);
+    println!("total_residues\t{}", result.total_residues);
+    for chain in &result.chains {
+        println!(
+            "chain\t{}\t{:?}\t{}\t{}",
+            chain.chain_id, chain.polymer_type, chain.residue_count, chain.sequence
+        );
+    }
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_structure_contact_map(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut path = None;
+    let mut options = ContactMapOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--cutoff" => {
+                index += 1;
+                options.cutoff_angstrom =
+                    parse_finite_f64(arguments.get(index), "--cutoff", Some(f64::MIN_POSITIVE))?;
+            }
+            "--atom" => {
+                index += 1;
+                options.atom_name = arguments
+                    .get(index)
+                    .ok_or("--atom requires a value")?
+                    .to_owned();
+            }
+            "--intra-chain-only" => options.include_inter_chain = false,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown structure contact-map option: {value}").into());
+            }
+            value if path.is_none() => path = Some(value),
+            value => {
+                return Err(format!("unexpected structure contact-map argument: {value}").into());
+            }
+        }
+        index += 1;
+    }
+    let path = path.ok_or("structure contact-map requires an input path")?;
+    let result = structure_contact_map_path(path, options)?;
+    if json {
+        print_analysis_json_with_warnings(
+            "structure-contact-map",
+            "structure.contact-map.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_structure_contact_map_text(&result);
+        Ok(())
+    }
+}
+
+fn print_structure_contact_map_text(result: &StructureContactMapResult) {
+    println!("model_id\t{}", result.model_id);
+    println!("atom_name\t{}", result.atom_name);
+    println!("cutoff_angstrom\t{:.6}", result.cutoff_angstrom);
+    println!(
+        "representative_residue_count\t{}",
+        result.representative_residue_count
+    );
+    println!("contact_count\t{}", result.contact_count);
+    for contact in &result.contacts {
+        println!(
+            "contact\t{}:{}\t{}:{}\t{:.6}",
+            contact.left.chain_id,
+            contact.left.residue_id,
+            contact.right.chain_id,
+            contact.right.residue_id,
+            contact.distance_angstrom
+        );
+    }
+}
+
+fn print_structure_geometry(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut path = None;
+    let mut selectors = Vec::new();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--atom" => {
+                index += 1;
+                selectors.push(parse_atom_selector(
+                    arguments.get(index).ok_or("--atom requires a selector")?,
+                )?);
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown structure geometry option: {value}").into());
+            }
+            value if path.is_none() => path = Some(value),
+            value => return Err(format!("unexpected structure geometry argument: {value}").into()),
+        }
+        index += 1;
+    }
+    let path = path.ok_or("structure geometry requires an input path")?;
+    let result = measure_structure_geometry_path(path, &selectors)?;
+    if json {
+        print_analysis_json("structure-geometry", "structure.geometry.v1", result)
+    } else {
+        print_structure_geometry_text(&result);
+        Ok(())
+    }
+}
+
+fn print_structure_geometry_text(result: &StructureGeometryResult) {
+    println!("measurement\t{}", result.measurement);
+    println!("value\t{:.6}", result.value);
+    println!("units\t{}", result.units);
+    for atom in &result.atoms {
+        println!(
+            "atom\t{}\t{}\t{}\t{}",
+            atom.chain_id, atom.residue_id, atom.residue_name, atom.atom_name
+        );
+    }
+}
+
+fn print_structure_superposition(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = SuperpositionOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--atom" => {
+                index += 1;
+                options.atom_name = arguments
+                    .get(index)
+                    .ok_or("--atom requires a value")?
+                    .to_owned();
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown structure superpose option: {value}").into());
+            }
+            value if paths.len() < 2 => paths.push(value),
+            value => {
+                return Err(format!("unexpected structure superpose argument: {value}").into());
+            }
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("structure superpose requires reference and mobile input paths".into());
+    }
+    let result = superpose_structures_path(paths[0], paths[1], options)?;
+    if json {
+        print_analysis_json_with_warnings(
+            "structure-superpose",
+            "structure.superpose.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_structure_superposition_text(&result);
+        Ok(())
+    }
+}
+
+fn print_structure_superposition_text(result: &StructureSuperpositionResult) {
+    println!("atom_name\t{}", result.atom_name);
+    println!("matched_atom_count\t{}", result.matched_atom_count);
+    println!("rmsd_before_angstrom\t{:.6}", result.rmsd_before_angstrom);
+    println!("rmsd_after_angstrom\t{:.6}", result.rmsd_after_angstrom);
+    println!(
+        "translation\t{:.6}\t{:.6}\t{:.6}",
+        result.translation[0], result.translation[1], result.translation[2]
+    );
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn parse_single_path_json<'a>(
+    arguments: &'a [String],
+    command: &str,
+) -> Result<(&'a str, bool), Box<dyn Error>> {
+    let mut path = None;
+    let mut json = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown {command} option: {value}").into());
+            }
+            value if path.is_none() => path = Some(value),
+            value => return Err(format!("unexpected {command} argument: {value}").into()),
+        }
+    }
+    Ok((
+        path.ok_or_else(|| format!("{command} requires an input path"))?,
+        json,
+    ))
+}
+
 fn print_set_analysis(arguments: &[String], venn: bool) -> Result<(), Box<dyn Error>> {
     let mut path = None;
     let mut options = SetAnalysisOptions::default();
@@ -2325,6 +2619,11 @@ fn usage() -> &'static str {
         "  linxira-bio protein properties <proteins.fasta[.gz]> [--json]\n",
         "  linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> [--select-column NAME ...] [--drop-column NAME ...] [--filter-column NAME --filter-op equals|contains|non-empty [--filter-value VALUE]] [--skip-rows N] [--limit N] [--delimiter csv|tsv] [--output-delimiter csv|tsv] [--json]\n",
         "  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n",
+        "  linxira-bio structure mmcif-summary <input.cif|mmcif[.gz]> [--json]\n",
+        "  linxira-bio structure sequence <input.pdb|cif[.gz]> [--json]\n",
+        "  linxira-bio structure contact-map <input.pdb|cif[.gz]> [--cutoff ANGSTROM] [--atom NAME] [--intra-chain-only] [--json]\n",
+        "  linxira-bio structure geometry <input.pdb|cif[.gz]> --atom CHAIN/RESIDUE/ATOM --atom ... [--json]\n",
+        "  linxira-bio structure superpose <reference.pdb|cif[.gz]> <mobile.pdb|cif[.gz]> [--atom NAME] [--json]\n",
         "  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
     )
 }

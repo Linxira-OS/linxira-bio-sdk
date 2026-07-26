@@ -1,0 +1,20 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-structure-mmcif-summary-v2",
+  "capability": "structure.mmcif.summary.v1",
+  "inputs": [{
+    "artifact_id": "input-structure",
+    "role": "structure",
+    "cardinality": "single",
+    "files": [{
+      "file_id": "input-structure-1",
+      "path": "../structure-analysis/reference.cif",
+      "format": "mmcif",
+      "compression": "none",
+      "size_bytes": 700,
+      "sha256": "4c5627406835f6cc65d1f35f7ff51524f2d687b0856a083922797ffd6a91b458"
+    }]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {}
+}

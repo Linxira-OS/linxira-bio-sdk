@@ -64,6 +64,11 @@
     "variant.filter.v1",
     "variant.normalize.v1",
     "structure.pdb.summary.v1",
+    "structure.mmcif.summary.v1",
+    "structure.sequence.extract.v1",
+    "structure.contact-map.v1",
+    "structure.geometry.v1",
+    "structure.superpose.v1",
     "dataset.inspect.v1",
     "table.export.v1"
   ]

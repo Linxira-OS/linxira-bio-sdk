@@ -8,6 +8,11 @@ use linxira_bio_core::annotation::{
     annotation_gene_positions_path, annotation_stats_path, extract_annotation_sequences_path,
     normalize_annotation_path,
 };
+use linxira_bio_core::coordinate::{
+    AtomSelector, ContactMapOptions, SuperpositionOptions, extract_structure_sequences_path,
+    measure_structure_geometry_path, mmcif_summary_path, parse_atom_selector,
+    structure_contact_map_path, superpose_structures_path,
+};
 use linxira_bio_core::dataset::{
     DatasetCompression, DatasetFormat, DatasetInspectionOptions, DetectionConfidence,
     inspect_dataset_with_options,
@@ -140,6 +145,11 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "set.upset.v1" => run_set_upset(base_directory, request),
         "protein.properties.v1" => run_protein_properties(base_directory, request),
         "structure.pdb.summary.v1" => run_pdb_summary(base_directory, request),
+        "structure.mmcif.summary.v1" => run_mmcif_summary(base_directory, request),
+        "structure.sequence.extract.v1" => run_structure_sequence(base_directory, request),
+        "structure.contact-map.v1" => run_structure_contact_map(base_directory, request),
+        "structure.geometry.v1" => run_structure_geometry(base_directory, request),
+        "structure.superpose.v1" => run_structure_superposition(base_directory, request),
         "variant.stats.v1" => run_variant_stats(base_directory, request),
         "variant.filter.v1" => run_variant_filter(base_directory, request),
         "variant.normalize.v1" => run_variant_normalize(base_directory, request),
@@ -889,6 +899,69 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
             finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
             Ok(serde_json::to_string(&result)?)
         }
+        "structure.mmcif.summary.v1" => {
+            let path = resolve_v2_single_input(base_directory, &request, "structure")?;
+            let summary = mmcif_summary_path(path)?;
+            serialize_v2_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary.clone(),
+                &summary.warnings,
+                "mmcif-summary-warning",
+            )
+        }
+        "structure.sequence.extract.v1" => {
+            let path = resolve_v2_single_input(base_directory, &request, "structure")?;
+            let result = extract_structure_sequences_path(path)?;
+            serialize_v2_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "structure-sequence-warning",
+            )
+        }
+        "structure.contact-map.v1" => {
+            let path = resolve_v2_single_input(base_directory, &request, "structure")?;
+            let result =
+                structure_contact_map_path(path, contact_map_options(&request.parameters)?)?;
+            serialize_v2_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "structure-contact-warning",
+            )
+        }
+        "structure.geometry.v1" => {
+            let path = resolve_v2_single_input(base_directory, &request, "structure")?;
+            serialize_v2_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                measure_structure_geometry_path(path, &geometry_selectors(&request.parameters)?)?,
+            )
+        }
+        "structure.superpose.v1" => {
+            let reference = resolve_v2_single_input(base_directory, &request, "reference")?;
+            let mobile = resolve_v2_single_input(base_directory, &request, "mobile")?;
+            let result = superpose_structures_path(
+                reference,
+                mobile,
+                superposition_options(&request.parameters)?,
+            )?;
+            serialize_v2_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "structure-superposition-warning",
+            )
+        }
         "variant.stats.v1" => {
             let path = resolve_v2_single_input(base_directory, &request, "vcf")?;
             let stats = vcf_stats_path(path)?;
@@ -1073,6 +1146,13 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         "set.venn.v1" | "set.upset.v1" => (&["table"], &["include_items", "max_intersections"]),
         "protein.properties.v1" => (&["fasta"], &[]),
         "structure.pdb.summary.v1" => (&["pdb"], &["interpret_b_factors_as_plddt"]),
+        "structure.mmcif.summary.v1" | "structure.sequence.extract.v1" => (&["structure"], &[]),
+        "structure.contact-map.v1" => (
+            &["structure"],
+            &["cutoff_angstrom", "atom_name", "include_inter_chain"],
+        ),
+        "structure.geometry.v1" => (&["structure"], &["atoms"]),
+        "structure.superpose.v1" => (&["reference", "mobile"], &["atom_name"]),
         "variant.stats.v1" => (&["vcf"], &[]),
         "variant.filter.v1" => (
             &["vcf"],
@@ -1144,6 +1224,38 @@ where
         value,
         ExecutionMode::LocalCpu,
     );
+    finalize_v2_input_hashes(&mut result, request, base_directory, verified_inputs)?;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn serialize_v2_with_warnings<T>(
+    request: &JobRequestV2,
+    base_directory: &Path,
+    verified_inputs: &BTreeMap<String, String>,
+    value: T,
+    warnings: &[String],
+    diagnostic_code: &str,
+) -> WorkerResult<String>
+where
+    T: serde::Serialize,
+{
+    let mut result = AnalysisResultV2::ok(
+        request.job_id.clone(),
+        request.capability.clone(),
+        value,
+        ExecutionMode::LocalCpu,
+    );
+    result
+        .diagnostics
+        .extend(warnings.iter().map(|message| Diagnostic {
+            code: diagnostic_code.to_owned(),
+            severity: DiagnosticSeverity::Warning,
+            message: message.clone(),
+            artifact_id: None,
+            line: None,
+            record: None,
+            hint: None,
+        }));
     finalize_v2_input_hashes(&mut result, request, base_directory, verified_inputs)?;
     Ok(serde_json::to_string(&result)?)
 }
@@ -2058,6 +2170,107 @@ fn run_pdb_summary(base_directory: &Path, request: JobRequest) -> WorkerResult<S
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_mmcif_summary(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "structure", &[])?;
+    let input = request
+        .inputs
+        .get("structure")
+        .ok_or("structure.mmcif.summary.v1 requires inputs.structure")?;
+    let summary = mmcif_summary_path(resolve_input(base_directory, input))?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = summary.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_structure_sequence(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "structure", &[])?;
+    let input = request
+        .inputs
+        .get("structure")
+        .ok_or("structure.sequence.extract.v1 requires inputs.structure")?;
+    let analysis = extract_structure_sequences_path(resolve_input(base_directory, input))?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_structure_contact_map(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "structure",
+        &["cutoff_angstrom", "atom_name", "include_inter_chain"],
+    )?;
+    let input = request
+        .inputs
+        .get("structure")
+        .ok_or("structure.contact-map.v1 requires inputs.structure")?;
+    let analysis = structure_contact_map_path(
+        resolve_input(base_directory, input),
+        contact_map_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_structure_geometry(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "structure", &["atoms"])?;
+    let input = request
+        .inputs
+        .get("structure")
+        .ok_or("structure.geometry.v1 requires inputs.structure")?;
+    let analysis = measure_structure_geometry_path(
+        resolve_input(base_directory, input),
+        &geometry_selectors(&request.parameters)?,
+    )?;
+    Ok(serde_json::to_string(&AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis,
+        ExecutionMode::LocalCpu,
+    ))?)
+}
+
+fn run_structure_superposition(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(&request, &["reference", "mobile"], &["atom_name"])?;
+    let reference = request
+        .inputs
+        .get("reference")
+        .ok_or("structure.superpose.v1 requires inputs.reference")?;
+    let mobile = request
+        .inputs
+        .get("mobile")
+        .ok_or("structure.superpose.v1 requires inputs.mobile")?;
+    let analysis = superpose_structures_path(
+        resolve_input(base_directory, reference),
+        resolve_input(base_directory, mobile),
+        superposition_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_set_venn(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     validate_v1_named_input_contract(&request, "table", &["include_items", "max_intersections"])?;
     let input = request
@@ -2120,6 +2333,45 @@ fn pdb_options(parameters: &serde_json::Value) -> WorkerResult<PdbSummaryOptions
     };
     Ok(PdbSummaryOptions {
         interpret_b_factors_as_plddt,
+    })
+}
+
+fn contact_map_options(parameters: &serde_json::Value) -> WorkerResult<ContactMapOptions> {
+    let mut options = ContactMapOptions::default();
+    if let Some(value) = optional_parameter_f64(parameters, "cutoff_angstrom")? {
+        options.cutoff_angstrom = value;
+    }
+    if let Some(value) = optional_parameter_string(parameters, "atom_name")? {
+        options.atom_name = value.to_owned();
+    }
+    if let Some(value) = optional_parameter_bool(parameters, "include_inter_chain")? {
+        options.include_inter_chain = value;
+    }
+    Ok(options)
+}
+
+fn geometry_selectors(parameters: &serde_json::Value) -> WorkerResult<Vec<AtomSelector>> {
+    let values = parameters
+        .get("atoms")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("atoms must be an array of two, three, or four selectors")?;
+    values
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let selector = value
+                .as_str()
+                .ok_or_else(|| format!("atoms[{index}] must be a string"))?;
+            parse_atom_selector(selector).map_err(Into::into)
+        })
+        .collect()
+}
+
+fn superposition_options(parameters: &serde_json::Value) -> WorkerResult<SuperpositionOptions> {
+    Ok(SuperpositionOptions {
+        atom_name: optional_parameter_string(parameters, "atom_name")?
+            .unwrap_or("CA")
+            .to_owned(),
     })
 }
 

@@ -1,0 +1,11 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-structure-superpose",
+  "capability": "structure.superpose.v1",
+  "inputs": {
+    "reference": "../structure-analysis/reference.pdb",
+    "mobile": "../structure-analysis/mobile.pdb"
+  },
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"atom_name": "CA"}
+}

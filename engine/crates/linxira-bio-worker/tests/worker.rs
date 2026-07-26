@@ -814,6 +814,111 @@ fn executes_set_and_protein_analysis_jobs() {
 }
 
 #[test]
+fn executes_coordinate_structure_analysis_jobs() {
+    let root = workspace_root();
+    let cases = [
+        (
+            "structure-mmcif-summary.json",
+            "structure.mmcif.summary.v1",
+            "atom_count",
+            5,
+            1,
+        ),
+        (
+            "structure-sequence.json",
+            "structure.sequence.extract.v1",
+            "total_residues",
+            4,
+            1,
+        ),
+        (
+            "structure-contact-map.json",
+            "structure.contact-map.v1",
+            "contact_count",
+            6,
+            1,
+        ),
+        (
+            "structure-geometry.json",
+            "structure.geometry.v1",
+            "value",
+            45,
+            1,
+        ),
+        (
+            "structure-superpose.json",
+            "structure.superpose.v1",
+            "matched_atom_count",
+            4,
+            2,
+        ),
+        (
+            "structure-mmcif-summary-v2.json",
+            "structure.mmcif.summary.v1",
+            "atom_count",
+            5,
+            1,
+        ),
+        (
+            "structure-sequence-v2.json",
+            "structure.sequence.extract.v1",
+            "total_residues",
+            4,
+            1,
+        ),
+        (
+            "structure-contact-map-v2.json",
+            "structure.contact-map.v1",
+            "contact_count",
+            6,
+            1,
+        ),
+        (
+            "structure-geometry-v2.json",
+            "structure.geometry.v1",
+            "value",
+            45,
+            1,
+        ),
+        (
+            "structure-superpose-v2.json",
+            "structure.superpose.v1",
+            "matched_atom_count",
+            4,
+            2,
+        ),
+    ];
+    for (fixture, capability, field, expected_integer_part, expected_hashes) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(root.join("tests/fixtures/jobs").join(fixture))
+            .output()
+            .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
+        assert!(
+            output.status.success(),
+            "{fixture}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid structure result");
+        assert_eq!(result["status"], "ok", "{fixture}");
+        assert_eq!(result["capability"], capability, "{fixture}");
+        let value = result["result"][field]
+            .as_f64()
+            .unwrap_or_else(|| panic!("{fixture}: numeric result field {field}"));
+        assert_eq!(value.round() as i64, expected_integer_part, "{fixture}");
+        if fixture.ends_with("-v2.json") {
+            assert_eq!(
+                result["provenance"]["input_sha256"]
+                    .as_object()
+                    .map(serde_json::Map::len),
+                Some(expected_hashes),
+                "{fixture}"
+            );
+        }
+    }
+}
+
+#[test]
 fn executes_v2_expression_analysis_fixtures() {
     let root = workspace_root();
     let output_path = root.join("target/test-results/expression-normalize-v2.tsv");

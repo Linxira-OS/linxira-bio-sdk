@@ -64,10 +64,13 @@ a replacement script silently.
   pI, charge, aromaticity, GRAVY, and extinction coefficients. Ambiguous
   sequences deliberately return null derived values.
 - PDB coordinate summaries and explicitly requested AlphaFold pLDDT from PDB
-  B-factors: use `analyze-pdb-structure`. The native GUI can preview PDB and
-  mmCIF coordinates in three representation modes and export the current view
-  as PNG; mmCIF analysis, PAE, structure comparison, and prediction remain
-  planned.
+  B-factors: use `analyze-pdb-structure`.
+- PDB/mmCIF coordinate-derived sequence, residue contacts, atom geometry, and
+  identity-matched superposition, plus mmCIF summaries: use
+  `analyze-coordinate-structures`. The native GUI can preview coordinates in
+  three representation modes and export the current view as PNG. PAE,
+  sequence-aligned structural comparison, assembly expansion, and structure
+  prediction remain planned.
 - Missing Python, R, BLAST, DIAMOND, command-line tools, WSL, or GPU runtime:
   `configure-bio-environment` before the domain capability runs.
 - Scheduler, cloud, GPU, or authenticated web service: execution selection

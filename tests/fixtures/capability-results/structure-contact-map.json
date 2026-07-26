@@ -1,0 +1,16 @@
+{
+  "format": "pdb",
+  "model_id": "1",
+  "atom_name": "CA",
+  "cutoff_angstrom": 6.0,
+  "representative_residue_count": 4,
+  "contact_count": 1,
+  "contacts": [{
+    "left": {"chain_id": "A", "residue_id": "1", "residue_name": "ALA", "ordinal": 0},
+    "right": {"chain_id": "A", "residue_id": "2", "residue_name": "GLY", "ordinal": 1},
+    "distance_angstrom": 4.0,
+    "inter_chain": false,
+    "sequence_separation": 1
+  }],
+  "warnings": []
+}

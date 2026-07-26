@@ -1,0 +1,20 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-structure-sequence-v2",
+  "capability": "structure.sequence.extract.v1",
+  "inputs": [{
+    "artifact_id": "input-structure",
+    "role": "structure",
+    "cardinality": "single",
+    "files": [{
+      "file_id": "input-structure-1",
+      "path": "../structure-analysis/reference.pdb",
+      "format": "pdb",
+      "compression": "none",
+      "size_bytes": 399,
+      "sha256": "1af080173620416d78b4f793ce5438c61db8988fd1c97d376f784cdea858bae6"
+    }]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {}
+}

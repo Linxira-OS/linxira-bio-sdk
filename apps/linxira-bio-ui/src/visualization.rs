@@ -131,7 +131,13 @@ fn chart_specs(payload: &Value, capability: Option<&str>, zh_cn: bool) -> Vec<Ch
         "variant.stats.v1" => variant_charts(payload, zh_cn),
         "variant.filter.v1" => variant_filter_charts(payload, zh_cn),
         "variant.normalize.v1" => variant_normalize_charts(payload, zh_cn),
-        "structure.pdb.summary.v1" => structure_charts(payload, zh_cn),
+        "structure.pdb.summary.v1" | "structure.mmcif.summary.v1" => {
+            structure_charts(payload, zh_cn)
+        }
+        "structure.sequence.extract.v1" => structure_sequence_charts(payload, zh_cn),
+        "structure.contact-map.v1" => structure_contact_charts(payload, zh_cn),
+        "structure.geometry.v1" => structure_geometry_charts(payload, zh_cn),
+        "structure.superpose.v1" => structure_superposition_charts(payload, zh_cn),
         _ if payload.get("per_cycle").is_some() => fastq_charts(payload, zh_cn),
         _ if payload.get("contig_counts").is_some() => variant_charts(payload, zh_cn),
         _ if payload.get("n50").is_some() => sequence_charts(payload, zh_cn),
@@ -843,6 +849,115 @@ fn structure_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
             ),
             (localized(zh_cn, "pLDDT 分段", "pLDDT bands"), bands),
         ],
+        false,
+    )
+}
+
+fn structure_sequence_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let chains = payload
+        .get("chains")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|chain| {
+            Some(BarValue {
+                label: chain.get("chain_id")?.as_str()?.to_owned(),
+                value: number(chain, "residue_count")?,
+            })
+        })
+        .collect::<Vec<_>>();
+    bar_specs(
+        [(
+            localized(zh_cn, "各链坐标残基数", "Coordinate residues by chain"),
+            chains,
+        )],
+        false,
+    )
+}
+
+fn structure_contact_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let mut distances = payload
+        .get("contacts")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|contact| {
+            let left = contact.get("left")?;
+            let right = contact.get("right")?;
+            Some(BarValue {
+                label: format!(
+                    "{}:{}–{}:{}",
+                    left.get("chain_id")?.as_str()?,
+                    left.get("residue_id")?.as_str()?,
+                    right.get("chain_id")?.as_str()?,
+                    right.get("residue_id")?.as_str()?
+                ),
+                value: number(contact, "distance_angstrom")?,
+            })
+        })
+        .collect::<Vec<_>>();
+    distances.sort_by(|left, right| {
+        left.value
+            .total_cmp(&right.value)
+            .then_with(|| left.label.cmp(&right.label))
+    });
+    distances.truncate(40);
+    bar_specs(
+        [(
+            localized(
+                zh_cn,
+                "最近残基接触距离（埃）",
+                "Nearest residue contacts (angstrom)",
+            ),
+            distances,
+        )],
+        false,
+    )
+}
+
+fn structure_geometry_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let Some(value) = number(payload, "value") else {
+        return Vec::new();
+    };
+    let label = payload
+        .get("measurement")
+        .and_then(Value::as_str)
+        .unwrap_or("measurement");
+    bar_specs(
+        [(
+            localized(zh_cn, "结构几何测量", "Structure geometry measurement"),
+            vec![BarValue {
+                label: label.to_owned(),
+                value,
+            }],
+        )],
+        false,
+    )
+}
+
+fn structure_superposition_charts(payload: &Value, zh_cn: bool) -> Vec<ChartSpec> {
+    let rmsd = values_for_keys(
+        payload,
+        &[
+            (
+                "rmsd_before_angstrom",
+                localized(zh_cn, "拟合前 RMSD", "RMSD before"),
+            ),
+            (
+                "rmsd_after_angstrom",
+                localized(zh_cn, "拟合后 RMSD", "RMSD after"),
+            ),
+        ],
+    );
+    bar_specs(
+        [(
+            localized(
+                zh_cn,
+                "结构叠合 RMSD（埃）",
+                "Structure superposition RMSD (angstrom)",
+            ),
+            rmsd,
+        )],
         false,
     )
 }
@@ -1666,6 +1781,47 @@ mod tests {
         let charts = chart_specs(&payload, Some("annotation.gxf.stats.v1"), true);
         assert_eq!(charts.len(), 2);
         assert!(matches!(charts.first(), Some(ChartSpec::Bars { .. })));
+    }
+
+    #[test]
+    fn coordinate_structure_results_build_domain_charts() {
+        let sequence = json!({
+            "chains": [
+                {"chain_id": "A", "residue_count": 4},
+                {"chain_id": "B", "residue_count": 2}
+            ]
+        });
+        let contacts = json!({
+            "contacts": [{
+                "left": {"chain_id": "A", "residue_id": "1"},
+                "right": {"chain_id": "B", "residue_id": "2"},
+                "distance_angstrom": 4.5
+            }]
+        });
+        let geometry = json!({"measurement": "angle", "value": 90.0});
+        let superposition = json!({
+            "rmsd_before_angstrom": 8.0,
+            "rmsd_after_angstrom": 0.4
+        });
+
+        assert_eq!(
+            chart_specs(&sequence, Some("structure.sequence.extract.v1"), false).len(),
+            1
+        );
+        assert_eq!(
+            chart_specs(&contacts, Some("structure.contact-map.v1"), false).len(),
+            1
+        );
+        assert_eq!(
+            chart_specs(&geometry, Some("structure.geometry.v1"), false).len(),
+            1
+        );
+        let charts = chart_specs(&superposition, Some("structure.superpose.v1"), false);
+        let ChartSpec::Bars { values, .. } = &charts[0] else {
+            panic!("expected superposition RMSD bars");
+        };
+        assert_eq!(values.len(), 2);
+        assert_eq!(values[1].value, 0.4);
     }
 
     #[test]

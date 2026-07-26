@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/structure-sequence-extract.v1.json",
+  "title": "Linxira Bio coordinate polymer sequence result",
+  "type": "object",
+  "required": ["format", "model_id", "chain_count", "total_residues", "chains", "warnings"],
+  "properties": {
+    "format": {"enum": ["pdb", "mmcif"]},
+    "model_id": {"type": "string", "minLength": 1},
+    "chain_count": {"type": "integer", "minimum": 1},
+    "total_residues": {"type": "integer", "minimum": 1},
+    "chains": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["chain_id", "polymer_type", "sequence", "residue_count", "unknown_residue_count"],
+        "properties": {
+          "chain_id": {"type": "string"},
+          "polymer_type": {"enum": ["protein", "nucleic-acid", "mixed-or-unknown"]},
+          "sequence": {"type": "string", "minLength": 1, "pattern": "^[A-Z]+$"},
+          "residue_count": {"type": "integer", "minimum": 1},
+          "unknown_residue_count": {"type": "integer", "minimum": 0}
+        },
+        "additionalProperties": false
+      }
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}
