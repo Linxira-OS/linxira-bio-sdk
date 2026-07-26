@@ -768,7 +768,8 @@ fn support_for(format: DatasetFormat) -> DatasetSupport {
         | DatasetFormat::Gtf
         | DatasetFormat::Vcf
         | DatasetFormat::Sam
-        | DatasetFormat::Pdb => DatasetSupport::Supported,
+        | DatasetFormat::Pdb
+        | DatasetFormat::Mmcif => DatasetSupport::Supported,
         DatasetFormat::Bam
         | DatasetFormat::Zip
         | DatasetFormat::Bcf
@@ -776,8 +777,7 @@ fn support_for(format: DatasetFormat) -> DatasetSupport {
         | DatasetFormat::H5ad
         | DatasetFormat::Loom
         | DatasetFormat::Hdf5
-        | DatasetFormat::Rds
-        | DatasetFormat::Mmcif => DatasetSupport::RecognizedUnsupported,
+        | DatasetFormat::Rds => DatasetSupport::RecognizedUnsupported,
         DatasetFormat::Unknown => DatasetSupport::Unknown,
     }
 }
@@ -1786,7 +1786,7 @@ mod tests {
 
         let mmcif = inspect_dataset(fixture("structure.cif")).expect("inspect mmCIF fixture");
         assert_eq!(mmcif.format, DatasetFormat::Mmcif);
-        assert_eq!(mmcif.support, DatasetSupport::RecognizedUnsupported);
+        assert_eq!(mmcif.support, DatasetSupport::Supported);
         assert_eq!(
             mmcif.preview.expect("mmCIF text preview").kind,
             PreviewKind::Text
