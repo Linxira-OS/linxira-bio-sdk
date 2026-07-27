@@ -8,7 +8,7 @@ means that an analysis capability is available.
 
 | Format | Content detection | Bounded preview | Available analysis | Current boundary |
 | --- | --- | --- | --- | --- |
-| FASTA | Yes | Sequence records | `sequence.stats.v1`, `sequence.kmer.count.v1`, `primer.epcr.v1`, `variant.normalize.v1` reference, `protein.properties.v1` | Plain, gzip, and BGZF; protein properties reject gap, stop, digit, and unsupported symbols |
+| FASTA | Yes | Sequence records | `sequence.stats.v1`, `sequence.kmer.count.v1`, `primer.epcr.v1`, `variant.normalize.v1` reference, `protein.properties.v1`, `similarity.blast.local.v1`, `similarity.diamond.v1`, `similarity.hmmer.v1` sequences, `msa.muscle.v1` | Plain, gzip, and BGZF; native search/alignment capabilities require their registered executable; protein properties reject gap, stop, digit, and unsupported symbols |
 | FASTQ | Yes | Read records | `fastq.qc.v1`, `fastq.trim.v1`, `fastq.adapter.v1` | QC plus FASTQ output for 3' quality trimming and adapter removal; plain, gzip, and BGZF input |
 | CSV | Yes | Parsed table | `expression.matrix.qc.v1`, `expression.normalize.v1`, `expression.pca.v1`, `expression.cluster.v1`, `expression.heatmap.v1`, `table.manipulate.v1`, `set.venn.v1`, `set.upset.v1`, functional annotation normalization, enrichment, and `enrichment.visualize.v1` | Rectangular expression analysis, general table manipulation, named-column exact set overlap, GO/eggNOG normalization, generic/GO/KEGG over-representation analysis, and SVG plots |
 | TSV | Yes | Parsed table | `expression.matrix.qc.v1`, `expression.normalize.v1`, `expression.pca.v1`, `expression.cluster.v1`, `expression.heatmap.v1`, `table.manipulate.v1`, `set.venn.v1`, `set.upset.v1`, `annotation.go.normalize.v1`, `annotation.eggnog.normalize.v1`, `enrichment.overrepresentation.v1`, `enrichment.go.v1`, `enrichment.kegg.v1`, `enrichment.visualize.v1` | Rectangular expression analysis, row/column manipulation, named-column exact set overlap, normalized association tables, local enrichment analysis, and SVG plots |
@@ -26,6 +26,7 @@ means that an analysis capability is available.
 | BLAST tabular | Content-validated tabular records | Bounded text | `similarity.blast.parse.v1`, `similarity.reciprocal.v1` | Default outfmt 6 and declared outfmt 7 fields; reciprocal analysis requires forward and reverse files |
 | BLAST XML | XML1 root detection | Bounded text | `similarity.blast.parse.v1`, `similarity.reciprocal.v1` | Legacy XML1 iterations and HSPs; XML2 is not claimed |
 | Protein-domain tables | InterProScan TSV or HMMER domtblout content | Bounded text | `protein.domain.parse.v1`, `protein.domain.visualize.v1` | Deterministic parsing of coordinates, scores, accessions, sources, available annotations, and bounded SVG architecture tracks |
+| HMMER3 profile | `HMMER3/` header | Bounded text | `similarity.hmmer.v1` profile input | Local `hmmsearch` or `hmmscan`; database preparation and downloads remain outside the capability |
 | Newick | Balanced tree content ending in `;` | Bounded text | `phylogeny.tree.transform.v1` | Parses one tree, reports topology metrics, supports deterministic relabel/reroot output, and writes `.nwk` |
 | ZIP | Container signature | Archive metadata | None | Never extracted by inspection |
 

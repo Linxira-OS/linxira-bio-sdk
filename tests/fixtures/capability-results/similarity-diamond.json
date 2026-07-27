@@ -1,0 +1,1 @@
+{"tool":"diamond","mode":"blastp","output_path":"results/diamond.tsv","output_bytes":58,"thread_count":2,"command_count":2,"warnings":[]}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/native-tool-result.v1.json",
+  "title": "Linxira Bio controlled native-tool execution result",
+  "type": "object",
+  "required": ["tool", "mode", "output_path", "output_bytes", "thread_count", "command_count", "warnings"],
+  "properties": {
+    "tool": {"enum": ["ncbi-blast", "diamond", "hmmer", "muscle"]},
+    "mode": {"type": "string", "minLength": 1},
+    "output_path": {"type": "string", "minLength": 1},
+    "output_bytes": {"type": "integer", "minimum": 0},
+    "thread_count": {"type": "integer", "minimum": 1, "maximum": 1024},
+    "command_count": {"type": "integer", "minimum": 1, "maximum": 2},
+    "warnings": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "additionalProperties": false
+}

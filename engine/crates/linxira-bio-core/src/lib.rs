@@ -13,6 +13,7 @@ pub mod fastq;
 pub mod fastq_transform;
 pub mod functional;
 pub mod interval;
+pub mod native_tools;
 pub mod phylogeny;
 pub mod protein;
 pub mod runtime;

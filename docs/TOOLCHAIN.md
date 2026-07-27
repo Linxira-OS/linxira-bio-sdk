@@ -18,6 +18,27 @@ the primary desktop release target.
 The current source tree is pure Rust and does not require CMake. Add CMake only
 when the first benchmark-justified C++ kernel is introduced.
 
+## Native Analysis Tools
+
+The controlled execution layer invokes mature native bioinformatics programs
+directly with `std::process::Command`; it never constructs a shell command.
+The first registered wrappers are NCBI BLAST+, DIAMOND, HMMER, and MUSCLE 5.
+They are audited through `environment audit` and grouped into the
+`sequence-search` and `multiple-sequence-alignment` workload profiles.
+
+Executable overrides are available for isolated or managed installations:
+
+- `LINXIRA_BIO_MAKEBLASTDB` and `LINXIRA_BIO_BLASTN`/`BLASTP`/`BLASTX`/
+  `TBLASTN`/`TBLASTX`
+- `LINXIRA_BIO_DIAMOND`
+- `LINXIRA_BIO_HMMSEARCH` and `LINXIRA_BIO_HMMSCAN`
+- `LINXIRA_BIO_MUSCLE`
+
+Windows uses native archives when maintained upstream builds exist. HMMER is
+routed through an approved WSL provider on Windows; Debian and Arch use their
+registered distribution packages. Environment planning remains preview-only
+until `environment.apply.v1` is implemented.
+
 ## Windows Prerequisites
 
 Use a machine-level MSYS2 UCRT64 toolchain rooted outside the repository. The

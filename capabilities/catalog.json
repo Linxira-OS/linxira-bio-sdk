@@ -501,6 +501,33 @@
       "output_formats": ["json"]
     },
     {
+      "id": "similarity.blast.local.v1",
+      "status": "available",
+      "category": "sequence-similarity",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio similarity blast <query.fasta> <reference.fasta> <output.tsv> --program blastn --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["blast-outfmt6", "blast-outfmt7", "json"]
+    },
+    {
+      "id": "similarity.diamond.v1",
+      "status": "available",
+      "category": "sequence-similarity",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio similarity diamond <query.fasta> <reference.fasta> <output.tsv> --mode blastp --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["blast-outfmt6", "blast-outfmt7", "json"]
+    },
+    {
+      "id": "similarity.hmmer.v1",
+      "status": "available",
+      "category": "sequence-similarity",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio similarity hmmer <profile.hmm> <sequences.fasta> <output.domtblout> --mode hmmsearch --json",
+      "input_formats": ["hmmer-profile", "fasta"],
+      "output_formats": ["hmmer-domtblout", "json"]
+    },
+    {
       "id": "similarity.reciprocal.v1",
       "status": "available",
       "category": "comparative-genomics",
@@ -535,6 +562,15 @@
       "command": "linxira-bio phylogeny tree <input.nwk> <output.nwk> --json",
       "input_formats": ["newick"],
       "output_formats": ["newick", "json"]
+    },
+    {
+      "id": "msa.muscle.v1",
+      "status": "available",
+      "category": "multiple-sequence-alignment",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio msa muscle <input.fasta> <output.fasta> --mode align --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["fasta", "json"]
     },
     {
       "id": "annotation.go.normalize.v1",

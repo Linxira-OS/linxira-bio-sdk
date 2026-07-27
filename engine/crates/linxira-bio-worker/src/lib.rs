@@ -43,6 +43,11 @@ use linxira_bio_core::functional::{
 use linxira_bio_core::interval::{
     IntervalMergeOptions, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
+use linxira_bio_core::native_tools::{
+    HmmerOptions, MuscleOptions, SimilaritySearchOptions, parse_blast_program, parse_diamond_mode,
+    parse_hmmer_mode, parse_muscle_mode, run_blast_fasta_path, run_diamond_fasta_path,
+    run_hmmer_path, run_muscle_path,
+};
 use linxira_bio_core::phylogeny::{TreeTransformOptions, transform_newick_path};
 use linxira_bio_core::protein::protein_properties_path;
 use linxira_bio_core::scientific_visualization::{
@@ -170,11 +175,15 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "set.venn.v1" => run_set_venn(base_directory, request),
         "set.upset.v1" => run_set_upset(base_directory, request),
         "similarity.blast.parse.v1" => run_blast_parse(base_directory, request),
+        "similarity.blast.local.v1" => run_local_blast(base_directory, request),
+        "similarity.diamond.v1" => run_local_diamond(base_directory, request),
+        "similarity.hmmer.v1" => run_local_hmmer(base_directory, request),
         "similarity.reciprocal.v1" => run_reciprocal_best_hits(base_directory, request),
         "protein.properties.v1" => run_protein_properties(base_directory, request),
         "protein.domain.parse.v1" => run_protein_domains(base_directory, request),
         "protein.domain.visualize.v1" => run_protein_domain_visualization(base_directory, request),
         "phylogeny.tree.transform.v1" => run_phylogeny_tree(base_directory, request),
+        "msa.muscle.v1" => run_muscle_alignment(base_directory, request),
         "structure.pdb.summary.v1" => run_pdb_summary(base_directory, request),
         "structure.mmcif.summary.v1" => run_mmcif_summary(base_directory, request),
         "structure.sequence.extract.v1" => run_structure_sequence(base_directory, request),
@@ -1019,6 +1028,102 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 upset_analysis_path(input, set_analysis_options(&request.parameters)?)?,
             )
         }
+        "similarity.blast.local.v1" => {
+            let query = resolve_v2_single_input(base_directory, &request, "query")?;
+            let reference = resolve_v2_single_input(base_directory, &request, "reference")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = run_blast_fasta_path(
+                query,
+                reference,
+                &output,
+                blast_program(&request.parameters)?,
+                &similarity_search_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "blast-results",
+                    role: "hits",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::BlastTabular),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "similarity.diamond.v1" => {
+            let query = resolve_v2_single_input(base_directory, &request, "query")?;
+            let reference = resolve_v2_single_input(base_directory, &request, "reference")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = run_diamond_fasta_path(
+                query,
+                reference,
+                &output,
+                diamond_mode(&request.parameters)?,
+                &similarity_search_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "diamond-results",
+                    role: "hits",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::BlastTabular),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "similarity.hmmer.v1" => {
+            let profile = resolve_v2_single_input(base_directory, &request, "profile")?;
+            let sequences = resolve_v2_single_input(base_directory, &request, "sequences")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = run_hmmer_path(
+                profile,
+                sequences,
+                &output,
+                hmmer_mode(&request.parameters)?,
+                &hmmer_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "hmmer-domains",
+                    role: "domains",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::ProteinDomains),
+                    media_type: Some("text/plain"),
+                },
+            )
+        }
         "similarity.blast.parse.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "blast")?;
             let result = parse_blast_path(input)?;
@@ -1107,6 +1212,31 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                     path: output,
                     format: Some(BioDataFormat::Svg),
                     media_type: Some("image/svg+xml"),
+                },
+            )
+        }
+        "msa.muscle.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "fasta")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = run_muscle_path(input, &output, &muscle_options(&request.parameters)?)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "multiple-sequence-alignment",
+                    role: "alignment",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Fasta),
+                    media_type: Some("text/x-fasta"),
                 },
             )
         }
@@ -1410,6 +1540,32 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         ),
         "set.venn.v1" | "set.upset.v1" => (&["table"], &["include_items", "max_intersections"]),
         "similarity.blast.parse.v1" => (&["blast"], &[]),
+        "similarity.blast.local.v1" => (
+            &["query", "reference"],
+            &[
+                "output",
+                "program",
+                "threads",
+                "evalue",
+                "max_target_sequences",
+                "outfmt",
+            ],
+        ),
+        "similarity.diamond.v1" => (
+            &["query", "reference"],
+            &[
+                "output",
+                "mode",
+                "threads",
+                "evalue",
+                "max_target_sequences",
+                "outfmt",
+            ],
+        ),
+        "similarity.hmmer.v1" => (
+            &["profile", "sequences"],
+            &["output", "mode", "threads", "evalue"],
+        ),
         "similarity.reciprocal.v1" => (
             &["forward", "reverse"],
             &["max_evalue", "min_identity_percent"],
@@ -1421,6 +1577,7 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             &["output", "sequence_id", "max_sequences", "max_domains"],
         ),
         "phylogeny.tree.transform.v1" => (&["tree"], &["output", "reroot_label", "label_map"]),
+        "msa.muscle.v1" => (&["fasta"], &["output", "mode", "threads"]),
         "annotation.go.normalize.v1" => (&["annotations"], &["output", "gene_column", "go_column"]),
         "annotation.eggnog.normalize.v1" => (&["annotations"], &["output"]),
         "annotation.structure.visualize.v1" => (
@@ -2841,6 +2998,130 @@ fn run_blast_parse(base_directory: &Path, request: JobRequest) -> WorkerResult<S
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_local_blast(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["query", "reference"],
+        &[
+            "output",
+            "program",
+            "threads",
+            "evalue",
+            "max_target_sequences",
+            "outfmt",
+        ],
+    )?;
+    let query = resolve_required_v1_input(base_directory, &request, "query")?;
+    let reference = resolve_required_v1_input(base_directory, &request, "reference")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&query, &output)?;
+    ensure_distinct_input_output(&reference, &output)?;
+    let analysis = run_blast_fasta_path(
+        query,
+        reference,
+        output,
+        blast_program(&request.parameters)?,
+        &similarity_search_options(&request.parameters)?,
+    )?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_local_diamond(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["query", "reference"],
+        &[
+            "output",
+            "mode",
+            "threads",
+            "evalue",
+            "max_target_sequences",
+            "outfmt",
+        ],
+    )?;
+    let query = resolve_required_v1_input(base_directory, &request, "query")?;
+    let reference = resolve_required_v1_input(base_directory, &request, "reference")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&query, &output)?;
+    ensure_distinct_input_output(&reference, &output)?;
+    let analysis = run_diamond_fasta_path(
+        query,
+        reference,
+        output,
+        diamond_mode(&request.parameters)?,
+        &similarity_search_options(&request.parameters)?,
+    )?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_local_hmmer(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["profile", "sequences"],
+        &["output", "mode", "threads", "evalue"],
+    )?;
+    let profile = resolve_required_v1_input(base_directory, &request, "profile")?;
+    let sequences = resolve_required_v1_input(base_directory, &request, "sequences")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&profile, &output)?;
+    ensure_distinct_input_output(&sequences, &output)?;
+    let analysis = run_hmmer_path(
+        profile,
+        sequences,
+        output,
+        hmmer_mode(&request.parameters)?,
+        &hmmer_options(&request.parameters)?,
+    )?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_muscle_alignment(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "fasta", &["output", "mode", "threads"])?;
+    let input = resolve_required_v1_input(base_directory, &request, "fasta")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis = run_muscle_path(input, output, &muscle_options(&request.parameters)?)?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn resolve_required_v1_input(
+    base_directory: &Path,
+    request: &JobRequest,
+    role: &str,
+) -> WorkerResult<PathBuf> {
+    request
+        .inputs
+        .get(role)
+        .map(|path| resolve_input(base_directory, path))
+        .ok_or_else(|| format!("{} requires inputs.{role}", request.capability).into())
+}
+
+fn serialize_v1_native_tool_result(
+    request: JobRequest,
+    analysis: linxira_bio_core::native_tools::NativeToolResult,
+) -> WorkerResult<String> {
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_reciprocal_best_hits(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     validate_v1_multi_input_contract(
         &request,
@@ -3150,6 +3431,71 @@ fn reciprocal_best_hit_options(
         max_evalue,
         min_identity_percent: optional_parameter_percentage(parameters, "min_identity_percent")?,
     })
+}
+
+fn similarity_search_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<SimilaritySearchOptions> {
+    let mut options = SimilaritySearchOptions::default();
+    if let Some(value) = optional_parameter_usize(parameters, "threads")? {
+        options.threads = value;
+    }
+    if let Some(value) = optional_parameter_f64(parameters, "evalue")? {
+        options.evalue = value;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "max_target_sequences")? {
+        options.max_target_sequences = value;
+    }
+    if let Some(value) = optional_parameter_u8(parameters, "outfmt")? {
+        options.outfmt = value;
+    }
+    Ok(options)
+}
+
+fn blast_program(
+    parameters: &serde_json::Value,
+) -> WorkerResult<linxira_bio_core::native_tools::BlastProgram> {
+    Ok(parse_blast_program(
+        optional_parameter_string(parameters, "program")?.unwrap_or("blastn"),
+    )?)
+}
+
+fn diamond_mode(
+    parameters: &serde_json::Value,
+) -> WorkerResult<linxira_bio_core::native_tools::DiamondMode> {
+    Ok(parse_diamond_mode(
+        optional_parameter_string(parameters, "mode")?.unwrap_or("blastp"),
+    )?)
+}
+
+fn hmmer_mode(
+    parameters: &serde_json::Value,
+) -> WorkerResult<linxira_bio_core::native_tools::HmmerMode> {
+    Ok(parse_hmmer_mode(
+        optional_parameter_string(parameters, "mode")?.unwrap_or("hmmsearch"),
+    )?)
+}
+
+fn hmmer_options(parameters: &serde_json::Value) -> WorkerResult<HmmerOptions> {
+    let mut options = HmmerOptions::default();
+    if let Some(value) = optional_parameter_usize(parameters, "threads")? {
+        options.threads = value;
+    }
+    if let Some(value) = optional_parameter_f64(parameters, "evalue")? {
+        options.evalue = value;
+    }
+    Ok(options)
+}
+
+fn muscle_options(parameters: &serde_json::Value) -> WorkerResult<MuscleOptions> {
+    let mut options = MuscleOptions::default();
+    if let Some(value) = optional_parameter_usize(parameters, "threads")? {
+        options.threads = value;
+    }
+    if let Some(value) = optional_parameter_string(parameters, "mode")? {
+        options.mode = parse_muscle_mode(value)?;
+    }
+    Ok(options)
 }
 
 fn tree_transform_options(parameters: &serde_json::Value) -> WorkerResult<TreeTransformOptions> {
