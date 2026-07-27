@@ -1,0 +1,8 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-similarity-hmmer",
+  "capability": "similarity.hmmer.v1",
+  "inputs": {"profile": "../native-tools/profile.hmm", "sequences": "../sequences/tiny.fa"},
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/hmmer.domtblout", "mode": "hmmsearch", "threads": 2}
+}

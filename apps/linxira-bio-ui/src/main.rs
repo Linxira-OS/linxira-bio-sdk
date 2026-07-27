@@ -292,11 +292,15 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "set.venn.v1",
     "set.upset.v1",
     "protein.properties.v1",
+    "similarity.blast.local.v1",
+    "similarity.diamond.v1",
+    "similarity.hmmer.v1",
     "similarity.blast.parse.v1",
     "similarity.reciprocal.v1",
     "protein.domain.parse.v1",
     "protein.domain.visualize.v1",
     "phylogeny.tree.transform.v1",
+    "msa.muscle.v1",
     "variant.stats.v1",
     "variant.filter.v1",
     "variant.normalize.v1",
@@ -374,6 +378,14 @@ struct BioApp {
     protein_domain_visual_max_domains: usize,
     similarity_max_evalue: f64,
     similarity_min_identity_percent: f64,
+    blast_program: String,
+    diamond_mode: String,
+    hmmer_mode: String,
+    muscle_mode: String,
+    native_threads: usize,
+    native_evalue: f64,
+    native_max_targets: usize,
+    native_outfmt: u8,
     phylogeny_reroot_label: String,
     job_history: Vec<JobRecord>,
     analysis_job_id: Option<String>,
@@ -465,6 +477,14 @@ impl BioApp {
             protein_domain_visual_max_domains: 500,
             similarity_max_evalue: 1e-5,
             similarity_min_identity_percent: 30.0,
+            blast_program: "blastn".to_owned(),
+            diamond_mode: "blastp".to_owned(),
+            hmmer_mode: "hmmsearch".to_owned(),
+            muscle_mode: "align".to_owned(),
+            native_threads: 4,
+            native_evalue: 1e-3,
+            native_max_targets: 50,
+            native_outfmt: 6,
             phylogeny_reroot_label: String::new(),
             job_history: Vec::new(),
             analysis_job_id: None,
@@ -953,6 +973,38 @@ impl BioApp {
                     "max_terms".to_owned(),
                     serde_json::json!(self.enrichment_max_terms),
                 );
+            }
+            if route.capability == "similarity.blast.local.v1" {
+                parameters.insert(
+                    "program".to_owned(),
+                    Value::String(self.blast_program.clone()),
+                );
+                parameters.insert("threads".to_owned(), serde_json::json!(self.native_threads));
+                parameters.insert("evalue".to_owned(), serde_json::json!(self.native_evalue));
+                parameters.insert(
+                    "max_target_sequences".to_owned(),
+                    serde_json::json!(self.native_max_targets),
+                );
+                parameters.insert("outfmt".to_owned(), serde_json::json!(self.native_outfmt));
+            }
+            if route.capability == "similarity.diamond.v1" {
+                parameters.insert("mode".to_owned(), Value::String(self.diamond_mode.clone()));
+                parameters.insert("threads".to_owned(), serde_json::json!(self.native_threads));
+                parameters.insert("evalue".to_owned(), serde_json::json!(self.native_evalue));
+                parameters.insert(
+                    "max_target_sequences".to_owned(),
+                    serde_json::json!(self.native_max_targets),
+                );
+                parameters.insert("outfmt".to_owned(), serde_json::json!(self.native_outfmt));
+            }
+            if route.capability == "similarity.hmmer.v1" {
+                parameters.insert("mode".to_owned(), Value::String(self.hmmer_mode.clone()));
+                parameters.insert("threads".to_owned(), serde_json::json!(self.native_threads));
+                parameters.insert("evalue".to_owned(), serde_json::json!(self.native_evalue));
+            }
+            if route.capability == "msa.muscle.v1" {
+                parameters.insert("mode".to_owned(), Value::String(self.muscle_mode.clone()));
+                parameters.insert("threads".to_owned(), serde_json::json!(self.native_threads));
             }
             request.parameters = Value::Object(parameters);
         }
@@ -1528,9 +1580,33 @@ impl BioApp {
                             .add_filter(
                                 "Bioinformatics",
                                 &[
-                                    "fa", "fasta", "fna", "faa", "fq", "fastq", "csv", "tsv",
-                                    "bed", "gff", "gff3", "gtf", "vcf", "sam", "bam", "pdb", "cif",
-                                    "mmcif", "gz",
+                                    "fa",
+                                    "fasta",
+                                    "fna",
+                                    "faa",
+                                    "fq",
+                                    "fastq",
+                                    "csv",
+                                    "tsv",
+                                    "bed",
+                                    "gff",
+                                    "gff3",
+                                    "gtf",
+                                    "vcf",
+                                    "sam",
+                                    "bam",
+                                    "pdb",
+                                    "cif",
+                                    "mmcif",
+                                    "blast",
+                                    "m8",
+                                    "domtblout",
+                                    "hmm",
+                                    "nwk",
+                                    "newick",
+                                    "tree",
+                                    "tre",
+                                    "gz",
                                 ],
                             )
                             .pick_files()
@@ -1818,11 +1894,15 @@ impl BioApp {
                     "set.venn.v1",
                     "set.upset.v1",
                     "protein.properties.v1",
+                    "similarity.blast.local.v1",
+                    "similarity.diamond.v1",
+                    "similarity.hmmer.v1",
                     "similarity.blast.parse.v1",
                     "similarity.reciprocal.v1",
                     "protein.domain.parse.v1",
                     "protein.domain.visualize.v1",
                     "phylogeny.tree.transform.v1",
+                    "msa.muscle.v1",
                     "table.manipulate.v1",
                     "structure.pdb.summary.v1",
                     "structure.mmcif.summary.v1",
@@ -1894,6 +1974,14 @@ impl BioApp {
                     "similarity.reciprocal.v1" => (
                         self.text("反向相似性结果", "Reverse similarity result"),
                         self.text("没有其他可用 BLAST 结果", "No other BLAST result available"),
+                    ),
+                    "similarity.blast.local.v1" | "similarity.diamond.v1" => (
+                        self.text("参考 FASTA", "Reference FASTA"),
+                        self.text("没有其他可用 FASTA", "No other FASTA available"),
+                    ),
+                    "similarity.hmmer.v1" => (
+                        self.text("目标序列 FASTA", "Target sequence FASTA"),
+                        self.text("没有可用 FASTA", "No FASTA available"),
                     ),
                     "enrichment.overrepresentation.v1"
                     | "enrichment.go.v1"
@@ -2086,6 +2174,108 @@ impl BioApp {
                         .speed(0.1),
                 );
             });
+        }
+        if matches!(
+            self.selected_capability.as_str(),
+            "similarity.blast.local.v1"
+                | "similarity.diamond.v1"
+                | "similarity.hmmer.v1"
+                | "msa.muscle.v1"
+        ) {
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("线程", "Threads"));
+                ui.add(egui::DragValue::new(&mut self.native_threads).range(1..=1024));
+                match self.selected_capability.as_str() {
+                    "similarity.blast.local.v1" => {
+                        ui.label(self.text("程序", "Program"));
+                        egui::ComboBox::from_id_salt("native-blast-program")
+                            .selected_text(&self.blast_program)
+                            .show_ui(ui, |ui| {
+                                for program in ["blastn", "blastp", "blastx", "tblastn", "tblastx"]
+                                {
+                                    ui.selectable_value(
+                                        &mut self.blast_program,
+                                        program.to_owned(),
+                                        program,
+                                    );
+                                }
+                            });
+                    }
+                    "similarity.diamond.v1" => {
+                        ui.label(self.text("模式", "Mode"));
+                        egui::ComboBox::from_id_salt("native-diamond-mode")
+                            .selected_text(&self.diamond_mode)
+                            .show_ui(ui, |ui| {
+                                for mode in ["blastp", "blastx"] {
+                                    ui.selectable_value(
+                                        &mut self.diamond_mode,
+                                        mode.to_owned(),
+                                        mode,
+                                    );
+                                }
+                            });
+                    }
+                    "similarity.hmmer.v1" => {
+                        ui.label(self.text("模式", "Mode"));
+                        egui::ComboBox::from_id_salt("native-hmmer-mode")
+                            .selected_text(&self.hmmer_mode)
+                            .show_ui(ui, |ui| {
+                                for mode in ["hmmsearch", "hmmscan"] {
+                                    ui.selectable_value(
+                                        &mut self.hmmer_mode,
+                                        mode.to_owned(),
+                                        mode,
+                                    );
+                                }
+                            });
+                    }
+                    "msa.muscle.v1" => {
+                        ui.label(self.text("模式", "Mode"));
+                        egui::ComboBox::from_id_salt("native-muscle-mode")
+                            .selected_text(&self.muscle_mode)
+                            .show_ui(ui, |ui| {
+                                for mode in ["align", "super5"] {
+                                    ui.selectable_value(
+                                        &mut self.muscle_mode,
+                                        mode.to_owned(),
+                                        mode,
+                                    );
+                                }
+                            });
+                    }
+                    _ => {}
+                }
+            });
+            if matches!(
+                self.selected_capability.as_str(),
+                "similarity.blast.local.v1" | "similarity.diamond.v1" | "similarity.hmmer.v1"
+            ) {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(self.text("e-value 阈值", "E-value threshold"));
+                    ui.add(
+                        egui::DragValue::new(&mut self.native_evalue)
+                            .range(1e-300..=1e300)
+                            .speed(0.0001),
+                    );
+                    if matches!(
+                        self.selected_capability.as_str(),
+                        "similarity.blast.local.v1" | "similarity.diamond.v1"
+                    ) {
+                        ui.label(self.text("最大目标数", "Maximum targets"));
+                        ui.add(
+                            egui::DragValue::new(&mut self.native_max_targets).range(1..=1_000_000),
+                        );
+                        ui.label("outfmt");
+                        egui::ComboBox::from_id_salt("native-search-outfmt")
+                            .selected_text(self.native_outfmt.to_string())
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut self.native_outfmt, 6, "6");
+                                ui.selectable_value(&mut self.native_outfmt, 7, "7");
+                            });
+                    }
+                });
+            }
         }
         if self.selected_capability == "phylogeny.tree.transform.v1" {
             ui.add_space(8.0);
@@ -2632,6 +2822,11 @@ impl BioApp {
                     );
                     ui.selectable_value(
                         &mut self.environment_profile,
+                        "multiple-sequence-alignment".to_owned(),
+                        "multiple-sequence-alignment",
+                    );
+                    ui.selectable_value(
+                        &mut self.environment_profile,
                         "genomics-cli".to_owned(),
                         "genomics-cli",
                     );
@@ -2935,6 +3130,10 @@ fn analysis_route_for_format(format: &str) -> Option<AnalysisRoute> {
             capability: "protein.domain.parse.v1",
             input_role: "domains",
         }),
+        "hmm-profile" => Some(AnalysisRoute {
+            capability: "similarity.hmmer.v1",
+            input_role: "profile",
+        }),
         "newick" => Some(AnalysisRoute {
             capability: "phylogeny.tree.transform.v1",
             input_role: "tree",
@@ -3059,6 +3258,18 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             capability: "protein.properties.v1",
             input_role: "fasta",
         }),
+        ("similarity.blast.local.v1", "fasta") => Some(AnalysisRoute {
+            capability: "similarity.blast.local.v1",
+            input_role: "query",
+        }),
+        ("similarity.diamond.v1", "fasta") => Some(AnalysisRoute {
+            capability: "similarity.diamond.v1",
+            input_role: "query",
+        }),
+        ("similarity.hmmer.v1", "hmm-profile") => Some(AnalysisRoute {
+            capability: "similarity.hmmer.v1",
+            input_role: "profile",
+        }),
         ("similarity.blast.parse.v1", "blast-tabular" | "blast-xml") => Some(AnalysisRoute {
             capability: "similarity.blast.parse.v1",
             input_role: "blast",
@@ -3078,6 +3289,10 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
         ("phylogeny.tree.transform.v1", "newick") => Some(AnalysisRoute {
             capability: "phylogeny.tree.transform.v1",
             input_role: "tree",
+        }),
+        ("msa.muscle.v1", "fasta") => Some(AnalysisRoute {
+            capability: "msa.muscle.v1",
+            input_role: "fasta",
         }),
         ("table.manipulate.v1", "csv" | "tsv") => Some(AnalysisRoute {
             capability: "table.manipulate.v1",
@@ -3132,6 +3347,9 @@ fn secondary_input_format(capability: &str) -> Option<&'static str> {
         "primer.epcr.v1" => Some("tsv"),
         "structure.superpose.v1" => Some("structure"),
         "similarity.reciprocal.v1" => Some("blast"),
+        "similarity.blast.local.v1" | "similarity.diamond.v1" | "similarity.hmmer.v1" => {
+            Some("fasta")
+        }
         "enrichment.overrepresentation.v1"
         | "enrichment.go.v1"
         | "enrichment.kegg.v1"
@@ -3161,6 +3379,8 @@ fn secondary_input_role(capability: &str) -> Option<&'static str> {
         "primer.epcr.v1" => Some("primers"),
         "structure.superpose.v1" => Some("mobile"),
         "similarity.reciprocal.v1" => Some("reverse"),
+        "similarity.blast.local.v1" | "similarity.diamond.v1" => Some("reference"),
+        "similarity.hmmer.v1" => Some("sequences"),
         "enrichment.overrepresentation.v1"
         | "enrichment.go.v1"
         | "enrichment.kegg.v1"
@@ -3182,6 +3402,9 @@ fn capability_output_extension(capability: &str) -> Option<&'static str> {
         "expression.normalize.v1" => Some("tsv"),
         "variant.filter.v1" | "variant.normalize.v1" => Some("vcf"),
         "phylogeny.tree.transform.v1" => Some("nwk"),
+        "similarity.blast.local.v1" | "similarity.diamond.v1" => Some("tsv"),
+        "similarity.hmmer.v1" => Some("domtblout"),
+        "msa.muscle.v1" => Some("fasta"),
         "annotation.structure.visualize.v1"
         | "enrichment.visualize.v1"
         | "protein.domain.visualize.v1" => Some("svg"),
@@ -3788,6 +4011,7 @@ fn format_hint(path: &Path) -> &'static str {
         "blast" | "m8" => "blast-tabular",
         "xml" => "blast-xml",
         "domtblout" => "protein-domains",
+        "hmm" => "hmm-profile",
         "nwk" | "newick" | "tree" | "tre" => "newick",
         "xlsx" => "xlsx",
         "zip" => "zip",
@@ -3842,6 +4066,9 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "set.venn.v1" => language.text("2–6 集合 Venn 分析", "Two-to-six-set Venn analysis"),
         "set.upset.v1" => language.text("多集合 UpSet 分析", "Multi-set UpSet analysis"),
         "protein.properties.v1" => language.text("蛋白理化性质", "Protein properties"),
+        "similarity.blast.local.v1" => language.text("本地 BLAST+ 搜索", "Local BLAST+ search"),
+        "similarity.diamond.v1" => language.text("DIAMOND 相似性搜索", "DIAMOND similarity search"),
+        "similarity.hmmer.v1" => language.text("HMMER profile 搜索", "HMMER profile search"),
         "similarity.blast.parse.v1" => language.text("BLAST 结果解析", "BLAST result parsing"),
         "similarity.reciprocal.v1" => language.text("双向最佳命中", "Reciprocal best hits"),
         "protein.domain.parse.v1" => {
@@ -3853,6 +4080,7 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "phylogeny.tree.transform.v1" => {
             language.text("系统发育树转换", "Phylogeny tree transform")
         }
+        "msa.muscle.v1" => language.text("MUSCLE 多序列比对", "MUSCLE multiple sequence alignment"),
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
         "structure.viewer.v1" => language.text("交互式结构查看器", "Interactive structure viewer"),
@@ -4532,6 +4760,9 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "set.venn.v1" => language.text("2–6 集合 Venn 分析", "Two-to-six-set Venn analysis"),
         "set.upset.v1" => language.text("多集合 UpSet 分析", "Multi-set UpSet analysis"),
         "protein.properties.v1" => language.text("蛋白理化性质", "Protein properties"),
+        "similarity.blast.local.v1" => language.text("本地 BLAST+ 搜索", "Local BLAST+ search"),
+        "similarity.diamond.v1" => language.text("DIAMOND 相似性搜索", "DIAMOND similarity search"),
+        "similarity.hmmer.v1" => language.text("HMMER profile 搜索", "HMMER profile search"),
         "similarity.blast.parse.v1" => language.text("BLAST 结果解析", "BLAST result parsing"),
         "similarity.reciprocal.v1" => language.text("双向最佳命中", "Reciprocal best hits"),
         "protein.domain.parse.v1" => {
@@ -4544,6 +4775,7 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "phylogeny.tree.transform.v1" => {
             language.text("系统发育树转换", "Phylogeny tree transform")
         }
+        "msa.muscle.v1" => language.text("MUSCLE 多序列比对", "MUSCLE multiple sequence alignment"),
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "variant.stats.v1" => language.text("VCF 变异统计", "VCF variant statistics"),
         "variant.filter.v1" => language.text("VCF 基础过滤", "Basic VCF filtering"),
@@ -4768,6 +5000,24 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         ("protein.properties.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/protein.properties.v1/en-US.md"
         )),
+        ("similarity.blast.local.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/similarity.blast.local.v1/zh-CN.md"
+        )),
+        ("similarity.blast.local.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/similarity.blast.local.v1/en-US.md"
+        )),
+        ("similarity.diamond.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/similarity.diamond.v1/zh-CN.md"
+        )),
+        ("similarity.diamond.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/similarity.diamond.v1/en-US.md"
+        )),
+        ("similarity.hmmer.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/similarity.hmmer.v1/zh-CN.md"
+        )),
+        ("similarity.hmmer.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/similarity.hmmer.v1/en-US.md"
+        )),
         ("similarity.blast.parse.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/similarity.blast.parse.v1/zh-CN.md"
         )),
@@ -4797,6 +5047,12 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("phylogeny.tree.transform.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/phylogeny.tree.transform.v1/en-US.md"
+        )),
+        ("msa.muscle.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/msa.muscle.v1/zh-CN.md"
+        )),
+        ("msa.muscle.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/msa.muscle.v1/en-US.md"
         )),
         ("variant.stats.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/variant.stats.v1/zh-CN.md"
@@ -5502,6 +5758,51 @@ mod tests {
             .expect("derived Newick output name");
         assert!(output_name.starts_with("input.phylogeny-tree-transform."));
         assert!(output_name.ends_with(".nwk"));
+    }
+
+    #[test]
+    fn native_search_and_alignment_routes_enforce_their_contracts() {
+        for capability in ["similarity.blast.local.v1", "similarity.diamond.v1"] {
+            assert_eq!(
+                analysis_route_for_capability(capability, "fasta"),
+                Some(AnalysisRoute {
+                    capability,
+                    input_role: "query",
+                })
+            );
+            assert!(capability_requires_secondary(capability));
+            assert!(secondary_input_matches(capability, "fasta"));
+            assert_eq!(secondary_input_role(capability), Some("reference"));
+            assert_eq!(capability_output_extension(capability), Some("tsv"));
+        }
+
+        assert_eq!(
+            analysis_route_for_format("hmm-profile"),
+            Some(AnalysisRoute {
+                capability: "similarity.hmmer.v1",
+                input_role: "profile",
+            })
+        );
+        assert!(capability_requires_secondary("similarity.hmmer.v1"));
+        assert!(secondary_input_matches("similarity.hmmer.v1", "fasta"));
+        assert_eq!(
+            secondary_input_role("similarity.hmmer.v1"),
+            Some("sequences")
+        );
+        assert_eq!(
+            capability_output_extension("similarity.hmmer.v1"),
+            Some("domtblout")
+        );
+
+        assert_eq!(
+            analysis_route_for_capability("msa.muscle.v1", "fasta"),
+            Some(AnalysisRoute {
+                capability: "msa.muscle.v1",
+                input_role: "fasta",
+            })
+        );
+        assert!(!capability_requires_secondary("msa.muscle.v1"));
+        assert_eq!(capability_output_extension("msa.muscle.v1"), Some("fasta"));
     }
 
     #[test]

@@ -58,6 +58,7 @@ SCHEMA_FILES = (
     "schemas/interval-intersect.schema.json",
     "schemas/job-request-v2.schema.json",
     "schemas/job-request.schema.json",
+    "schemas/native-tool-result.schema.json",
     "schemas/phylogeny-tree-transform.schema.json",
     "schemas/protein-domain-parse.schema.json",
     "schemas/protein-properties.schema.json",
@@ -104,6 +105,22 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/blast-parse.json",
         "schemas/blast-parse.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/similarity-blast-local.json",
+        "schemas/native-tool-result.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/similarity-diamond.json",
+        "schemas/native-tool-result.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/similarity-hmmer.json",
+        "schemas/native-tool-result.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/msa-muscle.json",
+        "schemas/native-tool-result.schema.json",
     ),
     (
         "tests/fixtures/capability-results/expression-normalization.json",

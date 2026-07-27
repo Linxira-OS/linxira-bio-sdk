@@ -24,7 +24,12 @@
     {
       "id": "sequence-search",
       "description": "Local nucleotide and protein database search",
-      "tools": ["ncbi-blast", "diamond"]
+      "tools": ["ncbi-blast", "diamond", "hmmer"]
+    },
+    {
+      "id": "multiple-sequence-alignment",
+      "description": "Local multiple sequence alignment",
+      "tools": ["muscle"]
     },
     {
       "id": "genomics-cli",
@@ -44,6 +49,8 @@
         "java",
         "ncbi-blast",
         "diamond",
+        "hmmer",
+        "muscle",
         "samtools",
         "bcftools",
         "bedtools",
@@ -313,6 +320,63 @@
           "strategy": "pacman",
           "package": "diamond",
           "source_url": "https://archlinux.org/packages/extra/x86_64/diamond/",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "hmmer",
+      "display_name": "HMMER",
+      "category": "sequence-search",
+      "probes": [
+        { "program": "hmmsearch", "args": ["-h"] },
+        { "program": "hmmscan", "args": ["-h"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "wsl-provider",
+          "package": "hmmer",
+          "source_url": "https://learn.microsoft.com/windows/wsl/install",
+          "requires_admin": true
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "hmmer",
+          "source_url": "https://packages.debian.org/stable/hmmer",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "hmmer",
+          "source_url": "https://archlinux.org/packages/extra/x86_64/hmmer/",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "muscle",
+      "display_name": "MUSCLE",
+      "category": "multiple-sequence-alignment",
+      "probes": [
+        { "program": "muscle", "args": ["-version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "official-archive",
+          "package": "MUSCLE 5",
+          "source_url": "https://github.com/rcedgar/muscle/releases",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "muscle",
+          "source_url": "https://packages.debian.org/stable/muscle",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "muscle",
+          "source_url": "https://archlinux.org/packages/extra/x86_64/muscle/",
           "requires_admin": true
         }
       }

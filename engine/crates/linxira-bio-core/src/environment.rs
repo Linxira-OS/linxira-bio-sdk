@@ -1095,7 +1095,7 @@ mod tests {
         parse_environment_mode, plan_environment, plan_environment_with_options,
         probe_wsl_provider, summarize_execution_backends,
     };
-    use std::path::PathBuf;
+    use std::{collections::BTreeSet, path::PathBuf};
 
     #[test]
     fn catalog_profiles_reference_registered_tools() {
@@ -1218,12 +1218,27 @@ mod tests {
         };
 
         let plan = plan_environment("sequence-search", &audit).expect("valid plan");
-        assert_eq!(plan.actions.len(), 2);
-        assert!(
+        assert_eq!(plan.actions.len(), 3);
+        assert_eq!(
             plan.actions
                 .iter()
-                .all(|action| action.state == PlanActionState::Install)
+                .filter(|action| action.state == PlanActionState::Install)
+                .count(),
+            2
         );
+        assert_eq!(
+            plan.actions
+                .iter()
+                .filter(|action| action.state == PlanActionState::Unsupported)
+                .count(),
+            1
+        );
+        let tool_ids = plan
+            .actions
+            .iter()
+            .map(|action| action.tool_id.as_str())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(tool_ids, BTreeSet::from(["diamond", "hmmer", "ncbi-blast"]));
         assert!(plan.requires_confirmation);
     }
 

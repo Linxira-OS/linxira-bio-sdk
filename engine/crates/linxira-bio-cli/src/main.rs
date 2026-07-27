@@ -39,6 +39,11 @@ use linxira_bio_core::interval::{
     IntervalIntersectStats, IntervalMergeOptions, bed_intersect_path, bed_merge_path,
     bed_subtract_path,
 };
+use linxira_bio_core::native_tools::{
+    HmmerOptions, MuscleOptions, NativeToolResult, SimilaritySearchOptions, parse_blast_program,
+    parse_diamond_mode, parse_hmmer_mode, parse_muscle_mode, run_blast_fasta_path,
+    run_diamond_fasta_path, run_hmmer_path, run_muscle_path,
+};
 use linxira_bio_core::phylogeny::{
     TreeTransformOptions, TreeTransformResult, read_tree_label_map_path, transform_newick_path,
 };
@@ -343,6 +348,17 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         {
             print_blast_parse(arguments)
         }
+        [similarity, blast, arguments @ ..] if similarity == "similarity" && blast == "blast" => {
+            print_local_blast(arguments)
+        }
+        [similarity, diamond, arguments @ ..]
+            if similarity == "similarity" && diamond == "diamond" =>
+        {
+            print_local_diamond(arguments)
+        }
+        [similarity, hmmer, arguments @ ..] if similarity == "similarity" && hmmer == "hmmer" => {
+            print_local_hmmer(arguments)
+        }
         [similarity, rbh, arguments @ ..] if similarity == "similarity" && rbh == "rbh" => {
             print_reciprocal_best_hits(arguments)
         }
@@ -364,6 +380,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         [phylogeny, tree, arguments @ ..] if phylogeny == "phylogeny" && tree == "tree" => {
             print_phylogeny_tree(arguments)
+        }
+        [msa, muscle, arguments @ ..] if msa == "msa" && muscle == "muscle" => {
+            print_muscle(arguments)
         }
         [structure, pdb, arguments @ ..] if structure == "structure" && pdb == "pdb" => {
             print_pdb_summary(arguments)
@@ -3265,6 +3284,205 @@ fn parse_table_delimiter(
     }
 }
 
+fn print_local_blast(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut program = "blastn".to_owned();
+    let mut options = SimilaritySearchOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--program" => {
+                index += 1;
+                program = arguments
+                    .get(index)
+                    .ok_or("--program requires a value")?
+                    .clone();
+            }
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--evalue" => {
+                index += 1;
+                options.evalue = parse_finite_f64(arguments.get(index), "--evalue", Some(0.0))?;
+            }
+            "--max-targets" => {
+                index += 1;
+                options.max_target_sequences =
+                    parse_sequence_usize(arguments.get(index), "--max-targets")?;
+            }
+            "--outfmt" => {
+                index += 1;
+                options.outfmt = parse_sequence_usize(arguments.get(index), "--outfmt")?
+                    .try_into()
+                    .map_err(|_| "--outfmt is out of range")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown local BLAST option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err(
+            "similarity blast requires <query.fasta> <reference.fasta> <output.tsv>".into(),
+        );
+    }
+    let program = parse_blast_program(&program)?;
+    let result = run_blast_fasta_path(&paths[0], &paths[1], &paths[2], program, &options)?;
+    print_native_tool_result("local-blast", "similarity.blast.local.v1", result, json)
+}
+
+fn print_local_diamond(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut mode = "blastp".to_owned();
+    let mut options = SimilaritySearchOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--mode" => {
+                index += 1;
+                mode = arguments
+                    .get(index)
+                    .ok_or("--mode requires a value")?
+                    .clone();
+            }
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--evalue" => {
+                index += 1;
+                options.evalue = parse_finite_f64(arguments.get(index), "--evalue", Some(0.0))?;
+            }
+            "--max-targets" => {
+                index += 1;
+                options.max_target_sequences =
+                    parse_sequence_usize(arguments.get(index), "--max-targets")?;
+            }
+            "--outfmt" => {
+                index += 1;
+                options.outfmt = parse_sequence_usize(arguments.get(index), "--outfmt")?
+                    .try_into()
+                    .map_err(|_| "--outfmt is out of range")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown DIAMOND option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err(
+            "similarity diamond requires <query.fasta> <reference.fasta> <output.tsv>".into(),
+        );
+    }
+    let mode = parse_diamond_mode(&mode)?;
+    let result = run_diamond_fasta_path(&paths[0], &paths[1], &paths[2], mode, &options)?;
+    print_native_tool_result("local-diamond", "similarity.diamond.v1", result, json)
+}
+
+fn print_local_hmmer(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut mode = "hmmsearch".to_owned();
+    let mut options = HmmerOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--mode" => {
+                index += 1;
+                mode = arguments
+                    .get(index)
+                    .ok_or("--mode requires a value")?
+                    .clone();
+            }
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--evalue" => {
+                index += 1;
+                options.evalue = parse_finite_f64(arguments.get(index), "--evalue", Some(0.0))?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown HMMER option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err(
+            "similarity hmmer requires <profile.hmm> <sequences.fasta> <output.domtblout>".into(),
+        );
+    }
+    let mode = parse_hmmer_mode(&mode)?;
+    let result = run_hmmer_path(&paths[0], &paths[1], &paths[2], mode, &options)?;
+    print_native_tool_result("local-hmmer", "similarity.hmmer.v1", result, json)
+}
+
+fn print_muscle(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = MuscleOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--mode" => {
+                index += 1;
+                options.mode =
+                    parse_muscle_mode(arguments.get(index).ok_or("--mode requires a value")?)?;
+            }
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown MUSCLE option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("msa muscle requires <input.fasta> <output.fasta>".into());
+    }
+    let result = run_muscle_path(&paths[0], &paths[1], &options)?;
+    print_native_tool_result("muscle-alignment", "msa.muscle.v1", result, json)
+}
+
+fn print_native_tool_result(
+    job_id: &str,
+    capability: &str,
+    result: NativeToolResult,
+    json: bool,
+) -> Result<(), Box<dyn Error>> {
+    if json {
+        let warnings = result.warnings.clone();
+        print_analysis_json_with_warnings(job_id, capability, result, warnings)
+    } else {
+        println!("tool\t{}", result.tool);
+        println!("mode\t{}", result.mode);
+        println!("output_path\t{}", result.output_path);
+        println!("output_bytes\t{}", result.output_bytes);
+        println!("thread_count\t{}", result.thread_count);
+        println!("command_count\t{}", result.command_count);
+        for warning in result.warnings {
+            println!("warning\t{warning}");
+        }
+        Ok(())
+    }
+}
+
 fn print_inspection_text(inspection: &DatasetInspection) {
     let support = match inspection.support {
         DatasetSupport::Supported => "supported",
@@ -3360,11 +3578,15 @@ fn usage() -> &'static str {
         "  linxira-bio enrichment kegg <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
         "  linxira-bio enrichment visualize <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> <output.svg> --kind custom|go|kegg [--style bar|dot|network] [--min-overlap N] [--max-terms N] [--json]\n",
         "  linxira-bio similarity blast-parse <blast.tsv|xml[.gz]> [--json]\n",
+        "  linxira-bio similarity blast <query.fasta> <reference.fasta> <output.tsv> [--program blastn|blastp|blastx|tblastn|tblastx] [--threads N] [--evalue X] [--max-targets N] [--outfmt 6|7] [--json]\n",
+        "  linxira-bio similarity diamond <query.fasta> <reference.fasta> <output.tsv> [--mode blastp|blastx] [--threads N] [--evalue X] [--max-targets N] [--outfmt 6|7] [--json]\n",
+        "  linxira-bio similarity hmmer <profile.hmm> <sequences.fasta> <output.domtblout> [--mode hmmsearch|hmmscan] [--threads N] [--evalue X] [--json]\n",
         "  linxira-bio similarity rbh <forward.tsv|xml[.gz]> <reverse.tsv|xml[.gz]> [--max-evalue X] [--min-identity P] [--json]\n",
         "  linxira-bio protein properties <proteins.fasta[.gz]> [--json]\n",
         "  linxira-bio protein domains <interproscan.tsv|hmmer.domtblout[.gz]> [--json]\n",
         "  linxira-bio protein domain-plot <interproscan.tsv|hmmer.domtblout[.gz]> <output.svg> [--sequence-id ID] [--max-sequences N] [--max-domains N] [--json]\n",
         "  linxira-bio phylogeny tree <input.nwk[.gz]> <output.nwk> [--reroot LEAF] [--label-map labels.tsv] [--json]\n",
+        "  linxira-bio msa muscle <input.fasta> <output.fasta> [--mode align|super5] [--threads N] [--json]\n",
         "  linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> [--select-column NAME ...] [--drop-column NAME ...] [--filter-column NAME --filter-op equals|contains|non-empty [--filter-value VALUE]] [--skip-rows N] [--limit N] [--delimiter csv|tsv] [--output-delimiter csv|tsv] [--json]\n",
         "  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n",
         "  linxira-bio structure mmcif-summary <input.cif|mmcif[.gz]> [--json]\n",

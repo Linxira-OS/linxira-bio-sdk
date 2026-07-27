@@ -1,4 +1,4 @@
 interface:
   display_name: "Analyze Sequence Similarity"
-  short_description: "Parse similarity results and find reciprocal hits"
-  default_prompt: "Use $analyze-sequence-similarity to parse local similarity results or calculate reciprocal best hits."
+  short_description: "Run and inspect local sequence similarity searches"
+  default_prompt: "Use $analyze-sequence-similarity to run or inspect a verified local BLAST+, DIAMOND, or HMMER workflow."

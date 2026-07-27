@@ -1278,6 +1278,137 @@ fn executes_scientific_visualization_jobs_and_tracks_svg_artifacts() {
     }
 }
 
+#[test]
+fn executes_native_tool_workflows_with_versioned_artifacts() {
+    let root = workspace_root();
+    let result_root = root.join("target/test-results");
+    std::fs::create_dir_all(&result_root).expect("create native-tool result directory");
+    let stub_root = std::env::temp_dir().join(format!(
+        "linxira-bio-worker-native-tools-{}",
+        std::process::id()
+    ));
+    if stub_root.exists() {
+        std::fs::remove_dir_all(&stub_root).expect("remove stale native-tool stub directory");
+    }
+    std::fs::create_dir(&stub_root).expect("create native-tool stub directory");
+    let stub = compile_native_tool_stub(&root, &stub_root);
+    let cases = [
+        (
+            "similarity-blast-local.json",
+            "similarity.blast.local.v1",
+            "blast-local.tsv",
+            false,
+            2,
+        ),
+        (
+            "similarity-blast-local-v2.json",
+            "similarity.blast.local.v1",
+            "blast-local-v2.tsv",
+            true,
+            2,
+        ),
+        (
+            "similarity-diamond.json",
+            "similarity.diamond.v1",
+            "diamond.tsv",
+            false,
+            2,
+        ),
+        (
+            "similarity-diamond-v2.json",
+            "similarity.diamond.v1",
+            "diamond-v2.tsv",
+            true,
+            2,
+        ),
+        (
+            "similarity-hmmer.json",
+            "similarity.hmmer.v1",
+            "hmmer.domtblout",
+            false,
+            2,
+        ),
+        (
+            "similarity-hmmer-v2.json",
+            "similarity.hmmer.v1",
+            "hmmer-v2.domtblout",
+            true,
+            2,
+        ),
+        ("msa-muscle.json", "msa.muscle.v1", "muscle.fa", false, 1),
+        (
+            "msa-muscle-v2.json",
+            "msa.muscle.v1",
+            "muscle-v2.fa",
+            true,
+            1,
+        ),
+    ];
+    for (_, _, output_name, _, _) in &cases {
+        let path = result_root.join(output_name);
+        if path.exists() {
+            std::fs::remove_file(path).expect("remove stale native-tool output");
+        }
+    }
+
+    for (fixture, capability, output_name, is_v2, input_hashes) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(root.join("tests/fixtures/jobs").join(fixture))
+            .env("LINXIRA_BIO_MAKEBLASTDB", &stub)
+            .env("LINXIRA_BIO_BLASTN", &stub)
+            .env("LINXIRA_BIO_DIAMOND", &stub)
+            .env("LINXIRA_BIO_HMMSEARCH", &stub)
+            .env("LINXIRA_BIO_MUSCLE", &stub)
+            .output()
+            .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
+        assert!(
+            output.status.success(),
+            "{fixture}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid native-tool result");
+        assert_eq!(result["status"], "ok", "{fixture}");
+        assert_eq!(result["capability"], capability, "{fixture}");
+        assert!(result["result"]["output_bytes"].as_u64().unwrap() > 0);
+        let output_path = result_root.join(output_name);
+        assert!(output_path.is_file(), "{fixture}");
+        if is_v2 {
+            assert_eq!(result["schema_version"], "2", "{fixture}");
+            assert_eq!(
+                result["artifacts"][0]["sha256"].as_str().map(str::len),
+                Some(64)
+            );
+            assert_eq!(
+                result["provenance"]["input_sha256"]
+                    .as_object()
+                    .map(serde_json::Map::len),
+                Some(input_hashes),
+                "{fixture}"
+            );
+        }
+        std::fs::remove_file(output_path).expect("remove native-tool output");
+    }
+    std::fs::remove_dir_all(stub_root).expect("remove native-tool stub directory");
+}
+
+fn compile_native_tool_stub(root: &std::path::Path, output_root: &std::path::Path) -> PathBuf {
+    let executable = output_root.join(format!("native-tool-stub{}", std::env::consts::EXE_SUFFIX));
+    let output = Command::new("rustc")
+        .args(["--edition", "2021"])
+        .arg(root.join("tests/fixtures/native-tools/stub.rs"))
+        .arg("-o")
+        .arg(&executable)
+        .output()
+        .expect("compile native tool stub");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    executable
+}
+
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")

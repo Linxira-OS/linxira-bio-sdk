@@ -53,6 +53,7 @@ pub enum DatasetFormat {
     BlastTabular,
     BlastXml,
     ProteinDomains,
+    HmmProfile,
     Newick,
     Unknown,
 }
@@ -82,6 +83,7 @@ impl DatasetFormat {
             Self::BlastTabular => "blast-tabular",
             Self::BlastXml => "blast-xml",
             Self::ProteinDomains => "protein-domains",
+            Self::HmmProfile => "hmm-profile",
             Self::Newick => "newick",
             Self::Unknown => "unknown",
         }
@@ -482,6 +484,7 @@ fn detect_from_extension(path: &Path) -> Option<Detection> {
         "blast" | "m8" => DatasetFormat::BlastTabular,
         "xml" => DatasetFormat::BlastXml,
         "domtblout" => DatasetFormat::ProteinDomains,
+        "hmm" => DatasetFormat::HmmProfile,
         "nwk" | "newick" | "tree" | "tre" => DatasetFormat::Newick,
         _ => return None,
     };
@@ -562,6 +565,9 @@ fn detect_from_content(prefix: &[u8], path: &Path) -> Option<Detection> {
     }
     if looks_like_protein_domains(&nonempty) {
         return high(DatasetFormat::ProteinDomains);
+    }
+    if first.starts_with("HMMER3/") {
+        return high(DatasetFormat::HmmProfile);
     }
     if looks_like_blast_tabular(&nonempty) {
         return high(DatasetFormat::BlastTabular);
@@ -874,6 +880,7 @@ fn support_for(format: DatasetFormat) -> DatasetSupport {
         | DatasetFormat::BlastTabular
         | DatasetFormat::BlastXml
         | DatasetFormat::ProteinDomains
+        | DatasetFormat::HmmProfile
         | DatasetFormat::Newick => DatasetSupport::Supported,
         DatasetFormat::Bam
         | DatasetFormat::Zip
@@ -919,6 +926,7 @@ fn build_preview(
         | DatasetFormat::BlastTabular
         | DatasetFormat::BlastXml
         | DatasetFormat::ProteinDomains
+        | DatasetFormat::HmmProfile
         | DatasetFormat::Newick
         | DatasetFormat::Unknown => preview_text(path, compression, options),
     }
@@ -1912,6 +1920,10 @@ mod tests {
             (
                 workspace_fixture("protein-domains/interproscan.tsv"),
                 DatasetFormat::ProteinDomains,
+            ),
+            (
+                workspace_fixture("native-tools/profile.hmm"),
+                DatasetFormat::HmmProfile,
             ),
             (
                 workspace_fixture("phylogeny/tree.nwk"),

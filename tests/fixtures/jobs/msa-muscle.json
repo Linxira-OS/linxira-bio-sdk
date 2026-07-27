@@ -1,0 +1,8 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-msa-muscle",
+  "capability": "msa.muscle.v1",
+  "inputs": {"fasta": "../sequences/tiny.fa"},
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/muscle.fa", "mode": "align", "threads": 2}
+}

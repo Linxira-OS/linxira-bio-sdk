@@ -87,9 +87,18 @@
       "path": "skills/analyze-sequence-similarity",
       "kind": "executable",
       "capabilities": [
+        "similarity.blast.local.v1",
+        "similarity.diamond.v1",
+        "similarity.hmmer.v1",
         "similarity.blast.parse.v1",
         "similarity.reciprocal.v1"
       ]
+    },
+    {
+      "id": "align-biological-sequences",
+      "path": "skills/align-biological-sequences",
+      "kind": "executable",
+      "capabilities": ["msa.muscle.v1"]
     },
     {
       "id": "analyze-functional-enrichment",

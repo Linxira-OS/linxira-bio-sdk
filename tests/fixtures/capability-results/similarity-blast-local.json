@@ -1,0 +1,1 @@
+{"tool":"ncbi-blast","mode":"blastn","output_path":"results/blast.tsv","output_bytes":58,"thread_count":2,"command_count":2,"warnings":[]}

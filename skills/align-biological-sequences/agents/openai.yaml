@@ -1,0 +1,4 @@
+interface:
+  display_name: "Align Biological Sequences"
+  short_description: "Run verified local multiple-sequence alignment workflows"
+  default_prompt: "Use $align-biological-sequences to align a local FASTA file with the verified MUSCLE capability."

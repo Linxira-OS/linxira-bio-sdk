@@ -1,0 +1,11 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-similarity-hmmer-v2",
+  "capability": "similarity.hmmer.v1",
+  "inputs": [
+    {"artifact_id": "input-profile", "role": "profile", "cardinality": "single", "files": [{"file_id": "input-profile-1", "path": "../native-tools/profile.hmm", "format": "unknown", "compression": "none", "size_bytes": 61, "sha256": "72b5286486d01e1e7e3af9646f97789202f5a4ae38057edb4f3019c653350657"}]},
+    {"artifact_id": "input-sequences", "role": "sequences", "cardinality": "single", "files": [{"file_id": "input-sequences-1", "path": "../sequences/tiny.fa", "format": "fasta", "compression": "none", "size_bytes": 32, "sha256": "d36ea1364a0451fd99584f0f36307dbc34b818ca4008c24c7705a95855172a1c"}]}
+  ],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/hmmer-v2.domtblout", "mode": "hmmsearch", "threads": 2}
+}

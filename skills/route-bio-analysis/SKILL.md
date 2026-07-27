@@ -64,10 +64,9 @@ a replacement script silently.
   `analyze-protein-properties` for composition, molecular weight, theoretical
   pI, charge, aromaticity, GRAVY, and extinction coefficients. Ambiguous
   sequences deliberately return null derived values.
-- Completed BLAST outfmt 6, outfmt 7, or legacy XML1 result files: use
-  `analyze-sequence-similarity` for parsing or reciprocal best-hit analysis.
-  Running the search and building a sequence database remain external native
-  workflows.
+- Local FASTA similarity search with BLAST+ or DIAMOND, HMMER3 profile search,
+  completed BLAST outfmt 6/outfmt 7/XML1 parsing, and reciprocal best-hit
+  analysis: use `analyze-sequence-similarity`.
 - Completed InterProScan TSV or HMMER domtblout files: use
   `analyze-protein-domains`. Domain search execution and database downloads
   remain external native workflows.
@@ -78,6 +77,8 @@ a replacement script silently.
 - Newick normalization, label mapping, summaries, and single-leaf rerooting:
   use `transform-phylogenetic-trees`. Tree inference and publication rendering
   remain external or planned.
+- Local nucleotide or protein multiple-sequence alignment: use
+  `align-biological-sequences` for MUSCLE 5 `align` or `super5`.
 - PDB coordinate summaries and explicitly requested AlphaFold pLDDT from PDB
   B-factors: use `analyze-pdb-structure`.
 - PDB/mmCIF coordinate-derived sequence, residue contacts, atom geometry, and

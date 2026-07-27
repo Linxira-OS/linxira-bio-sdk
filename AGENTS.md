@@ -26,8 +26,11 @@ the agent skills that select and validate them.
 - Read `skills/analyze-genome-annotations/SKILL.md` for implemented GFF3/GTF
   statistics, normalization, position-table, gene-density, and
   reference-guided extraction.
-- Read `skills/analyze-sequence-similarity/SKILL.md` for implemented BLAST
-  result parsing and reciprocal best-hit analysis.
+- Read `skills/analyze-sequence-similarity/SKILL.md` for implemented local
+  BLAST+, DIAMOND, HMMER, BLAST result parsing, and reciprocal best-hit
+  analysis.
+- Read `skills/align-biological-sequences/SKILL.md` for implemented MUSCLE 5
+  multiple-sequence alignment.
 - Read `skills/analyze-functional-enrichment/SKILL.md` for implemented GO and
   eggNOG annotation normalization plus custom, GO, and KEGG
   over-representation analysis.
