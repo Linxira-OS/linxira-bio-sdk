@@ -5,6 +5,10 @@ use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let arguments = env::args_os().skip(1).collect::<Vec<_>>();
+    if matches!(arguments.first().and_then(|value| value.to_str()), Some("stats" | "coverage")) {
+        println!("# linxira native-tool test report\nSN\traw total sequences:\t2");
+        return ExitCode::SUCCESS;
+    }
     if let Some(prefix) = value_after(&arguments, "-pre") {
         let output = PathBuf::from(format!("{}.treefile", prefix.to_string_lossy()));
         return write_output(&output, "(one:0.1,two:0.1);\n");

@@ -44,11 +44,11 @@ use linxira_bio_core::interval::{
     IntervalMergeOptions, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
 use linxira_bio_core::native_tools::{
-    HmmerOptions, IqtreeOptions, MemeOptions, MuscleOptions, SimilaritySearchOptions,
-    parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
-    parse_muscle_mode, parse_trimal_mode, run_blast_fasta_path, run_diamond_fasta_path,
-    run_dssp_path, run_hmmer_path, run_iqtree_path, run_meme_path, run_muscle_path,
-    run_trimal_path,
+    HmmerOptions, IqtreeOptions, MemeOptions, MuscleOptions, ShortReadAlignmentOptions,
+    SimilaritySearchOptions, parse_blast_program, parse_diamond_mode, parse_hmmer_mode,
+    parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode, run_blast_fasta_path,
+    run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path, run_meme_path,
+    run_muscle_path, run_samtools_report_path, run_short_read_alignment_path, run_trimal_path,
 };
 use linxira_bio_core::phylogeny::{TreeTransformOptions, transform_newick_path};
 use linxira_bio_core::protein::protein_properties_path;
@@ -149,6 +149,9 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "fastq.qc.v1" => run_fastq_qc(base_directory, request),
         "fastq.trim.v1" => run_fastq_trim(base_directory, request),
         "fastq.adapter.v1" => run_fastq_adapter_trim(base_directory, request),
+        "alignment.bam-cram.qc.v1" => run_bam_cram_report(base_directory, request, "stats"),
+        "alignment.coverage.v1" => run_bam_cram_report(base_directory, request, "coverage"),
+        "alignment.short-read.v1" => run_short_read_alignment(base_directory, request),
         "expression.matrix.qc.v1" => run_expression_matrix_qc(base_directory, request),
         "expression.normalize.v1" => run_expression_normalize(base_directory, request),
         "expression.pca.v1" => run_expression_pca(base_directory, request),
@@ -264,6 +267,73 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 }));
             finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
             Ok(serde_json::to_string(&result)?)
+        }
+        "alignment.bam-cram.qc.v1" | "alignment.coverage.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "alignment")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let mode = if request.capability == "alignment.bam-cram.qc.v1" {
+                "stats"
+            } else {
+                "coverage"
+            };
+            let result = run_samtools_report_path(input, None, &output, mode)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: if mode == "stats" {
+                        "alignment-stats"
+                    } else {
+                        "alignment-coverage"
+                    },
+                    role: "table",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "alignment.short-read.v1" => {
+            let reference = resolve_v2_single_input(base_directory, &request, "reference")?;
+            let reads = resolve_v2_single_input(base_directory, &request, "reads")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = run_short_read_alignment_path(
+                reference,
+                reads,
+                &output,
+                &ShortReadAlignmentOptions {
+                    threads: optional_parameter_usize(&request.parameters, "threads")?.unwrap_or(1),
+                },
+            )?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "short-read-alignment",
+                    role: "alignment",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Unknown),
+                    media_type: Some("application/octet-stream"),
+                },
+            )
         }
         "annotation.gxf.stats.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "annotation")?;
@@ -3287,6 +3357,51 @@ fn run_dssp_secondary_structure(
     );
     ensure_distinct_input_output(&input, &output)?;
     let analysis = run_dssp_path(input, output)?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_bam_cram_report(
+    base_directory: &Path,
+    request: JobRequest,
+    mode: &str,
+) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "alignment", &["output"])?;
+    let input = resolve_required_v1_input(base_directory, &request, "alignment")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis = run_samtools_report_path(input, None, output, mode)?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_short_read_alignment(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(&request, &["reference", "reads"], &["output", "threads"])?;
+    let reference = request
+        .inputs
+        .get("reference")
+        .ok_or("alignment.short-read.v1 requires inputs.reference")?;
+    let reads = request
+        .inputs
+        .get("reads")
+        .ok_or("alignment.short-read.v1 requires inputs.reads")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let reference = resolve_input(base_directory, reference);
+    let reads = resolve_input(base_directory, reads);
+    ensure_distinct_input_output(&reference, &output)?;
+    ensure_distinct_input_output(&reads, &output)?;
+    let analysis = run_short_read_alignment_path(
+        reference,
+        reads,
+        output,
+        &ShortReadAlignmentOptions {
+            threads: optional_parameter_usize(&request.parameters, "threads")?.unwrap_or(1),
+        },
+    )?;
     serialize_v1_native_tool_result(request, analysis)
 }
 

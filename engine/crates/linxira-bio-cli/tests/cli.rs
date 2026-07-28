@@ -1463,6 +1463,55 @@ fn executes_controlled_native_tool_wrappers_without_a_shell() {
     let cases = [
         (
             vec![
+                "alignment".to_owned(),
+                "bam-cram-qc".to_owned(),
+                fasta.to_string_lossy().into_owned(),
+                output_root
+                    .join("alignment-stats.tsv")
+                    .to_string_lossy()
+                    .into_owned(),
+                "--json".to_owned(),
+            ],
+            "alignment.bam-cram.qc.v1",
+            output_root.join("alignment-stats.tsv"),
+            "samtools",
+            1,
+        ),
+        (
+            vec![
+                "alignment".to_owned(),
+                "coverage".to_owned(),
+                fasta.to_string_lossy().into_owned(),
+                output_root
+                    .join("coverage.tsv")
+                    .to_string_lossy()
+                    .into_owned(),
+                "--json".to_owned(),
+            ],
+            "alignment.coverage.v1",
+            output_root.join("coverage.tsv"),
+            "samtools",
+            1,
+        ),
+        (
+            vec![
+                "alignment".to_owned(),
+                "short-read".to_owned(),
+                fasta.to_string_lossy().into_owned(),
+                fasta.to_string_lossy().into_owned(),
+                output_root
+                    .join("short-read.bam")
+                    .to_string_lossy()
+                    .into_owned(),
+                "--json".to_owned(),
+            ],
+            "alignment.short-read.v1",
+            output_root.join("short-read.bam"),
+            "minimap2-samtools",
+            2,
+        ),
+        (
+            vec![
                 "similarity".to_owned(),
                 "blast".to_owned(),
                 fasta.to_string_lossy().into_owned(),
@@ -1604,6 +1653,8 @@ fn executes_controlled_native_tool_wrappers_without_a_shell() {
             .env("LINXIRA_BIO_IQTREE", &stub)
             .env("LINXIRA_BIO_MEME", &stub)
             .env("LINXIRA_BIO_MKDSSP", &stub)
+            .env("LINXIRA_BIO_SAMTOOLS", &stub)
+            .env("LINXIRA_BIO_MINIMAP2", &stub)
             .output()
             .unwrap_or_else(|error| panic!("run {capability}: {error}"));
         assert!(

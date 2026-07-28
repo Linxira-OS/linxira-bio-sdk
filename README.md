@@ -47,6 +47,9 @@ cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
 cargo run -p linxira-bio-cli -- fastq qc tests/fixtures/fastq-qc/valid.fastq --json
 cargo run -p linxira-bio-cli -- alignment qc tests/fixtures/alignment-qc/valid.sam --json
+cargo run -p linxira-bio-cli -- alignment bam-cram-qc sample.bam alignment-stats.tsv --json
+cargo run -p linxira-bio-cli -- alignment coverage sample.bam coverage.tsv --json
+cargo run -p linxira-bio-cli -- alignment short-read reference.fa reads.fastq aligned.bam --threads 4 --json
 cargo run -p linxira-bio-cli -- variant stats tests/fixtures/variant-stats/mixed.vcf --json
 cargo run -p linxira-bio-cli -- interval intersect tests/fixtures/interval-intersect/left.bed tests/fixtures/interval-intersect/right.bed --json
 cargo run -p linxira-bio-cli -- expression matrix-qc tests/fixtures/expression-matrix/counts.tsv --json

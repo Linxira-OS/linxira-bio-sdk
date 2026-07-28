@@ -189,6 +189,17 @@ pub struct MemeOptions {
     pub maximum_width: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShortReadAlignmentOptions {
+    pub threads: usize,
+}
+
+impl Default for ShortReadAlignmentOptions {
+    fn default() -> Self {
+        Self { threads: 1 }
+    }
+}
+
 impl Default for MemeOptions {
     fn default() -> Self {
         Self {
@@ -626,6 +637,87 @@ pub fn run_dssp_path(
     result
 }
 
+/// Write a reproducible `samtools stats` or `samtools coverage` report.
+///
+/// The report is deliberately retained as the native tool's tabular output so
+/// downstream software can use every metric supported by its installed version.
+pub fn run_samtools_report_path(
+    input: impl AsRef<Path>,
+    reference: Option<&Path>,
+    output: impl AsRef<Path>,
+    mode: &str,
+) -> Result<NativeToolResult, NativeToolError> {
+    if !matches!(mode, "stats" | "coverage") {
+        return Err(NativeToolError::InvalidOption(
+            "samtools report mode must be stats or coverage".to_owned(),
+        ));
+    }
+    let input = input.as_ref();
+    let output = output.as_ref();
+    let mut inputs = vec![input];
+    if let Some(reference) = reference {
+        inputs.push(reference);
+    }
+    validate_paths(&inputs, output)?;
+    let executable = configured_program("LINXIRA_BIO_SAMTOOLS", "samtools");
+    let arguments = samtools_report_arguments(input, reference, mode);
+    let result = (|| {
+        let native_output = run_native_command(&executable, &arguments, false)?;
+        fs::write(output, native_output.stdout)?;
+        finish_result("samtools", mode, output, 1, 1)
+    })();
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
+pub fn run_short_read_alignment_path(
+    reference: impl AsRef<Path>,
+    reads: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &ShortReadAlignmentOptions,
+) -> Result<NativeToolResult, NativeToolError> {
+    validate_threads(options.threads)?;
+    let reference = reference.as_ref();
+    let reads = reads.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[reference, reads], output)?;
+    let temporary = create_temporary_directory(output, "short-read-alignment")?;
+    let sam = temporary.join("alignment.sam");
+    let result = (|| {
+        let minimap2 = configured_program("LINXIRA_BIO_MINIMAP2", "minimap2");
+        run_native_command(
+            &minimap2,
+            &minimap2_short_read_arguments(reference, reads, &sam, options),
+            false,
+        )?;
+        let samtools = configured_program("LINXIRA_BIO_SAMTOOLS", "samtools");
+        run_native_command(
+            &samtools,
+            &samtools_sort_arguments(&sam, output, options),
+            false,
+        )?;
+        finish_result(
+            "minimap2-samtools",
+            "short-read",
+            output,
+            options.threads,
+            2,
+        )
+    })();
+    let cleanup = fs::remove_dir_all(&temporary);
+    if let Err(error) = cleanup
+        && result.is_ok()
+    {
+        return Err(NativeToolError::Io(error));
+    }
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
 pub fn blast_arguments(
     query: &Path,
     database: &Path,
@@ -759,6 +851,54 @@ pub fn dssp_arguments(structure: &Path, output: &Path) -> Vec<OsString> {
         structure.as_os_str().to_owned(),
         OsString::from("-o"),
         output.as_os_str().to_owned(),
+    ]
+}
+
+pub fn samtools_report_arguments(
+    input: &Path,
+    reference: Option<&Path>,
+    mode: &str,
+) -> Vec<OsString> {
+    let mut arguments = vec![OsString::from(mode)];
+    if let Some(reference) = reference {
+        arguments.push(OsString::from("--reference"));
+        arguments.push(reference.as_os_str().to_owned());
+    }
+    arguments.push(input.as_os_str().to_owned());
+    arguments
+}
+
+pub fn minimap2_short_read_arguments(
+    reference: &Path,
+    reads: &Path,
+    output: &Path,
+    options: &ShortReadAlignmentOptions,
+) -> Vec<OsString> {
+    vec![
+        OsString::from("-a"),
+        OsString::from("-x"),
+        OsString::from("sr"),
+        OsString::from("-t"),
+        OsString::from(options.threads.to_string()),
+        OsString::from("-o"),
+        output.as_os_str().to_owned(),
+        reference.as_os_str().to_owned(),
+        reads.as_os_str().to_owned(),
+    ]
+}
+
+pub fn samtools_sort_arguments(
+    input: &Path,
+    output: &Path,
+    options: &ShortReadAlignmentOptions,
+) -> Vec<OsString> {
+    vec![
+        OsString::from("sort"),
+        OsString::from("-@"),
+        OsString::from(options.threads.to_string()),
+        OsString::from("-o"),
+        output.as_os_str().to_owned(),
+        input.as_os_str().to_owned(),
     ]
 }
 
@@ -937,10 +1077,11 @@ fn stderr_summary(stderr: &[u8]) -> String {
 mod tests {
     use super::{
         BlastProgram, DiamondMode, HmmerOptions, IqtreeOptions, MemeAlphabet, MemeOptions,
-        MuscleMode, MuscleOptions, SimilaritySearchOptions, TrimalMode, blast_arguments,
-        diamond_arguments, dssp_arguments, hmmer_arguments, iqtree_arguments, meme_arguments,
-        muscle_arguments, parse_blast_program, parse_diamond_mode, parse_hmmer_mode,
-        parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode, trimal_arguments,
+        MuscleMode, MuscleOptions, ShortReadAlignmentOptions, SimilaritySearchOptions, TrimalMode,
+        blast_arguments, diamond_arguments, dssp_arguments, hmmer_arguments, iqtree_arguments,
+        meme_arguments, minimap2_short_read_arguments, muscle_arguments, parse_blast_program,
+        parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet, parse_muscle_mode,
+        parse_trimal_mode, samtools_report_arguments, samtools_sort_arguments, trimal_arguments,
     };
     use std::ffi::OsString;
     use std::path::Path;
@@ -1033,6 +1174,30 @@ mod tests {
         let dssp = dssp_arguments(Path::new("model.cif"), Path::new("model.dssp"));
         assert_eq!(dssp[0], OsString::from("-i"));
         assert_eq!(dssp[2], OsString::from("-o"));
+
+        let report = samtools_report_arguments(
+            Path::new("reads.cram"),
+            Some(Path::new("reference.fa")),
+            "stats",
+        );
+        assert_eq!(report[0], OsString::from("stats"));
+        assert!(report.contains(&OsString::from("--reference")));
+
+        let short_read = minimap2_short_read_arguments(
+            Path::new("reference.fa"),
+            Path::new("reads.fq"),
+            Path::new("alignment.sam"),
+            &ShortReadAlignmentOptions { threads: 4 },
+        );
+        assert_eq!(short_read[0], OsString::from("-a"));
+        assert!(short_read.contains(&OsString::from("sr")));
+        let sorted = samtools_sort_arguments(
+            Path::new("alignment.sam"),
+            Path::new("alignment.bam"),
+            &ShortReadAlignmentOptions { threads: 4 },
+        );
+        assert_eq!(sorted[0], OsString::from("sort"));
+        assert!(sorted.contains(&OsString::from("alignment.bam")));
     }
 
     #[test]
