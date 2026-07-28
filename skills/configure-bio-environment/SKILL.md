@@ -63,6 +63,19 @@ Inspect the supported user-scoped providers separately:
 linxira-bio runtime catalog --json
 ```
 
+List first-party Python and R workflow scripts bundled with the release:
+
+```bash
+linxira-bio workflow packs --json
+```
+
+`cataloged` means the script, schema, lock, test, and license notice ship with
+the product. It does not mean that dependencies are installed. Use
+`LINXIRA_BIO_WORKFLOW_PYTHON` or `LINXIRA_BIO_WORKFLOW_R` only after auditing
+the selected isolated runtime. The runner validates the packed file hashes and
+dependency-lock hash before it invokes a local interpreter; it never downloads
+dependencies itself.
+
 A provider marked `cataloged` is not installable until
 `environment.apply.v1` becomes available. Prefer uv-managed CPython, Pixi for
 mixed R/Bioconda environments, rig-managed R, and Eclipse Temurin 21 with 17

@@ -19,7 +19,138 @@ fn prints_top_level_help_successfully() {
         assert!(stdout.contains("linxira-bio sequence stats"));
         assert!(stdout.contains("linxira-bio sequence reverse-complement"));
         assert!(stdout.contains("linxira-bio export table"));
+        assert!(stdout.contains("linxira-bio workflow packs"));
     }
+}
+
+#[test]
+fn lists_bundled_workflow_packs_without_claiming_installation() {
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["workflow", "packs", "--json"])
+        .output()
+        .expect("list workflow packs");
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packs: serde_json::Value = serde_json::from_slice(&output.stdout).expect("workflow JSON");
+    let packs = packs.as_array().expect("workflow pack array");
+    assert!(packs.iter().any(|pack| {
+        pack["id"] == "org.linxira.sequence-conversion-biopython"
+            && pack["status"] == "cataloged"
+            && pack["runtime"] == "python"
+    }));
+    assert!(packs.iter().any(|pack| {
+        pack["id"] == "org.linxira.bulk-expression-deseq2"
+            && pack["status"] == "cataloged"
+            && pack["runtime"] == "r"
+    }));
+}
+
+#[test]
+fn workflow_runner_rejects_a_request_for_the_wrong_capability_before_starting_runtime() {
+    let root = workspace_root();
+    let temporary = temporary_directory("workflow-wrong-capability");
+    let request = temporary.join("request.json");
+    let result = temporary.join("result.json");
+    fs::write(
+        &request,
+        serde_json::json!({
+            "schema_version": "2",
+            "job_id": "workflow-wrong-capability",
+            "capability": "sequence.stats.v1",
+            "inputs": [],
+            "execution": {"mode": "local-cpu"},
+            "parameters": {}
+        })
+        .to_string(),
+    )
+    .expect("write workflow request");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args([
+            "workflow",
+            "run",
+            "org.linxira.sequence-conversion-biopython",
+        ])
+        .arg(&request)
+        .arg(&result)
+        .env("LINXIRA_BIO_WORKFLOW_ROOT", root.join("workflows"))
+        .output()
+        .expect("run workflow validation");
+
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("schema v2 request for the selected capability")
+    );
+    assert!(!result.exists());
+    fs::remove_dir_all(temporary).expect("remove workflow test directory");
+}
+
+#[test]
+fn workflow_runner_returns_the_packed_python_result_envelope() {
+    let root = workspace_root();
+    let temporary = temporary_directory("workflow-python-envelope");
+    let input = root.join("tests/fixtures/sequences/tiny.fa");
+    let request = temporary.join("request.json");
+    let output_directory = temporary.join("converted");
+    let result = output_directory.join("result.json");
+    let input_size = fs::metadata(&input).expect("input metadata").len();
+    fs::write(
+        &request,
+        serde_json::json!({
+            "schema_version": "2",
+            "job_id": "workflow-python-envelope",
+            "capability": "sequence.convert.biopython.v1",
+            "inputs": [{
+                "artifact_id": "sequences-artifact",
+                "role": "sequences",
+                "cardinality": "single",
+                "files": [{
+                    "file_id": "sequences-file",
+                    "path": input,
+                    "format": "fasta",
+                    "compression": "none",
+                    "size_bytes": input_size
+                }]
+            }],
+            "execution": {"mode": "local-cpu"},
+            "parameters": {
+                "output_directory": output_directory,
+                "output_filename": "converted.fasta",
+                "output_format": "fasta"
+            }
+        })
+        .to_string(),
+    )
+    .expect("write workflow request");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args([
+            "workflow",
+            "run",
+            "org.linxira.sequence-conversion-biopython",
+        ])
+        .arg(&request)
+        .arg(&result)
+        .env("LINXIRA_BIO_WORKFLOW_ROOT", root.join("workflows"))
+        .output()
+        .expect("run packed Python workflow");
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("workflow JSON");
+    assert_eq!(result["schema_version"], "2");
+    assert_eq!(result["job_id"], "workflow-python-envelope");
+    assert_eq!(result["capability"], "sequence.convert.biopython.v1");
+    assert!(matches!(result["status"].as_str(), Some("ok" | "error")));
+    fs::remove_dir_all(temporary).expect("remove workflow test directory");
 }
 
 #[test]

@@ -84,13 +84,36 @@ use linxira_bio_core::variant_transform::{
     VariantFilterOptions, filter_vcf_path, normalize_vcf_path,
 };
 use linxira_bio_export::export_json_file;
-use linxira_bio_protocol::{AnalysisResult, ExecutionMode};
+use linxira_bio_protocol::{
+    AnalysisResult, ExecutionMode, WorkflowPackManifest, WorkflowRuntimeKind,
+};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::env;
 use std::error::Error;
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 
 const CAPABILITY_CATALOG: &str = include_str!("../../../../capabilities/catalog.json");
+const WORKFLOW_CATALOG: &str = include_str!("../../../../workflows/catalog.json");
+
+#[derive(Debug, Deserialize)]
+struct WorkflowCatalog {
+    schema_version: String,
+    packs: Vec<WorkflowCatalogPack>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct WorkflowCatalogPack {
+    id: String,
+    capability: String,
+    status: String,
+    trust: String,
+    runtime: WorkflowRuntimeKind,
+    manifest: String,
+}
 
 fn main() -> ExitCode {
     match run(env::args().skip(1).collect()) {
@@ -183,6 +206,17 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if runtime == "runtime" && catalog == "catalog" && json == "--json" =>
         {
             print_runtime_catalog(true)
+        }
+        [workflow, packs] if workflow == "workflow" && packs == "packs" => {
+            print_workflow_packs(false)
+        }
+        [workflow, packs, json]
+            if workflow == "workflow" && packs == "packs" && json == "--json" =>
+        {
+            print_workflow_packs(true)
+        }
+        [workflow, run, pack_id, request, result] if workflow == "workflow" && run == "run" => {
+            run_workflow_pack(pack_id, Path::new(request), Path::new(result))
         }
         [dataset, inspect, path] if dataset == "dataset" && inspect == "inspect" => {
             print_dataset_inspection(path, false)
@@ -478,6 +512,244 @@ fn print_runtime_catalog(json: bool) -> Result<(), Box<dyn Error>> {
     }
     println!("Installation is not implemented; environment.apply.v1 remains planned.");
     Ok(())
+}
+
+fn print_workflow_packs(json: bool) -> Result<(), Box<dyn Error>> {
+    let catalog = load_workflow_catalog()?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&catalog.packs)?);
+        return Ok(());
+    }
+    println!("Bundled workflow packs:");
+    for pack in catalog.packs {
+        println!(
+            "{}\t{}\t{}\t{:?}\t{}",
+            pack.id, pack.capability, pack.status, pack.runtime, pack.trust
+        );
+    }
+    Ok(())
+}
+
+fn run_workflow_pack(
+    pack_id: &str,
+    request_path: &Path,
+    result_path: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let catalog = load_workflow_catalog()?;
+    let pack = catalog
+        .packs
+        .iter()
+        .find(|candidate| candidate.id == pack_id)
+        .ok_or_else(|| format!("unknown workflow pack: {pack_id}"))?;
+    if pack.status == "planned" || pack.status == "deprecated" {
+        return Err(format!(
+            "workflow pack {} is not runnable ({})",
+            pack.id, pack.status
+        )
+        .into());
+    }
+    if !request_path.is_file() {
+        return Err(format!(
+            "workflow request does not exist: {}",
+            request_path.display()
+        )
+        .into());
+    }
+    if result_path.exists() {
+        return Err(format!(
+            "refusing to overwrite workflow result: {}",
+            result_path.display()
+        )
+        .into());
+    }
+
+    let root = workflow_root()?;
+    let relative_manifest = pack
+        .manifest
+        .strip_prefix("workflows/")
+        .ok_or("workflow catalog manifest must be below workflows/")?;
+    let manifest_path = safe_pack_path(&root, relative_manifest)?;
+    let pack_root = manifest_path
+        .parent()
+        .ok_or("workflow manifest has no parent")?;
+    let manifest: WorkflowPackManifest = serde_json::from_slice(&fs::read(&manifest_path)?)?;
+    if manifest.schema_version != "1"
+        || manifest.id != pack.id
+        || manifest.runtime.kind != pack.runtime
+    {
+        return Err(format!(
+            "workflow manifest identity mismatch: {}",
+            manifest_path.display()
+        )
+        .into());
+    }
+    verify_workflow_pack_files(pack_root, &manifest)?;
+    validate_workflow_request(request_path, &pack.capability)?;
+
+    let expected_arguments = ["--request", "{request}", "--result", "{result}"];
+    if manifest
+        .entrypoint
+        .arguments
+        .iter()
+        .map(String::as_str)
+        .ne(expected_arguments)
+    {
+        return Err(format!(
+            "workflow pack {} has unsupported entrypoint arguments",
+            pack.id
+        )
+        .into());
+    }
+    let entrypoint = safe_pack_path(pack_root, &manifest.entrypoint.path)?;
+    let executable = workflow_executable(manifest.runtime.kind)?;
+    let status = Command::new(&executable)
+        .arg(&entrypoint)
+        .arg("--request")
+        .arg(request_path)
+        .arg("--result")
+        .arg(result_path)
+        .current_dir(pack_root)
+        .status()?;
+
+    if !result_path.is_file() {
+        return Err(format!(
+            "workflow pack {} exited with {} without writing a result envelope",
+            pack.id, status
+        )
+        .into());
+    }
+    let result: serde_json::Value = serde_json::from_slice(&fs::read(result_path)?)?;
+    validate_workflow_result(&result, request_path, &pack.capability)?;
+    println!("{}", serde_json::to_string(&result)?);
+    Ok(())
+}
+
+fn load_workflow_catalog() -> Result<WorkflowCatalog, Box<dyn Error>> {
+    let catalog: WorkflowCatalog = serde_json::from_str(WORKFLOW_CATALOG)?;
+    if catalog.schema_version != "1" || catalog.packs.is_empty() {
+        return Err("workflow catalog is invalid".into());
+    }
+    Ok(catalog)
+}
+
+fn workflow_root() -> Result<PathBuf, Box<dyn Error>> {
+    let configured = env::var_os("LINXIRA_BIO_WORKFLOW_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("workflows"));
+    let root = fs::canonicalize(&configured)?;
+    if !root.is_dir() {
+        return Err(format!("workflow root is not a directory: {}", root.display()).into());
+    }
+    Ok(root)
+}
+
+fn safe_pack_path(root: &Path, relative: &str) -> Result<PathBuf, Box<dyn Error>> {
+    let candidate = Path::new(relative);
+    if candidate.is_absolute()
+        || candidate
+            .components()
+            .any(|component| component.as_os_str() == "..")
+    {
+        return Err(format!("workflow path escapes pack root: {relative}").into());
+    }
+    let resolved = fs::canonicalize(root.join(candidate))?;
+    if resolved != root && !resolved.starts_with(root) {
+        return Err(format!("workflow path escapes pack root: {relative}").into());
+    }
+    Ok(resolved)
+}
+
+fn verify_workflow_pack_files(
+    pack_root: &Path,
+    manifest: &WorkflowPackManifest,
+) -> Result<(), Box<dyn Error>> {
+    let mut declared = BTreeSet::new();
+    for file in &manifest.files {
+        if !declared.insert(file.path.clone()) {
+            return Err(format!("workflow manifest repeats file path: {}", file.path).into());
+        }
+        let path = safe_pack_path(pack_root, &file.path)?;
+        if !path.is_file() || sha256_file(&path)? != file.sha256.to_ascii_lowercase() {
+            return Err(format!("workflow file verification failed: {}", file.path).into());
+        }
+    }
+    for required in [
+        &manifest.entrypoint.path,
+        &manifest.runtime.dependency_lock.path,
+    ] {
+        if !declared.contains(required) {
+            return Err(
+                format!("workflow manifest does not declare required file: {required}").into(),
+            );
+        }
+    }
+    let lock_path = safe_pack_path(pack_root, &manifest.runtime.dependency_lock.path)?;
+    if sha256_file(&lock_path)? != manifest.runtime.dependency_lock.sha256.to_ascii_lowercase() {
+        return Err("workflow dependency lock hash does not match manifest".into());
+    }
+    Ok(())
+}
+
+fn validate_workflow_request(request_path: &Path, capability: &str) -> Result<(), Box<dyn Error>> {
+    let request: serde_json::Value = serde_json::from_slice(&fs::read(request_path)?)?;
+    if request
+        .get("schema_version")
+        .and_then(serde_json::Value::as_str)
+        != Some("2")
+        || request
+            .get("job_id")
+            .and_then(serde_json::Value::as_str)
+            .is_none_or(str::is_empty)
+        || request
+            .get("capability")
+            .and_then(serde_json::Value::as_str)
+            != Some(capability)
+    {
+        return Err(
+            "workflow request must be a schema v2 request for the selected capability".into(),
+        );
+    }
+    Ok(())
+}
+
+fn validate_workflow_result(
+    result: &serde_json::Value,
+    request_path: &Path,
+    capability: &str,
+) -> Result<(), Box<dyn Error>> {
+    let request: serde_json::Value = serde_json::from_slice(&fs::read(request_path)?)?;
+    if result
+        .get("schema_version")
+        .and_then(serde_json::Value::as_str)
+        != Some("2")
+        || result.get("capability").and_then(serde_json::Value::as_str) != Some(capability)
+        || result.get("job_id") != request.get("job_id")
+        || !matches!(
+            result.get("status").and_then(serde_json::Value::as_str),
+            Some("ok" | "error")
+        )
+    {
+        return Err("workflow output is not a valid result envelope for the request".into());
+    }
+    Ok(())
+}
+
+fn workflow_executable(kind: WorkflowRuntimeKind) -> Result<String, Box<dyn Error>> {
+    let (variable, fallback) = match kind {
+        WorkflowRuntimeKind::Python => ("LINXIRA_BIO_WORKFLOW_PYTHON", "python"),
+        WorkflowRuntimeKind::R => ("LINXIRA_BIO_WORKFLOW_R", "Rscript"),
+        WorkflowRuntimeKind::Java | WorkflowRuntimeKind::Native => {
+            return Err("workflow runtime kind is not implemented by this runner".into());
+        }
+    };
+    Ok(env::var(variable).unwrap_or_else(|_| fallback.to_owned()))
+}
+
+fn sha256_file(path: &Path) -> Result<String, Box<dyn Error>> {
+    let mut file = fs::File::open(path)?;
+    let mut digest = Sha256::new();
+    std::io::copy(&mut file, &mut digest)?;
+    Ok(format!("{:x}", digest.finalize()))
 }
 
 fn print_doctor(json: bool) -> Result<(), Box<dyn Error>> {
@@ -3700,6 +3972,8 @@ fn usage() -> &'static str {
         "  linxira-bio environment audit [--json]\n",
         "  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n",
         "  linxira-bio runtime catalog [--json]\n",
+        "  linxira-bio workflow packs [--json]\n",
+        "  linxira-bio workflow run <pack-id> <request.json> <result.json>\n",
         "  linxira-bio dataset inspect <input> [--json]\n",
         "  linxira-bio sequence stats <input.fasta[.gz]> [--json]\n",
         "  linxira-bio sequence extract <input.fasta[.gz]> <output.fasta> [--id ID ...] [--region ID:START-END[:+|-] ...] [--strict] [--json]\n",

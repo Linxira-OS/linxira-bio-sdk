@@ -41,6 +41,7 @@ structured result tables as CSV, TSV, JSON, JSONL, or XLSX:
 cargo run -p linxira-bio-cli -- environment audit --json
 cargo run -p linxira-bio-cli -- environment plan sequence-search --mode managed-user --json
 cargo run -p linxira-bio-cli -- runtime catalog --json
+cargo run -p linxira-bio-cli -- workflow packs --json
 cargo run -p linxira-bio-cli -- dataset inspect tests/fixtures/data-inspection/variants.vcf --json
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
@@ -83,6 +84,13 @@ view can be exported atomically as a 1600 by 1000 PNG. PDB analysis and
 optional explicit AlphaFold pLDDT handling use
 `structure.pdb.summary.v1`; mmCIF is currently a viewer input, not an available
 analysis capability.
+
+First-party Python and R workflow scripts ship under `workflows/` with their
+schemas, tests, locks, and license notices. They are local optional backends:
+the release does not bundle third-party interpreters, packages, databases, or
+models. `linxira-bio workflow run` verifies each pack before directly invoking
+an approved local interpreter. A cataloged pack is not an installed runtime or
+an available analysis capability.
 
 Release bundles are staged from `packaging/bundle-manifest.json`, which always
 includes the canonical bilingual `docs/` tree, schemas, catalogs, skills, and

@@ -47,6 +47,20 @@ are technically convenient.
 | Miniforge and Conda | BSD-3-Clause | Planned compatibility provider for Conda/Bioconda environments; not redistributed yet |
 | Eclipse Temurin | GPL-2.0-only WITH Classpath-exception-2.0 | Planned Java 21/17 runtime provider; not redistributed yet |
 
+## Workflow Distribution Boundary
+
+The release bundle includes only first-party workflow wrappers under
+`workflows/`, each licensed `AGPL-3.0-or-later` and accompanied by its own
+`NOTICE.md`. These wrappers may call third-party packages through their public
+APIs after a user approves installation into an isolated environment. The
+bundle does not copy upstream Python/R scripts, examples, package source,
+Bioconda artifacts, reference databases, or model weights.
+
+Every pack must name its runtime dependencies, exact versions, canonical
+sources, and license signals in its notice and lock. A direct-dependency-only
+lock remains `cataloged`; it is not evidence that the pack may install a
+transitive dependency graph.
+
 The bundled Noto Sans SC file has SHA-256
 `A2B93E6C2DB05D6BBBF6F27D413EC73269735B7B679019C8A5AA9670FF0FFBF2`.
 
