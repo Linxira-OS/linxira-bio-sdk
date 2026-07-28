@@ -72,6 +72,11 @@ class WorkflowManifestTests(unittest.TestCase):
             self.assertIsInstance(reference, str)
             self.assertIn(reference, declared)
 
+        notice = (pack_root / "NOTICE.md").read_text(encoding="utf-8")
+        self.assertIn("AGPL-3.0-or-later", notice)
+        self.assertIn("Runtime dependencies are installed separately", notice)
+        self.assertIn("not vendored", notice)
+
 
 if __name__ == "__main__":
     unittest.main()

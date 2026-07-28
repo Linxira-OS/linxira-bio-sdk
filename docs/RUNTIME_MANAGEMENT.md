@@ -81,3 +81,35 @@ Every completed analysis records input identities, parameters, capability
 version, resolved tool and runtime versions, command or backend invocation,
 execution mode, warnings, citations, and result artifacts. Global tools found
 during audit may be used only when the job manifest records them explicitly.
+
+## Bundled Workflow Scripts
+
+First-party Python and R workflow wrappers, their schemas, tests, locks, and
+license notices are distributed under `workflows/` in every release bundle.
+This does not redistribute Python, R, Bioconductor, Conda, Bioconda, databases,
+models, or third-party source code.
+
+Inspect bundled packs locally:
+
+```bash
+linxira-bio workflow packs --json
+```
+
+Run a selected pack only with a schema-v2 request that names that pack's
+capability:
+
+```bash
+linxira-bio workflow run org.linxira.sequence-conversion-biopython request.json result.json
+```
+
+The runner verifies every manifest-listed file and dependency-lock hash before
+starting an interpreter. It invokes the interpreter directly, never through a
+shell. Set `LINXIRA_BIO_WORKFLOW_PYTHON` or `LINXIRA_BIO_WORKFLOW_R` to an
+approved isolated interpreter; otherwise it resolves `python` or `Rscript` on
+the current local `PATH`. A missing or version-mismatched dependency returns a
+structured workflow result and does not trigger any download or global change.
+
+`cataloged` means a script is bundled and inspectable, not that an installer is
+available. A pack can become `installable` only after its complete platform
+dependency graph, artifact hashes, license evidence, and approved installation
+transaction are available.
