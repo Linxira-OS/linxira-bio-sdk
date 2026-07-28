@@ -121,7 +121,7 @@ class CoverageV1ValidationTests(unittest.TestCase):
 
     def test_planned_item_requires_owner(self) -> None:
         document = copy.deepcopy(self.coverage)
-        self.item(document, "alignment.coverage").pop("owner")
+        self.item(document, "alignment.long-read").pop("owner")
         with self.assertRaisesRegex(coverage_v1.CoverageValidationError, "owner"):
             self.validate(document)
 
@@ -130,7 +130,6 @@ class CoverageV1ValidationTests(unittest.TestCase):
         item = self.item(document, "alignment.coverage")
         item["disposition"] = "excluded-with-reason"
         item["reason"] = "outside the supported research scope"
-        item.pop("owner")
         with self.assertRaisesRegex(
             coverage_v1.CoverageValidationError, "excluded item cannot"
         ):
