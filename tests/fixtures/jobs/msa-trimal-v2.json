@@ -1,0 +1,8 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-msa-trimal-v2",
+  "capability": "msa.trimal.v1",
+  "inputs": [{"artifact_id": "input-alignment", "role": "alignment", "cardinality": "single", "files": [{"file_id": "input-alignment-1", "path": "../sequences/tiny.fa", "format": "fasta", "compression": "none", "size_bytes": 32, "sha256": "d36ea1364a0451fd99584f0f36307dbc34b818ca4008c24c7705a95855172a1c"}]}],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/trimal-v2.fa", "mode": "automated1"}
+}

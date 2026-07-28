@@ -29,7 +29,22 @@
     {
       "id": "multiple-sequence-alignment",
       "description": "Local multiple sequence alignment",
-      "tools": ["muscle"]
+      "tools": ["muscle", "trimal"]
+    },
+    {
+      "id": "phylogenetics",
+      "description": "Local maximum-likelihood phylogenetic inference",
+      "tools": ["iqtree"]
+    },
+    {
+      "id": "motif-analysis",
+      "description": "Local de novo sequence motif discovery",
+      "tools": ["meme"]
+    },
+    {
+      "id": "protein-structure",
+      "description": "Local coordinate-derived protein structure annotation",
+      "tools": ["mkdssp"]
     },
     {
       "id": "genomics-cli",
@@ -51,6 +66,10 @@
         "diamond",
         "hmmer",
         "muscle",
+        "trimal",
+        "iqtree",
+        "meme",
+        "mkdssp",
         "samtools",
         "bcftools",
         "bedtools",
@@ -379,6 +398,53 @@
           "source_url": "https://archlinux.org/packages/extra/x86_64/muscle/",
           "requires_admin": true
         }
+      }
+    },
+    {
+      "id": "trimal",
+      "display_name": "trimAl",
+      "category": "multiple-sequence-alignment",
+      "probes": [{ "program": "trimal", "args": ["--version"] }],
+      "install": {
+        "windows": {"strategy": "wsl-provider", "package": "trimal", "source_url": "https://github.com/inab/trimal", "requires_admin": true},
+        "debian": {"strategy": "apt", "package": "trimal", "source_url": "https://packages.debian.org/stable/trimal", "requires_admin": true},
+        "arch": {"strategy": "bioconda", "package": "trimal", "source_url": "https://anaconda.org/bioconda/trimal", "requires_admin": false}
+      }
+    },
+    {
+      "id": "iqtree",
+      "display_name": "IQ-TREE",
+      "category": "phylogenetics",
+      "probes": [
+        { "program": "iqtree3", "args": ["--version"] },
+        { "program": "iqtree2", "args": ["--version"] }
+      ],
+      "install": {
+        "windows": {"strategy": "official-archive", "package": "IQ-TREE", "source_url": "https://github.com/iqtree/iqtree3/releases", "requires_admin": false},
+        "debian": {"strategy": "apt", "package": "iqtree", "source_url": "https://packages.debian.org/stable/iqtree", "requires_admin": true},
+        "arch": {"strategy": "bioconda", "package": "iqtree", "source_url": "https://anaconda.org/bioconda/iqtree", "requires_admin": false}
+      }
+    },
+    {
+      "id": "meme",
+      "display_name": "MEME Suite",
+      "category": "motif-analysis",
+      "probes": [{ "program": "meme", "args": ["-version"] }],
+      "install": {
+        "windows": {"strategy": "wsl-provider", "package": "meme", "source_url": "https://meme-suite.org/meme/doc/download.html", "requires_admin": true},
+        "debian": {"strategy": "apt", "package": "meme", "source_url": "https://packages.debian.org/stable/meme", "requires_admin": true},
+        "arch": {"strategy": "bioconda", "package": "meme", "source_url": "https://anaconda.org/bioconda/meme", "requires_admin": false}
+      }
+    },
+    {
+      "id": "mkdssp",
+      "display_name": "DSSP",
+      "category": "protein-structure",
+      "probes": [{ "program": "mkdssp", "args": ["--version"] }],
+      "install": {
+        "windows": {"strategy": "wsl-provider", "package": "dssp", "source_url": "https://github.com/PDB-REDO/dssp/releases", "requires_admin": true},
+        "debian": {"strategy": "apt", "package": "dssp", "source_url": "https://packages.debian.org/stable/dssp", "requires_admin": true},
+        "arch": {"strategy": "bioconda", "package": "dssp", "source_url": "https://anaconda.org/bioconda/dssp", "requires_admin": false}
       }
     },
     {

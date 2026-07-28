@@ -75,6 +75,44 @@ pub enum MuscleMode {
     Super5,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrimalMode {
+    Automated1,
+    Gappyout,
+    Strict,
+    Strictplus,
+    Nogaps,
+}
+
+impl TrimalMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Automated1 => "automated1",
+            Self::Gappyout => "gappyout",
+            Self::Strict => "strict",
+            Self::Strictplus => "strictplus",
+            Self::Nogaps => "nogaps",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MemeAlphabet {
+    Dna,
+    Rna,
+    Protein,
+}
+
+impl MemeAlphabet {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Dna => "dna",
+            Self::Rna => "rna",
+            Self::Protein => "protein",
+        }
+    }
+}
+
 impl MuscleMode {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -122,6 +160,46 @@ impl Default for HmmerOptions {
 pub struct MuscleOptions {
     pub threads: usize,
     pub mode: MuscleMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IqtreeOptions {
+    pub threads: usize,
+    pub model: String,
+    pub seed: u64,
+}
+
+impl Default for IqtreeOptions {
+    fn default() -> Self {
+        Self {
+            threads: 1,
+            model: "MFP".to_owned(),
+            seed: 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MemeOptions {
+    pub threads: usize,
+    pub alphabet: MemeAlphabet,
+    pub distribution: String,
+    pub motif_count: usize,
+    pub minimum_width: usize,
+    pub maximum_width: usize,
+}
+
+impl Default for MemeOptions {
+    fn default() -> Self {
+        Self {
+            threads: 1,
+            alphabet: MemeAlphabet::Dna,
+            distribution: "zoops".to_owned(),
+            motif_count: 3,
+            minimum_width: 6,
+            maximum_width: 15,
+        }
+    }
 }
 
 impl Default for MuscleOptions {
@@ -265,6 +343,30 @@ pub fn parse_muscle_mode(value: &str) -> Result<MuscleMode, NativeToolError> {
     }
 }
 
+pub fn parse_trimal_mode(value: &str) -> Result<TrimalMode, NativeToolError> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "automated1" => Ok(TrimalMode::Automated1),
+        "gappyout" => Ok(TrimalMode::Gappyout),
+        "strict" => Ok(TrimalMode::Strict),
+        "strictplus" => Ok(TrimalMode::Strictplus),
+        "nogaps" => Ok(TrimalMode::Nogaps),
+        _ => Err(NativeToolError::InvalidOption(format!(
+            "unsupported trimAl mode: {value}"
+        ))),
+    }
+}
+
+pub fn parse_meme_alphabet(value: &str) -> Result<MemeAlphabet, NativeToolError> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "dna" => Ok(MemeAlphabet::Dna),
+        "rna" => Ok(MemeAlphabet::Rna),
+        "protein" => Ok(MemeAlphabet::Protein),
+        _ => Err(NativeToolError::InvalidOption(format!(
+            "unsupported MEME alphabet: {value}"
+        ))),
+    }
+}
+
 pub fn run_blast_fasta_path(
     query: impl AsRef<Path>,
     reference: impl AsRef<Path>,
@@ -399,6 +501,131 @@ pub fn run_muscle_path(
     result
 }
 
+pub fn run_trimal_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    mode: TrimalMode,
+) -> Result<NativeToolResult, NativeToolError> {
+    let input = input.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[input], output)?;
+    let executable = configured_program("LINXIRA_BIO_TRIMAL", "trimal");
+    let arguments = trimal_arguments(input, output, mode);
+    let result = run_native_command(&executable, &arguments, false)
+        .and_then(|_| finish_result("trimal", mode.as_str(), output, 1, 1));
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
+pub fn run_iqtree_path(
+    alignment: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &IqtreeOptions,
+) -> Result<NativeToolResult, NativeToolError> {
+    validate_threads(options.threads)?;
+    if options.model.trim().is_empty() || options.model.len() > 256 {
+        return Err(NativeToolError::InvalidOption(
+            "IQ-TREE model must contain 1 to 256 characters".to_owned(),
+        ));
+    }
+    let alignment = alignment.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[alignment], output)?;
+    let temporary = create_temporary_directory(output, "iqtree")?;
+    let prefix = temporary.join("analysis");
+    let generated = PathBuf::from(format!("{}.treefile", prefix.to_string_lossy()));
+    let result = (|| {
+        let executable = configured_program("LINXIRA_BIO_IQTREE", "iqtree2");
+        let arguments = iqtree_arguments(alignment, &prefix, options);
+        run_native_command(&executable, &arguments, false)?;
+        copy_generated_output("iqtree", &generated, output)?;
+        finish_result("iqtree", &options.model, output, options.threads, 1)
+    })();
+    let cleanup = fs::remove_dir_all(&temporary);
+    if let Err(error) = cleanup
+        && result.is_ok()
+    {
+        return Err(NativeToolError::Io(error));
+    }
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
+pub fn run_meme_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &MemeOptions,
+) -> Result<NativeToolResult, NativeToolError> {
+    validate_threads(options.threads)?;
+    if !matches!(options.distribution.as_str(), "oops" | "zoops" | "anr") {
+        return Err(NativeToolError::InvalidOption(
+            "MEME distribution must be oops, zoops, or anr".to_owned(),
+        ));
+    }
+    if options.motif_count == 0 || options.motif_count > 1_000 {
+        return Err(NativeToolError::InvalidOption(
+            "MEME motif_count must be between 1 and 1000".to_owned(),
+        ));
+    }
+    if options.minimum_width < 2
+        || options.maximum_width < options.minimum_width
+        || options.maximum_width > 1_000
+    {
+        return Err(NativeToolError::InvalidOption(
+            "MEME widths require 2 <= minimum_width <= maximum_width <= 1000".to_owned(),
+        ));
+    }
+    let input = input.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[input], output)?;
+    let temporary = create_temporary_directory(output, "meme")?;
+    let generated = temporary.join("meme.txt");
+    let result = (|| {
+        let executable = configured_program("LINXIRA_BIO_MEME", "meme");
+        let arguments = meme_arguments(input, &temporary, options);
+        run_native_command(&executable, &arguments, false)?;
+        copy_generated_output("meme", &generated, output)?;
+        finish_result(
+            "meme",
+            options.alphabet.as_str(),
+            output,
+            options.threads,
+            1,
+        )
+    })();
+    let cleanup = fs::remove_dir_all(&temporary);
+    if let Err(error) = cleanup
+        && result.is_ok()
+    {
+        return Err(NativeToolError::Io(error));
+    }
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
+pub fn run_dssp_path(
+    structure: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+) -> Result<NativeToolResult, NativeToolError> {
+    let structure = structure.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[structure], output)?;
+    let executable = configured_program("LINXIRA_BIO_MKDSSP", "mkdssp");
+    let arguments = dssp_arguments(structure, output);
+    let result = run_native_command(&executable, &arguments, false)
+        .and_then(|_| finish_result("mkdssp", "secondary-structure", output, 1, 1));
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
 pub fn blast_arguments(
     query: &Path,
     database: &Path,
@@ -475,6 +702,63 @@ pub fn muscle_arguments(input: &Path, output: &Path, options: &MuscleOptions) ->
         output.as_os_str().to_owned(),
         OsString::from("-threads"),
         OsString::from(options.threads.to_string()),
+    ]
+}
+
+pub fn trimal_arguments(input: &Path, output: &Path, mode: TrimalMode) -> Vec<OsString> {
+    vec![
+        OsString::from("-in"),
+        input.as_os_str().to_owned(),
+        OsString::from("-out"),
+        output.as_os_str().to_owned(),
+        OsString::from(format!("-{}", mode.as_str())),
+    ]
+}
+
+pub fn iqtree_arguments(alignment: &Path, prefix: &Path, options: &IqtreeOptions) -> Vec<OsString> {
+    vec![
+        OsString::from("-s"),
+        alignment.as_os_str().to_owned(),
+        OsString::from("-pre"),
+        prefix.as_os_str().to_owned(),
+        OsString::from("-nt"),
+        OsString::from(options.threads.to_string()),
+        OsString::from("-m"),
+        OsString::from(&options.model),
+        OsString::from("-seed"),
+        OsString::from(options.seed.to_string()),
+    ]
+}
+
+pub fn meme_arguments(
+    input: &Path,
+    output_directory: &Path,
+    options: &MemeOptions,
+) -> Vec<OsString> {
+    vec![
+        input.as_os_str().to_owned(),
+        OsString::from("-oc"),
+        output_directory.as_os_str().to_owned(),
+        OsString::from(format!("-{}", options.alphabet.as_str())),
+        OsString::from("-mod"),
+        OsString::from(&options.distribution),
+        OsString::from("-nmotifs"),
+        OsString::from(options.motif_count.to_string()),
+        OsString::from("-minw"),
+        OsString::from(options.minimum_width.to_string()),
+        OsString::from("-maxw"),
+        OsString::from(options.maximum_width.to_string()),
+        OsString::from("-p"),
+        OsString::from(options.threads.to_string()),
+    ]
+}
+
+pub fn dssp_arguments(structure: &Path, output: &Path) -> Vec<OsString> {
+    vec![
+        OsString::from("-i"),
+        structure.as_os_str().to_owned(),
+        OsString::from("-o"),
+        output.as_os_str().to_owned(),
     ]
 }
 
@@ -597,6 +881,21 @@ fn finish_result(
     })
 }
 
+fn copy_generated_output(
+    tool: &str,
+    generated: &Path,
+    output: &Path,
+) -> Result<(), NativeToolError> {
+    if !generated.is_file() {
+        return Err(NativeToolError::MissingOutput {
+            tool: tool.to_owned(),
+            path: generated.to_path_buf(),
+        });
+    }
+    fs::copy(generated, output)?;
+    Ok(())
+}
+
 fn create_temporary_directory(output: &Path, purpose: &str) -> Result<PathBuf, NativeToolError> {
     let parent = output.parent().unwrap_or_else(|| Path::new("."));
     for _ in 0..100 {
@@ -637,10 +936,11 @@ fn stderr_summary(stderr: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        BlastProgram, DiamondMode, HmmerOptions, MuscleMode, MuscleOptions,
-        SimilaritySearchOptions, blast_arguments, diamond_arguments, hmmer_arguments,
+        BlastProgram, DiamondMode, HmmerOptions, IqtreeOptions, MemeAlphabet, MemeOptions,
+        MuscleMode, MuscleOptions, SimilaritySearchOptions, TrimalMode, blast_arguments,
+        diamond_arguments, dssp_arguments, hmmer_arguments, iqtree_arguments, meme_arguments,
         muscle_arguments, parse_blast_program, parse_diamond_mode, parse_hmmer_mode,
-        parse_muscle_mode,
+        parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode, trimal_arguments,
     };
     use std::ffi::OsString;
     use std::path::Path;
@@ -695,6 +995,44 @@ mod tests {
         );
         assert_eq!(muscle[0], OsString::from("-super5"));
         assert!(muscle.contains(&OsString::from("-output")));
+
+        let trimal = trimal_arguments(
+            Path::new("alignment.fa"),
+            Path::new("trimmed.fa"),
+            TrimalMode::Automated1,
+        );
+        assert_eq!(trimal.last(), Some(&OsString::from("-automated1")));
+
+        let iqtree = iqtree_arguments(
+            Path::new("alignment.fa"),
+            Path::new("run prefix"),
+            &IqtreeOptions {
+                threads: 8,
+                model: "MFP".to_owned(),
+                seed: 7,
+            },
+        );
+        assert!(iqtree.contains(&OsString::from("run prefix")));
+        assert!(iqtree.contains(&OsString::from("7")));
+
+        let meme = meme_arguments(
+            Path::new("sequences.fa"),
+            Path::new("meme output"),
+            &MemeOptions {
+                threads: 4,
+                alphabet: MemeAlphabet::Protein,
+                distribution: "anr".to_owned(),
+                motif_count: 5,
+                minimum_width: 4,
+                maximum_width: 20,
+            },
+        );
+        assert!(meme.contains(&OsString::from("-protein")));
+        assert!(meme.contains(&OsString::from("meme output")));
+
+        let dssp = dssp_arguments(Path::new("model.cif"), Path::new("model.dssp"));
+        assert_eq!(dssp[0], OsString::from("-i"));
+        assert_eq!(dssp[2], OsString::from("-o"));
     }
 
     #[test]
@@ -703,10 +1041,14 @@ mod tests {
         assert_eq!(parse_diamond_mode("blastp").unwrap(), DiamondMode::Blastp);
         assert_eq!(parse_hmmer_mode("hmmscan").unwrap().as_str(), "hmmscan");
         assert_eq!(parse_muscle_mode("align").unwrap(), MuscleMode::Align);
+        assert_eq!(parse_trimal_mode("gappyout").unwrap(), TrimalMode::Gappyout);
+        assert_eq!(parse_meme_alphabet("rna").unwrap(), MemeAlphabet::Rna);
         assert!(parse_blast_program("remote").is_err());
         assert!(parse_diamond_mode("makedb").is_err());
         assert!(parse_hmmer_mode("jackhmmer").is_err());
         assert!(parse_muscle_mode("profile").is_err());
+        assert!(parse_trimal_mode("manual").is_err());
+        assert!(parse_meme_alphabet("codon").is_err());
     }
 
     #[test]

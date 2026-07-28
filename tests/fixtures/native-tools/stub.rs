@@ -5,15 +5,21 @@ use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let arguments = env::args_os().skip(1).collect::<Vec<_>>();
-    let output = ["--domtblout", "-output", "--out", "-out", "--db"]
+    if let Some(prefix) = value_after(&arguments, "-pre") {
+        let output = PathBuf::from(format!("{}.treefile", prefix.to_string_lossy()));
+        return write_output(&output, "(one:0.1,two:0.1);\n");
+    }
+    if let Some(directory) = value_after(&arguments, "-oc") {
+        let directory = PathBuf::from(directory);
+        if let Err(error) = fs::create_dir_all(&directory) {
+            eprintln!("failed to create {}: {error}", directory.display());
+            return ExitCode::from(3);
+        }
+        return write_output(&directory.join("meme.txt"), "MEME version 5\n\nALPHABET= ACGT\n");
+    }
+    let output = ["--domtblout", "-output", "--out", "-out", "-o", "--db"]
         .into_iter()
-        .find_map(|flag| {
-            arguments
-                .iter()
-                .position(|value| value == flag)
-                .and_then(|index| arguments.get(index + 1))
-                .map(PathBuf::from)
-        });
+        .find_map(|flag| value_after(&arguments, flag).map(PathBuf::from));
     let Some(output) = output else {
         eprintln!("stub did not receive a supported output flag");
         return ExitCode::from(2);
@@ -29,7 +35,18 @@ fn main() -> ExitCode {
     } else {
         "query\treference\t100.0\t4\t0\t0\t1\t4\t1\t4\t1e-20\t50.0\n"
     };
-    match fs::write(&output, content) {
+    write_output(&output, content)
+}
+
+fn value_after<'a>(arguments: &'a [std::ffi::OsString], flag: &str) -> Option<&'a std::ffi::OsString> {
+    arguments
+        .iter()
+        .position(|value| value == flag)
+        .and_then(|index| arguments.get(index + 1))
+}
+
+fn write_output(output: &PathBuf, content: &str) -> ExitCode {
+    match fs::write(output, content) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("failed to write {}: {error}", output.display());

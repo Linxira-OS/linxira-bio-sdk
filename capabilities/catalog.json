@@ -564,6 +564,15 @@
       "output_formats": ["newick", "json"]
     },
     {
+      "id": "phylogeny.iqtree.v1",
+      "status": "available",
+      "category": "phylogenetics",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio phylogeny iqtree <alignment> <output.newick> --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["newick", "json"]
+    },
+    {
       "id": "msa.muscle.v1",
       "status": "available",
       "category": "multiple-sequence-alignment",
@@ -571,6 +580,33 @@
       "command": "linxira-bio msa muscle <input.fasta> <output.fasta> --mode align --json",
       "input_formats": ["fasta"],
       "output_formats": ["fasta", "json"]
+    },
+    {
+      "id": "msa.trimal.v1",
+      "status": "available",
+      "category": "multiple-sequence-alignment",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio msa trimal <input.alignment> <output.alignment> --mode automated1 --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
+      "id": "motif.meme.v1",
+      "status": "available",
+      "category": "motif-analysis",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio motif meme <input.fasta> <output.meme> --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["meme-text", "json"]
+    },
+    {
+      "id": "protein.secondary-structure.v1",
+      "status": "available",
+      "category": "protein-structure",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio protein secondary-structure <structure.pdb|cif> <output.dssp> --json",
+      "input_formats": ["pdb", "mmcif"],
+      "output_formats": ["dssp", "json"]
     },
     {
       "id": "annotation.go.normalize.v1",

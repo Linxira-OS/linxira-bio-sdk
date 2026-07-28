@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Sequence Motifs"
+  short_description: "Run local de novo motif discovery with MEME"
+  default_prompt: "Use $analyze-sequence-motifs to discover motifs in a local FASTA file with MEME."

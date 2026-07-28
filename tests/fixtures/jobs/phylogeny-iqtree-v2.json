@@ -1,0 +1,8 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-phylogeny-iqtree-v2",
+  "capability": "phylogeny.iqtree.v1",
+  "inputs": [{"artifact_id": "input-alignment", "role": "alignment", "cardinality": "single", "files": [{"file_id": "input-alignment-1", "path": "../sequences/tiny.fa", "format": "fasta", "compression": "none", "size_bytes": 32, "sha256": "d36ea1364a0451fd99584f0f36307dbc34b818ca4008c24c7705a95855172a1c"}]}],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/iqtree-v2.nwk", "threads": 2, "model": "MFP", "seed": 7}
+}

@@ -40,9 +40,11 @@ use linxira_bio_core::interval::{
     bed_subtract_path,
 };
 use linxira_bio_core::native_tools::{
-    HmmerOptions, MuscleOptions, NativeToolResult, SimilaritySearchOptions, parse_blast_program,
-    parse_diamond_mode, parse_hmmer_mode, parse_muscle_mode, run_blast_fasta_path,
-    run_diamond_fasta_path, run_hmmer_path, run_muscle_path,
+    HmmerOptions, IqtreeOptions, MemeOptions, MuscleOptions, NativeToolResult,
+    SimilaritySearchOptions, parse_blast_program, parse_diamond_mode, parse_hmmer_mode,
+    parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode, run_blast_fasta_path,
+    run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path, run_meme_path,
+    run_muscle_path, run_trimal_path,
 };
 use linxira_bio_core::phylogeny::{
     TreeTransformOptions, TreeTransformResult, read_tree_label_map_path, transform_newick_path,
@@ -359,6 +361,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         [similarity, hmmer, arguments @ ..] if similarity == "similarity" && hmmer == "hmmer" => {
             print_local_hmmer(arguments)
         }
+        [motif, meme, arguments @ ..] if motif == "motif" && meme == "meme" => {
+            print_meme(arguments)
+        }
         [similarity, rbh, arguments @ ..] if similarity == "similarity" && rbh == "rbh" => {
             print_reciprocal_best_hits(arguments)
         }
@@ -381,8 +386,19 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         [phylogeny, tree, arguments @ ..] if phylogeny == "phylogeny" && tree == "tree" => {
             print_phylogeny_tree(arguments)
         }
+        [phylogeny, iqtree, arguments @ ..] if phylogeny == "phylogeny" && iqtree == "iqtree" => {
+            print_iqtree(arguments)
+        }
         [msa, muscle, arguments @ ..] if msa == "msa" && muscle == "muscle" => {
             print_muscle(arguments)
+        }
+        [msa, trimal, arguments @ ..] if msa == "msa" && trimal == "trimal" => {
+            print_trimal(arguments)
+        }
+        [protein, secondary_structure, arguments @ ..]
+            if protein == "protein" && secondary_structure == "secondary-structure" =>
+        {
+            print_dssp(arguments)
         }
         [structure, pdb, arguments @ ..] if structure == "structure" && pdb == "pdb" => {
             print_pdb_summary(arguments)
@@ -3460,6 +3476,156 @@ fn print_muscle(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     print_native_tool_result("muscle-alignment", "msa.muscle.v1", result, json)
 }
 
+fn print_trimal(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut mode = "automated1".to_owned();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--mode" => {
+                index += 1;
+                mode = arguments
+                    .get(index)
+                    .ok_or("--mode requires a value")?
+                    .clone();
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown trimAl option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("msa trimal requires <input.alignment> <output.alignment>".into());
+    }
+    let result = run_trimal_path(&paths[0], &paths[1], parse_trimal_mode(&mode)?)?;
+    print_native_tool_result("trimal-alignment", "msa.trimal.v1", result, json)
+}
+
+fn print_iqtree(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = IqtreeOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--model" => {
+                index += 1;
+                options.model = arguments
+                    .get(index)
+                    .ok_or("--model requires a value")?
+                    .clone();
+            }
+            "--seed" => {
+                index += 1;
+                options.seed = arguments
+                    .get(index)
+                    .ok_or("--seed requires a value")?
+                    .parse::<u64>()
+                    .map_err(|_| "--seed requires an unsigned integer")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown IQ-TREE option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("phylogeny iqtree requires <alignment> <output.newick>".into());
+    }
+    let result = run_iqtree_path(&paths[0], &paths[1], &options)?;
+    print_native_tool_result("iqtree-phylogeny", "phylogeny.iqtree.v1", result, json)
+}
+
+fn print_meme(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = MemeOptions::default();
+    let mut alphabet = "dna".to_owned();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--alphabet" => {
+                index += 1;
+                alphabet = arguments
+                    .get(index)
+                    .ok_or("--alphabet requires a value")?
+                    .clone();
+            }
+            "--distribution" => {
+                index += 1;
+                options.distribution = arguments
+                    .get(index)
+                    .ok_or("--distribution requires a value")?
+                    .clone();
+            }
+            "--motifs" => {
+                index += 1;
+                options.motif_count = parse_sequence_usize(arguments.get(index), "--motifs")?;
+            }
+            "--min-width" => {
+                index += 1;
+                options.minimum_width = parse_sequence_usize(arguments.get(index), "--min-width")?;
+            }
+            "--max-width" => {
+                index += 1;
+                options.maximum_width = parse_sequence_usize(arguments.get(index), "--max-width")?;
+            }
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown MEME option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("motif meme requires <input.fasta> <output.meme>".into());
+    }
+    options.alphabet = parse_meme_alphabet(&alphabet)?;
+    let result = run_meme_path(&paths[0], &paths[1], &options)?;
+    print_native_tool_result("meme-discovery", "motif.meme.v1", result, json)
+}
+
+fn print_dssp(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut json = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown DSSP option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+    }
+    if paths.len() != 2 {
+        return Err(
+            "protein secondary-structure requires <structure.pdb|cif> <output.dssp>".into(),
+        );
+    }
+    let result = run_dssp_path(&paths[0], &paths[1])?;
+    print_native_tool_result(
+        "dssp-secondary-structure",
+        "protein.secondary-structure.v1",
+        result,
+        json,
+    )
+}
+
 fn print_native_tool_result(
     job_id: &str,
     capability: &str,
@@ -3581,12 +3747,16 @@ fn usage() -> &'static str {
         "  linxira-bio similarity blast <query.fasta> <reference.fasta> <output.tsv> [--program blastn|blastp|blastx|tblastn|tblastx] [--threads N] [--evalue X] [--max-targets N] [--outfmt 6|7] [--json]\n",
         "  linxira-bio similarity diamond <query.fasta> <reference.fasta> <output.tsv> [--mode blastp|blastx] [--threads N] [--evalue X] [--max-targets N] [--outfmt 6|7] [--json]\n",
         "  linxira-bio similarity hmmer <profile.hmm> <sequences.fasta> <output.domtblout> [--mode hmmsearch|hmmscan] [--threads N] [--evalue X] [--json]\n",
+        "  linxira-bio motif meme <input.fasta> <output.meme> [--alphabet dna|rna|protein] [--distribution oops|zoops|anr] [--motifs N] [--min-width N] [--max-width N] [--threads N] [--json]\n",
         "  linxira-bio similarity rbh <forward.tsv|xml[.gz]> <reverse.tsv|xml[.gz]> [--max-evalue X] [--min-identity P] [--json]\n",
         "  linxira-bio protein properties <proteins.fasta[.gz]> [--json]\n",
         "  linxira-bio protein domains <interproscan.tsv|hmmer.domtblout[.gz]> [--json]\n",
         "  linxira-bio protein domain-plot <interproscan.tsv|hmmer.domtblout[.gz]> <output.svg> [--sequence-id ID] [--max-sequences N] [--max-domains N] [--json]\n",
         "  linxira-bio phylogeny tree <input.nwk[.gz]> <output.nwk> [--reroot LEAF] [--label-map labels.tsv] [--json]\n",
         "  linxira-bio msa muscle <input.fasta> <output.fasta> [--mode align|super5] [--threads N] [--json]\n",
+        "  linxira-bio msa trimal <input.alignment> <output.alignment> [--mode automated1|gappyout|strict|strictplus|nogaps] [--json]\n",
+        "  linxira-bio phylogeny iqtree <alignment> <output.newick> [--threads N] [--model MODEL] [--seed N] [--json]\n",
+        "  linxira-bio protein secondary-structure <structure.pdb|cif> <output.dssp> [--json]\n",
         "  linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> [--select-column NAME ...] [--drop-column NAME ...] [--filter-column NAME --filter-op equals|contains|non-empty [--filter-value VALUE]] [--skip-rows N] [--limit N] [--delimiter csv|tsv] [--output-delimiter csv|tsv] [--json]\n",
         "  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n",
         "  linxira-bio structure mmcif-summary <input.cif|mmcif[.gz]> [--json]\n",

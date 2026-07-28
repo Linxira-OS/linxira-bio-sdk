@@ -22,7 +22,8 @@ when the first benchmark-justified C++ kernel is introduced.
 
 The controlled execution layer invokes mature native bioinformatics programs
 directly with `std::process::Command`; it never constructs a shell command.
-The first registered wrappers are NCBI BLAST+, DIAMOND, HMMER, and MUSCLE 5.
+The registered wrappers are NCBI BLAST+, DIAMOND, HMMER, MUSCLE 5, trimAl,
+IQ-TREE, MEME Suite, and DSSP.
 They are audited through `environment audit` and grouped into the
 `sequence-search` and `multiple-sequence-alignment` workload profiles.
 
@@ -33,6 +34,10 @@ Executable overrides are available for isolated or managed installations:
 - `LINXIRA_BIO_DIAMOND`
 - `LINXIRA_BIO_HMMSEARCH` and `LINXIRA_BIO_HMMSCAN`
 - `LINXIRA_BIO_MUSCLE`
+- `LINXIRA_BIO_TRIMAL`
+- `LINXIRA_BIO_IQTREE`
+- `LINXIRA_BIO_MEME`
+- `LINXIRA_BIO_MKDSSP`
 
 Windows uses native archives when maintained upstream builds exist. HMMER is
 routed through an approved WSL provider on Windows; Debian and Arch use their

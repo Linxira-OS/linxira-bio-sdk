@@ -30,7 +30,9 @@ the agent skills that select and validate them.
   BLAST+, DIAMOND, HMMER, BLAST result parsing, and reciprocal best-hit
   analysis.
 - Read `skills/align-biological-sequences/SKILL.md` for implemented MUSCLE 5
-  multiple-sequence alignment.
+  multiple-sequence alignment and trimAl trimming.
+- Read `skills/analyze-sequence-motifs/SKILL.md` for implemented local MEME
+  de novo motif discovery.
 - Read `skills/analyze-functional-enrichment/SKILL.md` for implemented GO and
   eggNOG annotation normalization plus custom, GO, and KEGG
   over-representation analysis.
