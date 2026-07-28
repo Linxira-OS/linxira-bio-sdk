@@ -752,7 +752,10 @@ fn validate_workflow_result(
 
 fn workflow_executable(kind: WorkflowRuntimeKind) -> Result<String, Box<dyn Error>> {
     let (variable, fallback) = match kind {
-        WorkflowRuntimeKind::Python => ("LINXIRA_BIO_WORKFLOW_PYTHON", "python"),
+        WorkflowRuntimeKind::Python => (
+            "LINXIRA_BIO_WORKFLOW_PYTHON",
+            if cfg!(windows) { "python" } else { "python3" },
+        ),
         WorkflowRuntimeKind::R => ("LINXIRA_BIO_WORKFLOW_R", "Rscript"),
         WorkflowRuntimeKind::Java | WorkflowRuntimeKind::Native => {
             return Err("workflow runtime kind is not implemented by this runner".into());
