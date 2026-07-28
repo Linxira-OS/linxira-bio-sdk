@@ -317,6 +317,33 @@
       "output_formats": ["json"]
     },
     {
+      "id": "alignment.bam-cram.qc.v1",
+      "status": "available",
+      "category": "alignment-files",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio alignment bam-cram-qc <input.bam|cram> <output.tsv> --json",
+      "input_formats": ["bam", "cram"],
+      "output_formats": ["tsv", "json"]
+    },
+    {
+      "id": "alignment.coverage.v1",
+      "status": "available",
+      "category": "alignment-files",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio alignment coverage <input.bam|cram> <output.tsv> --json",
+      "input_formats": ["bam", "cram"],
+      "output_formats": ["tsv", "json"]
+    },
+    {
+      "id": "alignment.short-read.v1",
+      "status": "available",
+      "category": "read-alignment",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio alignment short-read <reference.fasta> <reads.fastq> <output.bam> --threads 1 --json",
+      "input_formats": ["fasta", "fastq"],
+      "output_formats": ["bam", "json"]
+    },
+    {
       "id": "variant.stats.v1",
       "status": "available",
       "category": "variant-calling",

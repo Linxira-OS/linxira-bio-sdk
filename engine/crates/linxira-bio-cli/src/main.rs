@@ -41,10 +41,11 @@ use linxira_bio_core::interval::{
 };
 use linxira_bio_core::native_tools::{
     HmmerOptions, IqtreeOptions, MemeOptions, MuscleOptions, NativeToolResult,
-    SimilaritySearchOptions, parse_blast_program, parse_diamond_mode, parse_hmmer_mode,
-    parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode, run_blast_fasta_path,
-    run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path, run_meme_path,
-    run_muscle_path, run_trimal_path,
+    ShortReadAlignmentOptions, SimilaritySearchOptions, parse_blast_program, parse_diamond_mode,
+    parse_hmmer_mode, parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode,
+    run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path,
+    run_meme_path, run_muscle_path, run_samtools_report_path, run_short_read_alignment_path,
+    run_trimal_path,
 };
 use linxira_bio_core::phylogeny::{
     TreeTransformOptions, TreeTransformResult, read_tree_label_map_path, transform_newick_path,
@@ -164,6 +165,21 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if alignment == "alignment" && qc == "qc" && json == "--json" =>
         {
             print_alignment_qc(path, true)
+        }
+        [alignment, bam_cram_qc, arguments @ ..]
+            if alignment == "alignment" && bam_cram_qc == "bam-cram-qc" =>
+        {
+            print_samtools_report(arguments, "stats", "alignment.bam-cram.qc.v1")
+        }
+        [alignment, coverage, arguments @ ..]
+            if alignment == "alignment" && coverage == "coverage" =>
+        {
+            print_samtools_report(arguments, "coverage", "alignment.coverage.v1")
+        }
+        [alignment, short_read, arguments @ ..]
+            if alignment == "alignment" && short_read == "short-read" =>
+        {
+            print_short_read_alignment(arguments)
         }
         [annotation, stats, arguments @ ..] if annotation == "annotation" && stats == "stats" => {
             print_annotation_stats(arguments)
@@ -2449,6 +2465,80 @@ fn print_variant_stats_text(stats: &VcfStats) {
     }
 }
 
+fn print_samtools_report(
+    arguments: &[String],
+    mode: &str,
+    capability: &str,
+) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut reference = None;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--reference" => {
+                index += 1;
+                reference = Some(PathBuf::from(
+                    arguments.get(index).ok_or("--reference requires a value")?,
+                ));
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown samtools {mode} option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err(format!("alignment {} requires <input.bam|cram> <output.tsv>", mode).into());
+    }
+    let result = run_samtools_report_path(&paths[0], reference.as_deref(), &paths[1], mode)?;
+    print_native_tool_result(
+        if mode == "stats" {
+            "bam-cram-qc"
+        } else {
+            "alignment-coverage"
+        },
+        capability,
+        result,
+        json,
+    )
+}
+
+fn print_short_read_alignment(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = ShortReadAlignmentOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown short-read alignment option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err(
+            "alignment short-read requires <reference.fasta> <reads.fastq> <output.bam>".into(),
+        );
+    }
+    let result = run_short_read_alignment_path(&paths[0], &paths[1], &paths[2], &options)?;
+    print_native_tool_result(
+        "short-read-alignment",
+        "alignment.short-read.v1",
+        result,
+        json,
+    )
+}
+
 fn print_alignment_qc(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
     let metrics = sam_qc_path(Path::new(path))?;
     if json {
@@ -3992,6 +4082,9 @@ fn usage() -> &'static str {
         "  linxira-bio fastq trim <input.fastq[.gz]> <output.fastq> [--min-quality N] [--min-length N] [--quality-encoding phred+33|phred+64] [--json]\n",
         "  linxira-bio fastq adapter-trim <input.fastq[.gz]> <output.fastq> [--adapter SEQ ...] [--min-overlap N] [--min-length N] [--json]\n",
         "  linxira-bio alignment qc <input.sam[.gz]> [--json]\n",
+        "  linxira-bio alignment bam-cram-qc <input.bam|cram> <output.tsv> [--reference reference.fasta] [--json]\n",
+        "  linxira-bio alignment coverage <input.bam|cram> <output.tsv> [--reference reference.fasta] [--json]\n",
+        "  linxira-bio alignment short-read <reference.fasta> <reads.fastq> <output.bam> [--threads N] [--json]\n",
         "  linxira-bio annotation stats <input.gff3|gtf[.gz]> [--json]\n",
         "  linxira-bio annotation normalize <input.gff3|gtf[.gz]> <output.gff3> [--sort] [--json]\n",
         "  linxira-bio annotation positions <input.gff3|gtf[.gz]> <output.tsv> [--feature-type TYPE ...] [--json]\n",
