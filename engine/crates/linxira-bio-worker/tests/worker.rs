@@ -1343,6 +1343,50 @@ fn executes_native_tool_workflows_with_versioned_artifacts() {
             true,
             1,
         ),
+        ("msa-trimal.json", "msa.trimal.v1", "trimal.fa", false, 1),
+        (
+            "msa-trimal-v2.json",
+            "msa.trimal.v1",
+            "trimal-v2.fa",
+            true,
+            1,
+        ),
+        (
+            "phylogeny-iqtree.json",
+            "phylogeny.iqtree.v1",
+            "iqtree.nwk",
+            false,
+            1,
+        ),
+        (
+            "phylogeny-iqtree-v2.json",
+            "phylogeny.iqtree.v1",
+            "iqtree-v2.nwk",
+            true,
+            1,
+        ),
+        ("motif-meme.json", "motif.meme.v1", "motifs.meme", false, 1),
+        (
+            "motif-meme-v2.json",
+            "motif.meme.v1",
+            "motifs-v2.meme",
+            true,
+            1,
+        ),
+        (
+            "protein-secondary-structure.json",
+            "protein.secondary-structure.v1",
+            "secondary-structure.dssp",
+            false,
+            1,
+        ),
+        (
+            "protein-secondary-structure-v2.json",
+            "protein.secondary-structure.v1",
+            "secondary-structure-v2.dssp",
+            true,
+            1,
+        ),
     ];
     for (_, _, output_name, _, _) in &cases {
         let path = result_root.join(output_name);
@@ -1359,6 +1403,10 @@ fn executes_native_tool_workflows_with_versioned_artifacts() {
             .env("LINXIRA_BIO_DIAMOND", &stub)
             .env("LINXIRA_BIO_HMMSEARCH", &stub)
             .env("LINXIRA_BIO_MUSCLE", &stub)
+            .env("LINXIRA_BIO_TRIMAL", &stub)
+            .env("LINXIRA_BIO_IQTREE", &stub)
+            .env("LINXIRA_BIO_MEME", &stub)
+            .env("LINXIRA_BIO_MKDSSP", &stub)
             .output()
             .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
         assert!(

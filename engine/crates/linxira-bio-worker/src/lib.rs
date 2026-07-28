@@ -44,9 +44,11 @@ use linxira_bio_core::interval::{
     IntervalMergeOptions, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
 use linxira_bio_core::native_tools::{
-    HmmerOptions, MuscleOptions, SimilaritySearchOptions, parse_blast_program, parse_diamond_mode,
-    parse_hmmer_mode, parse_muscle_mode, run_blast_fasta_path, run_diamond_fasta_path,
-    run_hmmer_path, run_muscle_path,
+    HmmerOptions, IqtreeOptions, MemeOptions, MuscleOptions, SimilaritySearchOptions,
+    parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
+    parse_muscle_mode, parse_trimal_mode, run_blast_fasta_path, run_diamond_fasta_path,
+    run_dssp_path, run_hmmer_path, run_iqtree_path, run_meme_path, run_muscle_path,
+    run_trimal_path,
 };
 use linxira_bio_core::phylogeny::{TreeTransformOptions, transform_newick_path};
 use linxira_bio_core::protein::protein_properties_path;
@@ -178,12 +180,16 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "similarity.blast.local.v1" => run_local_blast(base_directory, request),
         "similarity.diamond.v1" => run_local_diamond(base_directory, request),
         "similarity.hmmer.v1" => run_local_hmmer(base_directory, request),
+        "motif.meme.v1" => run_meme_discovery(base_directory, request),
         "similarity.reciprocal.v1" => run_reciprocal_best_hits(base_directory, request),
         "protein.properties.v1" => run_protein_properties(base_directory, request),
         "protein.domain.parse.v1" => run_protein_domains(base_directory, request),
         "protein.domain.visualize.v1" => run_protein_domain_visualization(base_directory, request),
         "phylogeny.tree.transform.v1" => run_phylogeny_tree(base_directory, request),
+        "phylogeny.iqtree.v1" => run_iqtree_inference(base_directory, request),
         "msa.muscle.v1" => run_muscle_alignment(base_directory, request),
+        "msa.trimal.v1" => run_trimal_alignment(base_directory, request),
+        "protein.secondary-structure.v1" => run_dssp_secondary_structure(base_directory, request),
         "structure.pdb.summary.v1" => run_pdb_summary(base_directory, request),
         "structure.mmcif.summary.v1" => run_mmcif_summary(base_directory, request),
         "structure.sequence.extract.v1" => run_structure_sequence(base_directory, request),
@@ -1240,6 +1246,109 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 },
             )
         }
+        "msa.trimal.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "alignment")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let mode = parse_trimal_mode(
+                optional_parameter_string(&request.parameters, "mode")?.unwrap_or("automated1"),
+            )?;
+            let result = run_trimal_path(input, &output, mode)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "trimmed-alignment",
+                    role: "alignment",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Fasta),
+                    media_type: Some("text/x-fasta"),
+                },
+            )
+        }
+        "phylogeny.iqtree.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "alignment")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = run_iqtree_path(input, &output, &iqtree_options(&request.parameters)?)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "maximum-likelihood-tree",
+                    role: "tree",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Newick),
+                    media_type: Some("text/x-newick"),
+                },
+            )
+        }
+        "motif.meme.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "fasta")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = run_meme_path(input, &output, &meme_options(&request.parameters)?)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "meme-motifs",
+                    role: "motifs",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: None,
+                    media_type: Some("text/plain"),
+                },
+            )
+        }
+        "protein.secondary-structure.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "structure")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = run_dssp_path(input, &output)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "secondary-structure",
+                    role: "secondary-structure",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: None,
+                    media_type: Some("text/plain"),
+                },
+            )
+        }
         "phylogeny.tree.transform.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "tree")?;
             let output = required_sequence_output(&request.parameters, &request.capability)?;
@@ -1578,6 +1687,21 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         ),
         "phylogeny.tree.transform.v1" => (&["tree"], &["output", "reroot_label", "label_map"]),
         "msa.muscle.v1" => (&["fasta"], &["output", "mode", "threads"]),
+        "msa.trimal.v1" => (&["alignment"], &["output", "mode"]),
+        "phylogeny.iqtree.v1" => (&["alignment"], &["output", "threads", "model", "seed"]),
+        "motif.meme.v1" => (
+            &["fasta"],
+            &[
+                "output",
+                "threads",
+                "alphabet",
+                "distribution",
+                "motif_count",
+                "minimum_width",
+                "maximum_width",
+            ],
+        ),
+        "protein.secondary-structure.v1" => (&["structure"], &["output"]),
         "annotation.go.normalize.v1" => (&["annotations"], &["output", "gene_column", "go_column"]),
         "annotation.eggnog.normalize.v1" => (&["annotations"], &["output"]),
         "annotation.structure.visualize.v1" => (
@@ -3096,6 +3220,76 @@ fn run_muscle_alignment(base_directory: &Path, request: JobRequest) -> WorkerRes
     serialize_v1_native_tool_result(request, analysis)
 }
 
+fn run_trimal_alignment(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "alignment", &["output", "mode"])?;
+    let input = resolve_required_v1_input(base_directory, &request, "alignment")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let mode = parse_trimal_mode(
+        optional_parameter_string(&request.parameters, "mode")?.unwrap_or("automated1"),
+    )?;
+    let analysis = run_trimal_path(input, output, mode)?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_iqtree_inference(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "alignment",
+        &["output", "threads", "model", "seed"],
+    )?;
+    let input = resolve_required_v1_input(base_directory, &request, "alignment")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis = run_iqtree_path(input, output, &iqtree_options(&request.parameters)?)?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_meme_discovery(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "fasta",
+        &[
+            "output",
+            "threads",
+            "alphabet",
+            "distribution",
+            "motif_count",
+            "minimum_width",
+            "maximum_width",
+        ],
+    )?;
+    let input = resolve_required_v1_input(base_directory, &request, "fasta")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis = run_meme_path(input, output, &meme_options(&request.parameters)?)?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_dssp_secondary_structure(
+    base_directory: &Path,
+    request: JobRequest,
+) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "structure", &["output"])?;
+    let input = resolve_required_v1_input(base_directory, &request, "structure")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis = run_dssp_path(input, output)?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
 fn resolve_required_v1_input(
     base_directory: &Path,
     request: &JobRequest,
@@ -3494,6 +3688,43 @@ fn muscle_options(parameters: &serde_json::Value) -> WorkerResult<MuscleOptions>
     }
     if let Some(value) = optional_parameter_string(parameters, "mode")? {
         options.mode = parse_muscle_mode(value)?;
+    }
+    Ok(options)
+}
+
+fn iqtree_options(parameters: &serde_json::Value) -> WorkerResult<IqtreeOptions> {
+    let mut options = IqtreeOptions::default();
+    if let Some(value) = optional_parameter_usize(parameters, "threads")? {
+        options.threads = value;
+    }
+    if let Some(value) = optional_parameter_string(parameters, "model")? {
+        options.model = value.to_owned();
+    }
+    if let Some(value) = optional_parameter_u64(parameters, "seed")? {
+        options.seed = value;
+    }
+    Ok(options)
+}
+
+fn meme_options(parameters: &serde_json::Value) -> WorkerResult<MemeOptions> {
+    let mut options = MemeOptions::default();
+    if let Some(value) = optional_parameter_usize(parameters, "threads")? {
+        options.threads = value;
+    }
+    if let Some(value) = optional_parameter_string(parameters, "alphabet")? {
+        options.alphabet = parse_meme_alphabet(value)?;
+    }
+    if let Some(value) = optional_parameter_string(parameters, "distribution")? {
+        options.distribution = value.to_owned();
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "motif_count")? {
+        options.motif_count = value;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "minimum_width")? {
+        options.minimum_width = value;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "maximum_width")? {
+        options.maximum_width = value;
     }
     Ok(options)
 }

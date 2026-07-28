@@ -300,7 +300,10 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "protein.domain.parse.v1",
     "protein.domain.visualize.v1",
     "phylogeny.tree.transform.v1",
+    "phylogeny.iqtree.v1",
     "msa.muscle.v1",
+    "msa.trimal.v1",
+    "motif.meme.v1",
     "variant.stats.v1",
     "variant.filter.v1",
     "variant.normalize.v1",
@@ -311,6 +314,7 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "structure.contact-map.v1",
     "structure.geometry.v1",
     "structure.superpose.v1",
+    "protein.secondary-structure.v1",
     "environment.audit.v1",
     "environment.plan.v1",
     "runtime.catalog.v1",
@@ -382,6 +386,14 @@ struct BioApp {
     diamond_mode: String,
     hmmer_mode: String,
     muscle_mode: String,
+    trimal_mode: String,
+    iqtree_model: String,
+    iqtree_seed: u64,
+    meme_alphabet: String,
+    meme_distribution: String,
+    meme_motif_count: usize,
+    meme_minimum_width: usize,
+    meme_maximum_width: usize,
     native_threads: usize,
     native_evalue: f64,
     native_max_targets: usize,
@@ -481,6 +493,14 @@ impl BioApp {
             diamond_mode: "blastp".to_owned(),
             hmmer_mode: "hmmsearch".to_owned(),
             muscle_mode: "align".to_owned(),
+            trimal_mode: "automated1".to_owned(),
+            iqtree_model: "MFP".to_owned(),
+            iqtree_seed: 1,
+            meme_alphabet: "dna".to_owned(),
+            meme_distribution: "zoops".to_owned(),
+            meme_motif_count: 3,
+            meme_minimum_width: 6,
+            meme_maximum_width: 15,
             native_threads: 4,
             native_evalue: 1e-3,
             native_max_targets: 50,
@@ -1004,6 +1024,37 @@ impl BioApp {
             }
             if route.capability == "msa.muscle.v1" {
                 parameters.insert("mode".to_owned(), Value::String(self.muscle_mode.clone()));
+                parameters.insert("threads".to_owned(), serde_json::json!(self.native_threads));
+            }
+            if route.capability == "msa.trimal.v1" {
+                parameters.insert("mode".to_owned(), Value::String(self.trimal_mode.clone()));
+            }
+            if route.capability == "phylogeny.iqtree.v1" {
+                parameters.insert("model".to_owned(), Value::String(self.iqtree_model.clone()));
+                parameters.insert("threads".to_owned(), serde_json::json!(self.native_threads));
+                parameters.insert("seed".to_owned(), serde_json::json!(self.iqtree_seed));
+            }
+            if route.capability == "motif.meme.v1" {
+                parameters.insert(
+                    "alphabet".to_owned(),
+                    Value::String(self.meme_alphabet.clone()),
+                );
+                parameters.insert(
+                    "distribution".to_owned(),
+                    Value::String(self.meme_distribution.clone()),
+                );
+                parameters.insert(
+                    "motif_count".to_owned(),
+                    serde_json::json!(self.meme_motif_count),
+                );
+                parameters.insert(
+                    "minimum_width".to_owned(),
+                    serde_json::json!(self.meme_minimum_width),
+                );
+                parameters.insert(
+                    "maximum_width".to_owned(),
+                    serde_json::json!(self.meme_maximum_width),
+                );
                 parameters.insert("threads".to_owned(), serde_json::json!(self.native_threads));
             }
             request.parameters = Value::Object(parameters);
@@ -1902,7 +1953,10 @@ impl BioApp {
                     "protein.domain.parse.v1",
                     "protein.domain.visualize.v1",
                     "phylogeny.tree.transform.v1",
+                    "phylogeny.iqtree.v1",
                     "msa.muscle.v1",
+                    "msa.trimal.v1",
+                    "motif.meme.v1",
                     "table.manipulate.v1",
                     "structure.pdb.summary.v1",
                     "structure.mmcif.summary.v1",
@@ -1910,6 +1964,7 @@ impl BioApp {
                     "structure.contact-map.v1",
                     "structure.geometry.v1",
                     "structure.superpose.v1",
+                    "protein.secondary-structure.v1",
                 ] {
                     ui.selectable_value(
                         &mut self.selected_capability,
@@ -2181,6 +2236,8 @@ impl BioApp {
                 | "similarity.diamond.v1"
                 | "similarity.hmmer.v1"
                 | "msa.muscle.v1"
+                | "phylogeny.iqtree.v1"
+                | "motif.meme.v1"
         ) {
             ui.add_space(8.0);
             ui.horizontal_wrapped(|ui| {
@@ -2244,6 +2301,38 @@ impl BioApp {
                                 }
                             });
                     }
+                    "phylogeny.iqtree.v1" => {
+                        ui.label(self.text("替换模型", "Substitution model"));
+                        ui.text_edit_singleline(&mut self.iqtree_model);
+                        ui.label(self.text("随机种子", "Random seed"));
+                        ui.add(egui::DragValue::new(&mut self.iqtree_seed).range(1..=u64::MAX));
+                    }
+                    "motif.meme.v1" => {
+                        ui.label(self.text("字母表", "Alphabet"));
+                        egui::ComboBox::from_id_salt("native-meme-alphabet")
+                            .selected_text(&self.meme_alphabet)
+                            .show_ui(ui, |ui| {
+                                for alphabet in ["dna", "rna", "protein"] {
+                                    ui.selectable_value(
+                                        &mut self.meme_alphabet,
+                                        alphabet.to_owned(),
+                                        alphabet,
+                                    );
+                                }
+                            });
+                        ui.label(self.text("出现模型", "Occurrence model"));
+                        egui::ComboBox::from_id_salt("native-meme-distribution")
+                            .selected_text(&self.meme_distribution)
+                            .show_ui(ui, |ui| {
+                                for distribution in ["oops", "zoops", "anr"] {
+                                    ui.selectable_value(
+                                        &mut self.meme_distribution,
+                                        distribution.to_owned(),
+                                        distribution,
+                                    );
+                                }
+                            });
+                    }
                     _ => {}
                 }
             });
@@ -2276,6 +2365,29 @@ impl BioApp {
                     }
                 });
             }
+        }
+        if self.selected_capability == "msa.trimal.v1" {
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.label(self.text("裁剪模式", "Trimming mode"));
+                egui::ComboBox::from_id_salt("native-trimal-mode")
+                    .selected_text(&self.trimal_mode)
+                    .show_ui(ui, |ui| {
+                        for mode in ["automated1", "gappyout", "strict", "strictplus"] {
+                            ui.selectable_value(&mut self.trimal_mode, mode.to_owned(), mode);
+                        }
+                    });
+            });
+        }
+        if self.selected_capability == "motif.meme.v1" {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("基序数", "Motif count"));
+                ui.add(egui::DragValue::new(&mut self.meme_motif_count).range(1..=100));
+                ui.label(self.text("最小宽度", "Minimum width"));
+                ui.add(egui::DragValue::new(&mut self.meme_minimum_width).range(2..=1_000));
+                ui.label(self.text("最大宽度", "Maximum width"));
+                ui.add(egui::DragValue::new(&mut self.meme_maximum_width).range(2..=1_000));
+            });
         }
         if self.selected_capability == "phylogeny.tree.transform.v1" {
             ui.add_space(8.0);
@@ -3294,6 +3406,18 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             capability: "msa.muscle.v1",
             input_role: "fasta",
         }),
+        ("msa.trimal.v1", "fasta") => Some(AnalysisRoute {
+            capability: "msa.trimal.v1",
+            input_role: "alignment",
+        }),
+        ("phylogeny.iqtree.v1", "fasta") => Some(AnalysisRoute {
+            capability: "phylogeny.iqtree.v1",
+            input_role: "alignment",
+        }),
+        ("motif.meme.v1", "fasta") => Some(AnalysisRoute {
+            capability: "motif.meme.v1",
+            input_role: "fasta",
+        }),
         ("table.manipulate.v1", "csv" | "tsv") => Some(AnalysisRoute {
             capability: "table.manipulate.v1",
             input_role: "table",
@@ -3330,6 +3454,10 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
         ("structure.superpose.v1", "pdb" | "mmcif") => Some(AnalysisRoute {
             capability: "structure.superpose.v1",
             input_role: "reference",
+        }),
+        ("protein.secondary-structure.v1", "pdb" | "mmcif") => Some(AnalysisRoute {
+            capability: "protein.secondary-structure.v1",
+            input_role: "structure",
         }),
         _ => None,
     }
@@ -3405,6 +3533,10 @@ fn capability_output_extension(capability: &str) -> Option<&'static str> {
         "similarity.blast.local.v1" | "similarity.diamond.v1" => Some("tsv"),
         "similarity.hmmer.v1" => Some("domtblout"),
         "msa.muscle.v1" => Some("fasta"),
+        "msa.trimal.v1" => Some("fasta"),
+        "phylogeny.iqtree.v1" => Some("nwk"),
+        "motif.meme.v1" => Some("meme"),
+        "protein.secondary-structure.v1" => Some("dssp"),
         "annotation.structure.visualize.v1"
         | "enrichment.visualize.v1"
         | "protein.domain.visualize.v1" => Some("svg"),
@@ -4080,7 +4212,12 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "phylogeny.tree.transform.v1" => {
             language.text("系统发育树转换", "Phylogeny tree transform")
         }
+        "phylogeny.iqtree.v1" => {
+            language.text("IQ-TREE 系统发育推断", "IQ-TREE phylogeny inference")
+        }
         "msa.muscle.v1" => language.text("MUSCLE 多序列比对", "MUSCLE multiple sequence alignment"),
+        "msa.trimal.v1" => language.text("trimAl 比对裁剪", "trimAl alignment trimming"),
+        "motif.meme.v1" => language.text("MEME 基序发现", "MEME motif discovery"),
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "structure.pdb.summary.v1" => language.text("PDB 结构摘要", "PDB structure summary"),
         "structure.viewer.v1" => language.text("交互式结构查看器", "Interactive structure viewer"),
@@ -4091,6 +4228,9 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "structure.contact-map.v1" => language.text("残基接触图", "Residue contact map"),
         "structure.geometry.v1" => language.text("结构几何测量", "Structure geometry"),
         "structure.superpose.v1" => language.text("结构刚体叠合", "Structure superposition"),
+        "protein.secondary-structure.v1" => {
+            language.text("DSSP 二级结构", "DSSP secondary structure")
+        }
         _ => language.text("未知能力", "Unknown capability"),
     }
 }
@@ -4775,7 +4915,12 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "phylogeny.tree.transform.v1" => {
             language.text("系统发育树转换", "Phylogeny tree transform")
         }
+        "phylogeny.iqtree.v1" => {
+            language.text("IQ-TREE 系统发育推断", "IQ-TREE phylogeny inference")
+        }
         "msa.muscle.v1" => language.text("MUSCLE 多序列比对", "MUSCLE multiple sequence alignment"),
+        "msa.trimal.v1" => language.text("trimAl 比对裁剪", "trimAl alignment trimming"),
+        "motif.meme.v1" => language.text("MEME 基序发现", "MEME motif discovery"),
         "table.manipulate.v1" => language.text("表格处理", "Table manipulation"),
         "variant.stats.v1" => language.text("VCF 变异统计", "VCF variant statistics"),
         "variant.filter.v1" => language.text("VCF 基础过滤", "Basic VCF filtering"),
@@ -4791,6 +4936,9 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "structure.contact-map.v1" => language.text("残基接触图", "Residue contact map"),
         "structure.geometry.v1" => language.text("结构几何测量", "Structure geometry"),
         "structure.superpose.v1" => language.text("结构刚体叠合", "Structure superposition"),
+        "protein.secondary-structure.v1" => {
+            language.text("DSSP 二级结构", "DSSP secondary structure")
+        }
         "environment.audit.v1" => language.text("环境审计", "Environment audit"),
         "environment.plan.v1" => language.text("环境计划", "Environment plan"),
         "runtime.catalog.v1" => language.text("运行时目录", "Runtime catalog"),
@@ -5054,6 +5202,24 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         ("msa.muscle.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/msa.muscle.v1/en-US.md"
         )),
+        ("msa.trimal.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/msa.trimal.v1/zh-CN.md"
+        )),
+        ("msa.trimal.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/msa.trimal.v1/en-US.md"
+        )),
+        ("phylogeny.iqtree.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/phylogeny.iqtree.v1/zh-CN.md"
+        )),
+        ("phylogeny.iqtree.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/phylogeny.iqtree.v1/en-US.md"
+        )),
+        ("motif.meme.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/motif.meme.v1/zh-CN.md"
+        )),
+        ("motif.meme.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/motif.meme.v1/en-US.md"
+        )),
         ("variant.stats.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/variant.stats.v1/zh-CN.md"
         )),
@@ -5113,6 +5279,12 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("structure.superpose.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/structure.superpose.v1/en-US.md"
+        )),
+        ("protein.secondary-structure.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/protein.secondary-structure.v1/zh-CN.md"
+        )),
+        ("protein.secondary-structure.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/protein.secondary-structure.v1/en-US.md"
         )),
         ("environment.audit.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/environment.audit.v1/zh-CN.md"
@@ -5803,6 +5975,36 @@ mod tests {
         );
         assert!(!capability_requires_secondary("msa.muscle.v1"));
         assert_eq!(capability_output_extension("msa.muscle.v1"), Some("fasta"));
+
+        for (capability, role, extension) in [
+            ("msa.trimal.v1", "alignment", "fasta"),
+            ("phylogeny.iqtree.v1", "alignment", "nwk"),
+            ("motif.meme.v1", "fasta", "meme"),
+        ] {
+            assert_eq!(
+                analysis_route_for_capability(capability, "fasta"),
+                Some(AnalysisRoute {
+                    capability,
+                    input_role: role,
+                })
+            );
+            assert!(!capability_requires_secondary(capability));
+            assert_eq!(capability_output_extension(capability), Some(extension));
+        }
+
+        for format in ["pdb", "mmcif"] {
+            assert_eq!(
+                analysis_route_for_capability("protein.secondary-structure.v1", format),
+                Some(AnalysisRoute {
+                    capability: "protein.secondary-structure.v1",
+                    input_role: "structure",
+                })
+            );
+        }
+        assert_eq!(
+            capability_output_extension("protein.secondary-structure.v1"),
+            Some("dssp")
+        );
     }
 
     #[test]

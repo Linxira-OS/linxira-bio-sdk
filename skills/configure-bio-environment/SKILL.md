@@ -1,6 +1,6 @@
 ---
 name: configure-bio-environment
-description: Audit and prepare a local bioinformatics software environment with Linxira Bio environment capabilities. Use when an agent must check tools, select a workload and installation scope, review a transaction preview, or configure managed Python, R, Java, uv, Pixi, rig, Miniforge, Conda/Bioconda, NCBI BLAST+, DIAMOND, HMMER, MUSCLE, samtools, bcftools, bedtools, minimap2, WSL Debian, WSL Arch, Docker, Podman, Rust, or local GPU availability on Windows, Debian, or Arch Linux.
+description: Audit and prepare a local bioinformatics software environment with Linxira Bio environment capabilities. Use when an agent must check tools, select a workload and installation scope, review a transaction preview, or configure managed runtimes, BLAST+, DIAMOND, HMMER, MUSCLE, trimAl, IQ-TREE, MEME, DSSP, genomics CLI tools, WSL, containers, Rust, or local GPU availability on Windows, Debian, or Arch Linux.
 ---
 
 # Configure Bio Environment
@@ -27,6 +27,9 @@ an installer, directory name, or PATH entry alone.
 - `containers`: Windows WSL/Docker or Linux Docker/Podman backends.
 - `sequence-search`: NCBI BLAST+, DIAMOND, and HMMER.
 - `multiple-sequence-alignment`: MUSCLE 5.
+- `phylogenetics`: IQ-TREE.
+- `motif-analysis`: MEME Suite.
+- `protein-structure`: DSSP.
 - `genomics-cli`: samtools, bcftools, bedtools, and minimap2.
 - `full-local`: every currently registered local analysis tool.
 

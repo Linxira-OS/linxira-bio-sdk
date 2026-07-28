@@ -1,6 +1,6 @@
 ---
 name: analyze-coordinate-structures
-description: Analyze local PDB or mmCIF coordinate files with native Linxira Bio capabilities for mmCIF summaries, polymer sequence extraction, residue contact maps, atom distance/angle/dihedral measurements, and identity-matched rigid structure superposition. Use when an agent must inspect or compare coordinate structures without uploading data or writing replacement analysis code.
+description: Analyze local PDB or mmCIF coordinate files with native Linxira Bio capabilities for summaries, polymer sequence extraction, residue contacts, atom geometry, rigid superposition, and DSSP secondary-structure annotation. Use when an agent must inspect or compare coordinate structures without uploading data or writing replacement analysis code.
 ---
 
 # Analyze Coordinate Structures
@@ -10,6 +10,9 @@ capability. Execute locally; these operations require neither Python nor an
 external molecular viewer.
 
 ## Select A Capability
+
+- Use `protein.secondary-structure.v1` to run local `mkdssp` and write a DSSP
+  residue-annotation artifact from PDB or mmCIF coordinates.
 
 - Use `structure.mmcif.summary.v1` for model, chain, residue, and atom counts
   from mmCIF.

@@ -78,7 +78,10 @@ a replacement script silently.
   use `transform-phylogenetic-trees`. Tree inference and publication rendering
   remain external or planned.
 - Local nucleotide or protein multiple-sequence alignment: use
-  `align-biological-sequences` for MUSCLE 5 `align` or `super5`.
+  `align-biological-sequences` for MUSCLE 5 `align` or `super5`, then trimAl
+  when an explicit alignment-trimming step is scientifically justified.
+- Local de novo DNA, RNA, or protein motif discovery: use
+  `analyze-sequence-motifs` for MEME.
 - PDB coordinate summaries and explicitly requested AlphaFold pLDDT from PDB
   B-factors: use `analyze-pdb-structure`.
 - PDB/mmCIF coordinate-derived sequence, residue contacts, atom geometry, and

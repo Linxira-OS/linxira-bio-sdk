@@ -8,7 +8,7 @@ means that an analysis capability is available.
 
 | Format | Content detection | Bounded preview | Available analysis | Current boundary |
 | --- | --- | --- | --- | --- |
-| FASTA | Yes | Sequence records | `sequence.stats.v1`, `sequence.kmer.count.v1`, `primer.epcr.v1`, `variant.normalize.v1` reference, `protein.properties.v1`, `similarity.blast.local.v1`, `similarity.diamond.v1`, `similarity.hmmer.v1` sequences, `msa.muscle.v1` | Plain, gzip, and BGZF; native search/alignment capabilities require their registered executable; protein properties reject gap, stop, digit, and unsupported symbols |
+| FASTA | Yes | Sequence records | `sequence.stats.v1`, `sequence.kmer.count.v1`, `primer.epcr.v1`, `variant.normalize.v1` reference, `protein.properties.v1`, `similarity.blast.local.v1`, `similarity.diamond.v1`, `similarity.hmmer.v1` sequences, `msa.muscle.v1`, `msa.trimal.v1`, `phylogeny.iqtree.v1`, `motif.meme.v1` | Plain, gzip, and BGZF; native search, alignment, phylogeny, and motif capabilities require their registered executable; protein properties reject gap, stop, digit, and unsupported symbols |
 | FASTQ | Yes | Read records | `fastq.qc.v1`, `fastq.trim.v1`, `fastq.adapter.v1` | QC plus FASTQ output for 3' quality trimming and adapter removal; plain, gzip, and BGZF input |
 | CSV | Yes | Parsed table | `expression.matrix.qc.v1`, `expression.normalize.v1`, `expression.pca.v1`, `expression.cluster.v1`, `expression.heatmap.v1`, `table.manipulate.v1`, `set.venn.v1`, `set.upset.v1`, functional annotation normalization, enrichment, and `enrichment.visualize.v1` | Rectangular expression analysis, general table manipulation, named-column exact set overlap, GO/eggNOG normalization, generic/GO/KEGG over-representation analysis, and SVG plots |
 | TSV | Yes | Parsed table | `expression.matrix.qc.v1`, `expression.normalize.v1`, `expression.pca.v1`, `expression.cluster.v1`, `expression.heatmap.v1`, `table.manipulate.v1`, `set.venn.v1`, `set.upset.v1`, `annotation.go.normalize.v1`, `annotation.eggnog.normalize.v1`, `enrichment.overrepresentation.v1`, `enrichment.go.v1`, `enrichment.kegg.v1`, `enrichment.visualize.v1` | Rectangular expression analysis, row/column manipulation, named-column exact set overlap, normalized association tables, local enrichment analysis, and SVG plots |
@@ -21,8 +21,8 @@ means that an analysis capability is available.
 | BCF, CRAM | Magic bytes only | Binary metadata | None | `recognized-unsupported` |
 | HDF5, H5AD, LOOM | Signature plus extension hints | Binary metadata | None | Domain import is planned |
 | RDS | Magic bytes only | Binary metadata | None | `recognized-unsupported` |
-| PDB | Recognized text structure | `structure.viewer.v1` 3D GUI and PNG snapshot | `structure.pdb.summary.v1`, `structure.sequence.extract.v1`, `structure.contact-map.v1`, `structure.geometry.v1`, `structure.superpose.v1`, `structure.viewer.v1` | Plain, gzip, or BGZF; first-model coordinate analysis except all-model PDB summary; explicit pLDDT remains opt-in |
-| mmCIF | Recognized text structure | `structure.viewer.v1` 3D GUI and PNG snapshot | `structure.mmcif.summary.v1`, `structure.sequence.extract.v1`, `structure.contact-map.v1`, `structure.geometry.v1`, `structure.superpose.v1`, `structure.viewer.v1` | Plain, gzip, or BGZF; supported `_atom_site` loops; first-model derived analysis except all-model summary |
+| PDB | Recognized text structure | `structure.viewer.v1` 3D GUI and PNG snapshot | `structure.pdb.summary.v1`, `structure.sequence.extract.v1`, `structure.contact-map.v1`, `structure.geometry.v1`, `structure.superpose.v1`, `protein.secondary-structure.v1`, `structure.viewer.v1` | Plain, gzip, or BGZF; first-model coordinate analysis except all-model PDB summary; explicit pLDDT remains opt-in |
+| mmCIF | Recognized text structure | `structure.viewer.v1` 3D GUI and PNG snapshot | `structure.mmcif.summary.v1`, `structure.sequence.extract.v1`, `structure.contact-map.v1`, `structure.geometry.v1`, `structure.superpose.v1`, `protein.secondary-structure.v1`, `structure.viewer.v1` | Plain, gzip, or BGZF; supported `_atom_site` loops; first-model derived analysis except all-model summary |
 | BLAST tabular | Content-validated tabular records | Bounded text | `similarity.blast.parse.v1`, `similarity.reciprocal.v1` | Default outfmt 6 and declared outfmt 7 fields; reciprocal analysis requires forward and reverse files |
 | BLAST XML | XML1 root detection | Bounded text | `similarity.blast.parse.v1`, `similarity.reciprocal.v1` | Legacy XML1 iterations and HSPs; XML2 is not claimed |
 | Protein-domain tables | InterProScan TSV or HMMER domtblout content | Bounded text | `protein.domain.parse.v1`, `protein.domain.visualize.v1` | Deterministic parsing of coordinates, scores, accessions, sources, available annotations, and bounded SVG architecture tracks |
@@ -93,7 +93,8 @@ including the header.
 均可在 GUI 中进行有界 3D 预览并导出当前视角 PNG。GFF3、GTF 已支持
 统计、规范化、坐标表、参考序列提取和滑动窗口特征密度。BLAST 表格和旧版 XML1
 可解析命中并进行双向最佳命中分析，InterProScan TSV 和 HMMER domtblout 可解析蛋白结构域，
-Newick 可统计拓扑并执行确定性的重命名、重定根和 `.nwk` 输出；BAM、BCF、CRAM、H5AD
+FASTA 可通过 MUSCLE 比对、trimAl 裁剪、IQ-TREE 推断和 MEME 基序发现；PDB/mmCIF 可通过 DSSP
+生成二级结构注释。Newick 可统计拓扑并执行确定性的重命名、重定根和 `.nwk` 输出；BAM、BCF、CRAM、H5AD
 等二进制格式仅识别，不会伪装成可用能力。
 
 CSV/TSV 现已支持 GO 关联表规范化、标准 eggNOG-mapper 注释规范化，以及通用、GO、

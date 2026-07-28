@@ -1,6 +1,6 @@
 ---
 name: align-biological-sequences
-description: Run verified local multiple-sequence alignment capabilities on biological FASTA data. Use when an agent must align nucleotide or protein sequences with MUSCLE, choose the standard or large-dataset mode, preserve a deterministic output artifact, or verify that the required native executable is available.
+description: Run verified local multiple-sequence alignment and trimming capabilities on biological FASTA data. Use when an agent must align nucleotide or protein sequences with MUSCLE, trim an alignment with trimAl, preserve deterministic output artifacts, or verify the required native executables.
 ---
 
 # Align Biological Sequences
@@ -30,9 +30,17 @@ and `threads`. The capability is `msa.muscle.v1`.
 - Check sequence identifiers and compare aligned sequence counts with the
   input before downstream trimming or phylogenetic inference.
 
+## Trim an alignment
+
+```bash
+linxira-bio msa trimal alignment.fa trimmed.fa --mode automated1 --json
+```
+
+Use capability `msa.trimal.v1` with input role `alignment`. Record the selected
+heuristic and compare retained alignment length before inference.
+
 ## Limits
 
-Execution is local CPU and requires MUSCLE 5 on `PATH` or
-`LINXIRA_BIO_MUSCLE`. The capability does not trim alignments, infer trees, or
-silently install software. Use `configure-bio-environment` when MUSCLE is
-missing.
+Execution is local CPU and requires MUSCLE 5 and/or trimAl on `PATH`, or their
+`LINXIRA_BIO_*` overrides. These capabilities do not infer trees or silently
+install software. Use `configure-bio-environment` when a tool is missing.

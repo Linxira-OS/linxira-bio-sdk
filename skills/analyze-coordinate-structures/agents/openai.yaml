@@ -1,4 +1,4 @@
 interface:
   display_name: "Analyze Coordinate Structures"
-  short_description: "Analyze local PDB and mmCIF coordinates"
-  default_prompt: "Use $analyze-coordinate-structures to analyze local PDB or mmCIF coordinates."
+  short_description: "Analyze local PDB and mmCIF coordinate structures"
+  default_prompt: "Use $analyze-coordinate-structures to analyze a local PDB or mmCIF structure."

@@ -98,7 +98,13 @@
       "id": "align-biological-sequences",
       "path": "skills/align-biological-sequences",
       "kind": "executable",
-      "capabilities": ["msa.muscle.v1"]
+      "capabilities": ["msa.muscle.v1", "msa.trimal.v1"]
+    },
+    {
+      "id": "analyze-sequence-motifs",
+      "path": "skills/analyze-sequence-motifs",
+      "kind": "executable",
+      "capabilities": ["motif.meme.v1"]
     },
     {
       "id": "analyze-functional-enrichment",
@@ -156,7 +162,7 @@
       "id": "transform-phylogenetic-trees",
       "path": "skills/transform-phylogenetic-trees",
       "kind": "executable",
-      "capabilities": ["phylogeny.tree.transform.v1"]
+      "capabilities": ["phylogeny.tree.transform.v1", "phylogeny.iqtree.v1"]
     },
     {
       "id": "manipulate-bio-tables",
@@ -190,6 +196,7 @@
         "structure.contact-map.v1",
         "structure.geometry.v1",
         "structure.superpose.v1"
+        ,"protein.secondary-structure.v1"
       ]
     },
     {

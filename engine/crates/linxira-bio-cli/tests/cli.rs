@@ -1328,6 +1328,7 @@ fn executes_controlled_native_tool_wrappers_without_a_shell() {
     let stub = compile_native_tool_stub(&root, &output_root);
     let fasta = root.join("tests/fixtures/sequences/tiny.fa");
     let profile = root.join("tests/fixtures/native-tools/profile.hmm");
+    let structure = root.join("tests/fixtures/data-inspection/structure.pdb");
     let cases = [
         (
             vec![
@@ -1397,6 +1398,67 @@ fn executes_controlled_native_tool_wrappers_without_a_shell() {
             "muscle",
             1,
         ),
+        (
+            vec![
+                "msa".to_owned(),
+                "trimal".to_owned(),
+                fasta.to_string_lossy().into_owned(),
+                output_root
+                    .join("trimmed.fa")
+                    .to_string_lossy()
+                    .into_owned(),
+                "--json".to_owned(),
+            ],
+            "msa.trimal.v1",
+            output_root.join("trimmed.fa"),
+            "trimal",
+            1,
+        ),
+        (
+            vec![
+                "phylogeny".to_owned(),
+                "iqtree".to_owned(),
+                fasta.to_string_lossy().into_owned(),
+                output_root.join("tree.nwk").to_string_lossy().into_owned(),
+                "--json".to_owned(),
+            ],
+            "phylogeny.iqtree.v1",
+            output_root.join("tree.nwk"),
+            "iqtree",
+            1,
+        ),
+        (
+            vec![
+                "motif".to_owned(),
+                "meme".to_owned(),
+                fasta.to_string_lossy().into_owned(),
+                output_root
+                    .join("motifs.meme")
+                    .to_string_lossy()
+                    .into_owned(),
+                "--json".to_owned(),
+            ],
+            "motif.meme.v1",
+            output_root.join("motifs.meme"),
+            "meme",
+            1,
+        ),
+        (
+            vec![
+                "protein".to_owned(),
+                "secondary-structure".to_owned(),
+                structure.to_string_lossy().into_owned(),
+                output_root
+                    .join("structure.dssp")
+                    .to_string_lossy()
+                    .into_owned(),
+                "--json".to_owned(),
+            ],
+            "protein.secondary-structure.v1",
+            output_root.join("structure.dssp"),
+            "mkdssp",
+            1,
+        ),
     ];
 
     for (arguments, capability, output_path, tool, command_count) in cases {
@@ -1407,6 +1469,10 @@ fn executes_controlled_native_tool_wrappers_without_a_shell() {
             .env("LINXIRA_BIO_DIAMOND", &stub)
             .env("LINXIRA_BIO_HMMSEARCH", &stub)
             .env("LINXIRA_BIO_MUSCLE", &stub)
+            .env("LINXIRA_BIO_TRIMAL", &stub)
+            .env("LINXIRA_BIO_IQTREE", &stub)
+            .env("LINXIRA_BIO_MEME", &stub)
+            .env("LINXIRA_BIO_MKDSSP", &stub)
             .output()
             .unwrap_or_else(|error| panic!("run {capability}: {error}"));
         assert!(

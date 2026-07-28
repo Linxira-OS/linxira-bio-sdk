@@ -123,6 +123,22 @@ CAPABILITY_RESULT_CONTRACTS = (
         "schemas/native-tool-result.schema.json",
     ),
     (
+        "tests/fixtures/capability-results/msa-trimal.json",
+        "schemas/native-tool-result.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/phylogeny-iqtree.json",
+        "schemas/native-tool-result.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/motif-meme.json",
+        "schemas/native-tool-result.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/protein-secondary-structure.json",
+        "schemas/native-tool-result.schema.json",
+    ),
+    (
         "tests/fixtures/capability-results/expression-normalization.json",
         "schemas/expression-normalization.schema.json",
     ),

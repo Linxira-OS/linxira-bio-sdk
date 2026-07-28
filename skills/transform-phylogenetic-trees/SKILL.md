@@ -1,9 +1,18 @@
 ---
 name: transform-phylogenetic-trees
-description: Normalize, relabel, summarize, and single-leaf-reroot local Newick phylogenetic trees with deterministic output. Use for Newick syntax validation, canonical serialization, label mapping, branch-length summaries, and outgroup rerooting without launching a tree-inference workflow.
+description: Infer local maximum-likelihood trees with IQ-TREE or normalize, relabel, summarize, and reroot existing Newick trees. Use for alignment-based phylogenetic inference, Newick validation, canonical serialization, label mapping, branch-length summaries, or outgroup rerooting.
 ---
 
 # Transform Phylogenetic Trees
+
+Infer a tree from an alignment with `phylogeny.iqtree.v1`:
+
+```bash
+linxira-bio phylogeny iqtree alignment.fa tree.nwk --model MFP --threads 4 --seed 1 --json
+```
+
+Worker v2 uses role `alignment`. Preserve the model and seed; this version does
+not claim bootstrap analysis.
 
 Inspect the imported tree before execution. Use `phylogeny.tree.transform.v1`; do not replace it with an ad hoc text substitution script.
 
