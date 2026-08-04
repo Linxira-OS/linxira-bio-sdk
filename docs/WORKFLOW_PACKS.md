@@ -29,11 +29,23 @@ checks, atomic activation, runtime locks, and rollback. Entries marked
 workflows. Entries marked `cataloged` have reviewable first-party source,
 contracts, locks, and manifests, but are not installable or dispatchable.
 
+A catalog entry has one primary `capability` and may declare
+`capability_aliases`. The primary identifier and every alias must be unique
+across the complete catalog. The runner authorizes the capability found in the
+request and requires the result to repeat that exact identifier; it never
+silently rewrites an alias to the primary identifier.
+
 The first cataloged official adapters are Biopython sequence conversion and an
 R DESeq2 bulk-expression workflow. Their pack directories include strict CLI
 entry points, artifact-aware schemas, atomic output handling, offline tests,
 dependency and source notices, and exact file checksums. A developer may invoke
-them manually in the locked runtime for review. Product availability still
-requires the managed installer, signed transitive artifact resolution,
-cross-platform fixture runs, and an executor that validates the manifest before
-launch.
+them manually in an audited isolated runtime for review. The R adapter follows
+the current stable R release and requires a project package library; the
+interpreter and library can be selected independently so multiple versions can
+coexist. It serves `expression.differential.v1` and the explicitly
+research-use-only `medical.bulk-rnaseq.v1`, while retaining
+`expression.deseq2.v1` as a compatibility alias. Product availability still
+requires the managed installer, a complete
+resolved direct-and-transitive environment lock with source hashes and license
+evidence, cross-platform fixture runs, and an executor that validates the
+manifest before launch.

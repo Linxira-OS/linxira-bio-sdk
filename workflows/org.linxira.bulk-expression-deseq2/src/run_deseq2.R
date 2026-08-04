@@ -1,10 +1,18 @@
 #!/usr/bin/env Rscript
 
 PACK_ID <- "org.linxira.bulk-expression-deseq2"
-PACK_VERSION <- "0.1.0"
-CAPABILITY <- "expression.deseq2.v1"
-EXPECTED_R <- "4.4.3"
-EXPECTED_PACKAGES <- c(DESeq2 = "1.46.0", jsonlite = "1.8.9", digest = "0.6.37")
+PACK_VERSION <- "0.2.0"
+PRIMARY_CAPABILITY <- "expression.differential.v1"
+MEDICAL_CAPABILITY <- "medical.bulk-rnaseq.v1"
+LEGACY_CAPABILITY <- "expression.deseq2.v1"
+SUPPORTED_CAPABILITIES <- c(PRIMARY_CAPABILITY, MEDICAL_CAPABILITY, LEGACY_CAPABILITY)
+PREFERRED_R <- "4.6.1"
+R_VERSION_REQUIREMENT <- ">=4.6.1,<4.7.0"
+PACKAGE_REQUIREMENTS <- c(
+  DESeq2 = ">=1.52.0,<1.53.0",
+  jsonlite = ">=1.8.9,<3.0.0",
+  digest = ">=0.6.37,<0.7.0"
+)
 
 request_error <- function(message) {
   stop(structure(list(message = message, call = NULL), class = c("request_error", "error", "condition")))
@@ -146,8 +154,11 @@ validate_request <- function(document, result_path) {
   )
   if (!identical(request$schema_version, "2")) request_error("schema_version must be '2'")
   require_string(request$job_id, "job_id")
-  if (!identical(request$capability, CAPABILITY)) {
-    request_error(sprintf("capability must be '%s'", CAPABILITY))
+  capability <- require_string(request$capability, "capability")
+  if (!capability %in% SUPPORTED_CAPABILITIES) {
+    request_error(sprintf(
+      "capability must be one of: %s", paste(SUPPORTED_CAPABILITIES, collapse = ", ")
+    ))
   }
   execution <- require_object(request$execution, "execution")
   require_exact_keys(execution, "mode", character(), "execution")
@@ -210,6 +221,7 @@ validate_request <- function(document, result_path) {
     require_nonnegative_integer(parameters$min_total_count, "parameters.min_total_count")
   list(
     job_id = request$job_id,
+    capability = capability,
     counts = counts,
     samples = samples,
     output_directory = output_directory,
@@ -303,22 +315,116 @@ load_analysis_inputs <- function(config) {
   list(counts = counts, metadata = metadata)
 }
 
-check_runtime <- function() {
-  actual_r <- paste(R.version$major, R.version$minor, sep = ".")
-  if (!identical(actual_r, EXPECTED_R)) {
-    stop(sprintf("locked runtime requires R %s, found R %s", EXPECTED_R, actual_r))
+version_satisfies <- function(actual, requirement) {
+  actual_version <- tryCatch(numeric_version(actual), error = function(error) NULL)
+  if (is.null(actual_version)) return(FALSE)
+  clauses <- trimws(strsplit(requirement, ",", fixed = TRUE)[[1L]])
+  if (length(clauses) == 0L || any(!nzchar(clauses))) return(FALSE)
+  all(vapply(clauses, function(clause) {
+    match <- regexec("^(>=|<=|==|>|<)([0-9]+(?:\\.[0-9]+)*)$", clause, perl = TRUE)
+    parts <- regmatches(clause, match)[[1L]]
+    if (length(parts) != 3L) return(FALSE)
+    expected <- tryCatch(numeric_version(parts[[3L]]), error = function(error) NULL)
+    if (is.null(expected)) return(FALSE)
+    switch(
+      parts[[2L]],
+      ">=" = actual_version >= expected,
+      "<=" = actual_version <= expected,
+      "==" = actual_version == expected,
+      ">" = actual_version > expected,
+      "<" = actual_version < expected,
+      FALSE
+    )
+  }, logical(1L)))
+}
+
+path_is_within <- function(path, root) {
+  path <- normalizePath(path, winslash = "/", mustWork = TRUE)
+  root <- normalizePath(root, winslash = "/", mustWork = TRUE)
+  if (.Platform$OS.type == "windows") {
+    path <- tolower(path)
+    root <- tolower(root)
   }
-  for (package in names(EXPECTED_PACKAGES)) {
-    if (!requireNamespace(package, quietly = TRUE)) {
-      stop(sprintf("locked dependency %s %s is not installed", package, EXPECTED_PACKAGES[[package]]))
-    }
-    actual <- as.character(utils::packageVersion(package))
-    if (!identical(actual, EXPECTED_PACKAGES[[package]])) {
+  identical(path, root) || startsWith(path, paste0(root, "/"))
+}
+
+configure_project_library <- function() {
+  configured <- Sys.getenv("LINXIRA_BIO_WORKFLOW_R_LIBRARY", unset = "")
+  if (!nzchar(configured)) {
+    stop(paste0(
+      "LINXIRA_BIO_WORKFLOW_R_LIBRARY must name the existing project-isolated ",
+      "R package library"
+    ))
+  }
+  if (!dir.exists(configured)) {
+    stop(sprintf("project-isolated R package library does not exist: %s", configured))
+  }
+  library <- normalizePath(configured, winslash = "/", mustWork = TRUE)
+  if (path_is_within(library, R.home())) {
+    stop("project-isolated R package library must be outside R_HOME")
+  }
+  Sys.setenv(R_LIBS_USER = library)
+  .libPaths(c(library, .Library))
+  active <- normalizePath(.libPaths()[[1L]], winslash = "/", mustWork = TRUE)
+  if (!same_path(active, library)) {
+    stop("project-isolated R package library could not be activated")
+  }
+  library
+}
+
+package_from_project_library <- function(package, library) {
+  location <- tryCatch(
+    find.package(package, lib.loc = .libPaths(), quiet = TRUE),
+    error = function(error) ""
+  )
+  nzchar(location) && path_is_within(location, library)
+}
+
+validate_loaded_namespace_origins <- function(project_library) {
+  for (package in loadedNamespaces()) {
+    location <- find.package(package, lib.loc = .libPaths(), quiet = TRUE)
+    if (nzchar(location) && path_is_within(location, project_library)) next
+    priority <- utils::packageDescription(package, fields = "Priority")
+    runtime_package <- nzchar(location) && path_is_within(location, R.home()) &&
+      length(priority) == 1L && !is.na(priority) &&
+      tolower(priority) %in% c("base", "recommended")
+    if (!runtime_package) {
       stop(sprintf(
-        "locked dependency requires %s %s, found %s", package, EXPECTED_PACKAGES[[package]], actual
+        "loaded namespace %s did not resolve from the project library", package
       ))
     }
   }
+  invisible(TRUE)
+}
+
+check_runtime <- function(project_library) {
+  actual_r <- paste(R.version$major, R.version$minor, sep = ".")
+  if (!version_satisfies(actual_r, R_VERSION_REQUIREMENT)) {
+    stop(sprintf(
+      "workflow requires R %s (preferred %s), found R %s",
+      R_VERSION_REQUIREMENT, PREFERRED_R, actual_r
+    ))
+  }
+  for (package in names(PACKAGE_REQUIREMENTS)) {
+    if (!requireNamespace(package, quietly = TRUE)) {
+      stop(sprintf(
+        "dependency %s %s is not installed in the project library",
+        package, PACKAGE_REQUIREMENTS[[package]]
+      ))
+    }
+    if (!package_from_project_library(package, project_library)) {
+      stop(sprintf("dependency %s did not resolve from the project library", package))
+    }
+    actual <- as.character(utils::packageVersion(package))
+    if (!version_satisfies(actual, PACKAGE_REQUIREMENTS[[package]])) {
+      stop(sprintf(
+        "dependency requires %s %s, found %s",
+        package, PACKAGE_REQUIREMENTS[[package]], actual
+      ))
+    }
+  }
+  validate_loaded_namespace_origins(project_library)
+  invisible(list(r = actual_r, library = project_library))
 }
 
 artifact_record <- function(id, role, path, final_path) {
@@ -334,7 +440,7 @@ artifact_record <- function(id, role, path, final_path) {
   )
 }
 
-run_analysis <- function(config, started_at) {
+run_analysis <- function(config, started_at, project_library) {
   if (file.info(config$counts$path)$size != config$counts$declared_size ||
       file.info(config$samples$path)$size != config$samples$declared_size) {
     request_error("an input size changed after request validation")
@@ -377,6 +483,7 @@ run_analysis <- function(config, started_at) {
   normalized_matrix <- DESeq2::counts(dataset, normalized = TRUE)
   normalized <- data.frame(feature_id = rownames(normalized_matrix), normalized_matrix,
                            check.names = FALSE, stringsAsFactors = FALSE)
+  validate_loaded_namespace_origins(project_library)
 
   output_parent <- dirname(config$output_directory)
   staging <- tempfile(pattern = ".linxira-deseq2-", tmpdir = output_parent)
@@ -415,7 +522,7 @@ run_analysis <- function(config, started_at) {
   result <- list(
     schema_version = "2",
     job_id = config$job_id,
-    capability = CAPABILITY,
+    capability = config$capability,
     status = "ok",
     result = list(
       input_features = nrow(input$counts),
@@ -425,6 +532,8 @@ run_analysis <- function(config, started_at) {
       significant_features = significant,
       alpha = config$alpha,
       min_total_count = config$min_total_count,
+      intended_use = "research-use-only",
+      clinical_use = FALSE,
       contrast = list(level = config$contrast_level, reference = config$reference_level),
       effective_parameters = list(
         feature_id_column = config$feature_id_column,
@@ -446,14 +555,23 @@ run_analysis <- function(config, started_at) {
       execution_mode = "local-cpu",
       started_at = started_at,
       finished_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-      software = c(list(list(name = "R", version = EXPECTED_R)), loaded_software),
+      software = c(list(list(name = "R", version = paste(
+        R.version$major, R.version$minor, sep = "."
+      ))), loaded_software),
       input_sha256 = list(counts = counts_sha, sample_metadata = samples_sha),
       command = c("Rscript", "src/run_deseq2.R", "--request", "<request>", "--result", "<result>"),
       dependency_lock_sha256 = digest::digest(
         file = lock_path, algo = "sha256", serialize = FALSE
       )
     ),
-    diagnostics = list()
+    diagnostics = if (identical(config$capability, MEDICAL_CAPABILITY)) list(list(
+      code = "research_use_only",
+      severity = "warning",
+      message = paste0(
+        "Research use only. This workflow performs statistical analysis and does not ",
+        "provide diagnosis, treatment advice, or clinical interpretation."
+      )
+    )) else list()
   )
   jsonlite::write_json(
     result, file.path(staging, "result.json"), auto_unbox = TRUE, pretty = TRUE,
@@ -482,16 +600,26 @@ parse_arguments <- function(arguments) {
   list(request = arguments[[request_index + 1L]], result = arguments[[result_index + 1L]])
 }
 
-minimal_error_json <- function(job_id, message, started_at) {
+minimal_error_json <- function(job_id, capability, message, started_at) {
+  diagnostics <- if (identical(capability, MEDICAL_CAPABILITY)) {
+    paste0(
+      '[{"code":"research_use_only","severity":"warning",',
+      '"message":"Research use only; no diagnosis or clinical interpretation is provided."},',
+      '{"code":"workflow_failed","severity":"error","message":%s}]'
+    )
+  } else {
+    '[{"code":"workflow_failed","severity":"error","message":%s}]'
+  }
   sprintf(
     paste0(
-      '{"schema_version":"2","job_id":%s,"capability":"%s","status":"error",',
+      '{"schema_version":"2","job_id":%s,"capability":%s,"status":"error",',
       '"result":{},"artifacts":[],"provenance":{"engine_version":"%s",',
       '"execution_mode":"local-cpu","started_at":"%s","finished_at":"%s"},',
-      '"diagnostics":[{"code":"workflow_failed","severity":"error","message":%s}]}'
+      '"diagnostics":', diagnostics, '}'
     ),
-    encodeString(job_id, quote = '"'), CAPABILITY, PACK_VERSION, started_at,
-    format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"), encodeString(message, quote = '"')
+    encodeString(job_id, quote = '"'), encodeString(capability, quote = '"'),
+    PACK_VERSION, started_at, format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+    encodeString(message, quote = '"')
   )
 }
 
@@ -523,28 +651,42 @@ write_error_json_atomic <- function(result_path, payload) {
 main <- function() {
   started_at <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
   job_id <- "workflow-error"
+  capability <- PRIMARY_CAPABILITY
   result_path <- NULL
   status <- tryCatch({
     options <- parse_arguments(commandArgs(trailingOnly = TRUE))
     result_path <- options$result
+    project_library <- configure_project_library()
     if (!file.exists(options$request) || dir.exists(options$request)) {
       request_error(sprintf("request file does not exist: %s", options$request))
     }
     if (!requireNamespace("jsonlite", quietly = TRUE)) {
-      stop("locked dependency jsonlite 1.8.9 is not installed")
+      stop(sprintf(
+        "dependency jsonlite %s is not installed in the project library",
+        PACKAGE_REQUIREMENTS[["jsonlite"]]
+      ))
+    }
+    if (!package_from_project_library("jsonlite", project_library)) {
+      stop("dependency jsonlite did not resolve from the project library")
     }
     document <- jsonlite::fromJSON(options$request, simplifyVector = FALSE)
     if (is.list(document) && is.character(document$job_id) && length(document$job_id) == 1L &&
         !is.na(document$job_id) && nzchar(document$job_id)) {
       job_id <- document$job_id
     }
+    if (is.list(document) && is.character(document$capability) &&
+        length(document$capability) == 1L && !is.na(document$capability) &&
+        document$capability %in% SUPPORTED_CAPABILITIES) {
+      capability <- document$capability
+    }
     config <- validate_request(document, options$result)
-    check_runtime()
-    result <- run_analysis(config, started_at)
+    capability <- config$capability
+    check_runtime(project_library)
+    result <- run_analysis(config, started_at, project_library)
     cat(jsonlite::toJSON(result, auto_unbox = TRUE, na = "null", null = "null", digits = NA), "\n")
     0L
   }, error = function(error) {
-    payload <- minimal_error_json(job_id, conditionMessage(error), started_at)
+    payload <- minimal_error_json(job_id, capability, conditionMessage(error), started_at)
     if (!is.null(result_path)) {
       try(write_error_json_atomic(result_path, payload), silent = TRUE)
     }

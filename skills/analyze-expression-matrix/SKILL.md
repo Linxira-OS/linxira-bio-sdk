@@ -48,6 +48,6 @@ artifact.
 - Treat PCA, clustering, and heatmaps as exploratory. Do not infer biological
   groups or statistical significance from them alone.
 
-Differential expression remains separate. Use a locked and validated workflow
-and preserve the design formula, contrasts, package versions, normalization,
-and multiple-testing method.
+Differential expression remains separate. Route raw integer counts and sample
+metadata to `analyze-differential-expression`, and preserve the design,
+contrast, package versions, normalization, and multiple-testing method.

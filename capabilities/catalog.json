@@ -280,6 +280,15 @@
       "output_formats": ["fastq", "json"]
     },
     {
+      "id": "fastq.deduplicate.v1",
+      "status": "available",
+      "category": "read-processing",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio fastq deduplicate <input.fastq> <output.fastq> --json",
+      "input_formats": ["fastq"],
+      "output_formats": ["fastq", "json"]
+    },
+    {
       "id": "interval.intersect.v1",
       "status": "available",
       "category": "genome-intervals",
@@ -305,6 +314,15 @@
       "command": "linxira-bio interval subtract <left.bed> <right.bed> <output.bed> --json",
       "input_formats": ["bed"],
       "output_formats": ["bed", "json"]
+    },
+    {
+      "id": "interval.closest.v1",
+      "status": "available",
+      "category": "genome-intervals",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio interval closest <query.bed> <target.bed> <output.tsv> --json",
+      "input_formats": ["bed"],
+      "output_formats": ["tsv", "json"]
     },
     {
       "id": "alignment.qc.v1",
@@ -335,6 +353,15 @@
       "output_formats": ["tsv", "json"]
     },
     {
+      "id": "alignment.bam-to-bigwig.v1",
+      "status": "available",
+      "category": "alignment",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio alignment bam-to-bigwig <input.bam|cram> <output.bw> --json",
+      "input_formats": ["bam", "cram"],
+      "output_formats": ["bigwig", "json"]
+    },
+    {
       "id": "alignment.short-read.v1",
       "status": "available",
       "category": "read-alignment",
@@ -349,6 +376,15 @@
       "category": "variant-calling",
       "default_execution": "local-cpu",
       "command": "linxira-bio variant stats <input.vcf> --json",
+      "input_formats": ["vcf"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "variant.compare.v1",
+      "status": "available",
+      "category": "variant-calling",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio variant compare <left.vcf> <right.vcf> --json",
       "input_formats": ["vcf"],
       "output_formats": ["json"]
     },
@@ -441,10 +477,13 @@
       "default_execution": "local-cpu"
     },
     {
-      "id": "expression.deseq2.v1",
-      "status": "planned",
+      "id": "expression.differential.v1",
+      "status": "available",
       "category": "expression",
-      "default_execution": "local-cpu"
+      "default_execution": "local-cpu",
+      "command": "linxira-bio workflow run org.linxira.bulk-expression-deseq2 <request.json> <output/result.json>",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["csv", "json"]
     },
     {
       "id": "expression.matrix.qc.v1",
@@ -490,6 +529,15 @@
       "command": "linxira-bio expression heatmap <matrix.csv|tsv> --top-features 50 --json",
       "input_formats": ["csv", "tsv"],
       "output_formats": ["json"]
+    },
+    {
+      "id": "expression.volcano.v1",
+      "status": "available",
+      "category": "visualization",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio expression volcano <differential.csv> <output.svg> --json",
+      "input_formats": ["csv"],
+      "output_formats": ["json", "svg"]
     },
     {
       "id": "set.venn.v1",
@@ -627,6 +675,15 @@
       "output_formats": ["meme-text", "json"]
     },
     {
+      "id": "motif.visualize.v1",
+      "status": "available",
+      "category": "scientific-visualization",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio motif logo <input.meme> <output.svg> --json",
+      "input_formats": ["meme-text"],
+      "output_formats": ["svg", "json"]
+    },
+    {
       "id": "protein.secondary-structure.v1",
       "status": "available",
       "category": "protein-structure",
@@ -681,6 +738,15 @@
       "output_formats": ["json"]
     },
     {
+      "id": "enrichment.gsea.v1",
+      "status": "available",
+      "category": "functional-enrichment",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio enrichment gsea <ranked.tsv> <gene-sets.tsv> --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["json"]
+    },
+    {
       "id": "enrichment.visualize.v1",
       "status": "available",
       "category": "scientific-visualization",
@@ -702,6 +768,78 @@
       "category": "structural-biology",
       "default_execution": "authenticated-browser",
       "requires_explicit_approval": true
+    },
+    {
+      "id": "medical.cohort-table.qc.v1",
+      "status": "available",
+      "category": "research-use-only",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio medical cohort-qc <cohort.csv|tsv> --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "medical.bulk-rnaseq.v1",
+      "status": "available",
+      "category": "research-use-only",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio workflow run org.linxira.bulk-expression-deseq2 <request.json> <output/result.json>",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["csv", "json"]
+    },
+    {
+      "id": "medical.pathway-ruo.v1",
+      "status": "available",
+      "category": "research-use-only",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio medical pathway <genes.txt|csv|tsv> <associations.csv|tsv> --json",
+      "input_formats": ["csv", "tsv", "identifier-list"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "medical.variant-cohort.v1",
+      "status": "available",
+      "category": "research-use-only",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio medical variant-cohort <cohort.vcf> --json",
+      "input_formats": ["vcf"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "medical.single-cell-qc.v1",
+      "status": "available",
+      "category": "research-use-only",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio medical single-cell-qc <counts.csv|tsv> --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["json"]
+    },
+    {
+      "id": "comparative.mcscanx.v1",
+      "status": "available",
+      "category": "comparative-genomics",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio comparative mcscanx <genes.tsv> <hits.blast> <output.collinearity> --json",
+      "input_formats": ["tsv", "blast-tabular"],
+      "output_formats": ["mcscanx-collinearity", "json"]
+    },
+    {
+      "id": "comparative.kaks.v1",
+      "status": "available",
+      "category": "comparative-genomics",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio comparative kaks <codon-alignment.axt> <output.tsv> <NG|LWL|LPB|YN> --json",
+      "input_formats": ["axt"],
+      "output_formats": ["tsv", "json"]
+    },
+    {
+      "id": "comparative.synteny.visualize.v1",
+      "status": "available",
+      "category": "comparative-genomics",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio comparative synteny-plot <anchors.tsv> <output.svg> [--style dual|multiple|micro|circular] --json",
+      "input_formats": ["tsv"],
+      "output_formats": ["svg", "json"]
     }
   ]
 }

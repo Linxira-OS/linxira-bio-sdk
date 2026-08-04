@@ -44,16 +44,20 @@ pub enum DatasetFormat {
     Zip,
     Bcf,
     Cram,
+    Bigwig,
     H5ad,
     Loom,
     Hdf5,
     Rds,
     Pdb,
     Mmcif,
+    Axt,
     BlastTabular,
     BlastXml,
     ProteinDomains,
     HmmProfile,
+    MemeText,
+    McscanxCollinearity,
     Newick,
     Unknown,
 }
@@ -74,16 +78,20 @@ impl DatasetFormat {
             Self::Zip => "zip",
             Self::Bcf => "bcf",
             Self::Cram => "cram",
+            Self::Bigwig => "bigwig",
             Self::H5ad => "h5ad",
             Self::Loom => "loom",
             Self::Hdf5 => "hdf5",
             Self::Rds => "rds",
             Self::Pdb => "pdb",
             Self::Mmcif => "mmcif",
+            Self::Axt => "axt",
             Self::BlastTabular => "blast-tabular",
             Self::BlastXml => "blast-xml",
             Self::ProteinDomains => "protein-domains",
             Self::HmmProfile => "hmm-profile",
+            Self::MemeText => "meme-text",
+            Self::McscanxCollinearity => "mcscanx-collinearity",
             Self::Newick => "newick",
             Self::Unknown => "unknown",
         }
@@ -475,16 +483,20 @@ fn detect_from_extension(path: &Path) -> Option<Detection> {
         "zip" => DatasetFormat::Zip,
         "bcf" => DatasetFormat::Bcf,
         "cram" => DatasetFormat::Cram,
+        "bw" | "bigwig" => DatasetFormat::Bigwig,
         "h5ad" => DatasetFormat::H5ad,
         "loom" => DatasetFormat::Loom,
         "h5" | "hdf5" => DatasetFormat::Hdf5,
         "rds" | "rda" | "rdata" => DatasetFormat::Rds,
         "pdb" | "ent" => DatasetFormat::Pdb,
         "cif" | "mmcif" => DatasetFormat::Mmcif,
+        "axt" => DatasetFormat::Axt,
         "blast" | "m8" => DatasetFormat::BlastTabular,
         "xml" => DatasetFormat::BlastXml,
         "domtblout" => DatasetFormat::ProteinDomains,
         "hmm" => DatasetFormat::HmmProfile,
+        "meme" => DatasetFormat::MemeText,
+        "collinearity" => DatasetFormat::McscanxCollinearity,
         "nwk" | "newick" | "tree" | "tre" => DatasetFormat::Newick,
         _ => return None,
     };
@@ -568,6 +580,9 @@ fn detect_from_content(prefix: &[u8], path: &Path) -> Option<Detection> {
     }
     if first.starts_with("HMMER3/") {
         return high(DatasetFormat::HmmProfile);
+    }
+    if text.contains("MEME version") && text.contains("ALPHABET=") {
+        return high(DatasetFormat::MemeText);
     }
     if looks_like_blast_tabular(&nonempty) {
         return high(DatasetFormat::BlastTabular);
@@ -877,15 +892,19 @@ fn support_for(format: DatasetFormat) -> DatasetSupport {
         | DatasetFormat::Sam
         | DatasetFormat::Pdb
         | DatasetFormat::Mmcif
+        | DatasetFormat::Axt
         | DatasetFormat::BlastTabular
         | DatasetFormat::BlastXml
         | DatasetFormat::ProteinDomains
         | DatasetFormat::HmmProfile
+        | DatasetFormat::MemeText
+        | DatasetFormat::McscanxCollinearity
         | DatasetFormat::Newick => DatasetSupport::Supported,
         DatasetFormat::Bam
         | DatasetFormat::Zip
         | DatasetFormat::Bcf
         | DatasetFormat::Cram
+        | DatasetFormat::Bigwig
         | DatasetFormat::H5ad
         | DatasetFormat::Loom
         | DatasetFormat::Hdf5
@@ -912,6 +931,7 @@ fn build_preview(
         DatasetFormat::Bam
         | DatasetFormat::Bcf
         | DatasetFormat::Cram
+        | DatasetFormat::Bigwig
         | DatasetFormat::H5ad
         | DatasetFormat::Loom
         | DatasetFormat::Hdf5
@@ -923,10 +943,13 @@ fn build_preview(
         }),
         DatasetFormat::Pdb
         | DatasetFormat::Mmcif
+        | DatasetFormat::Axt
         | DatasetFormat::BlastTabular
         | DatasetFormat::BlastXml
         | DatasetFormat::ProteinDomains
         | DatasetFormat::HmmProfile
+        | DatasetFormat::MemeText
+        | DatasetFormat::McscanxCollinearity
         | DatasetFormat::Newick
         | DatasetFormat::Unknown => preview_text(path, compression, options),
     }

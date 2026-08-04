@@ -566,6 +566,62 @@ pub fn run_iqtree_path(
     result
 }
 
+pub fn run_mcscanx_path(
+    gene_positions: impl AsRef<Path>,
+    similarity_hits: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+) -> Result<NativeToolResult, NativeToolError> {
+    let gene_positions = gene_positions.as_ref();
+    let similarity_hits = similarity_hits.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[gene_positions, similarity_hits], output)?;
+    let temporary = create_temporary_directory(output, "mcscanx")?;
+    let dataset = temporary.join("dataset");
+    let gff = temporary.join("dataset.gff");
+    let blast = temporary.join("dataset.blast");
+    let generated = temporary.join("dataset.collinearity");
+    let result = (|| {
+        fs::copy(gene_positions, &gff)?;
+        fs::copy(similarity_hits, &blast)?;
+        let executable = configured_program("LINXIRA_BIO_MCSCANX", "MCScanX");
+        run_native_command(&executable, &mcscanx_arguments(&dataset), false)?;
+        copy_generated_output("MCScanX", &generated, output)?;
+        finish_result("mcscanx", "collinearity", output, 1, 2)
+    })();
+    let cleanup = fs::remove_dir_all(&temporary);
+    if let Err(error) = cleanup
+        && result.is_ok()
+    {
+        return Err(NativeToolError::Io(error));
+    }
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
+pub fn run_kaks_path(
+    codon_alignment: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    method: &str,
+) -> Result<NativeToolResult, NativeToolError> {
+    let method = parse_kaks_method(method)?;
+    let codon_alignment = codon_alignment.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[codon_alignment], output)?;
+    let executable = configured_program("LINXIRA_BIO_KAKS_CALCULATOR", "KaKs_Calculator");
+    let result = run_native_command(
+        &executable,
+        &kaks_arguments(codon_alignment, output, method),
+        false,
+    )
+    .and_then(|_| finish_result("kaks-calculator", method, output, 1, 1));
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
 pub fn run_meme_path(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
@@ -666,6 +722,26 @@ pub fn run_samtools_report_path(
         fs::write(output, native_output.stdout)?;
         finish_result("samtools", mode, output, 1, 1)
     })();
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
+/// Convert an indexed BAM/CRAM alignment to a BigWig coverage track with deepTools.
+pub fn run_bam_to_bigwig_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    threads: usize,
+) -> Result<NativeToolResult, NativeToolError> {
+    validate_threads(threads)?;
+    let input = input.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[input], output)?;
+    let executable = configured_program("LINXIRA_BIO_BAMCOVERAGE", "bamCoverage");
+    let arguments = bam_coverage_arguments(input, output, threads);
+    let result = run_native_command(&executable, &arguments, false)
+        .and_then(|_| finish_result("bamCoverage", "bam-to-bigwig", output, 1, 1));
     if result.is_err() {
         remove_incomplete_output(output);
     }
@@ -822,6 +898,21 @@ pub fn iqtree_arguments(alignment: &Path, prefix: &Path, options: &IqtreeOptions
     ]
 }
 
+pub fn mcscanx_arguments(dataset: &Path) -> Vec<OsString> {
+    vec![dataset.as_os_str().to_owned()]
+}
+
+pub fn kaks_arguments(input: &Path, output: &Path, method: &str) -> Vec<OsString> {
+    vec![
+        OsString::from("-i"),
+        input.as_os_str().to_owned(),
+        OsString::from("-o"),
+        output.as_os_str().to_owned(),
+        OsString::from("-m"),
+        OsString::from(method),
+    ]
+}
+
 pub fn meme_arguments(
     input: &Path,
     output_directory: &Path,
@@ -866,6 +957,19 @@ pub fn samtools_report_arguments(
     }
     arguments.push(input.as_os_str().to_owned());
     arguments
+}
+
+pub fn bam_coverage_arguments(input: &Path, output: &Path, threads: usize) -> Vec<OsString> {
+    vec![
+        OsString::from("--bam"),
+        input.as_os_str().to_os_string(),
+        OsString::from("--outFileName"),
+        output.as_os_str().to_os_string(),
+        OsString::from("--outFileFormat"),
+        OsString::from("bigwig"),
+        OsString::from("--numberOfProcessors"),
+        OsString::from(threads.to_string()),
+    ]
 }
 
 pub fn minimap2_short_read_arguments(
@@ -916,6 +1020,18 @@ fn validate_similarity_options(options: &SimilaritySearchOptions) -> Result<(), 
         ));
     }
     Ok(())
+}
+
+fn parse_kaks_method(method: &str) -> Result<&str, NativeToolError> {
+    match method.trim().to_ascii_uppercase().as_str() {
+        "NG" => Ok("NG"),
+        "LWL" => Ok("LWL"),
+        "LPB" => Ok("LPB"),
+        "YN" => Ok("YN"),
+        _ => Err(NativeToolError::InvalidOption(
+            "Ka/Ks method must be NG, LWL, LPB, or YN".to_owned(),
+        )),
+    }
 }
 
 fn validate_threads(threads: usize) -> Result<(), NativeToolError> {
@@ -1078,10 +1194,11 @@ mod tests {
     use super::{
         BlastProgram, DiamondMode, HmmerOptions, IqtreeOptions, MemeAlphabet, MemeOptions,
         MuscleMode, MuscleOptions, ShortReadAlignmentOptions, SimilaritySearchOptions, TrimalMode,
-        blast_arguments, diamond_arguments, dssp_arguments, hmmer_arguments, iqtree_arguments,
-        meme_arguments, minimap2_short_read_arguments, muscle_arguments, parse_blast_program,
-        parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet, parse_muscle_mode,
-        parse_trimal_mode, samtools_report_arguments, samtools_sort_arguments, trimal_arguments,
+        bam_coverage_arguments, blast_arguments, diamond_arguments, dssp_arguments,
+        hmmer_arguments, iqtree_arguments, kaks_arguments, mcscanx_arguments, meme_arguments,
+        minimap2_short_read_arguments, muscle_arguments, parse_blast_program, parse_diamond_mode,
+        parse_hmmer_mode, parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode,
+        samtools_report_arguments, samtools_sort_arguments, trimal_arguments,
     };
     use std::ffi::OsString;
     use std::path::Path;
@@ -1156,6 +1273,14 @@ mod tests {
         assert!(iqtree.contains(&OsString::from("run prefix")));
         assert!(iqtree.contains(&OsString::from("7")));
 
+        let mcscanx = mcscanx_arguments(Path::new("isolated workspace/dataset"));
+        assert_eq!(mcscanx, vec![OsString::from("isolated workspace/dataset")]);
+
+        let kaks = kaks_arguments(Path::new("codons.axt"), Path::new("kaks.tsv"), "YN");
+        assert_eq!(kaks[0], OsString::from("-i"));
+        assert_eq!(kaks[4], OsString::from("-m"));
+        assert_eq!(kaks[5], OsString::from("YN"));
+
         let meme = meme_arguments(
             Path::new("sequences.fa"),
             Path::new("meme output"),
@@ -1180,6 +1305,10 @@ mod tests {
             Some(Path::new("reference.fa")),
             "stats",
         );
+        let bigwig = bam_coverage_arguments(Path::new("reads.bam"), Path::new("track.bw"), 4);
+        assert_eq!(bigwig[0], OsString::from("--bam"));
+        assert!(bigwig.contains(&OsString::from("--outFileFormat")));
+        assert!(bigwig.contains(&OsString::from("bigwig")));
         assert_eq!(report[0], OsString::from("stats"));
         assert!(report.contains(&OsString::from("--reference")));
 

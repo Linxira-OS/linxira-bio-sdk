@@ -2,12 +2,15 @@
 
 //! Execute versioned Linxira Bio jobs through one shared local worker API.
 
+mod workflow;
+
 use linxira_bio_core::alignment::sam_qc_path;
 use linxira_bio_core::annotation::{
     AnnotationExtractOptions, AnnotationNormalizeOptions, GeneDensityOptions, GenePositionOptions,
     annotation_gene_positions_path, annotation_stats_path, extract_annotation_sequences_path,
     gene_density_path, normalize_annotation_path,
 };
+use linxira_bio_core::cohort::cohort_table_qc_path;
 use linxira_bio_core::coordinate::{
     AtomSelector, ContactMapOptions, SuperpositionOptions, extract_structure_sequences_path,
     measure_structure_geometry_path, mmcif_summary_path, parse_atom_selector,
@@ -33,29 +36,33 @@ use linxira_bio_core::fastq::{
 };
 use linxira_bio_core::fastq_transform::{
     DEFAULT_ADAPTER_MIN_OVERLAP, DEFAULT_MIN_LENGTH, DEFAULT_TRIM_QUALITY, FastqAdapterOptions,
-    FastqTransformError, FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
-    fastq_trim_path,
+    FastqDeduplicateKey, FastqDeduplicateOptions, FastqTransformError,
+    FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
+    fastq_deduplicate_path, fastq_trim_path,
 };
 use linxira_bio_core::functional::{
-    EnrichmentKind, EnrichmentOptions, GoAnnotationOptions, normalize_eggnog_path,
-    normalize_go_annotations_path, overrepresentation_path,
+    EnrichmentKind, EnrichmentOptions, GoAnnotationOptions, GseaOptions, gsea_preranked_path,
+    normalize_eggnog_path, normalize_go_annotations_path, overrepresentation_path,
 };
 use linxira_bio_core::interval::{
-    IntervalMergeOptions, bed_intersect_path, bed_merge_path, bed_subtract_path,
+    IntervalMergeOptions, bed_closest_path, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
 use linxira_bio_core::native_tools::{
     HmmerOptions, IqtreeOptions, MemeOptions, MuscleOptions, ShortReadAlignmentOptions,
     SimilaritySearchOptions, parse_blast_program, parse_diamond_mode, parse_hmmer_mode,
-    parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode, run_blast_fasta_path,
-    run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path, run_meme_path,
-    run_muscle_path, run_samtools_report_path, run_short_read_alignment_path, run_trimal_path,
+    parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
+    run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path,
+    run_kaks_path, run_mcscanx_path, run_meme_path, run_muscle_path, run_samtools_report_path,
+    run_short_read_alignment_path, run_trimal_path,
 };
 use linxira_bio_core::phylogeny::{TreeTransformOptions, transform_newick_path};
 use linxira_bio_core::protein::protein_properties_path;
 use linxira_bio_core::scientific_visualization::{
     AnnotationStructureOptions, DomainArchitectureOptions, EnrichmentPlotStyle,
-    EnrichmentVisualizationOptions, render_annotation_structure_svg_path,
-    render_domain_architecture_svg_path, render_enrichment_svg_path,
+    EnrichmentVisualizationOptions, SyntenyPlotStyle, SyntenyVisualizationOptions,
+    VolcanoPlotOptions, render_annotation_structure_svg_path, render_domain_architecture_svg_path,
+    render_enrichment_svg_path, render_motif_logo_svg_path, render_synteny_svg_with_options_path,
+    render_volcano_svg_path,
 };
 use linxira_bio_core::sequence::fasta_stats_path;
 use linxira_bio_core::sequence_analysis::{
@@ -79,7 +86,7 @@ use linxira_bio_core::table::{
 };
 use linxira_bio_core::variant::vcf_stats_path;
 use linxira_bio_core::variant_transform::{
-    VariantFilterOptions, filter_vcf_path, normalize_vcf_path,
+    VariantFilterOptions, compare_vcf_paths, filter_vcf_path, normalize_vcf_path,
 };
 use linxira_bio_export::{ExportFormat, ensure_distinct_input_output, export_json_file};
 use linxira_bio_protocol::{
@@ -137,11 +144,16 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "annotation.structure.visualize.v1" => {
             run_annotation_structure_visualization(base_directory, request)
         }
+        "comparative.synteny.visualize.v1" => run_synteny_visualization(base_directory, request),
+        "comparative.mcscanx.v1" => run_mcscanx(base_directory, request),
+        "comparative.kaks.v1" => run_kaks(base_directory, request),
         "enrichment.overrepresentation.v1" => {
             run_enrichment(base_directory, request, EnrichmentKind::Custom)
         }
+        "medical.pathway-ruo.v1" => run_enrichment(base_directory, request, EnrichmentKind::Custom),
         "enrichment.go.v1" => run_enrichment(base_directory, request, EnrichmentKind::Go),
         "enrichment.kegg.v1" => run_enrichment(base_directory, request, EnrichmentKind::Kegg),
+        "enrichment.gsea.v1" => run_gsea(base_directory, request),
         "enrichment.visualize.v1" => run_enrichment_visualization(base_directory, request),
         "environment.audit.v1" => run_environment_audit(request),
         "environment.plan.v1" => run_environment_plan(base_directory, request),
@@ -149,17 +161,25 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "fastq.qc.v1" => run_fastq_qc(base_directory, request),
         "fastq.trim.v1" => run_fastq_trim(base_directory, request),
         "fastq.adapter.v1" => run_fastq_adapter_trim(base_directory, request),
+        "fastq.deduplicate.v1" => run_fastq_deduplicate(base_directory, request),
         "alignment.bam-cram.qc.v1" => run_bam_cram_report(base_directory, request, "stats"),
         "alignment.coverage.v1" => run_bam_cram_report(base_directory, request, "coverage"),
+        "alignment.bam-to-bigwig.v1" => run_bam_to_bigwig(base_directory, request),
         "alignment.short-read.v1" => run_short_read_alignment(base_directory, request),
         "expression.matrix.qc.v1" => run_expression_matrix_qc(base_directory, request),
+        "medical.cohort-table.qc.v1" => run_cohort_table_qc(base_directory, request),
+        "medical.single-cell-qc.v1" => run_single_cell_qc(base_directory, request),
         "expression.normalize.v1" => run_expression_normalize(base_directory, request),
         "expression.pca.v1" => run_expression_pca(base_directory, request),
         "expression.cluster.v1" => run_expression_cluster(base_directory, request),
         "expression.heatmap.v1" => run_expression_heatmap(base_directory, request),
+        "expression.differential.v1" | "medical.bulk-rnaseq.v1" => {
+            workflow::execute_bulk_expression_v1(base_directory, request)
+        }
         "interval.intersect.v1" => run_interval_intersect(base_directory, request),
         "interval.merge.v1" => run_interval_merge(base_directory, request),
         "interval.subtract.v1" => run_interval_subtract(base_directory, request),
+        "interval.closest.v1" => run_interval_closest(base_directory, request),
         "table.manipulate.v1" => run_table_manipulate(base_directory, request),
         "table.export.v1" => run_table_export(base_directory, request),
         "sequence.extract.v1" => run_sequence_extract(base_directory, request),
@@ -200,6 +220,8 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "structure.geometry.v1" => run_structure_geometry(base_directory, request),
         "structure.superpose.v1" => run_structure_superposition(base_directory, request),
         "variant.stats.v1" => run_variant_stats(base_directory, request),
+        "variant.compare.v1" => run_variant_compare(base_directory, request),
+        "medical.variant-cohort.v1" => run_medical_variant_cohort(base_directory, request),
         "variant.filter.v1" => run_variant_filter(base_directory, request),
         "variant.normalize.v1" => run_variant_normalize(base_directory, request),
         capability => Err(format!("unsupported capability: {capability}").into()),
@@ -299,6 +321,32 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                     path: output,
                     format: Some(BioDataFormat::Tsv),
                     media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "alignment.bam-to-bigwig.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "alignment")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let threads = optional_parameter_usize(&request.parameters, "threads")?.unwrap_or(1);
+            let result = run_bam_to_bigwig_path(input, &output, threads)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "alignment-bigwig",
+                    role: "track",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Bigwig),
+                    media_type: Some("application/x-bigwig"),
                 },
             )
         }
@@ -509,10 +557,100 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 },
             )
         }
-        "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1" => {
+        "comparative.synteny.visualize.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "anchors")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = render_synteny_svg_with_options_path(
+                input,
+                &output,
+                &synteny_visualization_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "synteny-warning",
+                FileArtifactSpec {
+                    artifact_id: "synteny-plot",
+                    role: "plot",
+                    kind: OutputArtifactKind::Plot,
+                    path: output,
+                    format: Some(BioDataFormat::Svg),
+                    media_type: Some("image/svg+xml"),
+                },
+            )
+        }
+        "comparative.mcscanx.v1" => {
+            let gene_positions =
+                resolve_v2_single_input(base_directory, &request, "gene-positions")?;
+            let similarity_hits =
+                resolve_v2_single_input(base_directory, &request, "similarity-hits")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = run_mcscanx_path(gene_positions, similarity_hits, &output)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "mcscanx-collinearity",
+                    role: "collinearity",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::McscanxCollinearity),
+                    media_type: Some("text/plain"),
+                },
+            )
+        }
+        "comparative.kaks.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "codon-alignment")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let method = optional_parameter_string(&request.parameters, "method")?.unwrap_or("NG");
+            let result = run_kaks_path(input, &output, method)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "kaks-estimates",
+                    role: "table",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "enrichment.overrepresentation.v1"
+        | "enrichment.go.v1"
+        | "enrichment.kegg.v1"
+        | "medical.pathway-ruo.v1" => {
             let genes = resolve_v2_single_input(base_directory, &request, "genes")?;
             let associations = resolve_v2_single_input(base_directory, &request, "associations")?;
-            let kind = enrichment_kind(&request.capability)?;
+            let kind = if request.capability == "medical.pathway-ruo.v1" {
+                EnrichmentKind::Custom
+            } else {
+                enrichment_kind(&request.capability)?
+            };
             let result = overrepresentation_path(
                 genes,
                 associations,
@@ -526,6 +664,20 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 result.clone(),
                 &result.warnings,
                 "enrichment-warning",
+            )
+        }
+        "enrichment.gsea.v1" => {
+            let ranked = resolve_v2_single_input(base_directory, &request, "ranked")?;
+            let gene_sets = resolve_v2_single_input(base_directory, &request, "gene-sets")?;
+            let result =
+                gsea_preranked_path(ranked, gene_sets, gsea_options(&request.parameters)?)?;
+            serialize_v2_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "gsea-warning",
             )
         }
         "enrichment.visualize.v1" => {
@@ -677,6 +829,15 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 |input, output| fastq_adapter_trim_path(input, output, &options),
             )
         }
+        "fastq.deduplicate.v1" => {
+            let options = fastq_deduplicate_options(&request.parameters)?;
+            execute_fastq_transform_v2(
+                &request,
+                base_directory,
+                &verified_inputs,
+                |input, output| fastq_deduplicate_path(input, output, &options),
+            )
+        }
         "expression.matrix.qc.v1" => {
             let path = resolve_v2_single_input(base_directory, &request, "matrix")?;
             let metrics = expression_matrix_qc_path(path)?;
@@ -699,6 +860,23 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 }));
             finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
             Ok(serde_json::to_string(&result)?)
+        }
+        "medical.cohort-table.qc.v1" => {
+            let path = resolve_v2_single_input(base_directory, &request, "cohort")?;
+            let metrics = cohort_table_qc_path(path)?;
+            serialize_v2_result(&request, base_directory, &verified_inputs, metrics)
+        }
+        "medical.single-cell-qc.v1" => {
+            let path = resolve_v2_single_input(base_directory, &request, "matrix")?;
+            let metrics = expression_matrix_qc_path(path)?;
+            serialize_v2_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                metrics.clone(),
+                &metrics.warnings,
+                "single-cell-qc-warning",
+            )
         }
         "expression.normalize.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "matrix")?;
@@ -740,6 +918,63 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
             let result =
                 expression_heatmap_path(input, &expression_heatmap_options(&request.parameters)?)?;
             serialize_v2_result(&request, base_directory, &verified_inputs, result)
+        }
+        "expression.differential.v1" | "medical.bulk-rnaseq.v1" => {
+            workflow::execute_bulk_expression_v2(base_directory, request, &verified_inputs)
+        }
+        "expression.volcano.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "differential")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = render_volcano_svg_path(
+                input,
+                &output,
+                &volcano_plot_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "expression-volcano-warning",
+                FileArtifactSpec {
+                    artifact_id: "expression-volcano-plot",
+                    role: "plot",
+                    kind: OutputArtifactKind::Plot,
+                    path: output,
+                    format: Some(BioDataFormat::Svg),
+                    media_type: Some("image/svg+xml"),
+                },
+            )
+        }
+        "motif.visualize.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "meme")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = render_motif_logo_svg_path(input, &output)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "motif-logo-warning",
+                FileArtifactSpec {
+                    artifact_id: "motif-sequence-logo",
+                    role: "plot",
+                    kind: OutputArtifactKind::Plot,
+                    path: output,
+                    format: Some(BioDataFormat::Svg),
+                    media_type: Some("image/svg+xml"),
+                },
+            )
         }
         "interval.intersect.v1" => {
             let left = resolve_v2_single_input(base_directory, &request, "left-bed")?;
@@ -811,6 +1046,32 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                     path: output,
                     format: Some(BioDataFormat::Bed),
                     media_type: Some("text/x-bed"),
+                },
+            )
+        }
+        "interval.closest.v1" => {
+            let query = resolve_v2_single_input(base_directory, &request, "query-bed")?;
+            let target = resolve_v2_single_input(base_directory, &request, "target-bed")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let summary = bed_closest_path(query, target, &output)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary.clone(),
+                &summary.warnings,
+                "interval-closest-warning",
+                FileArtifactSpec {
+                    artifact_id: "closest-intervals",
+                    role: "table",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
                 },
             )
         }
@@ -1555,6 +1816,21 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
             finalize_v2_input_hashes(&mut result, &request, base_directory, &verified_inputs)?;
             Ok(serde_json::to_string(&result)?)
         }
+        "variant.compare.v1" => {
+            let left = resolve_v2_single_input(base_directory, &request, "left-vcf")?;
+            let right = resolve_v2_single_input(base_directory, &request, "right-vcf")?;
+            serialize_v2_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                compare_vcf_paths(left, right)?,
+            )
+        }
+        "medical.variant-cohort.v1" => {
+            let path = resolve_v2_single_input(base_directory, &request, "vcf")?;
+            let stats = vcf_stats_path(path)?;
+            serialize_v2_result(&request, base_directory, &verified_inputs, stats)
+        }
         "variant.filter.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "vcf")?;
             let output = required_sequence_output(&request.parameters, &request.capability)?;
@@ -1610,6 +1886,9 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
     let (required_roles, allowed_parameters): (&[&str], &[&str]) = match request.capability.as_str()
     {
         "alignment.qc.v1" => (&["sam"], &[]),
+        "alignment.bam-cram.qc.v1" | "alignment.coverage.v1" => (&["alignment"], &["output"]),
+        "alignment.bam-to-bigwig.v1" => (&["alignment"], &["output", "threads"]),
+        "alignment.short-read.v1" => (&["reference", "reads"], &["output", "threads"]),
         "annotation.gxf.stats.v1" => (&["annotation"], &[]),
         "annotation.gxf.normalize.v1" => (&["annotation"], &["output", "sort"]),
         "annotation.gene-position.v1" => (&["annotation"], &["output", "feature_types"]),
@@ -1633,7 +1912,13 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             &["fastq"],
             &["output", "adapter", "adapters", "min_overlap", "min_length"],
         ),
+        "fastq.deduplicate.v1" => (
+            &["fastq"],
+            &["output", "header_umi_delimiter", "sequence_prefix_umi"],
+        ),
         "expression.matrix.qc.v1" => (&["matrix"], &[]),
+        "medical.cohort-table.qc.v1" => (&["cohort"], &[]),
+        "medical.single-cell-qc.v1" => (&["matrix"], &[]),
         "expression.normalize.v1" => (&["matrix"], &["output", "method", "pseudocount"]),
         "expression.pca.v1" => (&["matrix"], &["components", "scale_features"]),
         "expression.cluster.v1" => (
@@ -1646,9 +1931,28 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             ],
         ),
         "expression.heatmap.v1" => (&["matrix"], &["top_variable_features", "scale_rows"]),
+        "expression.differential.v1" | "medical.bulk-rnaseq.v1" => (
+            &["counts", "sample_metadata"],
+            &[
+                "output_directory",
+                "feature_id_column",
+                "sample_id_column",
+                "condition_column",
+                "reference_level",
+                "contrast_level",
+                "alpha",
+                "min_total_count",
+            ],
+        ),
+        "expression.volcano.v1" => (
+            &["differential"],
+            &["output", "padj", "log2_fold_change", "max_points"],
+        ),
+        "motif.visualize.v1" => (&["meme"], &["output"]),
         "interval.intersect.v1" => (&["left-bed", "right-bed"], &[]),
         "interval.merge.v1" => (&["bed"], &["output", "max_gap"]),
         "interval.subtract.v1" => (&["left-bed", "right-bed"], &["output"]),
+        "interval.closest.v1" => (&["query-bed", "target-bed"], &["output"]),
         "table.export.v1" => (&["table"], &["output"]),
         "table.manipulate.v1" => (
             &["table"],
@@ -1778,7 +2082,24 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             &["annotation"],
             &["output", "feature_id", "seqid", "max_features"],
         ),
+        "comparative.synteny.visualize.v1" => (&["anchors"], &["output", "style"]),
+        "comparative.mcscanx.v1" => (&["gene-positions", "similarity-hits"], &["output"]),
+        "comparative.kaks.v1" => (&["codon-alignment"], &["output", "method"]),
         "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1" => (
+            &["genes", "associations"],
+            &["min_overlap", "max_terms", "include_genes"],
+        ),
+        "enrichment.gsea.v1" => (
+            &["ranked", "gene-sets"],
+            &[
+                "score_exponent",
+                "min_set_size",
+                "max_set_size",
+                "permutations",
+                "seed",
+            ],
+        ),
+        "medical.pathway-ruo.v1" => (
             &["genes", "associations"],
             &["min_overlap", "max_terms", "include_genes"],
         ),
@@ -1795,6 +2116,8 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         "structure.geometry.v1" => (&["structure"], &["atoms"]),
         "structure.superpose.v1" => (&["reference", "mobile"], &["atom_name"]),
         "variant.stats.v1" => (&["vcf"], &[]),
+        "variant.compare.v1" => (&["left-vcf", "right-vcf"], &[]),
+        "medical.variant-cohort.v1" => (&["vcf"], &[]),
         "variant.filter.v1" => (
             &["vcf"],
             &[
@@ -2090,6 +2413,7 @@ fn declared_dataset_format(format: BioDataFormat) -> Option<DatasetFormat> {
         BioDataFormat::Bam => DatasetFormat::Bam,
         BioDataFormat::Bcf => DatasetFormat::Bcf,
         BioDataFormat::Cram => DatasetFormat::Cram,
+        BioDataFormat::Bigwig => DatasetFormat::Bigwig,
         BioDataFormat::H5ad => DatasetFormat::H5ad,
         BioDataFormat::Loom => DatasetFormat::Loom,
         BioDataFormat::Hdf5 => DatasetFormat::Hdf5,
@@ -2099,6 +2423,9 @@ fn declared_dataset_format(format: BioDataFormat) -> Option<DatasetFormat> {
         BioDataFormat::BlastTabular => DatasetFormat::BlastTabular,
         BioDataFormat::BlastXml => DatasetFormat::BlastXml,
         BioDataFormat::ProteinDomains => DatasetFormat::ProteinDomains,
+        BioDataFormat::MemeText => DatasetFormat::MemeText,
+        BioDataFormat::Axt => DatasetFormat::Axt,
+        BioDataFormat::McscanxCollinearity => DatasetFormat::McscanxCollinearity,
         BioDataFormat::Newick => DatasetFormat::Newick,
         BioDataFormat::Zip => DatasetFormat::Zip,
         BioDataFormat::Genbank
@@ -2446,6 +2773,18 @@ fn run_fastq_adapter_trim(base_directory: &Path, request: JobRequest) -> WorkerR
     })
 }
 
+fn run_fastq_deduplicate(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "fastq",
+        &["output", "header_umi_delimiter", "sequence_prefix_umi"],
+    )?;
+    let options = fastq_deduplicate_options(&request.parameters)?;
+    execute_fastq_transform_v1(base_directory, request, |input, output| {
+        fastq_deduplicate_path(input, output, &options)
+    })
+}
+
 fn run_alignment_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -2669,6 +3008,31 @@ fn run_enrichment(
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_gsea(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["ranked", "gene-sets"],
+        &[
+            "score_exponent",
+            "min_set_size",
+            "max_set_size",
+            "permutations",
+            "seed",
+        ],
+    )?;
+    let ranked = resolve_required_v1_input(base_directory, &request, "ranked")?;
+    let gene_sets = resolve_required_v1_input(base_directory, &request, "gene-sets")?;
+    let result = gsea_preranked_path(ranked, gene_sets, gsea_options(&request.parameters)?)?;
+    let mut envelope = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        result.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    envelope.warnings = result.warnings;
+    Ok(serde_json::to_string(&envelope)?)
+}
+
 fn run_annotation_structure_visualization(
     base_directory: &Path,
     request: JobRequest,
@@ -2699,6 +3063,77 @@ fn run_annotation_structure_visualization(
     );
     result.warnings = analysis.warnings;
     Ok(serde_json::to_string(&result)?)
+}
+
+fn run_synteny_visualization(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "anchors", &["output", "style"])?;
+    let input = resolve_required_v1_input(base_directory, &request, "anchors")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis = render_synteny_svg_with_options_path(
+        input,
+        output,
+        &synteny_visualization_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_mcscanx(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["gene-positions", "similarity-hits"],
+        &["output"],
+    )?;
+    let genes = request
+        .inputs
+        .get("gene-positions")
+        .ok_or("MCScanX requires inputs.gene-positions")?;
+    let hits = request
+        .inputs
+        .get("similarity-hits")
+        .ok_or("MCScanX requires inputs.similarity-hits")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let analysis = run_mcscanx_path(
+        resolve_input(base_directory, genes),
+        resolve_input(base_directory, hits),
+        output,
+    )?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_kaks(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "codon-alignment", &["output", "method"])?;
+    let input = resolve_required_v1_input(base_directory, &request, "codon-alignment")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let method = optional_parameter_string(&request.parameters, "method")?.unwrap_or("NG");
+    let analysis = run_kaks_path(input, output, method)?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn synteny_visualization_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<SyntenyVisualizationOptions> {
+    let style = optional_parameter_string(parameters, "style")?
+        .map(SyntenyPlotStyle::parse)
+        .transpose()?
+        .unwrap_or(SyntenyPlotStyle::Dual);
+    Ok(SyntenyVisualizationOptions { style })
 }
 
 fn run_enrichment_visualization(
@@ -2748,6 +3183,34 @@ fn run_expression_matrix_qc(base_directory: &Path, request: JobRequest) -> Worke
         .get("matrix")
         .ok_or("expression.matrix.qc.v1 requires inputs.matrix")?;
     let metrics = expression_matrix_qc_path(resolve_input(base_directory, input))?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        metrics.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = metrics.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_cohort_table_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "cohort", &[])?;
+    let input = resolve_required_v1_input(base_directory, &request, "cohort")?;
+    let metrics = cohort_table_qc_path(input)?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        metrics.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = metrics.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_single_cell_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "matrix", &[])?;
+    let input = resolve_required_v1_input(base_directory, &request, "matrix")?;
+    let metrics = expression_matrix_qc_path(input)?;
     let mut result = AnalysisResult::ok(
         request.job_id,
         request.capability,
@@ -2933,12 +3396,60 @@ fn run_interval_subtract(base_directory: &Path, request: JobRequest) -> WorkerRe
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_interval_closest(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(&request, &["query-bed", "target-bed"], &["output"])?;
+    let query = resolve_required_v1_input(base_directory, &request, "query-bed")?;
+    let target = resolve_required_v1_input(base_directory, &request, "target-bed")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&query, &output)?;
+    ensure_distinct_input_output(&target, &output)?;
+    let summary = bed_closest_path(query, target, output)?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = summary.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_variant_stats(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
         .get("vcf")
         .ok_or("variant.stats.v1 requires inputs.vcf")?;
     let stats = vcf_stats_path(resolve_input(base_directory, input))?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        stats.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = stats.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_variant_compare(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(&request, &["left-vcf", "right-vcf"], &[])?;
+    let left = resolve_required_v1_input(base_directory, &request, "left-vcf")?;
+    let right = resolve_required_v1_input(base_directory, &request, "right-vcf")?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        compare_vcf_paths(left, right)?,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_medical_variant_cohort(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "vcf", &[])?;
+    let input = resolve_required_v1_input(base_directory, &request, "vcf")?;
+    let stats = vcf_stats_path(input)?;
     let mut result = AnalysisResult::ok(
         request.job_id,
         request.capability,
@@ -3376,6 +3887,19 @@ fn run_bam_cram_report(
     serialize_v1_native_tool_result(request, analysis)
 }
 
+fn run_bam_to_bigwig(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "alignment", &["output", "threads"])?;
+    let input = resolve_required_v1_input(base_directory, &request, "alignment")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let threads = optional_parameter_usize(&request.parameters, "threads")?.unwrap_or(1);
+    let analysis = run_bam_to_bigwig_path(input, output, threads)?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
 fn run_short_read_alignment(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     validate_v1_multi_input_contract(&request, &["reference", "reads"], &["output", "threads"])?;
     let reference = request
@@ -3654,6 +4178,28 @@ fn enrichment_options(parameters: &serde_json::Value) -> WorkerResult<Enrichment
     }
     if let Some(value) = optional_parameter_bool(parameters, "include_genes")? {
         options.include_genes = value;
+    }
+    Ok(options)
+}
+
+fn gsea_options(parameters: &serde_json::Value) -> WorkerResult<GseaOptions> {
+    let mut options = GseaOptions::default();
+    if let Some(value) = optional_parameter_f64(parameters, "score_exponent")? {
+        options.score_exponent = value;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "min_set_size")? {
+        options.min_set_size = value;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "max_set_size")? {
+        options.max_set_size = value;
+    }
+    if let Some(value) = optional_parameter_u64(parameters, "permutations")? {
+        options.permutation_count = value
+            .try_into()
+            .map_err(|_| "permutations must fit in a 32-bit integer")?;
+    }
+    if let Some(value) = optional_parameter_u64(parameters, "seed")? {
+        options.seed = value;
     }
     Ok(options)
 }
@@ -3944,6 +4490,26 @@ fn expression_heatmap_options(
     Ok(options)
 }
 
+fn volcano_plot_options(parameters: &serde_json::Value) -> WorkerResult<VolcanoPlotOptions> {
+    let mut options = VolcanoPlotOptions::default();
+    if let Some(value) = optional_parameter_f64(parameters, "padj")? {
+        if !(0.0..=1.0).contains(&value) {
+            return Err("padj must be between 0 and 1".into());
+        }
+        options.adjusted_pvalue_threshold = value;
+    }
+    if let Some(value) = optional_parameter_f64(parameters, "log2_fold_change")? {
+        if value < 0.0 {
+            return Err("log2_fold_change must be non-negative".into());
+        }
+        options.absolute_log2_fold_change_threshold = value;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "max_points")? {
+        options.max_points = value;
+    }
+    Ok(options)
+}
+
 fn fastq_options_v1(request: &JobRequest) -> WorkerResult<FastqQcOptions> {
     Ok(FastqQcOptions {
         max_cycles: optional_usize_parameter(request, "max_cycles")?.unwrap_or(DEFAULT_MAX_CYCLES),
@@ -4013,6 +4579,22 @@ fn fastq_adapter_options(parameters: &serde_json::Value) -> WorkerResult<FastqAd
         min_length: optional_parameter_usize(parameters, "min_length")?
             .unwrap_or(DEFAULT_MIN_LENGTH),
     })
+}
+
+fn fastq_deduplicate_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<FastqDeduplicateOptions> {
+    let header = optional_parameter_string(parameters, "header_umi_delimiter")?;
+    let sequence_prefix = optional_parameter_usize(parameters, "sequence_prefix_umi")?;
+    let key = match (header, sequence_prefix) {
+        (Some(delimiter), None) => FastqDeduplicateKey::HeaderUmi {
+            delimiter: delimiter.to_owned(),
+        },
+        (None, Some(length)) => FastqDeduplicateKey::SequencePrefixUmi { length },
+        (Some(_), Some(_)) => return Err("choose only one UMI source".into()),
+        (None, None) => FastqDeduplicateKey::Sequence,
+    };
+    Ok(FastqDeduplicateOptions { key })
 }
 
 fn parse_fastq_transform_quality_encoding(
@@ -5855,6 +6437,14 @@ mod tests {
                 "expression.matrix.qc.v1",
                 "matrix",
                 "feature_count",
+                4,
+            ),
+            (
+                root.join("tests/fixtures/cohort/participants.tsv"),
+                BioDataFormat::Tsv,
+                "medical.cohort-table.qc.v1",
+                "cohort",
+                "row_count",
                 4,
             ),
         ];

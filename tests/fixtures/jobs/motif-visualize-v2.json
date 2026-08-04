@@ -1,0 +1,20 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-motif-visualize-v2",
+  "capability": "motif.visualize.v1",
+  "inputs": [{
+    "artifact_id": "input-meme",
+    "role": "meme",
+    "cardinality": "single",
+    "files": [{
+      "file_id": "input-meme-1",
+      "path": "../motifs/tiny.meme",
+      "format": "meme-text",
+      "compression": "none",
+      "size_bytes": 174,
+      "sha256": "07c34c0efc324ed4649317eb894215c373f1ae3015f3e85fb8fc90d78a0726de"
+    }]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/motif-visualize-v2.svg"}
+}

@@ -1,33 +1,79 @@
 {
-  "schema_version": "1",
+  "schema_version": "2",
+  "lock_kind": "compatibility-and-resolution-policy",
   "runtime": {
     "name": "R",
-    "version": "4.4.3",
-    "bioconductor_release": "3.20"
+    "preferred_version": "4.6.1",
+    "version_requirement": ">=4.6.1,<4.7.0",
+    "release_policy": "latest-stable-patch-within-tested-minor",
+    "bioconductor_release": "3.23"
+  },
+  "isolation": {
+    "scope": "project",
+    "interpreter_environment_variable": "LINXIRA_BIO_WORKFLOW_R",
+    "library_environment_variable": "LINXIRA_BIO_WORKFLOW_R_LIBRARY",
+    "declared_packages_must_resolve_from_project_library": true,
+    "all_loaded_non_base_packages_must_resolve_from_project_library": true,
+    "base_and_recommended_packages_may_resolve_from_runtime": true,
+    "global_library_mutation": false,
+    "global_path_mutation": false,
+    "side_by_side_runtime_versions": true
   },
   "repositories": [
-    "https://bioconductor.org/packages/3.20/bioc",
-    "https://cloud.r-project.org"
+    {
+      "id": "bioconductor-bioc",
+      "url": "https://bioconductor.org/packages/3.23/bioc"
+    },
+    {
+      "id": "bioconductor-data-annotation",
+      "url": "https://bioconductor.org/packages/3.23/data/annotation"
+    },
+    {
+      "id": "bioconductor-data-experiment",
+      "url": "https://bioconductor.org/packages/3.23/data/experiment"
+    },
+    {
+      "id": "cran",
+      "url": "https://cloud.r-project.org"
+    }
   ],
-  "packages": [
+  "direct_requirements": [
     {
       "name": "DESeq2",
-      "version": "1.46.0",
-      "source": "https://bioconductor.org/packages/3.20/bioc/src/contrib/DESeq2_1.46.0.tar.gz"
+      "version_requirement": ">=1.52.0,<1.53.0",
+      "repository": "bioconductor-bioc",
+      "license": "LGPL-3.0-or-later"
     },
     {
       "name": "jsonlite",
-      "version": "1.8.9",
-      "source": "https://cloud.r-project.org/src/contrib/Archive/jsonlite/jsonlite_1.8.9.tar.gz"
+      "version_requirement": ">=1.8.9,<3.0.0",
+      "repository": "cran",
+      "license": "MIT"
     },
     {
       "name": "digest",
-      "version": "0.6.37",
-      "source": "https://cloud.r-project.org/src/contrib/Archive/digest/digest_0.6.37.tar.gz"
+      "version_requirement": ">=0.6.37,<0.7.0",
+      "repository": "cran",
+      "license": "GPL-2.0-or-later"
     }
   ],
-  "lock_completeness": "direct-dependencies-only",
-  "execution_policy": "reject-runtime-and-declared-package-version-drift",
+  "resolved_environment_lock": {
+    "required_before_activation": true,
+    "scope": "one-platform-one-r-runtime-one-project-library",
+    "completeness": "direct-and-transitive",
+    "required_fields": [
+      "name",
+      "version",
+      "repository",
+      "source_url",
+      "sha256",
+      "license"
+    ],
+    "activation_policy": "verify-hashes-and-health-check-before-atomic-activation",
+    "reuse_policy": "reuse-only-when-runtime-and-complete-lock-identities-match"
+  },
+  "pack_lock_completeness": "runtime-and-direct-requirements",
+  "execution_policy": "require-compatible-runtime-and-project-resolved-dependencies",
   "installable": false,
-  "install_blocker": "A signed resolver must add exact versions and source checksums for the complete transitive Bioconductor dependency graph."
+  "install_blocker": "A platform resolver must materialize exact versions, canonical source URLs, SHA-256 values, and licenses for the complete transitive R and Bioconductor graph before activation."
 }

@@ -1,4 +1,4 @@
 interface:
   display_name: "Functional Annotation and Enrichment"
-  short_description: "Normalize GO/eggNOG annotations and run local ORA"
-  default_prompt: "Use $analyze-functional-enrichment to normalize functional annotations or run custom, GO, or KEGG over-representation analysis with the verified local Rust capabilities."
+  short_description: "Normalize annotations and run local ORA or GSEA"
+  default_prompt: "Use $analyze-functional-enrichment to normalize annotations or run verified local over-representation or preranked GSEA analysis."

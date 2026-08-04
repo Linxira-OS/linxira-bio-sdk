@@ -30,7 +30,7 @@ requires an explicit root. A system plan is not authority to execute it.
 | Python | uv-managed CPython 3.12 | Fast isolated Python applications and environments |
 | Mixed Python/R/Bioconda | Pixi | Reproducible cross-language analysis environments |
 | Existing Conda workflows | Miniforge | Compatibility with Conda/Bioconda packages |
-| R installations | rig | Versioned R runtime management |
+| R installations | rig | Latest stable R by default, with side-by-side versioned runtimes |
 | Java | Eclipse Temurin 21 LTS | Default Java analysis runtime |
 | Java compatibility | Eclipse Temurin 17 LTS | Tools that do not yet support Java 21 |
 
@@ -108,6 +108,17 @@ shell. Set `LINXIRA_BIO_WORKFLOW_PYTHON` or `LINXIRA_BIO_WORKFLOW_R` to an
 approved isolated interpreter; otherwise it resolves `python` or `Rscript` on
 the current local `PATH`. A missing or version-mismatched dependency returns a
 structured workflow result and does not trigger any download or global change.
+
+R workflows select the interpreter and package library separately. The
+default policy follows the latest stable R release; a pack declares the minor
+release range it has actually tested. `LINXIRA_BIO_WORKFLOW_R_LIBRARY` names
+the existing project library paired with the selected interpreter. This lets
+multiple R releases and project dependency graphs coexist without modifying a
+global library. A resolved environment lock is specific to the platform, R
+runtime identity, and project library, and must include every direct and
+transitive package before activation. A project layout such as
+`<project>/.linxira-bio/r/<runtime-version>/library` keeps each interpreter,
+package graph, and resolved lock independently selectable.
 
 `cataloged` means a script is bundled and inspectable, not that an installer is
 available. A pack can become `installable` only after its complete platform

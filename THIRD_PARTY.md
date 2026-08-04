@@ -38,9 +38,11 @@ are technically convenient.
 | `hexf-parse` | CC0-1.0 | Transitive shader-number parsing used by the native GPU renderer |
 | Biopython 1.85 | Biopython License Agreement | Cataloged sequence-conversion workflow dependency; not redistributed yet |
 | NumPy 2.2.4 | BSD-3-Clause | Cataloged sequence-conversion workflow dependency; not redistributed yet |
-| DESeq2 1.46.0 | LGPL-3.0-or-later | Cataloged differential-expression workflow dependency; not redistributed yet |
-| jsonlite 1.8.9 | MIT | Cataloged differential-expression workflow dependency; not redistributed yet |
-| digest 0.6.37 | GPL-2.0-or-later | Cataloged differential-expression workflow dependency; not redistributed yet |
+| DESeq2 `>=1.52.0,<1.53.0` | LGPL-3.0-or-later | Project-isolated differential-expression workflow dependency for Bioconductor 3.23; not redistributed |
+| jsonlite `>=1.8.9,<3.0.0` | MIT | Project-isolated R workflow dependency; not redistributed |
+| digest `>=0.6.37,<0.7.0` | GPL-2.0-or-later | Project-isolated R workflow dependency; not redistributed |
+| MCScanX | BSD-2-Clause | Optional external executable invoked without a shell; not bundled or downloaded by the application |
+| KaKs Calculator | License of the user-selected distribution | Optional external executable invoked without a shell; no executable or upstream source is bundled or downloaded by the application |
 | `uv` | Apache-2.0 OR MIT | Planned user-scoped Python runtime provider; not redistributed yet |
 | `Pixi` | BSD-3-Clause | Planned mixed Python/R/Bioconda environment provider; not redistributed yet |
 | `rig` | MIT | Planned R version manager; R itself retains GPL terms |

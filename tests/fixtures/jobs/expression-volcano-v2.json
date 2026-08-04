@@ -1,0 +1,20 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-expression-volcano-v2",
+  "capability": "expression.volcano.v1",
+  "inputs": [{
+    "artifact_id": "input-differential",
+    "role": "differential",
+    "cardinality": "single",
+    "files": [{
+      "file_id": "input-differential-1",
+      "path": "../expression-matrix/differential.csv",
+      "format": "csv",
+      "compression": "none",
+      "size_bytes": 69,
+      "sha256": "9ee8348a2dcee22687561b2b805a8f6b49285726b6fbe5b2404fcabecac9acad"
+    }]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/expression-volcano-v2.svg", "padj": 0.05, "log2_fold_change": 1.0}
+}

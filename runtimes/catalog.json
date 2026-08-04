@@ -54,10 +54,10 @@
     {
       "id": "r-rig",
       "runtime": "r",
-      "display_name": "R (rig managed)",
+      "display_name": "R (rig-managed, versioned)",
       "status": "cataloged",
       "manager": "rig",
-      "version_policy": "release",
+      "version_policy": "latest-stable (4.6.1 preferred); side-by-side versions",
       "default": true,
       "user_scoped": true,
       "platforms": ["windows", "debian", "arch"],

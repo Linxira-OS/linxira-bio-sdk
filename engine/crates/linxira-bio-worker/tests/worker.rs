@@ -453,7 +453,12 @@ fn manipulates_tables_through_the_worker() {
         );
         let result: serde_json::Value =
             serde_json::from_slice(&output.stdout).expect("valid table manipulation result");
-        assert_eq!(result["status"], "ok", "{fixture}");
+        assert_eq!(
+            result["status"],
+            "ok",
+            "{fixture}: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
         assert_eq!(result["capability"], "table.manipulate.v1", "{fixture}");
         assert_eq!(result["result"]["input_rows"], 4, "{fixture}");
         assert_eq!(
@@ -506,8 +511,10 @@ fn executes_fastq_read_processing_jobs() {
     let output_paths = [
         result_dir.join("fastq-trim.fastq"),
         result_dir.join("fastq-adapter-trim.fastq"),
+        result_dir.join("fastq-deduplicate.fastq"),
         result_dir.join("fastq-trim-v2.fastq"),
         result_dir.join("fastq-adapter-trim-v2.fastq"),
+        result_dir.join("fastq-deduplicate-v2.fastq"),
     ];
     for path in &output_paths {
         if path.exists() {
@@ -531,6 +538,13 @@ fn executes_fastq_read_processing_jobs() {
             "@trim\nACGTAC\n+\nIIII!!\n@adapter\nTTTT\n+\nIIII\n@drop\nACGT\n+\n!!!!\n",
         ),
         (
+            "fastq-deduplicate.json",
+            "fastq.deduplicate.v1",
+            "duplicate_read_count",
+            1,
+            "@first:AAAA\nACGT\n+\nIIII\n@other:CCCC\nACGT\n+\nIIII\n",
+        ),
+        (
             "fastq-trim-v2.json",
             "fastq.trim.v1",
             "quality_trimmed_bases",
@@ -543,6 +557,13 @@ fn executes_fastq_read_processing_jobs() {
             "adapter_trimmed_bases",
             8,
             "@trim\nACGTAC\n+\nIIII!!\n@adapter\nTTTT\n+\nIIII\n@drop\nACGT\n+\n!!!!\n",
+        ),
+        (
+            "fastq-deduplicate-v2.json",
+            "fastq.deduplicate.v1",
+            "duplicate_read_count",
+            1,
+            "@first:AAAA\nACGT\n+\nIIII\n@other:CCCC\nACGT\n+\nIIII\n",
         ),
     ];
 
@@ -607,6 +628,37 @@ fn executes_variant_statistics_job() {
     assert_eq!(result["capability"], "variant.stats.v1");
     assert_eq!(result["result"]["record_count"], 7);
     assert_eq!(result["result"]["sample_count"], 2);
+}
+
+#[test]
+fn executes_artifact_aware_variant_comparison() {
+    let request = workspace_root().join("tests/fixtures/jobs/variant-compare-v2.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(request)
+        .output()
+        .expect("run variant comparison worker request");
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid variant comparison result");
+    assert_eq!(result["schema_version"], "2");
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["capability"], "variant.compare.v1");
+    assert_eq!(result["result"]["shared_count"], 3);
+    assert_eq!(result["result"]["left_only_count"], 2);
+    assert_eq!(result["result"]["right_only_count"], 1);
+    assert_eq!(result["result"]["sample_genotypes_compared"], false);
+    assert_eq!(result["artifacts"].as_array().map(Vec::len), Some(0));
+    assert_eq!(
+        result["provenance"]["input_sha256"]
+            .as_object()
+            .map(|hashes| hashes.len()),
+        Some(2)
+    );
 }
 
 #[test]
@@ -762,6 +814,83 @@ fn executes_expression_matrix_qc_job() {
     let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid result");
     assert_eq!(result["capability"], "expression.matrix.qc.v1");
     assert_eq!(result["result"]["feature_count"], 4);
+    assert_eq!(result["result"]["sample_count"], 3);
+}
+
+#[test]
+fn executes_cohort_table_qc_v2_job() {
+    let request = workspace_root().join("tests/fixtures/jobs/cohort-table-qc-v2.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(request)
+        .output()
+        .expect("run cohort table QC job");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("result JSON");
+    assert_eq!(result["schema_version"], "2");
+    assert_eq!(result["capability"], "medical.cohort-table.qc.v1");
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["result"]["duplicate_row_count"], 1);
+}
+
+#[test]
+fn executes_medical_pathway_ruo_v2_job() {
+    let request = workspace_root().join("tests/fixtures/jobs/medical-pathway-ruo-v2.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(request)
+        .output()
+        .expect("run medical pathway job");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("result JSON");
+    assert_eq!(result["schema_version"], "2");
+    assert_eq!(result["capability"], "medical.pathway-ruo.v1");
+    assert_eq!(result["status"], "ok");
+    assert!(result["result"]["tested_term_count"].as_u64().unwrap_or(0) > 0);
+}
+
+#[test]
+fn executes_medical_variant_cohort_v2_job() {
+    let request = workspace_root().join("tests/fixtures/jobs/medical-variant-cohort-v2.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(request)
+        .output()
+        .expect("run medical variant cohort job");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("result JSON");
+    assert_eq!(result["schema_version"], "2");
+    assert_eq!(result["capability"], "medical.variant-cohort.v1");
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["result"]["carrier_genotype_count"], 8);
+    assert_eq!(result["result"]["alternate_allele_count"], 10);
+}
+
+#[test]
+fn executes_medical_single_cell_qc_v2_job() {
+    let request = workspace_root().join("tests/fixtures/jobs/medical-single-cell-qc-v2.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(request)
+        .output()
+        .expect("run single-cell QC job");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("result JSON");
+    assert_eq!(result["schema_version"], "2");
+    assert_eq!(result["capability"], "medical.single-cell-qc.v1");
+    assert_eq!(result["status"], "ok");
     assert_eq!(result["result"]["sample_count"], 3);
 }
 
@@ -922,16 +1051,21 @@ fn executes_coordinate_structure_analysis_jobs() {
 fn executes_v2_expression_analysis_fixtures() {
     let root = workspace_root();
     let output_path = root.join("target/test-results/expression-normalize-v2.tsv");
+    let volcano_output = root.join("target/test-results/expression-volcano-v2.svg");
     std::fs::create_dir_all(output_path.parent().expect("output parent"))
         .expect("create expression result directory");
     if output_path.exists() {
         std::fs::remove_file(&output_path).expect("remove stale normalized matrix");
+    }
+    if volcano_output.exists() {
+        std::fs::remove_file(&volcano_output).expect("remove stale volcano plot");
     }
     let cases = [
         ("expression-normalize-v2.json", "expression.normalize.v1"),
         ("expression-pca-v2.json", "expression.pca.v1"),
         ("expression-cluster-v2.json", "expression.cluster.v1"),
         ("expression-heatmap-v2.json", "expression.heatmap.v1"),
+        ("expression-volcano-v2.json", "expression.volcano.v1"),
     ];
     for (fixture, capability) in cases {
         let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
@@ -957,7 +1091,34 @@ fn executes_v2_expression_analysis_fixtures() {
         );
     }
     assert!(output_path.exists());
+    assert!(volcano_output.exists());
     std::fs::remove_file(output_path).expect("remove normalized expression output");
+    std::fs::remove_file(volcano_output).expect("remove volcano plot output");
+}
+
+#[test]
+fn executes_v2_motif_visualization_fixture() {
+    let root = workspace_root();
+    let output_path = root.join("target/test-results/motif-visualize-v2.svg");
+    std::fs::create_dir_all(output_path.parent().expect("output parent"))
+        .expect("create motif result directory");
+    if output_path.exists() {
+        std::fs::remove_file(&output_path).expect("remove stale motif plot");
+    }
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(root.join("tests/fixtures/jobs/motif-visualize-v2.json"))
+        .output()
+        .expect("run motif visualization");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("result JSON");
+    assert_eq!(result["capability"], "motif.visualize.v1");
+    assert_eq!(result["status"], "ok");
+    assert!(output_path.exists());
+    std::fs::remove_file(output_path).expect("remove motif plot");
 }
 
 #[test]
@@ -1188,6 +1349,14 @@ fn executes_scientific_visualization_jobs_and_tracks_svg_artifacts() {
             1,
         ),
         (
+            "synteny-visualize-v2.json",
+            "comparative.synteny.visualize.v1",
+            "synteny-visualize-v2.svg",
+            "Synteny anchors",
+            true,
+            1,
+        ),
+        (
             "enrichment-visualize.json",
             "enrichment.visualize.v1",
             "enrichment-network.svg",
@@ -1387,6 +1556,27 @@ fn executes_native_tool_workflows_with_versioned_artifacts() {
             true,
             1,
         ),
+        (
+            "alignment-bam-to-bigwig-v2.json",
+            "alignment.bam-to-bigwig.v1",
+            "alignment-bigwig-v2.bw",
+            true,
+            1,
+        ),
+        (
+            "comparative-mcscanx-v2.json",
+            "comparative.mcscanx.v1",
+            "mcscanx-v2.collinearity",
+            true,
+            2,
+        ),
+        (
+            "comparative-kaks-v2.json",
+            "comparative.kaks.v1",
+            "kaks-v2.tsv",
+            true,
+            1,
+        ),
     ];
     for (_, _, output_name, _, _) in &cases {
         let path = result_root.join(output_name);
@@ -1407,6 +1597,9 @@ fn executes_native_tool_workflows_with_versioned_artifacts() {
             .env("LINXIRA_BIO_IQTREE", &stub)
             .env("LINXIRA_BIO_MEME", &stub)
             .env("LINXIRA_BIO_MKDSSP", &stub)
+            .env("LINXIRA_BIO_BAMCOVERAGE", &stub)
+            .env("LINXIRA_BIO_MCSCANX", &stub)
+            .env("LINXIRA_BIO_KAKS_CALCULATOR", &stub)
             .output()
             .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
         assert!(
@@ -1416,7 +1609,12 @@ fn executes_native_tool_workflows_with_versioned_artifacts() {
         );
         let result: serde_json::Value =
             serde_json::from_slice(&output.stdout).expect("valid native-tool result");
-        assert_eq!(result["status"], "ok", "{fixture}");
+        assert_eq!(
+            result["status"],
+            "ok",
+            "{fixture}: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
         assert_eq!(result["capability"], capability, "{fixture}");
         assert!(result["result"]["output_bytes"].as_u64().unwrap() > 0);
         let output_path = result_root.join(output_name);
@@ -1434,10 +1632,264 @@ fn executes_native_tool_workflows_with_versioned_artifacts() {
                 Some(input_hashes),
                 "{fixture}"
             );
+            if capability == "comparative.mcscanx.v1" {
+                assert_eq!(result["artifacts"][0]["kind"], "domain-file");
+                assert_eq!(result["artifacts"][0]["format"], "mcscanx-collinearity");
+                assert_eq!(result["artifacts"][0]["role"], "collinearity");
+                assert!(
+                    std::fs::read_to_string(&output_path)
+                        .expect("read MCScanX collinearity output")
+                        .contains("## Alignment 0:")
+                );
+            }
+            if capability == "comparative.kaks.v1" {
+                assert_eq!(result["artifacts"][0]["kind"], "table");
+                assert_eq!(result["artifacts"][0]["format"], "tsv");
+                assert_eq!(result["artifacts"][0]["role"], "table");
+                assert_eq!(result["result"]["mode"], "YN");
+                let table = std::fs::read_to_string(&output_path).expect("read Ka/Ks output");
+                assert!(table.starts_with("Sequence\tMethod\tKa\tKs\tKa/Ks\n"));
+                assert!(table.contains("Gene1&GeneA\tYN\t"));
+            }
         }
         std::fs::remove_file(output_path).expect("remove native-tool output");
     }
     std::fs::remove_dir_all(stub_root).expect("remove native-tool stub directory");
+}
+
+#[test]
+fn executes_bulk_expression_workflows_with_isolated_rscript() {
+    let root = workspace_root();
+    let result_root = root.join("target/test-results");
+    std::fs::create_dir_all(&result_root).expect("create workflow result directory");
+    let stub_root =
+        std::env::temp_dir().join(format!("linxira-bio-worker-rscript-{}", std::process::id()));
+    if stub_root.exists() {
+        std::fs::remove_dir_all(&stub_root).expect("remove stale Rscript stub directory");
+    }
+    std::fs::create_dir(&stub_root).expect("create Rscript stub directory");
+    let stub = compile_rscript_stub(&root, &stub_root);
+    let library = stub_root.join("r-library");
+    std::fs::create_dir(&library).expect("create isolated R library fixture");
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root.join("workflows/org.linxira.bulk-expression-deseq2/manifest.json"))
+            .expect("read bulk expression manifest"),
+    )
+    .expect("parse bulk expression manifest");
+    let lock_sha256 = manifest["runtime"]["dependency_lock"]["sha256"]
+        .as_str()
+        .expect("manifest dependency lock hash");
+
+    let cases = [
+        (
+            "expression-differential-v1.json",
+            "expression.differential.v1",
+            "expression-differential-v1",
+        ),
+        (
+            "expression-differential-v2.json",
+            "expression.differential.v1",
+            "expression-differential-v2",
+        ),
+        (
+            "medical-bulk-rnaseq-v1.json",
+            "medical.bulk-rnaseq.v1",
+            "medical-bulk-rnaseq-v1",
+        ),
+        (
+            "medical-bulk-rnaseq-v2.json",
+            "medical.bulk-rnaseq.v1",
+            "medical-bulk-rnaseq-v2",
+        ),
+    ];
+
+    for (index, (fixture, capability, output_name)) in cases.into_iter().enumerate() {
+        let output_directory = result_root.join(output_name);
+        if output_directory.exists() {
+            std::fs::remove_dir_all(&output_directory).expect("remove stale workflow output");
+        }
+        let trace = stub_root.join(format!("request-{index}.trace"));
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(root.join("tests/fixtures/jobs").join(fixture))
+            .env("LINXIRA_BIO_WORKFLOW_ROOT", root.join("workflows"))
+            .env("LINXIRA_BIO_WORKFLOW_R", &stub)
+            .env("LINXIRA_BIO_WORKFLOW_R_LIBRARY", &library)
+            .env("LINXIRA_BIO_RSCRIPT_STUB_LOCK_SHA256", lock_sha256)
+            .env("LINXIRA_BIO_RSCRIPT_STUB_TRACE", &trace)
+            .env_remove("LINXIRA_BIO_RSCRIPT_STUB_MODE")
+            .output()
+            .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
+        assert!(
+            output.status.success(),
+            "{fixture}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid workflow result");
+        assert_eq!(result["schema_version"], "2", "{fixture}");
+        assert_eq!(result["capability"], capability, "{fixture}");
+        assert_eq!(result["status"], "ok", "{fixture}");
+        assert_eq!(result["artifacts"].as_array().map(Vec::len), Some(2));
+        assert_eq!(
+            result["provenance"]["input_sha256"]
+                .as_object()
+                .map(serde_json::Map::len),
+            Some(2),
+            "{fixture}"
+        );
+        assert!(
+            output_directory
+                .join("differential-expression.csv")
+                .is_file()
+        );
+        assert!(output_directory.join("normalized-counts.csv").is_file());
+        assert!(output_directory.join("result.json").is_file());
+        if capability == "medical.bulk-rnaseq.v1" {
+            assert!(result["diagnostics"].as_array().is_some_and(|diagnostics| {
+                diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic["code"] == "research_use_only")
+            }));
+        }
+        let temporary_request =
+            PathBuf::from(std::fs::read_to_string(&trace).expect("read temporary request trace"));
+        assert!(temporary_request.is_absolute(), "{fixture}");
+        assert!(!temporary_request.exists(), "{fixture}");
+        assert_ne!(
+            temporary_request,
+            root.join("tests/fixtures/jobs").join(fixture),
+            "{fixture}"
+        );
+        std::fs::remove_dir_all(output_directory).expect("remove workflow output");
+    }
+
+    let fixture = root.join("tests/fixtures/jobs/expression-differential-v2.json");
+    let output_directory = result_root.join("expression-differential-v2");
+    let trace = stub_root.join("request-missing-package.trace");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(&fixture)
+        .env("LINXIRA_BIO_WORKFLOW_ROOT", root.join("workflows"))
+        .env("LINXIRA_BIO_WORKFLOW_R", &stub)
+        .env("LINXIRA_BIO_WORKFLOW_R_LIBRARY", &library)
+        .env("LINXIRA_BIO_RSCRIPT_STUB_LOCK_SHA256", lock_sha256)
+        .env("LINXIRA_BIO_RSCRIPT_STUB_TRACE", &trace)
+        .env("LINXIRA_BIO_RSCRIPT_STUB_MODE", "missing-package")
+        .output()
+        .expect("run missing-package workflow");
+    assert!(output.status.success());
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("structured workflow error");
+    assert_eq!(result["status"], "error");
+    assert_eq!(result["capability"], "expression.differential.v1");
+    assert!(result["diagnostics"].as_array().is_some_and(|diagnostics| {
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic["severity"] == "error"
+                && diagnostic["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("DESeq2"))
+        })
+    }));
+    let temporary_request =
+        PathBuf::from(std::fs::read_to_string(&trace).expect("read error request trace"));
+    assert!(!temporary_request.exists());
+    std::fs::remove_dir_all(&output_directory).expect("remove error output");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(&fixture)
+        .env("LINXIRA_BIO_WORKFLOW_ROOT", root.join("workflows"))
+        .env("LINXIRA_BIO_WORKFLOW_R", &stub)
+        .env("LINXIRA_BIO_WORKFLOW_R_LIBRARY", &library)
+        .env("LINXIRA_BIO_RSCRIPT_STUB_LOCK_SHA256", lock_sha256)
+        .env("LINXIRA_BIO_RSCRIPT_STUB_MODE", "wrong-capability")
+        .output()
+        .expect("run wrong-identity workflow");
+    assert!(output.status.success());
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("worker validation error");
+    assert_eq!(result["status"], "error");
+    assert_eq!(result["capability"], "expression.differential.v1");
+    assert!(result["diagnostics"].as_array().is_some_and(|diagnostics| {
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic["code"] == "job-failed"
+                && diagnostic["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("identity"))
+        })
+    }));
+    assert!(!output_directory.exists());
+    std::fs::remove_dir_all(stub_root).expect("remove Rscript stub directory");
+}
+
+#[test]
+fn executes_closest_interval_and_preranked_gsea_jobs() {
+    let root = workspace_root();
+    let closest_output = root.join("target/test-results/interval-closest-v2.tsv");
+    std::fs::create_dir_all(closest_output.parent().expect("result parent"))
+        .expect("create result directory");
+    if closest_output.exists() {
+        std::fs::remove_file(&closest_output).expect("remove stale closest output");
+    }
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(root.join("tests/fixtures/jobs/interval-closest-v2.json"))
+        .output()
+        .expect("run closest interval job");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("closest interval result");
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["capability"], "interval.closest.v1");
+    assert_eq!(result["result"]["matched_query_count"], 3);
+    assert_eq!(result["artifacts"][0]["format"], "tsv");
+    assert!(
+        std::fs::read_to_string(&closest_output)
+            .expect("closest output")
+            .starts_with("query_contig\tquery_start\tquery_end")
+    );
+    std::fs::remove_file(&closest_output).expect("remove closest output");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(root.join("tests/fixtures/jobs/enrichment-gsea-v2.json"))
+        .output()
+        .expect("run GSEA job");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("GSEA result");
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["capability"], "enrichment.gsea.v1");
+    assert_eq!(result["result"]["tested_gene_set_count"], 3);
+    assert_eq!(result["result"]["permutation_count"], 50);
+    assert_eq!(result["artifacts"], serde_json::json!([]));
+    assert_eq!(
+        result["provenance"]["input_sha256"]
+            .as_object()
+            .map(|hashes| hashes.len()),
+        Some(2)
+    );
+}
+
+fn compile_rscript_stub(root: &std::path::Path, output_root: &std::path::Path) -> PathBuf {
+    let executable = output_root.join(format!("rscript-stub{}", std::env::consts::EXE_SUFFIX));
+    let output = Command::new("rustc")
+        .args(["--edition", "2021"])
+        .arg(root.join("tests/fixtures/workflows/rscript_stub.rs"))
+        .arg("-o")
+        .arg(&executable)
+        .output()
+        .expect("compile Rscript stub");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    executable
 }
 
 fn compile_native_tool_stub(root: &std::path::Path, output_root: &std::path::Path) -> PathBuf {

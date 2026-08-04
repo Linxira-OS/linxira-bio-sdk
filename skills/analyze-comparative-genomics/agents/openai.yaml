@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Comparative Genomics"
+  short_description: "Run local collinearity and Ka/Ks workflows"
+  default_prompt: "Use $analyze-comparative-genomics to run and validate a local comparative-genomics analysis."

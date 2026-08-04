@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/gsea.v1.json",
+  "title": "Linxira Bio preranked GSEA result",
+  "type": "object",
+  "required": [
+    "capability_id",
+    "schema_version",
+    "analysis_type",
+    "score_exponent",
+    "permutation_count",
+    "seed",
+    "permutation_method",
+    "multiple_testing_method",
+    "ranked_gene_count",
+    "input_gene_set_count",
+    "tested_gene_set_count",
+    "input_membership_count",
+    "mapped_membership_count",
+    "skipped_no_overlap_count",
+    "skipped_below_min_size_count",
+    "skipped_above_max_size_count",
+    "skipped_full_universe_count",
+    "terms",
+    "warnings"
+  ],
+  "properties": {
+    "capability_id": {"const": "enrichment.gsea.v1"},
+    "schema_version": {"const": "1"},
+    "analysis_type": {"const": "preranked-gsea"},
+    "score_exponent": {"type": "number", "minimum": 0},
+    "permutation_count": {"type": "integer", "minimum": 1, "maximum": 100000},
+    "seed": {"type": "integer", "minimum": 0},
+    "permutation_method": {"type": "string", "minLength": 1},
+    "multiple_testing_method": {"type": "string", "minLength": 1},
+    "ranked_gene_count": {"type": "integer", "minimum": 2, "maximum": 2000000},
+    "input_gene_set_count": {"type": "integer", "minimum": 1},
+    "tested_gene_set_count": {"type": "integer", "minimum": 1, "maximum": 10000},
+    "input_membership_count": {"$ref": "#/$defs/count"},
+    "mapped_membership_count": {"$ref": "#/$defs/count"},
+    "skipped_no_overlap_count": {"$ref": "#/$defs/count"},
+    "skipped_below_min_size_count": {"$ref": "#/$defs/count"},
+    "skipped_above_max_size_count": {"$ref": "#/$defs/count"},
+    "skipped_full_universe_count": {"$ref": "#/$defs/count"},
+    "terms": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {"$ref": "#/$defs/term"}
+    },
+    "warnings": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "count": {"type": "integer", "minimum": 0},
+    "probability": {"type": "number", "minimum": 0, "maximum": 1},
+    "term": {
+      "type": "object",
+      "required": [
+        "term_id",
+        "term_name",
+        "namespace",
+        "input_gene_count",
+        "mapped_gene_count",
+        "enrichment_score",
+        "direction",
+        "peak_rank",
+        "leading_edge_gene_count",
+        "leading_edge_genes",
+        "nominal_p_value",
+        "fdr_bh"
+      ],
+      "properties": {
+        "term_id": {"type": "string", "minLength": 1},
+        "term_name": {"type": ["string", "null"]},
+        "namespace": {"type": ["string", "null"]},
+        "input_gene_count": {"type": "integer", "minimum": 1},
+        "mapped_gene_count": {"type": "integer", "minimum": 1},
+        "enrichment_score": {"type": "number", "minimum": -1, "maximum": 1},
+        "direction": {"enum": ["positive", "negative"]},
+        "peak_rank": {"type": "integer", "minimum": 1},
+        "leading_edge_gene_count": {"$ref": "#/$defs/count"},
+        "leading_edge_genes": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "nominal_p_value": {"$ref": "#/$defs/probability"},
+        "fdr_bh": {"$ref": "#/$defs/probability"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

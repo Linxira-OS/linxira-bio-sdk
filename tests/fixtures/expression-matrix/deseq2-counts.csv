@@ -1,0 +1,5 @@
+gene_id,control_1,control_2,treated_1,treated_2
+Gene1,100,110,400,420
+Gene2,250,240,120,130
+Gene3,10,12,11,9
+Gene4,0,1,25,30

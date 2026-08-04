@@ -12,7 +12,10 @@ pub const MAX_FUNCTIONAL_DECOMPRESSED_BYTES: u64 = 256 * 1024 * 1024;
 pub const MAX_FUNCTIONAL_ROWS: u64 = 2_000_000;
 pub const MAX_FUNCTIONAL_IDENTIFIERS: usize = 2_000_000;
 pub const MAX_REPORTED_ENRICHMENT_TERMS: usize = 10_000;
+pub const MAX_GSEA_PERMUTATIONS: u32 = 100_000;
+pub const MAX_GSEA_PERMUTATION_DRAWS: u64 = 250_000_000;
 const MAX_TERMS_PER_CELL: usize = 10_000;
+pub const GSEA_CAPABILITY_ID: &str = "enrichment.gsea.v1";
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct GoAnnotationOptions {
@@ -127,6 +130,66 @@ pub struct EnrichmentResult {
     pub reported_term_count: u64,
     pub omitted_term_count: u64,
     pub terms: Vec<EnrichmentTerm>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct GseaOptions {
+    pub score_exponent: f64,
+    pub min_set_size: usize,
+    pub max_set_size: usize,
+    pub permutation_count: u32,
+    pub seed: u64,
+}
+
+impl Default for GseaOptions {
+    fn default() -> Self {
+        Self {
+            score_exponent: 1.0,
+            min_set_size: 15,
+            max_set_size: 500,
+            permutation_count: 1_000,
+            seed: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct GseaTermResult {
+    pub term_id: String,
+    pub term_name: Option<String>,
+    pub namespace: Option<String>,
+    pub input_gene_count: u64,
+    pub mapped_gene_count: u64,
+    pub enrichment_score: f64,
+    pub direction: String,
+    pub peak_rank: u64,
+    pub leading_edge_gene_count: u64,
+    pub leading_edge_genes: Vec<String>,
+    pub nominal_p_value: f64,
+    pub fdr_bh: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct GseaResult {
+    pub capability_id: String,
+    pub schema_version: String,
+    pub analysis_type: String,
+    pub score_exponent: f64,
+    pub permutation_count: u32,
+    pub seed: u64,
+    pub permutation_method: String,
+    pub multiple_testing_method: String,
+    pub ranked_gene_count: u64,
+    pub input_gene_set_count: u64,
+    pub tested_gene_set_count: u64,
+    pub input_membership_count: u64,
+    pub mapped_membership_count: u64,
+    pub skipped_no_overlap_count: u64,
+    pub skipped_below_min_size_count: u64,
+    pub skipped_above_max_size_count: u64,
+    pub skipped_full_universe_count: u64,
+    pub terms: Vec<GseaTermResult>,
     pub warnings: Vec<String>,
 }
 
@@ -527,6 +590,229 @@ pub fn overrepresentation_path(
     })
 }
 
+pub fn gsea_preranked_path(
+    ranked_genes: impl AsRef<Path>,
+    gene_sets: impl AsRef<Path>,
+    options: GseaOptions,
+) -> Result<GseaResult, FunctionalError> {
+    validate_gsea_options(options)?;
+    let ranked = read_ranked_genes(ranked_genes.as_ref(), options.score_exponent)?;
+    let gene_sets = read_gsea_gene_sets(gene_sets.as_ref())?;
+    let GseaGeneSetTable {
+        terms: gene_set_terms,
+        input_gene_set_count,
+        input_membership_count,
+        duplicate_membership_count,
+    } = gene_sets;
+    let ranked_index = ranked
+        .genes
+        .iter()
+        .enumerate()
+        .map(|(index, gene)| (gene.gene_id.as_str(), index))
+        .collect::<BTreeMap<_, _>>();
+    let ranked_weights = ranked
+        .genes
+        .iter()
+        .map(|gene| gene.weight)
+        .collect::<Vec<_>>();
+    let weight_prefix = prefix_sums(&ranked_weights);
+
+    let mut skipped_no_overlap_count = 0_u64;
+    let mut skipped_below_min_size_count = 0_u64;
+    let mut skipped_above_max_size_count = 0_u64;
+    let mut skipped_full_universe_count = 0_u64;
+    let mut mapped_membership_count = 0_u64;
+    let mut zero_weight_set_count = 0_u64;
+    let mut tested = Vec::new();
+    let mut permutation_draws = 0_u64;
+
+    for (term_id, term) in gene_set_terms {
+        let mut positions = term
+            .genes
+            .iter()
+            .filter_map(|gene| ranked_index.get(gene.as_str()).copied())
+            .collect::<Vec<_>>();
+        positions.sort_unstable();
+        let mapped_size = positions.len();
+        mapped_membership_count = mapped_membership_count
+            .checked_add(mapped_size as u64)
+            .ok_or(FunctionalError::LimitExceeded {
+                resource: "mapped GSEA membership count",
+                limit: u64::MAX,
+            })?;
+        if mapped_size == 0 {
+            skipped_no_overlap_count += 1;
+            continue;
+        }
+        if mapped_size < options.min_set_size {
+            skipped_below_min_size_count += 1;
+            continue;
+        }
+        if mapped_size > options.max_set_size {
+            skipped_above_max_size_count += 1;
+            continue;
+        }
+        if mapped_size == ranked.genes.len() {
+            skipped_full_universe_count += 1;
+            continue;
+        }
+        if tested.len() >= MAX_REPORTED_ENRICHMENT_TERMS {
+            return Err(FunctionalError::LimitExceeded {
+                resource: "tested GSEA gene-set count",
+                limit: MAX_REPORTED_ENRICHMENT_TERMS as u64,
+            });
+        }
+        let sampled_permutation_indices = mapped_size.min(ranked.genes.len() - mapped_size);
+        let term_draws = (sampled_permutation_indices as u64)
+            .checked_mul(options.permutation_count as u64)
+            .ok_or(FunctionalError::LimitExceeded {
+                resource: "GSEA permutation sampled-index count",
+                limit: MAX_GSEA_PERMUTATION_DRAWS,
+            })?;
+        permutation_draws =
+            permutation_draws
+                .checked_add(term_draws)
+                .ok_or(FunctionalError::LimitExceeded {
+                    resource: "GSEA permutation sampled-index count",
+                    limit: MAX_GSEA_PERMUTATION_DRAWS,
+                })?;
+        if permutation_draws > MAX_GSEA_PERMUTATION_DRAWS {
+            return Err(FunctionalError::LimitExceeded {
+                resource: "GSEA permutation sampled-index count",
+                limit: MAX_GSEA_PERMUTATION_DRAWS,
+            });
+        }
+
+        let trace = enrichment_score_from_hits(&ranked_weights, &positions);
+        if trace.used_unweighted_fallback {
+            zero_weight_set_count += 1;
+        }
+        let nominal_p_value = gsea_permutation_p_value(
+            &ranked_weights,
+            &weight_prefix,
+            mapped_size,
+            trace.score,
+            options.permutation_count,
+            derive_gsea_seed(options.seed, &term_id),
+        );
+        let leading_edge_genes = if trace.score >= 0.0 {
+            positions
+                .iter()
+                .copied()
+                .take_while(|position| *position <= trace.peak_index)
+                .map(|position| ranked.genes[position].gene_id.clone())
+                .collect::<Vec<_>>()
+        } else {
+            positions
+                .iter()
+                .copied()
+                .filter(|position| *position > trace.peak_index)
+                .map(|position| ranked.genes[position].gene_id.clone())
+                .collect::<Vec<_>>()
+        };
+        tested.push(GseaTermResult {
+            term_id,
+            term_name: term.name,
+            namespace: term.namespace,
+            input_gene_count: term.genes.len() as u64,
+            mapped_gene_count: mapped_size as u64,
+            enrichment_score: trace.score,
+            direction: if trace.score >= 0.0 {
+                "positive".to_owned()
+            } else {
+                "negative".to_owned()
+            },
+            peak_rank: trace.peak_index as u64 + 1,
+            leading_edge_gene_count: leading_edge_genes.len() as u64,
+            leading_edge_genes,
+            nominal_p_value,
+            fdr_bh: 1.0,
+        });
+    }
+
+    if tested.is_empty() {
+        return Err(FunctionalError::InvalidTable(format!(
+            "no gene sets remain after mapping and size filtering (min_set_size={}, max_set_size={})",
+            options.min_set_size, options.max_set_size
+        )));
+    }
+    adjust_gsea_benjamini_hochberg(&mut tested);
+    tested.sort_by(|left, right| {
+        left.fdr_bh
+            .total_cmp(&right.fdr_bh)
+            .then_with(|| left.nominal_p_value.total_cmp(&right.nominal_p_value))
+            .then_with(|| {
+                right
+                    .enrichment_score
+                    .abs()
+                    .total_cmp(&left.enrichment_score.abs())
+            })
+            .then_with(|| left.term_id.cmp(&right.term_id))
+    });
+
+    let mut warnings = Vec::new();
+    if ranked.tie_group_count > 0 {
+        warnings.push(format!(
+            "{} ranked genes occur in {} tied-score groups; ties were ordered by gene identifier",
+            ranked.tied_gene_count, ranked.tie_group_count
+        ));
+    }
+    if duplicate_membership_count > 0 {
+        warnings.push(format!(
+            "{} duplicate gene-set membership rows were deduplicated",
+            duplicate_membership_count
+        ));
+    }
+    let unmapped_memberships = input_membership_count.saturating_sub(mapped_membership_count);
+    if unmapped_memberships > 0 {
+        warnings.push(format!(
+            "{unmapped_memberships} unique gene-set memberships were absent from the ranked gene table"
+        ));
+    }
+    if skipped_no_overlap_count > 0 {
+        warnings.push(format!(
+            "{skipped_no_overlap_count} gene sets had no ranked members and were not tested"
+        ));
+    }
+    if skipped_below_min_size_count > 0 || skipped_above_max_size_count > 0 {
+        warnings.push(format!(
+            "{skipped_below_min_size_count} gene sets were below min_set_size and {skipped_above_max_size_count} were above max_set_size after mapping"
+        ));
+    }
+    if skipped_full_universe_count > 0 {
+        warnings.push(format!(
+            "{skipped_full_universe_count} gene sets contained the complete ranked universe and had no valid miss denominator"
+        ));
+    }
+    if zero_weight_set_count > 0 {
+        warnings.push(format!(
+            "{zero_weight_set_count} tested gene sets had zero total weighted hit score and used the documented unweighted hit fallback"
+        ));
+    }
+
+    Ok(GseaResult {
+        capability_id: GSEA_CAPABILITY_ID.to_owned(),
+        schema_version: "1".to_owned(),
+        analysis_type: "preranked-gsea".to_owned(),
+        score_exponent: options.score_exponent,
+        permutation_count: options.permutation_count,
+        seed: options.seed,
+        permutation_method: "deterministic gene-label permutation with per-set SplitMix64 streams and add-one correction".to_owned(),
+        multiple_testing_method: "Benjamini-Hochberg across all tested gene sets".to_owned(),
+        ranked_gene_count: ranked.genes.len() as u64,
+        input_gene_set_count,
+        tested_gene_set_count: tested.len() as u64,
+        input_membership_count,
+        mapped_membership_count,
+        skipped_no_overlap_count,
+        skipped_below_min_size_count,
+        skipped_above_max_size_count,
+        skipped_full_universe_count,
+        terms: tested,
+        warnings,
+    })
+}
+
 #[derive(Debug)]
 struct EggnogColumns {
     query: usize,
@@ -549,6 +835,588 @@ struct TermGenes {
     name: Option<String>,
     namespace: Option<String>,
     genes: BTreeSet<String>,
+}
+
+#[derive(Debug)]
+struct RankedGene {
+    gene_id: String,
+    score: f64,
+    weight: f64,
+}
+
+#[derive(Debug)]
+struct RankedGeneTable {
+    genes: Vec<RankedGene>,
+    tie_group_count: u64,
+    tied_gene_count: u64,
+}
+
+#[derive(Debug)]
+struct GseaGeneSetTable {
+    terms: BTreeMap<String, TermGenes>,
+    input_gene_set_count: u64,
+    input_membership_count: u64,
+    duplicate_membership_count: u64,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct GseaTrace {
+    score: f64,
+    peak_index: usize,
+    used_unweighted_fallback: bool,
+}
+
+fn validate_gsea_options(options: GseaOptions) -> Result<(), FunctionalError> {
+    if !options.score_exponent.is_finite() || options.score_exponent < 0.0 {
+        return Err(FunctionalError::InvalidOption(
+            "score_exponent must be finite and greater than or equal to zero".to_owned(),
+        ));
+    }
+    if options.min_set_size == 0 {
+        return Err(FunctionalError::InvalidOption(
+            "min_set_size must be greater than zero".to_owned(),
+        ));
+    }
+    if options.max_set_size < options.min_set_size {
+        return Err(FunctionalError::InvalidOption(
+            "max_set_size must be greater than or equal to min_set_size".to_owned(),
+        ));
+    }
+    if options.max_set_size > MAX_FUNCTIONAL_IDENTIFIERS {
+        return Err(FunctionalError::InvalidOption(format!(
+            "max_set_size must not exceed {MAX_FUNCTIONAL_IDENTIFIERS}"
+        )));
+    }
+    if !(1..=MAX_GSEA_PERMUTATIONS).contains(&options.permutation_count) {
+        return Err(FunctionalError::InvalidOption(format!(
+            "permutation_count must be between 1 and {MAX_GSEA_PERMUTATIONS}"
+        )));
+    }
+    Ok(())
+}
+
+fn read_ranked_genes(path: &Path, score_exponent: f64) -> Result<RankedGeneTable, FunctionalError> {
+    let text = read_bounded_text(path)?;
+    let delimiter = infer_delimiter(path, &text);
+    let mut reader = ReaderBuilder::new()
+        .delimiter(delimiter)
+        .comment(Some(b'#'))
+        .trim(csv::Trim::All)
+        .flexible(false)
+        .from_reader(text.as_bytes());
+    let headers = reader.headers()?.clone();
+    let gene_column = resolve_column(
+        &headers,
+        None,
+        &["gene_id", "gene", "query", "query_id", "protein_id", "id"],
+        "gene",
+    )?;
+    let score_column = resolve_column(
+        &headers,
+        None,
+        &[
+            "score",
+            "rank_score",
+            "ranking_metric",
+            "metric",
+            "stat",
+            "statistic",
+            "wald_stat",
+            "log2_fold_change",
+            "log2fc",
+        ],
+        "ranking score",
+    )?;
+    if gene_column == score_column {
+        return Err(FunctionalError::InvalidTable(
+            "gene and ranking score columns must be different".to_owned(),
+        ));
+    }
+
+    let mut genes = Vec::new();
+    let mut seen = BTreeMap::<String, usize>::new();
+    for (row_index, record) in reader.records().enumerate() {
+        if row_index as u64 >= MAX_FUNCTIONAL_ROWS {
+            return Err(FunctionalError::LimitExceeded {
+                resource: "ranked gene row count",
+                limit: MAX_FUNCTIONAL_ROWS,
+            });
+        }
+        let record = record?;
+        let gene_id = record.get(gene_column).unwrap_or_default().trim();
+        let raw_score = record.get(score_column).unwrap_or_default().trim();
+        let display_row = row_index + 2;
+        if gene_id.is_empty() || is_missing_value(gene_id) {
+            return Err(FunctionalError::InvalidTable(format!(
+                "ranked gene row {display_row} has no gene identifier"
+            )));
+        }
+        if raw_score.is_empty() || is_missing_value(raw_score) {
+            return Err(FunctionalError::InvalidTable(format!(
+                "ranked gene row {display_row} has no ranking score"
+            )));
+        }
+        let mut score = raw_score.parse::<f64>().map_err(|_| {
+            FunctionalError::InvalidTable(format!(
+                "ranked gene row {display_row} has non-numeric score {raw_score:?}"
+            ))
+        })?;
+        if !score.is_finite() {
+            return Err(FunctionalError::InvalidTable(format!(
+                "ranked gene row {display_row} must have a finite score"
+            )));
+        }
+        if score == 0.0 {
+            score = 0.0;
+        }
+        if let Some(previous_row) = seen.insert(gene_id.to_owned(), display_row) {
+            return Err(FunctionalError::InvalidTable(format!(
+                "ranked gene identifier {gene_id:?} is duplicated at rows {previous_row} and {display_row}"
+            )));
+        }
+        if genes.len() >= MAX_FUNCTIONAL_IDENTIFIERS {
+            return Err(FunctionalError::LimitExceeded {
+                resource: "ranked gene identifier count",
+                limit: MAX_FUNCTIONAL_IDENTIFIERS as u64,
+            });
+        }
+        genes.push(RankedGene {
+            gene_id: gene_id.to_owned(),
+            score,
+            weight: 0.0,
+        });
+    }
+    if genes.len() < 2 {
+        return Err(FunctionalError::InvalidTable(
+            "preranked GSEA requires at least two uniquely ranked genes".to_owned(),
+        ));
+    }
+    genes.sort_by(|left, right| {
+        right
+            .score
+            .total_cmp(&left.score)
+            .then_with(|| left.gene_id.cmp(&right.gene_id))
+    });
+    if genes
+        .iter()
+        .skip(1)
+        .all(|gene| gene.score == genes[0].score)
+    {
+        return Err(FunctionalError::InvalidTable(
+            "all ranked genes have the same score; GSEA requires an informative ordering"
+                .to_owned(),
+        ));
+    }
+
+    let maximum_absolute_score = genes
+        .iter()
+        .map(|gene| gene.score.abs())
+        .fold(0.0_f64, f64::max);
+    for gene in &mut genes {
+        gene.weight = if score_exponent == 0.0 {
+            1.0
+        } else {
+            (gene.score.abs() / maximum_absolute_score).powf(score_exponent)
+        };
+    }
+    let mut tie_group_count = 0_u64;
+    let mut tied_gene_count = 0_u64;
+    let mut run_start = 0_usize;
+    while run_start < genes.len() {
+        let mut run_end = run_start + 1;
+        while run_end < genes.len() && genes[run_end].score == genes[run_start].score {
+            run_end += 1;
+        }
+        if run_end - run_start > 1 {
+            tie_group_count += 1;
+            tied_gene_count += (run_end - run_start) as u64;
+        }
+        run_start = run_end;
+    }
+    Ok(RankedGeneTable {
+        genes,
+        tie_group_count,
+        tied_gene_count,
+    })
+}
+
+fn read_gsea_gene_sets(path: &Path) -> Result<GseaGeneSetTable, FunctionalError> {
+    let text = read_bounded_text(path)?;
+    let delimiter = infer_delimiter(path, &text);
+    let mut reader = ReaderBuilder::new()
+        .delimiter(delimiter)
+        .comment(Some(b'#'))
+        .trim(csv::Trim::All)
+        .flexible(false)
+        .from_reader(text.as_bytes());
+    let headers = reader.headers()?.clone();
+    let gene_column = resolve_column(
+        &headers,
+        None,
+        &["gene_id", "gene", "query", "query_id", "protein_id", "id"],
+        "gene",
+    )?;
+    let term_column = resolve_column(
+        &headers,
+        None,
+        &[
+            "term_id",
+            "term",
+            "gene_set",
+            "set_id",
+            "pathway_id",
+            "category_id",
+        ],
+        "gene set",
+    )?;
+    if gene_column == term_column {
+        return Err(FunctionalError::InvalidTable(
+            "gene and gene-set columns must be different".to_owned(),
+        ));
+    }
+    let name_column = optional_column(
+        &headers,
+        &[
+            "term_name",
+            "gene_set_name",
+            "set_name",
+            "name",
+            "description",
+        ],
+    );
+    let namespace_column = optional_column(&headers, &["namespace", "category", "source"]);
+    let mut terms = BTreeMap::<String, TermGenes>::new();
+    let mut input_membership_count = 0_u64;
+    let mut duplicate_membership_count = 0_u64;
+    for (row_index, record) in reader.records().enumerate() {
+        if row_index as u64 >= MAX_FUNCTIONAL_ROWS {
+            return Err(FunctionalError::LimitExceeded {
+                resource: "GSEA membership row count",
+                limit: MAX_FUNCTIONAL_ROWS,
+            });
+        }
+        let record = record?;
+        let gene_id = record.get(gene_column).unwrap_or_default().trim();
+        let term_id = record.get(term_column).unwrap_or_default().trim();
+        let display_row = row_index + 2;
+        if gene_id.is_empty() || is_missing_value(gene_id) {
+            return Err(FunctionalError::InvalidTable(format!(
+                "gene-set membership row {display_row} has no gene identifier"
+            )));
+        }
+        if term_id.is_empty() || is_missing_value(term_id) {
+            return Err(FunctionalError::InvalidTable(format!(
+                "gene-set membership row {display_row} has no gene-set identifier"
+            )));
+        }
+        let name = optional_value(&record, name_column);
+        let namespace = optional_value(&record, namespace_column);
+        let term = terms
+            .entry(term_id.to_owned())
+            .or_insert_with(|| TermGenes {
+                name: name.clone(),
+                namespace: namespace.clone(),
+                genes: BTreeSet::new(),
+            });
+        merge_gsea_metadata(&mut term.name, name, term_id, "name")?;
+        merge_gsea_metadata(&mut term.namespace, namespace, term_id, "namespace")?;
+        if term.genes.insert(gene_id.to_owned()) {
+            input_membership_count += 1;
+            if input_membership_count as usize > MAX_FUNCTIONAL_IDENTIFIERS {
+                return Err(FunctionalError::LimitExceeded {
+                    resource: "unique GSEA membership count",
+                    limit: MAX_FUNCTIONAL_IDENTIFIERS as u64,
+                });
+            }
+        } else {
+            duplicate_membership_count += 1;
+        }
+    }
+    if terms.is_empty() {
+        return Err(FunctionalError::InvalidTable(
+            "gene-set membership table contains no memberships".to_owned(),
+        ));
+    }
+    Ok(GseaGeneSetTable {
+        input_gene_set_count: terms.len() as u64,
+        terms,
+        input_membership_count,
+        duplicate_membership_count,
+    })
+}
+
+fn merge_gsea_metadata(
+    stored: &mut Option<String>,
+    candidate: Option<String>,
+    term_id: &str,
+    label: &str,
+) -> Result<(), FunctionalError> {
+    match (stored.as_ref(), candidate) {
+        (Some(existing), Some(candidate)) if existing != &candidate => {
+            Err(FunctionalError::InvalidTable(format!(
+                "gene set {term_id:?} has conflicting {label} values {existing:?} and {candidate:?}"
+            )))
+        }
+        (None, Some(candidate)) => {
+            *stored = Some(candidate);
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
+fn prefix_sums(values: &[f64]) -> Vec<f64> {
+    let mut prefix = Vec::with_capacity(values.len() + 1);
+    prefix.push(0.0);
+    for value in values {
+        prefix.push(prefix.last().copied().unwrap_or(0.0) + value);
+    }
+    prefix
+}
+
+fn enrichment_score_from_hits(weights: &[f64], hit_positions: &[usize]) -> GseaTrace {
+    debug_assert!(!hit_positions.is_empty() && hit_positions.len() < weights.len());
+    let hit_weight_total = hit_positions
+        .iter()
+        .map(|position| weights[*position])
+        .sum::<f64>();
+    let used_unweighted_fallback = hit_weight_total == 0.0;
+    let hit_count = hit_positions.len();
+    let miss_decrement = 1.0 / (weights.len() - hit_count) as f64;
+    let mut running = 0.0_f64;
+    let mut maximum = 0.0_f64;
+    let mut minimum = 0.0_f64;
+    let mut maximum_index = 0_usize;
+    let mut minimum_index = 0_usize;
+    let mut previous_hit = None;
+    // Between hits the running sum only decreases, so sparse boundary evaluation is exact.
+    for position in hit_positions.iter().copied() {
+        let misses = position - previous_hit.map_or(0, |previous| previous + 1);
+        if misses > 0 {
+            running -= misses as f64 * miss_decrement;
+            if running < minimum {
+                minimum = running;
+                minimum_index = position - 1;
+            }
+        }
+        running += if used_unweighted_fallback {
+            1.0 / hit_count as f64
+        } else {
+            weights[position] / hit_weight_total
+        };
+        if running > maximum {
+            maximum = running;
+            maximum_index = position;
+        }
+        previous_hit = Some(position);
+    }
+    let trailing_misses = weights.len() - previous_hit.unwrap_or(0) - 1;
+    if trailing_misses > 0 {
+        running -= trailing_misses as f64 * miss_decrement;
+        if running < minimum {
+            minimum = running;
+            minimum_index = weights.len() - 1;
+        }
+    }
+    if maximum.abs() + 64.0 * f64::EPSILON >= minimum.abs() {
+        GseaTrace {
+            score: maximum.clamp(-1.0, 1.0),
+            peak_index: maximum_index,
+            used_unweighted_fallback,
+        }
+    } else {
+        GseaTrace {
+            score: minimum.clamp(-1.0, 1.0),
+            peak_index: minimum_index,
+            used_unweighted_fallback,
+        }
+    }
+}
+
+fn enrichment_score_from_misses(
+    weights: &[f64],
+    weight_prefix: &[f64],
+    miss_positions: &[usize],
+) -> GseaTrace {
+    debug_assert!(!miss_positions.is_empty() && miss_positions.len() < weights.len());
+    let hit_count = weights.len() - miss_positions.len();
+    let missed_weight = miss_positions
+        .iter()
+        .map(|position| weights[*position])
+        .sum::<f64>();
+    let hit_weight_total = (weight_prefix[weights.len()] - missed_weight).max(0.0);
+    let used_unweighted_fallback = hit_weight_total == 0.0;
+    let miss_decrement = 1.0 / miss_positions.len() as f64;
+    let mut running = 0.0_f64;
+    let mut maximum = 0.0_f64;
+    let mut minimum = 0.0_f64;
+    let mut maximum_index = 0_usize;
+    let mut minimum_index = 0_usize;
+    let mut start = 0_usize;
+    // This complementary path keeps permutations of large sets proportional to miss count.
+    for position in miss_positions.iter().copied() {
+        let hits = position - start;
+        if hits > 0 {
+            running += if used_unweighted_fallback {
+                hits as f64 / hit_count as f64
+            } else {
+                (weight_prefix[position] - weight_prefix[start]) / hit_weight_total
+            };
+            if running > maximum {
+                maximum = running;
+                maximum_index = position - 1;
+            }
+        }
+        running -= miss_decrement;
+        if running < minimum {
+            minimum = running;
+            minimum_index = position;
+        }
+        start = position + 1;
+    }
+    if start < weights.len() {
+        let hits = weights.len() - start;
+        running += if used_unweighted_fallback {
+            hits as f64 / hit_count as f64
+        } else {
+            (weight_prefix[weights.len()] - weight_prefix[start]) / hit_weight_total
+        };
+        if running > maximum {
+            maximum = running;
+            maximum_index = weights.len() - 1;
+        }
+    }
+    if maximum.abs() + 64.0 * f64::EPSILON >= minimum.abs() {
+        GseaTrace {
+            score: maximum.clamp(-1.0, 1.0),
+            peak_index: maximum_index,
+            used_unweighted_fallback,
+        }
+    } else {
+        GseaTrace {
+            score: minimum.clamp(-1.0, 1.0),
+            peak_index: minimum_index,
+            used_unweighted_fallback,
+        }
+    }
+}
+
+fn gsea_permutation_p_value(
+    weights: &[f64],
+    weight_prefix: &[f64],
+    set_size: usize,
+    observed_score: f64,
+    permutation_count: u32,
+    seed: u64,
+) -> f64 {
+    if observed_score == 0.0 {
+        return 1.0;
+    }
+    let mut random = SplitMix64::new(seed);
+    let sample_hits = set_size <= weights.len() - set_size;
+    let sample_size = if sample_hits {
+        set_size
+    } else {
+        weights.len() - set_size
+    };
+    let mut same_direction = 0_u64;
+    let mut at_least_as_extreme = 0_u64;
+    for _ in 0..permutation_count {
+        let positions = sample_sorted_indices(weights.len(), sample_size, &mut random);
+        let permuted_score = if sample_hits {
+            enrichment_score_from_hits(weights, &positions).score
+        } else {
+            enrichment_score_from_misses(weights, weight_prefix, &positions).score
+        };
+        if observed_score > 0.0 && permuted_score > 0.0 {
+            same_direction += 1;
+            if permuted_score >= observed_score {
+                at_least_as_extreme += 1;
+            }
+        } else if observed_score < 0.0 && permuted_score < 0.0 {
+            same_direction += 1;
+            if permuted_score <= observed_score {
+                at_least_as_extreme += 1;
+            }
+        }
+    }
+    // Broad-style preranked nominal probabilities condition on null scores in the observed direction.
+    (at_least_as_extreme + 1) as f64 / (same_direction + 1) as f64
+}
+
+fn sample_sorted_indices(
+    population_size: usize,
+    sample_size: usize,
+    random: &mut SplitMix64,
+) -> Vec<usize> {
+    let mut selected = BTreeSet::new();
+    for candidate in (population_size - sample_size)..population_size {
+        let draw = random.index(candidate + 1);
+        if !selected.insert(draw) {
+            selected.insert(candidate);
+        }
+    }
+    selected.into_iter().collect()
+}
+
+fn derive_gsea_seed(seed: u64, term_id: &str) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+    for byte in term_id.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    seed ^ hash
+}
+
+#[derive(Debug)]
+struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+
+    fn next(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut value = self.state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        value ^ (value >> 31)
+    }
+
+    fn index(&mut self, upper: usize) -> usize {
+        debug_assert!(upper > 0);
+        let upper = upper as u64;
+        let rejection_threshold = upper.wrapping_neg() % upper;
+        loop {
+            let value = self.next();
+            let product = u128::from(value) * u128::from(upper);
+            let low = product as u64;
+            if low >= rejection_threshold {
+                return (product >> 64) as usize;
+            }
+        }
+    }
+}
+
+fn adjust_gsea_benjamini_hochberg(terms: &mut [GseaTermResult]) {
+    let mut order = (0..terms.len()).collect::<Vec<_>>();
+    order.sort_by(|left, right| {
+        terms[*left]
+            .nominal_p_value
+            .total_cmp(&terms[*right].nominal_p_value)
+            .then_with(|| terms[*left].term_id.cmp(&terms[*right].term_id))
+    });
+    let count = order.len() as f64;
+    let mut running = 1.0_f64;
+    for (reverse_index, term_index) in order.into_iter().enumerate().rev() {
+        let rank = reverse_index as f64 + 1.0;
+        let adjusted = (terms[term_index].nominal_p_value * count / rank).min(1.0);
+        running = running.min(adjusted);
+        terms[term_index].fdr_bh = running;
+    }
 }
 
 fn validate_enrichment_options(options: EnrichmentOptions) -> Result<(), FunctionalError> {
@@ -1019,8 +1887,9 @@ fn write_new_file(path: &Path, bytes: &[u8]) -> Result<(), FunctionalError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        EnrichmentKind, EnrichmentOptions, GoAnnotationOptions, normalize_eggnog_path,
-        normalize_go_annotations_path, overrepresentation_path,
+        EnrichmentKind, EnrichmentOptions, GoAnnotationOptions, GseaOptions,
+        enrichment_score_from_hits, enrichment_score_from_misses, gsea_preranked_path,
+        normalize_eggnog_path, normalize_go_annotations_path, overrepresentation_path, prefix_sums,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -1125,6 +1994,190 @@ g8\tcustom:1\tCustom A\tcustom\n",
         assert_eq!(kegg.terms[0].term_id, "map00010");
         fs::remove_file(genes).expect("remove genes");
         fs::remove_file(associations).expect("remove associations");
+    }
+
+    #[test]
+    fn computes_deterministic_preranked_gsea_with_leading_edges_and_bh() {
+        let ranks = temporary("gsea-ranks.csv");
+        let memberships = temporary("gsea-memberships.tsv");
+        fs::write(
+            &ranks,
+            "gene_id,score\ng1,5\ng2,4\ng3,3\ng4,-1\ng5,-2\ng6,-4\n",
+        )
+        .expect("write GSEA ranks");
+        fs::write(
+            &memberships,
+            "gene_id\tterm_id\tterm_name\tnamespace\n\
+g1\ttop\tTop genes\tcustom\n\
+g2\ttop\tTop genes\tcustom\n\
+g1\ttop\tTop genes\tcustom\n\
+g5\tbottom\tBottom genes\tcustom\n\
+g6\tbottom\tBottom genes\tcustom\n\
+g1\tmixed\tMixed genes\tcustom\n\
+g6\tmixed\tMixed genes\tcustom\n\
+z1\tmissing\tMissing genes\tcustom\n\
+g3\tsmall\tSmall set\tcustom\n\
+g1\tall\tAll genes\tcustom\n\
+g2\tall\tAll genes\tcustom\n\
+g3\tall\tAll genes\tcustom\n\
+g4\tall\tAll genes\tcustom\n\
+g5\tall\tAll genes\tcustom\n\
+g6\tall\tAll genes\tcustom\n",
+        )
+        .expect("write GSEA memberships");
+        let options = GseaOptions {
+            score_exponent: 1.0,
+            min_set_size: 2,
+            max_set_size: 6,
+            permutation_count: 127,
+            seed: 42,
+        };
+        let result = gsea_preranked_path(&ranks, &memberships, options).expect("run GSEA");
+        let repeated = gsea_preranked_path(&ranks, &memberships, options).expect("repeat GSEA");
+        assert_eq!(result, repeated);
+        assert_eq!(result.capability_id, "enrichment.gsea.v1");
+        assert_eq!(result.schema_version, "1");
+        assert_eq!(result.ranked_gene_count, 6);
+        assert_eq!(result.input_gene_set_count, 6);
+        assert_eq!(result.tested_gene_set_count, 3);
+        assert_eq!(result.skipped_no_overlap_count, 1);
+        assert_eq!(result.skipped_below_min_size_count, 1);
+        assert_eq!(result.skipped_full_universe_count, 1);
+        assert_eq!(result.input_membership_count, 14);
+        assert_eq!(result.mapped_membership_count, 13);
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("duplicate gene-set membership"))
+        );
+
+        let top = result
+            .terms
+            .iter()
+            .find(|term| term.term_id == "top")
+            .expect("top term");
+        assert!((top.enrichment_score - 1.0).abs() < 1e-12);
+        assert_eq!(top.direction, "positive");
+        assert_eq!(top.peak_rank, 2);
+        assert_eq!(top.leading_edge_genes, ["g1", "g2"]);
+        let bottom = result
+            .terms
+            .iter()
+            .find(|term| term.term_id == "bottom")
+            .expect("bottom term");
+        assert!((bottom.enrichment_score + 1.0).abs() < 1e-12);
+        assert_eq!(bottom.direction, "negative");
+        assert_eq!(bottom.leading_edge_genes, ["g5", "g6"]);
+        assert!(result.terms.iter().all(|term| {
+            (0.0..=1.0).contains(&term.nominal_p_value) && (0.0..=1.0).contains(&term.fdr_bh)
+        }));
+        let json = serde_json::to_value(&result).expect("serialize GSEA result");
+        assert_eq!(json["permutation_count"], 127);
+        assert_eq!(json["seed"], 42);
+        fs::remove_file(ranks).expect("remove ranks");
+        fs::remove_file(memberships).expect("remove memberships");
+    }
+
+    #[test]
+    fn stabilizes_rank_ties_and_documents_zero_weight_fallback() {
+        let ranks = temporary("gsea-tied-ranks.tsv");
+        let memberships = temporary("gsea-zero-memberships.tsv");
+        fs::write(
+            &ranks,
+            "gene\tranking_metric\ng2\t2\ng1\t2\ng3\t0\ng4\t0\ng5\t-1\n",
+        )
+        .expect("write tied ranks");
+        fs::write(
+            &memberships,
+            "gene\tgene_set\ng1\thigh\ng2\thigh\ng3\tzero\ng4\tzero\n",
+        )
+        .expect("write zero-weight set");
+        let result = gsea_preranked_path(
+            &ranks,
+            &memberships,
+            GseaOptions {
+                min_set_size: 2,
+                max_set_size: 3,
+                permutation_count: 31,
+                seed: 7,
+                ..GseaOptions::default()
+            },
+        )
+        .expect("run tied GSEA");
+        let high = result
+            .terms
+            .iter()
+            .find(|term| term.term_id == "high")
+            .expect("high set");
+        assert_eq!(high.leading_edge_genes, ["g1", "g2"]);
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("tied-score groups"))
+        );
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("unweighted hit fallback"))
+        );
+        fs::remove_file(ranks).expect("remove ranks");
+        fs::remove_file(memberships).expect("remove memberships");
+    }
+
+    #[test]
+    fn rejects_duplicate_ranked_identifiers_and_invalid_options() {
+        let ranks = temporary("gsea-duplicate-ranks.tsv");
+        let memberships = temporary("gsea-valid-memberships.tsv");
+        fs::write(&ranks, "gene_id\tscore\ng1\t2\ng1\t1\ng2\t0\n").expect("write duplicate ranks");
+        fs::write(&memberships, "gene_id\tterm_id\ng1\tset1\n").expect("write memberships");
+        let duplicate_error = gsea_preranked_path(
+            &ranks,
+            &memberships,
+            GseaOptions {
+                min_set_size: 1,
+                max_set_size: 2,
+                permutation_count: 10,
+                seed: 0,
+                score_exponent: 1.0,
+            },
+        )
+        .expect_err("duplicate ranks must fail");
+        assert!(duplicate_error.to_string().contains("duplicated"));
+        let option_error = gsea_preranked_path(
+            &ranks,
+            &memberships,
+            GseaOptions {
+                permutation_count: 0,
+                ..GseaOptions::default()
+            },
+        )
+        .expect_err("zero permutations must fail");
+        assert!(option_error.to_string().contains("permutation_count"));
+        fs::remove_file(ranks).expect("remove ranks");
+        fs::remove_file(memberships).expect("remove memberships");
+    }
+
+    #[test]
+    fn sparse_hit_and_sparse_miss_score_algorithms_agree() {
+        let weights = [1.0, 0.8, 0.6, 0.2, 0.4, 0.8];
+        let prefix = prefix_sums(&weights);
+        for mask in 1_u32..((1_u32 << weights.len()) - 1) {
+            let hits = (0..weights.len())
+                .filter(|index| mask & (1 << index) != 0)
+                .collect::<Vec<_>>();
+            let misses = (0..weights.len())
+                .filter(|index| mask & (1 << index) == 0)
+                .collect::<Vec<_>>();
+            let from_hits = enrichment_score_from_hits(&weights, &hits);
+            let from_misses = enrichment_score_from_misses(&weights, &prefix, &misses);
+            assert!(
+                (from_hits.score - from_misses.score).abs() < 1e-12,
+                "sparse paths differ for membership mask {mask:#08b}"
+            );
+        }
     }
 
     fn temporary(name: &str) -> PathBuf {

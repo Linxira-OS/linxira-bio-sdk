@@ -32,6 +32,10 @@
           "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
           "display_name": { "type": "string", "minLength": 1 },
           "category": { "type": "string", "minLength": 1 },
+          "executable_env": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
           "status": { "enum": ["active", "planned"] },
           "platforms": {
             "type": "array",

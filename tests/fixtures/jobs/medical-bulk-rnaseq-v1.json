@@ -1,0 +1,20 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-medical-bulk-rnaseq-v1",
+  "capability": "medical.bulk-rnaseq.v1",
+  "inputs": {
+    "counts": "../expression-matrix/deseq2-counts.csv",
+    "sample_metadata": "../expression-matrix/deseq2-samples.csv"
+  },
+  "execution": {"mode": "local-cpu"},
+  "parameters": {
+    "output_directory": "../../../target/test-results/medical-bulk-rnaseq-v1",
+    "feature_id_column": "gene_id",
+    "sample_id_column": "sample_id",
+    "condition_column": "condition",
+    "reference_level": "control",
+    "contrast_level": "treated",
+    "alpha": 0.05,
+    "min_total_count": 10
+  }
+}

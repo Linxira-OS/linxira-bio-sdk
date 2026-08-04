@@ -1,0 +1,23 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-comparative-kaks-v2",
+  "capability": "comparative.kaks.v1",
+  "inputs": [{
+    "artifact_id": "input-codon-alignment",
+    "role": "codon-alignment",
+    "cardinality": "single",
+    "files": [{
+      "file_id": "input-codon-alignment-1",
+      "path": "../comparative/codon-pairs.axt",
+      "format": "axt",
+      "compression": "none",
+      "size_bytes": 39,
+      "sha256": "5f69008a1cf3281e97d03f86e1c3f0ad727d7c7ec7c895eecd8b2876aae422f4"
+    }]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {
+    "output": "../../../target/test-results/kaks-v2.tsv",
+    "method": "YN"
+  }
+}

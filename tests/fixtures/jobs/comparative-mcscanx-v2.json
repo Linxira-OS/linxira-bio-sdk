@@ -1,0 +1,35 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-comparative-mcscanx-v2",
+  "capability": "comparative.mcscanx.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-gene-positions",
+      "role": "gene-positions",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "input-gene-positions-1",
+        "path": "../comparative/mcscanx-genes.tsv",
+        "format": "tsv",
+        "compression": "none",
+        "size_bytes": 73,
+        "sha256": "0599160906eaa7b5962381d039cd26b7fa1ad417570583bbec743cf98a4c7576"
+      }]
+    },
+    {
+      "artifact_id": "input-similarity-hits",
+      "role": "similarity-hits",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "input-similarity-hits-1",
+        "path": "../comparative/mcscanx-hits.tsv",
+        "format": "blast-tabular",
+        "compression": "none",
+        "size_bytes": 94,
+        "sha256": "8db9df87cab1a16a30e0636dbb1e8798b65ada0b830236dfad6f443e8d112341"
+      }]
+    }
+  ],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/mcscanx-v2.collinearity"}
+}

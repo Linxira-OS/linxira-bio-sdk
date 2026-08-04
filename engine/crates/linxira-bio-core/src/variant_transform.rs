@@ -85,6 +85,204 @@ pub struct VariantFilterSummary {
     pub rejected_by_info_dp: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum VariantComparisonStatus {
+    Shared,
+    LeftOnly,
+    RightOnly,
+}
+
+impl VariantComparisonStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Shared => "shared",
+            Self::LeftOnly => "left-only",
+            Self::RightOnly => "right-only",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct VariantAlleleKey {
+    chrom: String,
+    position: u64,
+    reference: String,
+    alternate: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct VariantComparisonRow {
+    pub chrom: String,
+    pub position: u64,
+    pub reference: String,
+    pub alternate: String,
+    pub status: VariantComparisonStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct VariantComparisonResult {
+    pub shared_count: u64,
+    pub left_only_count: u64,
+    pub right_only_count: u64,
+    pub sample_genotypes_compared: bool,
+    pub variants: Vec<VariantComparisonRow>,
+}
+
+pub fn compare_vcf_paths(
+    left: impl AsRef<Path>,
+    right: impl AsRef<Path>,
+) -> Result<VariantComparisonResult, VariantTransformError> {
+    let left = collect_variant_alleles(left.as_ref())?;
+    let right = collect_variant_alleles(right.as_ref())?;
+    let mut shared_count = 0_u64;
+    let mut left_only_count = 0_u64;
+    let mut right_only_count = 0_u64;
+    let mut variants = Vec::with_capacity(left.len().saturating_add(right.len()));
+
+    for key in left.union(&right) {
+        let status = match (left.contains(key), right.contains(key)) {
+            (true, true) => {
+                shared_count += 1;
+                VariantComparisonStatus::Shared
+            }
+            (true, false) => {
+                left_only_count += 1;
+                VariantComparisonStatus::LeftOnly
+            }
+            (false, true) => {
+                right_only_count += 1;
+                VariantComparisonStatus::RightOnly
+            }
+            (false, false) => unreachable!("set union contains a key from at least one input"),
+        };
+        variants.push(VariantComparisonRow {
+            chrom: key.chrom.clone(),
+            position: key.position,
+            reference: key.reference.clone(),
+            alternate: key.alternate.clone(),
+            status,
+        });
+    }
+
+    Ok(VariantComparisonResult {
+        shared_count,
+        left_only_count,
+        right_only_count,
+        sample_genotypes_compared: false,
+        variants,
+    })
+}
+
+fn collect_variant_alleles(
+    input: &Path,
+) -> Result<BTreeSet<VariantAlleleKey>, VariantTransformError> {
+    vcf_stats_path(input)?;
+    let mut reader = open_vcf_reader(input)?;
+    let mut variants = BTreeSet::new();
+    let mut buffer = String::new();
+    let mut line_number = 0_usize;
+    loop {
+        buffer.clear();
+        if reader.read_line(&mut buffer)? == 0 {
+            break;
+        }
+        line_number += 1;
+        if buffer.starts_with('#') {
+            continue;
+        }
+        let columns = buffer
+            .trim_end_matches(['\r', '\n'])
+            .split('\t')
+            .collect::<Vec<_>>();
+        let position =
+            columns[1]
+                .parse::<u64>()
+                .map_err(|_| VariantTransformError::InvalidRecord {
+                    line: line_number,
+                    message: "POS does not fit the comparison key".to_owned(),
+                })?;
+        if columns[4] == "." {
+            continue;
+        }
+        for alternate in columns[4].split(',') {
+            variants.insert(canonical_variant_key(
+                columns[0],
+                position,
+                columns[3],
+                alternate,
+                line_number,
+            )?);
+        }
+    }
+    Ok(variants)
+}
+
+fn canonical_variant_key(
+    chrom: &str,
+    mut position: u64,
+    reference: &str,
+    alternate: &str,
+    line: usize,
+) -> Result<VariantAlleleKey, VariantTransformError> {
+    let mut reference = normalize_allele(reference, line)?;
+    if is_symbolic_allele(alternate) {
+        return Ok(VariantAlleleKey {
+            chrom: chrom.to_owned(),
+            position,
+            reference: String::from_utf8(reference)
+                .expect("validated reference alleles contain ASCII nucleotides"),
+            alternate: alternate.to_owned(),
+        });
+    }
+    let mut alternate = normalize_allele(alternate, line)?;
+    trim_comparison_alleles(&mut position, &mut reference, &mut alternate, line)?;
+    if reference == alternate {
+        return Err(VariantTransformError::InvalidRecord {
+            line,
+            message: "REF and ALT are identical after comparison normalization".to_owned(),
+        });
+    }
+    Ok(VariantAlleleKey {
+        chrom: chrom.to_owned(),
+        position,
+        reference: String::from_utf8(reference)
+            .expect("validated reference alleles contain ASCII nucleotides"),
+        alternate: String::from_utf8(alternate)
+            .expect("validated alternate alleles contain ASCII nucleotides"),
+    })
+}
+
+fn trim_comparison_alleles(
+    position: &mut u64,
+    reference: &mut Vec<u8>,
+    alternate: &mut Vec<u8>,
+    line: usize,
+) -> Result<(), VariantTransformError> {
+    while reference.len() > 1 && alternate.len() > 1 && reference.last() == alternate.last() {
+        reference.pop();
+        alternate.pop();
+    }
+    let mut prefix = 0_usize;
+    while reference.len() - prefix > 1
+        && alternate.len() - prefix > 1
+        && reference[prefix] == alternate[prefix]
+    {
+        prefix += 1;
+    }
+    if prefix > 0 {
+        reference.drain(..prefix);
+        alternate.drain(..prefix);
+        *position = position
+            .checked_add(u64::try_from(prefix).expect("allele length fits in u64"))
+            .ok_or_else(|| VariantTransformError::InvalidRecord {
+                line,
+                message: "normalized POS overflows the comparison key".to_owned(),
+            })?;
+    }
+    Ok(())
+}
+
 pub fn filter_vcf_path(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
@@ -498,6 +696,192 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("linxira-{nonce}-{name}"))
+    }
+
+    fn comparison_fixture(name: &str) -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../tests/fixtures/variant-compare")
+            .join(name)
+    }
+
+    fn write_vcf(path: &Path, column_header: &str, records: &str) {
+        fs::write(
+            path,
+            format!("##fileformat=VCFv4.2\n{column_header}\n{records}"),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn compares_fixture_alleles_in_stable_order() {
+        let left = comparison_fixture("left.vcf");
+        let right = comparison_fixture("right.vcf");
+        let result = compare_vcf_paths(&left, &right).unwrap();
+
+        assert_eq!(result.shared_count, 3);
+        assert_eq!(result.left_only_count, 2);
+        assert_eq!(result.right_only_count, 1);
+        assert!(!result.sample_genotypes_compared);
+        assert_eq!(
+            result.variants,
+            vec![
+                VariantComparisonRow {
+                    chrom: "chr1".to_owned(),
+                    position: 5,
+                    reference: "G".to_owned(),
+                    alternate: "A".to_owned(),
+                    status: VariantComparisonStatus::LeftOnly,
+                },
+                VariantComparisonRow {
+                    chrom: "chr1".to_owned(),
+                    position: 6,
+                    reference: "C".to_owned(),
+                    alternate: "G".to_owned(),
+                    status: VariantComparisonStatus::RightOnly,
+                },
+                VariantComparisonRow {
+                    chrom: "chr1".to_owned(),
+                    position: 11,
+                    reference: "C".to_owned(),
+                    alternate: "T".to_owned(),
+                    status: VariantComparisonStatus::Shared,
+                },
+                VariantComparisonRow {
+                    chrom: "chr2".to_owned(),
+                    position: 20,
+                    reference: "A".to_owned(),
+                    alternate: "C".to_owned(),
+                    status: VariantComparisonStatus::Shared,
+                },
+                VariantComparisonRow {
+                    chrom: "chr2".to_owned(),
+                    position: 20,
+                    reference: "A".to_owned(),
+                    alternate: "G".to_owned(),
+                    status: VariantComparisonStatus::LeftOnly,
+                },
+                VariantComparisonRow {
+                    chrom: "chr3".to_owned(),
+                    position: 7,
+                    reference: "T".to_owned(),
+                    alternate: "<DEL>".to_owned(),
+                    status: VariantComparisonStatus::Shared,
+                },
+            ]
+        );
+        assert_eq!(result, compare_vcf_paths(left, right).unwrap());
+    }
+
+    #[test]
+    fn splits_multiallelic_records_and_collapses_duplicate_alleles() {
+        let left = temp_path("compare-multi-left.vcf");
+        let right = temp_path("compare-multi-right.vcf");
+        let header = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO";
+        write_vcf(
+            &left,
+            header,
+            "chr1\t2\t.\tA\tC,G\t50\tPASS\t.\nchr1\t2\tduplicate\ta\tg\t50\tPASS\t.\n",
+        );
+        write_vcf(&right, header, "chr1\t2\t.\tA\tG\t50\tPASS\t.\n");
+
+        let result = compare_vcf_paths(&left, &right).unwrap();
+        assert_eq!(result.shared_count, 1);
+        assert_eq!(result.left_only_count, 1);
+        assert_eq!(result.right_only_count, 0);
+        assert_eq!(result.variants.len(), 2);
+        assert_eq!(result.variants[0].alternate, "C");
+        assert_eq!(result.variants[1].alternate, "G");
+
+        let _ = fs::remove_file(left);
+        let _ = fs::remove_file(right);
+    }
+
+    #[test]
+    fn compares_alleles_without_claiming_genotype_concordance() {
+        let left = temp_path("compare-gt-left.vcf");
+        let right = temp_path("compare-gt-right.vcf");
+        let header = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample";
+        write_vcf(&left, header, "chr1\t2\t.\tA\tG\t50\tPASS\t.\tGT\t0/1\n");
+        write_vcf(&right, header, "chr1\t2\t.\tA\tG\t50\tPASS\t.\tGT\t1/1\n");
+
+        let result = compare_vcf_paths(&left, &right).unwrap();
+        assert_eq!(result.shared_count, 1);
+        assert_eq!(result.variants[0].status, VariantComparisonStatus::Shared);
+        assert!(!result.sample_genotypes_compared);
+
+        let _ = fs::remove_file(left);
+        let _ = fs::remove_file(right);
+    }
+
+    #[test]
+    fn rejects_invalid_alleles_during_comparison() {
+        let valid = temp_path("compare-valid.vcf");
+        let invalid_alt_list = temp_path("compare-invalid-alt-list.vcf");
+        let unsupported_allele = temp_path("compare-unsupported-allele.vcf");
+        let identical_allele = temp_path("compare-identical-allele.vcf");
+        let header = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO";
+        write_vcf(&valid, header, "chr1\t2\t.\tA\tG\t50\tPASS\t.\n");
+        write_vcf(
+            &invalid_alt_list,
+            header,
+            "chr1\t2\t.\tA\tA,,G\t50\tPASS\t.\n",
+        );
+        write_vcf(
+            &unsupported_allele,
+            header,
+            "chr1\t2\t.\tA\tU\t50\tPASS\t.\n",
+        );
+        write_vcf(&identical_allele, header, "chr1\t2\t.\ta\tA\t50\tPASS\t.\n");
+
+        assert!(matches!(
+            compare_vcf_paths(&invalid_alt_list, &valid),
+            Err(VariantTransformError::Vcf(VcfError::MalformedRecord { .. }))
+        ));
+        assert!(matches!(
+            compare_vcf_paths(&unsupported_allele, &valid),
+            Err(VariantTransformError::InvalidRecord { .. })
+        ));
+        assert!(matches!(
+            compare_vcf_paths(&identical_allele, &valid),
+            Err(VariantTransformError::InvalidRecord { .. })
+        ));
+
+        let _ = fs::remove_file(valid);
+        let _ = fs::remove_file(invalid_alt_list);
+        let _ = fs::remove_file(unsupported_allele);
+        let _ = fs::remove_file(identical_allele);
+    }
+
+    #[test]
+    fn rejects_malformed_headers_and_positions_during_comparison() {
+        let valid = temp_path("compare-valid-structure.vcf");
+        let malformed_header = temp_path("compare-malformed-header.vcf");
+        let malformed_position = temp_path("compare-malformed-position.vcf");
+        let header = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO";
+        write_vcf(&valid, header, "chr1\t2\t.\tA\tG\t50\tPASS\t.\n");
+        write_vcf(
+            &malformed_header,
+            "#CHROM\tSTART\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
+            "chr1\t2\t.\tA\tG\t50\tPASS\t.\n",
+        );
+        write_vcf(
+            &malformed_position,
+            header,
+            "chr1\tzero\t.\tA\tG\t50\tPASS\t.\n",
+        );
+
+        assert!(matches!(
+            compare_vcf_paths(&malformed_header, &valid),
+            Err(VariantTransformError::Vcf(VcfError::InvalidHeader { .. }))
+        ));
+        assert!(matches!(
+            compare_vcf_paths(&malformed_position, &valid),
+            Err(VariantTransformError::Vcf(VcfError::MalformedRecord { .. }))
+        ));
+
+        let _ = fs::remove_file(valid);
+        let _ = fs::remove_file(malformed_header);
+        let _ = fs::remove_file(malformed_position);
     }
 
     #[test]
