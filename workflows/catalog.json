@@ -29,7 +29,11 @@
     },
     {
       "id": "org.linxira.bulk-expression-deseq2",
-      "capability": "expression.deseq2.v1",
+      "capability": "expression.differential.v1",
+      "capability_aliases": [
+        "medical.bulk-rnaseq.v1",
+        "expression.deseq2.v1"
+      ],
       "status": "cataloged",
       "trust": "official",
       "runtime": "r",

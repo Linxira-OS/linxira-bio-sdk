@@ -1,0 +1,47 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-enrichment-gsea-v2",
+  "capability": "enrichment.gsea.v1",
+  "inputs": [
+    {
+      "artifact_id": "ranked-genes",
+      "role": "ranked",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "ranked-genes-1",
+          "path": "../functional/ranked.tsv",
+          "format": "tsv",
+          "compression": "none",
+          "size_bytes": 47,
+          "sha256": "99e34d668913aa561a099d03abf8456f4d8bea0aee9860651632f8fa6b90f6b1"
+        }
+      ]
+    },
+    {
+      "artifact_id": "gene-sets",
+      "role": "gene-sets",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "gene-sets-1",
+          "path": "../functional/gene-sets.tsv",
+          "format": "tsv",
+          "compression": "none",
+          "size_bytes": 208,
+          "sha256": "5c842ce81baa7ff78ed9a7eb69d3a9bcb06fbb621f290e036a10cd8e06eab183"
+        }
+      ]
+    }
+  ],
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "score_exponent": 1.0,
+    "min_set_size": 2,
+    "max_set_size": 4,
+    "permutations": 50,
+    "seed": 42
+  }
+}

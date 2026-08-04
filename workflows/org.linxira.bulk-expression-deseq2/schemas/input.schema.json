@@ -6,7 +6,13 @@
   "properties": {
     "schema_version": { "const": "2" },
     "job_id": { "type": "string", "minLength": 1 },
-    "capability": { "const": "expression.deseq2.v1" },
+    "capability": {
+      "enum": [
+        "expression.differential.v1",
+        "medical.bulk-rnaseq.v1",
+        "expression.deseq2.v1"
+      ]
+    },
     "inputs": {
       "type": "array",
       "minItems": 2,

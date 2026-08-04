@@ -21,13 +21,34 @@ fn main() -> ExitCode {
         }
         return write_output(&directory.join("meme.txt"), "MEME version 5\n\nALPHABET= ACGT\n");
     }
-    let output = ["--domtblout", "-output", "--out", "-out", "-o", "--db"]
+    if arguments.len() == 1 {
+        let dataset = PathBuf::from(&arguments[0]);
+        let gff = PathBuf::from(format!("{}.gff", dataset.to_string_lossy()));
+        let blast = PathBuf::from(format!("{}.blast", dataset.to_string_lossy()));
+        if gff.is_file() && blast.is_file() {
+            let output = PathBuf::from(format!("{}.collinearity", dataset.to_string_lossy()));
+            return write_output(
+                &output,
+                "## Alignment 0: score=100 e_value=1e-20 N=2 chr1&chrA plus\n  0-  0: gene1 geneA 1e-20\n  0-  1: gene2 geneB 1e-18\n",
+            );
+        }
+    }
+    let output = ["--domtblout", "-output", "--out", "-out", "-o", "--db", "--outFileName"]
         .into_iter()
         .find_map(|flag| value_after(&arguments, flag).map(PathBuf::from));
     let Some(output) = output else {
         eprintln!("stub did not receive a supported output flag");
         return ExitCode::from(2);
     };
+    if let Some(method) = value_after(&arguments, "-m") {
+        return write_output(
+            &output,
+            &format!(
+                "Sequence\tMethod\tKa\tKs\tKa/Ks\nGene1&GeneA\t{}\t0.010\t0.100\t0.100\n",
+                method.to_string_lossy()
+            ),
+        );
+    }
     let content = if arguments.iter().any(|value| value == "-output") {
         ">one\nACGTNN\n>two\nGGGG\n>three\nAT\n"
     } else if arguments.iter().any(|value| value == "--domtblout") {

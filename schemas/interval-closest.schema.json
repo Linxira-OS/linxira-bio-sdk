@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/interval-closest.v1.json",
+  "title": "Linxira Bio nearest genomic interval result",
+  "type": "object",
+  "required": [
+    "query_interval_count",
+    "target_interval_count",
+    "matched_query_count",
+    "unmatched_query_count",
+    "contigs",
+    "warnings"
+  ],
+  "properties": {
+    "query_interval_count": {"$ref": "#/$defs/count"},
+    "target_interval_count": {"$ref": "#/$defs/count"},
+    "matched_query_count": {"$ref": "#/$defs/count"},
+    "unmatched_query_count": {"$ref": "#/$defs/count"},
+    "contigs": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/contig"}
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "count": {"type": "integer", "minimum": 0},
+    "contig": {
+      "type": "object",
+      "required": [
+        "query_interval_count",
+        "target_interval_count",
+        "matched_query_count",
+        "unmatched_query_count"
+      ],
+      "properties": {
+        "query_interval_count": {"$ref": "#/$defs/count"},
+        "target_interval_count": {"$ref": "#/$defs/count"},
+        "matched_query_count": {"$ref": "#/$defs/count"},
+        "unmatched_query_count": {"$ref": "#/$defs/count"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

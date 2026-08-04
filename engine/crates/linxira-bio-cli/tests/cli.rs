@@ -44,6 +44,9 @@ fn lists_bundled_workflow_packs_without_claiming_installation() {
     }));
     assert!(packs.iter().any(|pack| {
         pack["id"] == "org.linxira.bulk-expression-deseq2"
+            && pack["capability"] == "expression.differential.v1"
+            && pack["capability_aliases"]
+                == serde_json::json!(["medical.bulk-rnaseq.v1", "expression.deseq2.v1"])
             && pack["status"] == "cataloged"
             && pack["runtime"] == "r"
     }));
@@ -629,7 +632,85 @@ fn processes_fastq_reads_as_json() {
         fs::read_to_string(&adapter_output).expect("adapter-trimmed FASTQ"),
         "@trim\nACGTAC\n+\nIIII!!\n@adapter\nTTTT\n+\nIIII\n@drop\nACGT\n+\n!!!!\n"
     );
+
+    let duplicate_input = temp.join("duplicates.fastq");
+    fs::write(
+        &duplicate_input,
+        "@one:AAAA\nACGT\n+\nIIII\n@copy:AAAA\nACGT\n+\nIIII\n@other:CCCC\nACGT\n+\nIIII\n",
+    )
+    .expect("write duplicate FASTQ");
+    let deduplicated_output = temp.join("deduplicated.fastq");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["fastq", "deduplicate"])
+        .arg(&duplicate_input)
+        .arg(&deduplicated_output)
+        .args(["--header-umi-delimiter", ":", "--json"])
+        .output()
+        .expect("run FASTQ deduplicate");
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid FASTQ deduplicate JSON");
+    assert_eq!(result["capability"], "fastq.deduplicate.v1");
+    assert_eq!(result["result"]["output_read_count"], 2);
+    assert_eq!(result["result"]["duplicate_read_count"], 1);
     fs::remove_dir_all(temp).expect("remove FASTQ transform directory");
+}
+
+#[test]
+fn runs_closest_interval_and_preranked_gsea_as_json() {
+    let root = workspace_root();
+    let temp = temporary_directory("closest-gsea");
+    let closest = temp.join("closest.tsv");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["interval", "closest"])
+        .arg(root.join("tests/fixtures/interval-intersect/left.bed"))
+        .arg(root.join("tests/fixtures/interval-intersect/right.bed"))
+        .arg(&closest)
+        .arg("--json")
+        .output()
+        .expect("run closest intervals");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("closest JSON");
+    assert_eq!(result["capability"], "interval.closest.v1");
+    assert_eq!(result["result"]["matched_query_count"], 3);
+    assert!(closest.exists());
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["enrichment", "gsea"])
+        .arg(root.join("tests/fixtures/functional/ranked.tsv"))
+        .arg(root.join("tests/fixtures/functional/gene-sets.tsv"))
+        .args([
+            "--min-set-size",
+            "2",
+            "--max-set-size",
+            "4",
+            "--permutations",
+            "50",
+            "--seed",
+            "42",
+            "--json",
+        ])
+        .output()
+        .expect("run preranked GSEA");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("GSEA JSON");
+    assert_eq!(result["capability"], "enrichment.gsea.v1");
+    assert_eq!(result["result"]["tested_gene_set_count"], 3);
+    assert_eq!(result["result"]["seed"], 42);
+    fs::remove_dir_all(temp).expect("remove closest GSEA directory");
 }
 
 #[test]
@@ -646,6 +727,98 @@ fn reports_variant_statistics_as_json() {
     let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
     assert_eq!(result["capability"], "variant.stats.v1");
     assert_eq!(result["result"]["record_count"], 7);
+}
+
+#[test]
+fn runs_variant_compare_interval_closest_and_preranked_gsea() {
+    let root = workspace_root();
+    let temporary = temporary_directory("new-local-analyses");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["variant", "compare"])
+        .arg(root.join("tests/fixtures/variant-compare/left.vcf"))
+        .arg(root.join("tests/fixtures/variant-compare/right.vcf"))
+        .arg("--json")
+        .output()
+        .expect("run variant comparison");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("variant comparison JSON");
+    assert_eq!(result["capability"], "variant.compare.v1");
+    assert_eq!(result["result"]["shared_count"], 3);
+    assert_eq!(result["result"]["left_only_count"], 2);
+    assert_eq!(result["result"]["right_only_count"], 1);
+    assert_eq!(result["result"]["sample_genotypes_compared"], false);
+
+    let query = temporary.join("query.bed");
+    let target = temporary.join("target.bed");
+    let closest = temporary.join("closest.tsv");
+    fs::write(&query, "chr1\t10\t20\nchr2\t1\t2\n").expect("write query BED");
+    fs::write(&target, "chr1\t22\t30\n").expect("write target BED");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["interval", "closest"])
+        .arg(&query)
+        .arg(&target)
+        .arg(&closest)
+        .arg("--json")
+        .output()
+        .expect("run closest interval analysis");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("closest interval JSON");
+    assert_eq!(result["capability"], "interval.closest.v1");
+    assert_eq!(result["result"]["matched_query_count"], 1);
+    assert_eq!(result["result"]["unmatched_query_count"], 1);
+    assert!(
+        fs::read_to_string(&closest)
+            .unwrap()
+            .contains("\t2\tdownstream")
+    );
+
+    let ranks = temporary.join("ranks.csv");
+    let gene_sets = temporary.join("gene-sets.tsv");
+    fs::write(&ranks, "gene_id,score\nA,4\nB,3\nC,-2\nD,-3\n").expect("write ranked genes");
+    fs::write(
+        &gene_sets,
+        "term_id\tgene_id\tterm_name\nTOP\tA\tTop genes\nTOP\tB\tTop genes\nBOTTOM\tC\tBottom genes\nBOTTOM\tD\tBottom genes\n",
+    )
+    .expect("write gene sets");
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["enrichment", "gsea"])
+        .arg(&ranks)
+        .arg(&gene_sets)
+        .args([
+            "--min-set-size",
+            "1",
+            "--max-set-size",
+            "3",
+            "--permutations",
+            "32",
+            "--seed",
+            "7",
+            "--json",
+        ])
+        .output()
+        .expect("run preranked GSEA");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("GSEA JSON");
+    assert_eq!(result["capability"], "enrichment.gsea.v1");
+    assert_eq!(result["result"]["ranked_gene_count"], 4);
+    assert_eq!(result["result"]["tested_gene_set_count"], 2);
+
+    fs::remove_dir_all(temporary).expect("remove local analysis test directory");
 }
 
 #[test]

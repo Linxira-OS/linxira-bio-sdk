@@ -1,0 +1,44 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-expression-differential-v2",
+  "capability": "expression.differential.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-counts",
+      "role": "counts",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "input-counts-1",
+        "path": "../expression-matrix/deseq2-counts.csv",
+        "format": "csv",
+        "compression": "none",
+        "size_bytes": 125,
+        "sha256": "365ec34ff99a91eaca206014e7cdf7ceba6ee8f96f120ca60b2bb05327996006"
+      }]
+    },
+    {
+      "artifact_id": "input-sample-metadata",
+      "role": "sample_metadata",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "input-sample-metadata-1",
+        "path": "../expression-matrix/deseq2-samples.csv",
+        "format": "csv",
+        "compression": "none",
+        "size_bytes": 92,
+        "sha256": "daf55d07e3e55c677b2977d47eea333f284daec4db9856a0138cc33e2f9a9244"
+      }]
+    }
+  ],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {
+    "output_directory": "../../../target/test-results/expression-differential-v2",
+    "feature_id_column": "gene_id",
+    "sample_id_column": "sample_id",
+    "condition_column": "condition",
+    "reference_level": "control",
+    "contrast_level": "treated",
+    "alpha": 0.05,
+    "min_total_count": 10
+  }
+}

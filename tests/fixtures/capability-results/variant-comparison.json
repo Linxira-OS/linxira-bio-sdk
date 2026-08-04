@@ -1,0 +1,14 @@
+{
+  "shared_count": 3,
+  "left_only_count": 2,
+  "right_only_count": 1,
+  "sample_genotypes_compared": false,
+  "variants": [
+    {"chrom": "chr1", "position": 5, "reference": "G", "alternate": "A", "status": "left-only"},
+    {"chrom": "chr1", "position": 6, "reference": "C", "alternate": "G", "status": "right-only"},
+    {"chrom": "chr1", "position": 11, "reference": "C", "alternate": "T", "status": "shared"},
+    {"chrom": "chr2", "position": 20, "reference": "A", "alternate": "C", "status": "shared"},
+    {"chrom": "chr2", "position": 20, "reference": "A", "alternate": "G", "status": "left-only"},
+    {"chrom": "chr3", "position": 7, "reference": "T", "alternate": "<DEL>", "status": "shared"}
+  ]
+}

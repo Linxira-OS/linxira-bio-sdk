@@ -74,6 +74,50 @@ pub struct EnrichmentVisualizationOptions {
     pub max_terms: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyntenyPlotStyle {
+    Dual,
+    Multiple,
+    Micro,
+    Circular,
+}
+
+impl SyntenyPlotStyle {
+    pub fn parse(value: &str) -> Result<Self, VisualizationError> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "dual" => Ok(Self::Dual),
+            "multiple" => Ok(Self::Multiple),
+            "micro" => Ok(Self::Micro),
+            "circular" => Ok(Self::Circular),
+            _ => Err(VisualizationError::InvalidOption(format!(
+                "unsupported synteny plot style: {value}"
+            ))),
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Dual => "dual",
+            Self::Multiple => "multiple",
+            Self::Micro => "micro",
+            Self::Circular => "circular",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SyntenyVisualizationOptions {
+    pub style: SyntenyPlotStyle,
+}
+
+impl Default for SyntenyVisualizationOptions {
+    fn default() -> Self {
+        Self {
+            style: SyntenyPlotStyle::Dual,
+        }
+    }
+}
+
 impl Default for EnrichmentVisualizationOptions {
     fn default() -> Self {
         Self {
@@ -92,6 +136,23 @@ pub struct SvgVisualizationResult {
     pub track_count: u64,
     pub glyph_count: u64,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VolcanoPlotOptions {
+    pub adjusted_pvalue_threshold: f64,
+    pub absolute_log2_fold_change_threshold: f64,
+    pub max_points: usize,
+}
+
+impl Default for VolcanoPlotOptions {
+    fn default() -> Self {
+        Self {
+            adjusted_pvalue_threshold: 0.05,
+            absolute_log2_fold_change_threshold: 1.0,
+            max_points: DEFAULT_MAX_VISUAL_ITEMS,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -162,6 +223,433 @@ impl From<io::Error> for VisualizationError {
     fn from(error: io::Error) -> Self {
         Self::Io(error)
     }
+}
+
+pub fn render_volcano_svg_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &VolcanoPlotOptions,
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    validate_item_limit(options.max_points, "max_points")?;
+    if !options.adjusted_pvalue_threshold.is_finite()
+        || !(0.0..=1.0).contains(&options.adjusted_pvalue_threshold)
+        || !options.absolute_log2_fold_change_threshold.is_finite()
+        || options.absolute_log2_fold_change_threshold < 0.0
+    {
+        return Err(VisualizationError::InvalidOption(
+            "volcano thresholds must be finite, with adjusted p value in [0, 1]".to_owned(),
+        ));
+    }
+    let mut reader = csv::ReaderBuilder::new()
+        .flexible(true)
+        .from_path(input.as_ref())
+        .map_err(|error| VisualizationError::InvalidOption(error.to_string()))?;
+    let headers = reader
+        .headers()
+        .map_err(|error| VisualizationError::InvalidOption(error.to_string()))?
+        .clone();
+    let fold = headers
+        .iter()
+        .position(|value| value == "log2FoldChange")
+        .ok_or_else(|| {
+            VisualizationError::InvalidOption(
+                "volcano input requires a log2FoldChange column".to_owned(),
+            )
+        })?;
+    let padj = headers
+        .iter()
+        .position(|value| value == "padj")
+        .ok_or_else(|| {
+            VisualizationError::InvalidOption("volcano input requires a padj column".to_owned())
+        })?;
+    let mut points = Vec::new();
+    for record in reader.records().take(options.max_points) {
+        let record =
+            record.map_err(|error| VisualizationError::InvalidOption(error.to_string()))?;
+        let x = record.get(fold).unwrap_or_default().parse::<f64>().ok();
+        let p = record.get(padj).unwrap_or_default().parse::<f64>().ok();
+        if let (Some(x), Some(p)) = (x, p)
+            && x.is_finite()
+            && p.is_finite()
+            && (0.0..=1.0).contains(&p)
+        {
+            points.push((x, negative_log10(p)));
+        }
+    }
+    if points.is_empty() {
+        return Err(VisualizationError::EmptyInput(
+            "volcano input has no finite log2FoldChange/padj rows".to_owned(),
+        ));
+    }
+    let max_x = points.iter().map(|(x, _)| x.abs()).fold(1.0_f64, f64::max);
+    let max_y = points.iter().map(|(_, y)| *y).fold(1.0_f64, f64::max);
+    let (width, height) = (DEFAULT_VISUALIZATION_WIDTH, 760_u32);
+    let mut svg = svg_header(width, height, "Differential expression volcano plot");
+    svg.push_str("<line x1=\"100\" y1=\"680\" x2=\"1140\" y2=\"680\" stroke=\"#334\"/><line x1=\"620\" y1=\"60\" x2=\"620\" y2=\"680\" stroke=\"#ccd\"/>");
+    for (x, y) in &points {
+        let px = 620.0 + x / max_x * 500.0;
+        let py = 680.0 - y / max_y * 590.0;
+        let significant = *y >= negative_log10(options.adjusted_pvalue_threshold)
+            && x.abs() >= options.absolute_log2_fold_change_threshold;
+        let color = if significant {
+            if *x > 0.0 { "#b1433f" } else { "#2f68a5" }
+        } else {
+            "#89939d"
+        };
+        svg.push_str(&format!(
+            "<circle cx=\"{px:.2}\" cy=\"{py:.2}\" r=\"3\" fill=\"{color}\" fill-opacity=\"0.75\"/>"
+        ));
+    }
+    push_text(&mut svg, 100.0, 725.0, 18, "#223", "log2 fold change");
+    push_text(&mut svg, 20.0, 50.0, 18, "#223", "-log10 adjusted p value");
+    svg.push_str("</svg>");
+    write_new_output(output.as_ref(), svg.as_bytes())?;
+    Ok(SvgVisualizationResult {
+        visualization_type: "expression-volcano".to_owned(),
+        output_path: output.as_ref().to_string_lossy().into_owned(),
+        width,
+        height,
+        track_count: 1,
+        glyph_count: points.len() as u64,
+        warnings: Vec::new(),
+    })
+}
+
+pub fn render_motif_logo_svg_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    let text = fs::read_to_string(input).map_err(VisualizationError::Io)?;
+    let alphabet = text
+        .lines()
+        .find_map(|line| line.strip_prefix("ALPHABET=").map(str::trim))
+        .ok_or_else(|| VisualizationError::InvalidOption("MEME input lacks ALPHABET".to_owned()))?;
+    let symbols = alphabet
+        .chars()
+        .filter(|value| !value.is_whitespace())
+        .collect::<Vec<_>>();
+    if symbols.len() < 2 {
+        return Err(VisualizationError::InvalidOption(
+            "MEME alphabet must contain at least two symbols".to_owned(),
+        ));
+    }
+    let matrix = text
+        .lines()
+        .skip_while(|line| !line.starts_with("letter-probability matrix:"))
+        .skip(1)
+        .take_while(|line| !line.trim().is_empty())
+        .filter_map(|line| {
+            let values = line
+                .split_whitespace()
+                .map(str::parse::<f64>)
+                .collect::<Result<Vec<_>, _>>()
+                .ok()?;
+            (values.len() == symbols.len()
+                && values
+                    .iter()
+                    .all(|value| value.is_finite() && *value >= 0.0))
+            .then_some(values)
+        })
+        .collect::<Vec<_>>();
+    if matrix.is_empty() {
+        return Err(VisualizationError::EmptyInput(
+            "MEME input has no valid probability matrix".to_owned(),
+        ));
+    }
+    let width = 100_u32.saturating_add((matrix.len() as u32).saturating_mul(90));
+    let height = 420_u32;
+    let mut svg = svg_header(width, height, "Motif sequence logo");
+    for (position, values) in matrix.iter().enumerate() {
+        for (index, value) in values.iter().enumerate() {
+            let h = value * 280.0;
+            let x = 55.0 + position as f64 * 90.0;
+            let y = 350.0 - index as f64 * 70.0;
+            svg.push_str(&format!("<text x=\"{x:.1}\" y=\"{y:.1}\" font-family=\"sans-serif\" font-size=\"{h:.1}\" fill=\"{}\">{}</text>", color_for(&symbols[index].to_string()), symbols[index]));
+        }
+    }
+    svg.push_str("</svg>");
+    write_new_output(output.as_ref(), svg.as_bytes())?;
+    Ok(SvgVisualizationResult {
+        visualization_type: "motif-logo".to_owned(),
+        output_path: output.as_ref().to_string_lossy().into_owned(),
+        width,
+        height,
+        track_count: 1,
+        glyph_count: matrix.len() as u64 * symbols.len() as u64,
+        warnings: Vec::new(),
+    })
+}
+
+/// Render a two-track synteny plot from a tab-separated anchor table.
+/// The table must have `source_id`, `source_position`, `target_id`, and
+/// `target_position` headers; positions are normalized within each track.
+pub fn render_synteny_svg_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    render_synteny_svg_with_options_path(input, output, &SyntenyVisualizationOptions::default())
+}
+
+/// Render a local synteny SVG from a tab-separated anchor table.
+/// The style changes only layout; it never infers anchors or collinearity.
+pub fn render_synteny_svg_with_options_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &SyntenyVisualizationOptions,
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    let input = input.as_ref();
+    let output = output.as_ref();
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .trim(csv::Trim::All)
+        .from_path(input)
+        .map_err(|error| VisualizationError::InvalidOption(error.to_string()))?;
+    let headers = reader
+        .headers()
+        .map_err(|error| VisualizationError::InvalidOption(error.to_string()))?
+        .clone();
+    let required = [
+        "source_id",
+        "source_position",
+        "target_id",
+        "target_position",
+    ];
+    let indices = required
+        .iter()
+        .map(|name| {
+            headers
+                .iter()
+                .position(|header| header == *name)
+                .ok_or_else(|| {
+                    VisualizationError::InvalidOption(format!("synteny table is missing {name}"))
+                })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut anchors = Vec::new();
+    for record in reader.records().take(MAX_VISUAL_ITEMS) {
+        let record =
+            record.map_err(|error| VisualizationError::InvalidOption(error.to_string()))?;
+        let source = record[indices[1]].parse::<f64>().map_err(|_| {
+            VisualizationError::InvalidOption("source_position must be numeric".to_owned())
+        })?;
+        let target = record[indices[3]].parse::<f64>().map_err(|_| {
+            VisualizationError::InvalidOption("target_position must be numeric".to_owned())
+        })?;
+        if !source.is_finite() || !target.is_finite() {
+            return Err(VisualizationError::InvalidOption(
+                "synteny positions must be finite".to_owned(),
+            ));
+        }
+        anchors.push((
+            record[indices[0]].to_owned(),
+            source,
+            record[indices[2]].to_owned(),
+            target,
+        ));
+    }
+    if anchors.is_empty() {
+        return Err(VisualizationError::EmptyInput(
+            "synteny table contains no anchors".to_owned(),
+        ));
+    }
+    if options.style == SyntenyPlotStyle::Multiple {
+        return render_multiple_synteny_svg(output, &anchors);
+    }
+    if options.style == SyntenyPlotStyle::Circular {
+        return render_circular_synteny_svg(output, &anchors);
+    }
+    let source_min = anchors
+        .iter()
+        .map(|anchor| anchor.1)
+        .fold(f64::INFINITY, f64::min);
+    let source_max = anchors
+        .iter()
+        .map(|anchor| anchor.1)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let target_min = anchors
+        .iter()
+        .map(|anchor| anchor.3)
+        .fold(f64::INFINITY, f64::min);
+    let target_max = anchors
+        .iter()
+        .map(|anchor| anchor.3)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let width = DEFAULT_VISUALIZATION_WIDTH;
+    let height = 440;
+    let left = 90.0;
+    let right = f64::from(width) - 90.0;
+    let scale = |value: f64, minimum: f64, maximum: f64| {
+        if maximum == minimum {
+            (left + right) / 2.0
+        } else {
+            left + (value - minimum) / (maximum - minimum) * (right - left)
+        }
+    };
+    let title = if options.style == SyntenyPlotStyle::Micro {
+        "Micro-synteny anchors"
+    } else {
+        "Synteny anchors"
+    };
+    let mut svg = svg_header(width, height, title);
+    push_text(&mut svg, 24.0, 34.0, 20, "#18332b", title);
+    svg.push_str(&format!("<line x1=\"{left}\" y1=\"110\" x2=\"{right}\" y2=\"110\" stroke=\"#294c62\" stroke-width=\"10\"/><line x1=\"{left}\" y1=\"330\" x2=\"{right}\" y2=\"330\" stroke=\"#6c5634\" stroke-width=\"10\"/>"));
+    push_text(&mut svg, left, 88.0, 13, "#263d36", &anchors[0].0);
+    push_text(&mut svg, left, 370.0, 13, "#263d36", &anchors[0].2);
+    for (index, anchor) in anchors.iter().enumerate() {
+        let source = scale(anchor.1, source_min, source_max);
+        let target = scale(anchor.3, target_min, target_max);
+        svg.push_str(&format!("<path d=\"M {source:.1} 116 C {source:.1} 190, {target:.1} 250, {target:.1} 324\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"0.55\" stroke-width=\"2\"><title>{} -> {}</title></path>", color_for(&format!("{}:{}", anchor.0, anchor.2)), xml_escape(&anchor.0), xml_escape(&anchor.2)));
+        if index >= MAX_VISUAL_ITEMS {
+            break;
+        }
+    }
+    svg.push_str("</svg>");
+    write_new_output(output, svg.as_bytes())?;
+    Ok(SvgVisualizationResult {
+        visualization_type: format!("synteny-{}", options.style.as_str()),
+        output_path: output.display().to_string(),
+        width,
+        height,
+        track_count: 2,
+        glyph_count: anchors.len() as u64,
+        warnings: Vec::new(),
+    })
+}
+
+fn render_multiple_synteny_svg(
+    output: &Path,
+    anchors: &[(String, f64, String, f64)],
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    let mut labels = BTreeSet::new();
+    for (source_id, _, target_id, _) in anchors {
+        labels.insert(source_id.clone());
+        labels.insert(target_id.clone());
+    }
+    let labels = labels.into_iter().take(12).collect::<Vec<_>>();
+    let track_count = labels.len();
+    if track_count < 2 {
+        return Err(VisualizationError::InvalidOption(
+            "multiple synteny requires at least two track identifiers".to_owned(),
+        ));
+    }
+    let width = DEFAULT_VISUALIZATION_WIDTH;
+    let height = 130_u32.saturating_add((track_count as u32).saturating_mul(86));
+    let left = 150.0;
+    let right = f64::from(width) - 80.0;
+    let min = anchors
+        .iter()
+        .map(|anchor| anchor.1.min(anchor.3))
+        .fold(f64::INFINITY, f64::min);
+    let max = anchors
+        .iter()
+        .map(|anchor| anchor.1.max(anchor.3))
+        .fold(f64::NEG_INFINITY, f64::max);
+    let scale = |value: f64| {
+        if max == min {
+            (left + right) / 2.0
+        } else {
+            left + (value - min) / (max - min) * (right - left)
+        }
+    };
+    let y_for = |identifier: &str| {
+        95.0 + labels
+            .iter()
+            .position(|label| label == identifier)
+            .unwrap_or(0) as f64
+            * 86.0
+    };
+    let mut svg = svg_header(width, height, "Multiple synteny anchors");
+    push_text(
+        &mut svg,
+        24.0,
+        34.0,
+        20,
+        "#18332b",
+        "Multiple synteny anchors",
+    );
+    for label in &labels {
+        let y = y_for(label);
+        svg.push_str(&format!("<line x1=\"{left}\" y1=\"{y:.1}\" x2=\"{right}\" y2=\"{y:.1}\" stroke=\"#536b78\" stroke-width=\"8\"/>"));
+        push_text(&mut svg, 20.0, y + 5.0, 13, "#263d36", label);
+    }
+    for (source_id, source_position, target_id, target_position) in anchors {
+        if !labels.contains(source_id) || !labels.contains(target_id) {
+            continue;
+        }
+        let sx = scale(*source_position);
+        let tx = scale(*target_position);
+        let sy = y_for(source_id);
+        let ty = y_for(target_id);
+        let control_y = (sy + ty) / 2.0;
+        svg.push_str(&format!("<path d=\"M {sx:.1} {sy:.1} C {sx:.1} {control_y:.1}, {tx:.1} {control_y:.1}, {tx:.1} {ty:.1}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"0.52\" stroke-width=\"2\"><title>{} -&gt; {}</title></path>", color_for(&format!("{source_id}:{target_id}")), xml_escape(source_id), xml_escape(target_id)));
+    }
+    svg.push_str("</svg>");
+    write_new_output(output, svg.as_bytes())?;
+    Ok(SvgVisualizationResult {
+        visualization_type: "synteny-multiple".to_owned(),
+        output_path: output.display().to_string(),
+        width,
+        height,
+        track_count: track_count as u64,
+        glyph_count: anchors.len() as u64,
+        warnings: Vec::new(),
+    })
+}
+
+fn render_circular_synteny_svg(
+    output: &Path,
+    anchors: &[(String, f64, String, f64)],
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    let width = DEFAULT_VISUALIZATION_WIDTH;
+    let height = 760;
+    let cx = f64::from(width) / 2.0;
+    let cy = f64::from(height) / 2.0 + 20.0;
+    let radius = 255.0;
+    let min = anchors
+        .iter()
+        .map(|anchor| anchor.1.min(anchor.3))
+        .fold(f64::INFINITY, f64::min);
+    let max = anchors
+        .iter()
+        .map(|anchor| anchor.1.max(anchor.3))
+        .fold(f64::NEG_INFINITY, f64::max);
+    let angle = |value: f64, offset: f64| {
+        if max == min {
+            offset
+        } else {
+            offset + (value - min) / (max - min) * std::f64::consts::PI
+        }
+    };
+    let point = |value: f64, offset: f64| {
+        let theta = angle(value, offset);
+        (cx + radius * theta.cos(), cy + radius * theta.sin())
+    };
+    let mut svg = svg_header(width, height, "Circular synteny anchors");
+    push_text(
+        &mut svg,
+        24.0,
+        34.0,
+        20,
+        "#18332b",
+        "Circular synteny anchors",
+    );
+    svg.push_str(&format!("<path d=\"M {:.1} {:.1} A {radius} {radius} 0 0 1 {:.1} {:.1}\" fill=\"none\" stroke=\"#294c62\" stroke-width=\"12\"/><path d=\"M {:.1} {:.1} A {radius} {radius} 0 0 1 {:.1} {:.1}\" fill=\"none\" stroke=\"#6c5634\" stroke-width=\"12\"/>", cx - radius, cy, cx + radius, cy, cx + radius, cy, cx - radius, cy));
+    for (source_id, source_position, target_id, target_position) in anchors {
+        let (sx, sy) = point(*source_position, std::f64::consts::PI);
+        let (tx, ty) = point(*target_position, 0.0);
+        svg.push_str(&format!("<path d=\"M {sx:.1} {sy:.1} Q {cx:.1} {cy:.1} {tx:.1} {ty:.1}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"0.5\" stroke-width=\"2\"><title>{} -&gt; {}</title></path>", color_for(&format!("{source_id}:{target_id}")), xml_escape(source_id), xml_escape(target_id)));
+    }
+    svg.push_str("</svg>");
+    write_new_output(output, svg.as_bytes())?;
+    Ok(SvgVisualizationResult {
+        visualization_type: "synteny-circular".to_owned(),
+        output_path: output.display().to_string(),
+        width,
+        height,
+        track_count: 2,
+        glyph_count: anchors.len() as u64,
+        warnings: Vec::new(),
+    })
 }
 
 pub fn render_annotation_structure_svg_path(
@@ -780,6 +1268,7 @@ mod tests {
         AnnotationStructureOptions, DomainArchitectureOptions, EnrichmentPlotStyle,
         EnrichmentVisualizationOptions, render_annotation_structure_svg_path,
         render_domain_architecture_svg_path, render_enrichment_svg_path,
+        render_motif_logo_svg_path, render_volcano_svg_path,
     };
     use crate::functional::{EnrichmentKind, EnrichmentOptions};
     use std::fs;
@@ -841,6 +1330,74 @@ mod tests {
             );
         }
 
+        fs::remove_dir_all(temporary).expect("remove visualization directory");
+    }
+
+    #[test]
+    fn renders_volcano_plot_from_differential_expression_table() {
+        let temporary = temporary_directory();
+        let input = temporary.join("differential.csv");
+        let output = temporary.join("volcano.svg");
+        fs::write(
+            &input,
+            "gene,log2FoldChange,padj\nup,2.0,0.001\ndown,-1.5,0.01\nneutral,0.1,0.8\n",
+        )
+        .expect("write differential table");
+        let result = render_volcano_svg_path(&input, &output, &Default::default())
+            .expect("render volcano plot");
+        assert_eq!(result.glyph_count, 3);
+        let svg = fs::read_to_string(&output).expect("read volcano SVG");
+        assert!(svg.contains("#b1433f"));
+        assert!(svg.contains("#2f68a5"));
+        fs::remove_dir_all(temporary).expect("remove visualization directory");
+    }
+
+    #[test]
+    fn renders_sequence_logo_from_meme_matrix() {
+        let temporary = temporary_directory();
+        let output = temporary.join("motif.svg");
+        let result = render_motif_logo_svg_path(
+            fixture_root().join("tests/fixtures/motifs/tiny.meme"),
+            &output,
+        )
+        .expect("render motif logo");
+        assert_eq!(result.glyph_count, 8);
+        assert!(
+            fs::read_to_string(&output)
+                .expect("read SVG")
+                .contains(">A</text>")
+        );
+        fs::remove_dir_all(temporary).expect("remove visualization directory");
+    }
+
+    #[test]
+    fn renders_synteny_anchor_table_as_svg() {
+        let temporary = temporary_directory();
+        let input = fixture_root().join("tests/fixtures/comparative/synteny-anchors.tsv");
+        for (style, expected_title) in [
+            (super::SyntenyPlotStyle::Dual, "Synteny anchors"),
+            (super::SyntenyPlotStyle::Micro, "Micro-synteny anchors"),
+            (
+                super::SyntenyPlotStyle::Multiple,
+                "Multiple synteny anchors",
+            ),
+            (
+                super::SyntenyPlotStyle::Circular,
+                "Circular synteny anchors",
+            ),
+        ] {
+            let output = temporary.join(format!("synteny-{}.svg", style.as_str()));
+            let result = super::render_synteny_svg_with_options_path(
+                &input,
+                &output,
+                &super::SyntenyVisualizationOptions { style },
+            )
+            .expect("render synteny");
+            assert_eq!(result.glyph_count, 3);
+            let svg = fs::read_to_string(&output).expect("synteny SVG");
+            assert!(svg.contains(expected_title));
+            assert!(svg.contains("<path"));
+        }
         fs::remove_dir_all(temporary).expect("remove visualization directory");
     }
 

@@ -62,7 +62,11 @@
       "id": "process-fastq-reads",
       "path": "skills/process-fastq-reads",
       "kind": "executable",
-      "capabilities": ["fastq.trim.v1", "fastq.adapter.v1"]
+      "capabilities": [
+        "fastq.trim.v1",
+        "fastq.adapter.v1",
+        "fastq.deduplicate.v1"
+      ]
     },
     {
       "id": "analyze-sam-quality",
@@ -115,7 +119,8 @@
         "annotation.eggnog.normalize.v1",
         "enrichment.overrepresentation.v1",
         "enrichment.go.v1",
-        "enrichment.kegg.v1"
+        "enrichment.kegg.v1",
+        "enrichment.gsea.v1"
       ]
     },
     {
@@ -125,7 +130,8 @@
       "capabilities": [
         "interval.intersect.v1",
         "interval.merge.v1",
-        "interval.subtract.v1"
+        "interval.subtract.v1",
+        "interval.closest.v1"
       ]
     },
     {
@@ -138,6 +144,25 @@
         "expression.pca.v1",
         "expression.cluster.v1",
         "expression.heatmap.v1"
+      ]
+    },
+    {
+      "id": "analyze-differential-expression",
+      "path": "skills/analyze-differential-expression",
+      "kind": "executable",
+      "capabilities": [
+        "expression.differential.v1",
+        "medical.bulk-rnaseq.v1"
+      ]
+    },
+    {
+      "id": "analyze-comparative-genomics",
+      "path": "skills/analyze-comparative-genomics",
+      "kind": "executable",
+      "capabilities": [
+        "comparative.mcscanx.v1",
+        "comparative.kaks.v1",
+        "comparative.synteny.visualize.v1"
       ]
     },
     {
@@ -177,7 +202,8 @@
       "capabilities": [
         "variant.stats.v1",
         "variant.filter.v1",
-        "variant.normalize.v1"
+        "variant.normalize.v1",
+        "variant.compare.v1"
       ]
     },
     {

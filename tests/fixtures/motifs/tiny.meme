@@ -1,0 +1,10 @@
+MEME version 5.5.0
+
+ALPHABET= ACGT
+
+strands: + -
+
+MOTIF Motif_1 example
+letter-probability matrix: alength= 4 w= 2 nsites= 10 E= 1e-4
+0.70 0.10 0.10 0.10
+0.10 0.10 0.10 0.70

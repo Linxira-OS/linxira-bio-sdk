@@ -1,4 +1,4 @@
 interface:
   display_name: "Genomic Interval Operations"
-  short_description: "Intersect, merge, and subtract local BED intervals"
+  short_description: "Intersect, merge, subtract, and match BED intervals"
   default_prompt: "Use $intersect-genomic-intervals to inspect and run the correct local BED interval operation."

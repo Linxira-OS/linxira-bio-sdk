@@ -1,0 +1,4 @@
+source_id	source_position	target_id	target_position
+chr1	10	chrA	20
+chr1	30	chrA	40
+chr1	60	chrA	55

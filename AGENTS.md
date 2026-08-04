@@ -20,7 +20,8 @@ the agent skills that select and validate them.
 - Read `skills/analyze-fastq-quality/SKILL.md` for the implemented
   `fastq.qc.v1` capability.
 - Read `skills/process-fastq-reads/SKILL.md` for the implemented
-  `fastq.trim.v1` and `fastq.adapter.v1` capabilities.
+  `fastq.trim.v1`, `fastq.adapter.v1`, and `fastq.deduplicate.v1`
+  capabilities.
 - Read `skills/analyze-sam-quality/SKILL.md` for the implemented SAM-text
   `alignment.qc.v1`, native BAM/CRAM quality, coverage, and short-read
   alignment capabilities.
@@ -36,13 +37,18 @@ the agent skills that select and validate them.
   de novo motif discovery.
 - Read `skills/analyze-functional-enrichment/SKILL.md` for implemented GO and
   eggNOG annotation normalization plus custom, GO, and KEGG
-  over-representation analysis.
+  over-representation analysis and preranked GSEA.
 - Read `skills/intersect-genomic-intervals/SKILL.md` for the implemented BED
-  `interval.intersect.v1`, `interval.merge.v1`, and
-  `interval.subtract.v1` capabilities.
+  `interval.intersect.v1`, `interval.merge.v1`, `interval.subtract.v1`, and
+  `interval.closest.v1` capabilities.
 - Read `skills/analyze-expression-matrix/SKILL.md` for implemented CSV/TSV
   matrix QC, normalization, PCA, sample/feature clustering, and native
   clustered-heatmap preparation.
+- Read `skills/analyze-differential-expression/SKILL.md` for implemented local
+  bulk RNA-seq differential expression and its research-use-only medical
+  entrypoint.
+- Read `skills/analyze-comparative-genomics/SKILL.md` for implemented local
+  collinearity inference, Ka/Ks estimation, and synteny visualization.
 - Read `skills/analyze-set-overlaps/SKILL.md` for implemented exact Venn and
   UpSet analysis of biological identifier-set tables.
 - Read `skills/analyze-protein-properties/SKILL.md` for implemented local
@@ -54,8 +60,8 @@ the agent skills that select and validate them.
 - Read `skills/manipulate-bio-tables/SKILL.md` for the implemented CSV/TSV
   `table.manipulate.v1` capability.
 - Read `skills/analyze-variant-statistics/SKILL.md` for the implemented
-  `variant.stats.v1`, `variant.filter.v1`, and `variant.normalize.v1`
-  capabilities.
+  `variant.stats.v1`, `variant.filter.v1`, `variant.normalize.v1`, and
+  `variant.compare.v1` capabilities.
 - Read `skills/analyze-pdb-structure/SKILL.md` for the implemented
   `structure.pdb.summary.v1` capability and explicit AlphaFold pLDDT handling.
 - Read `skills/analyze-coordinate-structures/SKILL.md` for implemented local

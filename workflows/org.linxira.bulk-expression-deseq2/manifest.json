@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "id": "org.linxira.bulk-expression-deseq2",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": {
     "name": "Linxira OS",
     "url": "https://github.com/Linxira-OS"
@@ -14,10 +14,10 @@
   },
   "runtime": {
     "kind": "r",
-    "version": "4.4.3",
+    "version": ">=4.6.1,<4.7.0",
     "dependency_lock": {
       "path": "dependencies.lock.json",
-      "sha256": "280a01c859ab60b30bf8ebf66403ae77734c6a18ed34c25bb8ee7e8975c32918"
+      "sha256": "9cc9cab1ccd085d8480a23fe32d64b69513b098164f718376599417e7ab3e2ac"
     }
   },
   "input_schema": {
@@ -42,31 +42,31 @@
   "files": [
     {
       "path": "NOTICE.md",
-      "sha256": "20386d9ee50ba0c73a333636774455f0805bf6ff3eb04fee82b25d287bc848a0"
+      "sha256": "c133e5fc2dbf6dc0f637f4e8ce4dac770135fc3650c186c38e13c323562f903f"
     },
     {
       "path": "README.md",
-      "sha256": "d35c698486cf69898de3a42b18b90956cb1bd06620fcfec1a37eae19c39e7de7"
+      "sha256": "cd9147588357f7c1d27a68065d0aeda5cf15a3238fc79a2305d4b4fdc59b74b6"
     },
     {
       "path": "dependencies.lock.json",
-      "sha256": "280a01c859ab60b30bf8ebf66403ae77734c6a18ed34c25bb8ee7e8975c32918"
+      "sha256": "9cc9cab1ccd085d8480a23fe32d64b69513b098164f718376599417e7ab3e2ac"
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "c923df3689d9ade6f9b7a790ba977ed12d00eccb87e127c78b8d639b18207139"
+      "sha256": "c52f40a69f1e4c540cfee2eb9cc04d9eb87d417f78b4f7197b3d534774298ee8"
     },
     {
       "path": "schemas/output.schema.json",
-      "sha256": "2efdb7e9403df1e0e9ebb1bd1acaf8a70903ef36be310d937290e06de4a66376"
+      "sha256": "f2eed48a152b5a74438da1975c23d1b250e4a65a2fe1b2709d852c301e9d03dc"
     },
     {
       "path": "src/run_deseq2.R",
-      "sha256": "5749f6380fecfbd2fda31a9b50306790338006d61187084f079edbae553d5652"
+      "sha256": "c699c8b3760796de5e3592ffe7bc5fc2ec439acc1f8776dd5db98e67fab25417"
     },
     {
       "path": "tests/test_validation.R",
-      "sha256": "8f6068a4ea60528285fc072596249a3eed754f5a08a7b02503fd0eee1305417a"
+      "sha256": "d72ffa181373d8981708a24c6ba0ba45b28ae52c91239d761d8e795790aa600f"
     }
   ]
 }

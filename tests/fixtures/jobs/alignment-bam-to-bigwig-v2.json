@@ -1,0 +1,20 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-alignment-bam-to-bigwig-v2",
+  "capability": "alignment.bam-to-bigwig.v1",
+  "inputs": [{
+    "artifact_id": "input-alignment",
+    "role": "alignment",
+    "cardinality": "single",
+    "files": [{
+      "file_id": "input-alignment-1",
+      "path": "../native-tools/alignment.bam",
+      "format": "bam",
+      "compression": "none",
+      "size_bytes": 61,
+      "sha256": "0bcd4a704c0a7d9fda811570412e02e7a5b0547e0423909a0ce2fe97b76e25e1"
+    }]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/alignment-bigwig-v2.bw", "threads": 2}
+}

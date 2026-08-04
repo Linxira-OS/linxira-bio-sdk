@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Differential Expression"
+  short_description: "Run local bulk RNA-seq differential expression"
+  default_prompt: "Use $analyze-differential-expression to validate and run a local bulk RNA-seq comparison."

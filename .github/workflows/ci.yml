@@ -20,7 +20,16 @@ jobs:
           install: mingw-w64-ucrt-x86_64-gcc
       - uses: r-lib/actions/setup-r@v2
         with:
-          r-version: '4.4.3'
+          r-version: '4.6.1'
+      - name: Configure project-isolated R library
+        shell: pwsh
+        run: |
+          $rLibrary = Join-Path $env:GITHUB_WORKSPACE '.linxira-bio\ci\r\4.6.1\library'
+          New-Item -ItemType Directory -Force -Path $rLibrary | Out-Null
+          "R_LIBS_USER=$rLibrary" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "LINXIRA_BIO_WORKFLOW_R=Rscript" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "LINXIRA_BIO_WORKFLOW_R_LIBRARY=$rLibrary" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Rscript --vanilla -e 'stopifnot(getRversion() >= "4.6.1", getRversion() < "4.7.0")'
       - run: >-
           rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
           --component rustfmt --component clippy
@@ -70,8 +79,19 @@ jobs:
       - run: >-
           apt-get install -y build-essential curl git libgl1-mesa-dev libwayland-dev
           libx11-dev libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev
-          libxrandr-dev pkg-config python3 python3-venv r-base
+          libxrandr-dev pkg-config python3 python3-venv
       - uses: actions/checkout@v7
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.1'
+      - name: Configure project-isolated R library
+        run: |
+          r_library="$GITHUB_WORKSPACE/.linxira-bio/ci/r/4.6.1/library"
+          mkdir -p "$r_library"
+          echo "R_LIBS_USER=$r_library" >> "$GITHUB_ENV"
+          echo "LINXIRA_BIO_WORKFLOW_R=Rscript" >> "$GITHUB_ENV"
+          echo "LINXIRA_BIO_WORKFLOW_R_LIBRARY=$r_library" >> "$GITHUB_ENV"
+          Rscript --vanilla -e 'stopifnot(getRversion() >= "4.6.1", getRversion() < "4.7.0")'
       - name: Install pinned CI Python dependencies
         run: |
           python3 -m venv .venv-ci
@@ -107,6 +127,14 @@ jobs:
           libxinerama libxkbcommon libxrandr mesa pkgconf python python-pip r rustup
           wayland
       - uses: actions/checkout@v7
+      - name: Configure project-isolated R library
+        run: |
+          r_library="$GITHUB_WORKSPACE/.linxira-bio/ci/r/4.6.1/library"
+          mkdir -p "$r_library"
+          echo "R_LIBS_USER=$r_library" >> "$GITHUB_ENV"
+          echo "LINXIRA_BIO_WORKFLOW_R=Rscript" >> "$GITHUB_ENV"
+          echo "LINXIRA_BIO_WORKFLOW_R_LIBRARY=$r_library" >> "$GITHUB_ENV"
+          Rscript --vanilla -e 'stopifnot(getRversion() >= "4.6.1", getRversion() < "4.7.0")'
       - name: Install pinned CI Python dependencies
         run: |
           python -m venv .venv-ci
