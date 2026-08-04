@@ -6,6 +6,7 @@ use linxira_bio_core::annotation::{
     GeneDensityResult, GenePositionOptions, annotation_gene_positions_path, annotation_stats_path,
     extract_annotation_sequences_path, gene_density_path, normalize_annotation_path,
 };
+use linxira_bio_core::cohort::{CohortTableQc, cohort_table_qc_path};
 use linxira_bio_core::coordinate::{
     ContactMapOptions, MmcifStructureSummary, StructureContactMapResult, StructureGeometryResult,
     StructureSequenceResult, StructureSuperpositionResult, SuperpositionOptions,
@@ -27,25 +28,26 @@ use linxira_bio_core::expression::{
 };
 use linxira_bio_core::fastq::{FastqQcMetrics, FastqQcOptions, QualityEncodingMode, fastq_qc_path};
 use linxira_bio_core::fastq_transform::{
-    FastqAdapterOptions, FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
-    fastq_trim_path,
+    FastqAdapterOptions, FastqDeduplicateKey, FastqDeduplicateOptions,
+    FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
+    fastq_deduplicate_path, fastq_trim_path,
 };
 use linxira_bio_core::functional::{
     AnnotationMapResult, EggnogNormalizeResult, EnrichmentKind, EnrichmentOptions,
-    EnrichmentResult, GoAnnotationOptions, normalize_eggnog_path, normalize_go_annotations_path,
-    overrepresentation_path,
+    EnrichmentResult, GoAnnotationOptions, GseaOptions, GseaResult, gsea_preranked_path,
+    normalize_eggnog_path, normalize_go_annotations_path, overrepresentation_path,
 };
 use linxira_bio_core::interval::{
-    IntervalIntersectStats, IntervalMergeOptions, bed_intersect_path, bed_merge_path,
-    bed_subtract_path,
+    IntervalIntersectStats, IntervalMergeOptions, bed_closest_path, bed_intersect_path,
+    bed_merge_path, bed_subtract_path,
 };
 use linxira_bio_core::native_tools::{
     HmmerOptions, IqtreeOptions, MemeOptions, MuscleOptions, NativeToolResult,
     ShortReadAlignmentOptions, SimilaritySearchOptions, parse_blast_program, parse_diamond_mode,
     parse_hmmer_mode, parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode,
-    run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path,
-    run_meme_path, run_muscle_path, run_samtools_report_path, run_short_read_alignment_path,
-    run_trimal_path,
+    run_bam_to_bigwig_path, run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path,
+    run_hmmer_path, run_iqtree_path, run_kaks_path, run_mcscanx_path, run_meme_path,
+    run_muscle_path, run_samtools_report_path, run_short_read_alignment_path, run_trimal_path,
 };
 use linxira_bio_core::phylogeny::{
     TreeTransformOptions, TreeTransformResult, read_tree_label_map_path, transform_newick_path,
@@ -54,8 +56,10 @@ use linxira_bio_core::protein::{ProteinPropertiesResult, protein_properties_path
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
 use linxira_bio_core::scientific_visualization::{
     AnnotationStructureOptions, DomainArchitectureOptions, EnrichmentPlotStyle,
-    EnrichmentVisualizationOptions, SvgVisualizationResult, render_annotation_structure_svg_path,
-    render_domain_architecture_svg_path, render_enrichment_svg_path,
+    EnrichmentVisualizationOptions, SvgVisualizationResult, SyntenyPlotStyle,
+    SyntenyVisualizationOptions, VolcanoPlotOptions, render_annotation_structure_svg_path,
+    render_domain_architecture_svg_path, render_enrichment_svg_path, render_motif_logo_svg_path,
+    render_synteny_svg_with_options_path, render_volcano_svg_path,
 };
 use linxira_bio_core::sequence::{SequenceStats, fasta_stats_path};
 use linxira_bio_core::sequence_analysis::{
@@ -82,7 +86,8 @@ use linxira_bio_core::table::{
 };
 use linxira_bio_core::variant::{VcfStats, vcf_stats_path};
 use linxira_bio_core::variant_transform::{
-    VariantFilterOptions, filter_vcf_path, normalize_vcf_path,
+    VariantComparisonResult, VariantFilterOptions, compare_vcf_paths, filter_vcf_path,
+    normalize_vcf_path,
 };
 use linxira_bio_export::export_json_file;
 use linxira_bio_protocol::{
@@ -110,10 +115,29 @@ struct WorkflowCatalog {
 struct WorkflowCatalogPack {
     id: String,
     capability: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    capability_aliases: Vec<String>,
     status: String,
     trust: String,
     runtime: WorkflowRuntimeKind,
     manifest: String,
+}
+
+impl WorkflowCatalogPack {
+    fn capabilities(&self) -> impl Iterator<Item = &str> {
+        std::iter::once(self.capability.as_str())
+            .chain(self.capability_aliases.iter().map(String::as_str))
+    }
+
+    fn supports_capability(&self, capability: &str) -> bool {
+        self.capabilities().any(|candidate| candidate == capability)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct ValidatedWorkflowRequest {
+    job_id: String,
+    capability: String,
 }
 
 fn main() -> ExitCode {
@@ -158,6 +182,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         {
             print_fastq_adapter_trim(arguments)
         }
+        [fastq, deduplicate, arguments @ ..]
+            if fastq == "fastq" && deduplicate == "deduplicate" =>
+        {
+            print_fastq_deduplicate(arguments)
+        }
         [alignment, qc, path] if alignment == "alignment" && qc == "qc" => {
             print_alignment_qc(path, false)
         }
@@ -175,6 +204,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if alignment == "alignment" && coverage == "coverage" =>
         {
             print_samtools_report(arguments, "coverage", "alignment.coverage.v1")
+        }
+        [alignment, bam_to_bigwig, arguments @ ..]
+            if alignment == "alignment" && bam_to_bigwig == "bam-to-bigwig" =>
+        {
+            print_bam_to_bigwig(arguments)
         }
         [alignment, short_read, arguments @ ..]
             if alignment == "alignment" && short_read == "short-read" =>
@@ -317,8 +351,26 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         {
             print_variant_stats(path, true)
         }
+        [medical, variant_cohort, path]
+            if medical == "medical" && variant_cohort == "variant-cohort" =>
+        {
+            print_medical_variant_cohort(path, false)
+        }
+        [medical, variant_cohort, path, json]
+            if medical == "medical" && variant_cohort == "variant-cohort" && json == "--json" =>
+        {
+            print_medical_variant_cohort(path, true)
+        }
         [variant, filter, arguments @ ..] if variant == "variant" && filter == "filter" => {
             print_variant_filter(arguments)
+        }
+        [variant, compare, left, right] if variant == "variant" && compare == "compare" => {
+            print_variant_compare(left, right, false)
+        }
+        [variant, compare, left, right, json]
+            if variant == "variant" && compare == "compare" && json == "--json" =>
+        {
+            print_variant_compare(left, right, true)
         }
         [variant, normalize, arguments @ ..]
             if variant == "variant" && normalize == "normalize" =>
@@ -343,6 +395,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         {
             print_interval_subtract(arguments)
         }
+        [interval, closest, arguments @ ..] if interval == "interval" && closest == "closest" => {
+            print_interval_closest(arguments)
+        }
         [expression, matrix_qc, path] if expression == "expression" && matrix_qc == "matrix-qc" => {
             print_expression_matrix_qc(path, false)
         }
@@ -350,6 +405,24 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if expression == "expression" && matrix_qc == "matrix-qc" && json == "--json" =>
         {
             print_expression_matrix_qc(path, true)
+        }
+        [medical, single_cell_qc, path]
+            if medical == "medical" && single_cell_qc == "single-cell-qc" =>
+        {
+            print_single_cell_qc(path, false)
+        }
+        [medical, single_cell_qc, path, json]
+            if medical == "medical" && single_cell_qc == "single-cell-qc" && json == "--json" =>
+        {
+            print_single_cell_qc(path, true)
+        }
+        [medical, cohort_qc, path] if medical == "medical" && cohort_qc == "cohort-qc" => {
+            print_cohort_table_qc(path, false)
+        }
+        [medical, cohort_qc, path, json]
+            if medical == "medical" && cohort_qc == "cohort-qc" && json == "--json" =>
+        {
+            print_cohort_table_qc(path, true)
         }
         [expression, normalize, arguments @ ..]
             if expression == "expression" && normalize == "normalize" =>
@@ -369,6 +442,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         {
             print_expression_heatmap(arguments)
         }
+        [expression, volcano, arguments @ ..]
+            if expression == "expression" && volcano == "volcano" =>
+        {
+            print_expression_volcano(arguments)
+        }
         [set, venn, arguments @ ..] if set == "set" && venn == "venn" => {
             print_set_analysis(arguments, true)
         }
@@ -384,11 +462,17 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
                 "enrichment.overrepresentation.v1",
             )
         }
+        [medical, pathway, arguments @ ..] if medical == "medical" && pathway == "pathway" => {
+            print_enrichment(arguments, EnrichmentKind::Custom, "medical.pathway-ruo.v1")
+        }
         [enrichment, go, arguments @ ..] if enrichment == "enrichment" && go == "go" => {
             print_enrichment(arguments, EnrichmentKind::Go, "enrichment.go.v1")
         }
         [enrichment, kegg, arguments @ ..] if enrichment == "enrichment" && kegg == "kegg" => {
             print_enrichment(arguments, EnrichmentKind::Kegg, "enrichment.kegg.v1")
+        }
+        [enrichment, gsea, arguments @ ..] if enrichment == "enrichment" && gsea == "gsea" => {
+            print_gsea(arguments)
         }
         [enrichment, visualize, arguments @ ..]
             if enrichment == "enrichment" && visualize == "visualize" =>
@@ -413,6 +497,69 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         [motif, meme, arguments @ ..] if motif == "motif" && meme == "meme" => {
             print_meme(arguments)
+        }
+        [motif, logo, input, output, json]
+            if motif == "motif" && logo == "logo" && json == "--json" =>
+        {
+            print_visualization_result(
+                "motif-logo",
+                "motif.visualize.v1",
+                render_motif_logo_svg_path(input, output)?,
+                true,
+            )
+        }
+        [motif, logo, input, output] if motif == "motif" && logo == "logo" => {
+            print_visualization_result(
+                "motif-logo",
+                "motif.visualize.v1",
+                render_motif_logo_svg_path(input, output)?,
+                false,
+            )
+        }
+        [comparative, synteny_plot, arguments @ ..]
+            if comparative == "comparative" && synteny_plot == "synteny-plot" =>
+        {
+            print_synteny_plot(arguments)
+        }
+        [comparative, mcscanx, gene_positions, hits, output, json]
+            if comparative == "comparative" && mcscanx == "mcscanx" && json == "--json" =>
+        {
+            print_native_tool_result(
+                "mcscanx",
+                "comparative.mcscanx.v1",
+                run_mcscanx_path(gene_positions, hits, output)?,
+                true,
+            )
+        }
+        [comparative, mcscanx, gene_positions, hits, output]
+            if comparative == "comparative" && mcscanx == "mcscanx" =>
+        {
+            print_native_tool_result(
+                "mcscanx",
+                "comparative.mcscanx.v1",
+                run_mcscanx_path(gene_positions, hits, output)?,
+                false,
+            )
+        }
+        [comparative, kaks, alignment, output, method, json]
+            if comparative == "comparative" && kaks == "kaks" && json == "--json" =>
+        {
+            print_native_tool_result(
+                "kaks",
+                "comparative.kaks.v1",
+                run_kaks_path(alignment, output, method)?,
+                true,
+            )
+        }
+        [comparative, kaks, alignment, output, method]
+            if comparative == "comparative" && kaks == "kaks" =>
+        {
+            print_native_tool_result(
+                "kaks",
+                "comparative.kaks.v1",
+                run_kaks_path(alignment, output, method)?,
+                false,
+            )
         }
         [similarity, rbh, arguments @ ..] if similarity == "similarity" && rbh == "rbh" => {
             print_reciprocal_best_hits(arguments)
@@ -600,7 +747,8 @@ fn run_workflow_pack(
         .into());
     }
     verify_workflow_pack_files(pack_root, &manifest)?;
-    validate_workflow_request(request_path, &pack.capability)?;
+    let request: serde_json::Value = serde_json::from_slice(&fs::read(request_path)?)?;
+    let request_identity = validate_workflow_request(&request, pack)?;
 
     let expected_arguments = ["--request", "{request}", "--result", "{result}"];
     if manifest
@@ -635,17 +783,43 @@ fn run_workflow_pack(
         .into());
     }
     let result: serde_json::Value = serde_json::from_slice(&fs::read(result_path)?)?;
-    validate_workflow_result(&result, request_path, &pack.capability)?;
+    validate_workflow_result(&result, &request_identity)?;
     println!("{}", serde_json::to_string(&result)?);
     Ok(())
 }
 
 fn load_workflow_catalog() -> Result<WorkflowCatalog, Box<dyn Error>> {
     let catalog: WorkflowCatalog = serde_json::from_str(WORKFLOW_CATALOG)?;
+    validate_workflow_catalog(&catalog)?;
+    Ok(catalog)
+}
+
+fn validate_workflow_catalog(catalog: &WorkflowCatalog) -> Result<(), Box<dyn Error>> {
     if catalog.schema_version != "1" || catalog.packs.is_empty() {
         return Err("workflow catalog is invalid".into());
     }
-    Ok(catalog)
+    let mut pack_ids = BTreeSet::new();
+    let mut capabilities = BTreeSet::new();
+    for pack in &catalog.packs {
+        if !pack_ids.insert(pack.id.as_str()) {
+            return Err(format!("workflow catalog repeats pack id: {}", pack.id).into());
+        }
+        let mut pack_capabilities = BTreeSet::new();
+        for capability in pack.capabilities() {
+            if !pack_capabilities.insert(capability) {
+                return Err(
+                    format!("workflow pack {} repeats capability: {capability}", pack.id).into(),
+                );
+            }
+            if !capabilities.insert(capability) {
+                return Err(format!(
+                    "workflow catalog assigns capability more than once: {capability}"
+                )
+                .into());
+            }
+        }
+    }
+    Ok(())
 }
 
 fn workflow_root() -> Result<PathBuf, Box<dyn Error>> {
@@ -706,40 +880,42 @@ fn verify_workflow_pack_files(
     Ok(())
 }
 
-fn validate_workflow_request(request_path: &Path, capability: &str) -> Result<(), Box<dyn Error>> {
-    let request: serde_json::Value = serde_json::from_slice(&fs::read(request_path)?)?;
+fn validate_workflow_request(
+    request: &serde_json::Value,
+    pack: &WorkflowCatalogPack,
+) -> Result<ValidatedWorkflowRequest, Box<dyn Error>> {
+    let job_id = request.get("job_id").and_then(serde_json::Value::as_str);
+    let capability = request
+        .get("capability")
+        .and_then(serde_json::Value::as_str);
     if request
         .get("schema_version")
         .and_then(serde_json::Value::as_str)
         != Some("2")
-        || request
-            .get("job_id")
-            .and_then(serde_json::Value::as_str)
-            .is_none_or(str::is_empty)
-        || request
-            .get("capability")
-            .and_then(serde_json::Value::as_str)
-            != Some(capability)
+        || job_id.is_none_or(str::is_empty)
+        || capability.is_none_or(|candidate| !pack.supports_capability(candidate))
     {
         return Err(
             "workflow request must be a schema v2 request for the selected capability".into(),
         );
     }
-    Ok(())
+    Ok(ValidatedWorkflowRequest {
+        job_id: job_id.expect("validated job id").to_owned(),
+        capability: capability.expect("validated capability").to_owned(),
+    })
 }
 
 fn validate_workflow_result(
     result: &serde_json::Value,
-    request_path: &Path,
-    capability: &str,
+    request: &ValidatedWorkflowRequest,
 ) -> Result<(), Box<dyn Error>> {
-    let request: serde_json::Value = serde_json::from_slice(&fs::read(request_path)?)?;
     if result
         .get("schema_version")
         .and_then(serde_json::Value::as_str)
         != Some("2")
-        || result.get("capability").and_then(serde_json::Value::as_str) != Some(capability)
-        || result.get("job_id") != request.get("job_id")
+        || result.get("capability").and_then(serde_json::Value::as_str)
+            != Some(request.capability.as_str())
+        || result.get("job_id").and_then(serde_json::Value::as_str) != Some(request.job_id.as_str())
         || !matches!(
             result.get("status").and_then(serde_json::Value::as_str),
             Some("ok" | "error")
@@ -1754,6 +1930,60 @@ fn print_fastq_adapter_trim(arguments: &[String]) -> Result<(), Box<dyn Error>> 
     )
 }
 
+fn print_fastq_deduplicate(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut key = None;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--header-umi-delimiter" => {
+                index += 1;
+                let delimiter = arguments
+                    .get(index)
+                    .ok_or("--header-umi-delimiter requires a value")?
+                    .clone();
+                if key.is_some() {
+                    return Err("choose only one UMI source".into());
+                }
+                key = Some(FastqDeduplicateKey::HeaderUmi { delimiter });
+            }
+            "--sequence-prefix-umi" => {
+                index += 1;
+                let length = parse_sequence_usize(arguments.get(index), "--sequence-prefix-umi")?;
+                if key.is_some() {
+                    return Err("choose only one UMI source".into());
+                }
+                key = Some(FastqDeduplicateKey::SequencePrefixUmi { length });
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown FASTQ deduplicate option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "fastq deduplicate")?,
+        }
+        index += 1;
+    }
+    let input = input.ok_or("fastq deduplicate requires an input FASTQ path")?;
+    let output = output.ok_or("fastq deduplicate requires an output FASTQ path")?;
+    let output = Path::new(output);
+    let summary = fastq_deduplicate_path(
+        Path::new(input),
+        output,
+        &FastqDeduplicateOptions {
+            key: key.unwrap_or(FastqDeduplicateKey::Sequence),
+        },
+    )?;
+    print_sequence_transform_result(
+        "fastq-deduplicate",
+        "fastq.deduplicate.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
 fn parse_fastq_transform_quality_encoding(
     value: Option<&String>,
     option: &str,
@@ -1783,6 +2013,46 @@ fn print_variant_stats(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
         print_variant_stats_text(&stats);
     }
     Ok(())
+}
+
+fn print_medical_variant_cohort(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let stats = vcf_stats_path(Path::new(path))?;
+    if json {
+        print_analysis_json("medical-variant-cohort", "medical.variant-cohort.v1", stats)?;
+    } else {
+        print_variant_stats_text(&stats);
+    }
+    Ok(())
+}
+
+fn print_variant_compare(left: &str, right: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let result = compare_vcf_paths(left, right)?;
+    if json {
+        print_analysis_json("variant-compare", "variant.compare.v1", result)?;
+    } else {
+        print_variant_compare_text(&result);
+    }
+    Ok(())
+}
+
+fn print_variant_compare_text(result: &VariantComparisonResult) {
+    println!("shared_count\t{}", result.shared_count);
+    println!("left_only_count\t{}", result.left_only_count);
+    println!("right_only_count\t{}", result.right_only_count);
+    println!(
+        "sample_genotypes_compared\t{}",
+        result.sample_genotypes_compared
+    );
+    for variant in &result.variants {
+        println!(
+            "variant\t{}\t{}\t{}\t{}\t{}",
+            variant.chrom,
+            variant.position,
+            variant.reference,
+            variant.alternate,
+            variant.status.as_str()
+        );
+    }
 }
 
 fn print_variant_filter(arguments: &[String]) -> Result<(), Box<dyn Error>> {
@@ -2255,6 +2525,84 @@ fn print_enrichment_text(result: &EnrichmentResult) {
     }
 }
 
+fn print_gsea(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = GseaOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--score-exponent" => {
+                index += 1;
+                options.score_exponent =
+                    parse_finite_f64(arguments.get(index), "--score-exponent", Some(0.0))?;
+            }
+            "--min-set-size" => {
+                index += 1;
+                options.min_set_size =
+                    parse_sequence_usize(arguments.get(index), "--min-set-size")?;
+            }
+            "--max-set-size" => {
+                index += 1;
+                options.max_set_size =
+                    parse_sequence_usize(arguments.get(index), "--max-set-size")?;
+            }
+            "--permutations" => {
+                index += 1;
+                options.permutation_count =
+                    parse_sequence_u64(arguments.get(index), "--permutations")?
+                        .try_into()
+                        .map_err(|_| "--permutations exceeds the supported integer range")?;
+            }
+            "--seed" => {
+                index += 1;
+                options.seed = parse_sequence_u64(arguments.get(index), "--seed")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown GSEA option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("GSEA requires <ranked-genes.csv|tsv> <gene-sets.csv|tsv>".into());
+    }
+    let result = gsea_preranked_path(&paths[0], &paths[1], options)?;
+    if json {
+        print_analysis_json_with_warnings(
+            "enrichment-gsea",
+            "enrichment.gsea.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_gsea_text(&result);
+        Ok(())
+    }
+}
+
+fn print_gsea_text(result: &GseaResult) {
+    println!("ranked_gene_count\t{}", result.ranked_gene_count);
+    println!("input_gene_set_count\t{}", result.input_gene_set_count);
+    println!("tested_gene_set_count\t{}", result.tested_gene_set_count);
+    for term in &result.terms {
+        println!(
+            "term\t{}\t{}\t{:.8}\t{}\t{:.8}\t{:.8}",
+            term.term_id,
+            term.term_name.as_deref().unwrap_or_default(),
+            term.enrichment_score,
+            term.direction,
+            term.nominal_p_value,
+            term.fdr_bh
+        );
+    }
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
 fn print_annotation_structure_plot(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     let mut paths = Vec::new();
     let mut options = AnnotationStructureOptions::default();
@@ -2426,6 +2774,41 @@ fn print_enrichment_visualization(arguments: &[String]) -> Result<(), Box<dyn Er
     )
 }
 
+fn print_synteny_plot(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut style = SyntenyPlotStyle::Dual;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--style" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--style requires a value")?;
+                style = SyntenyPlotStyle::parse(value)?;
+            }
+            "--json" => json = true,
+            value if value.starts_with("--") => {
+                return Err(format!("unknown synteny option: {value}").into());
+            }
+            _ => paths.push(arguments[index].clone()),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("comparative synteny-plot requires <anchors.tsv> <output.svg>".into());
+    }
+    print_visualization_result(
+        "synteny-visualization",
+        "comparative.synteny.visualize.v1",
+        render_synteny_svg_with_options_path(
+            &paths[0],
+            &paths[1],
+            &SyntenyVisualizationOptions { style },
+        )?,
+        json,
+    )
+}
+
 fn print_visualization_result(
     job_id: &str,
     capability: &str,
@@ -2505,6 +2888,36 @@ fn print_samtools_report(
         },
         capability,
         result,
+        json,
+    )
+}
+
+fn print_bam_to_bigwig(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut threads = 1;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--threads" => {
+                index += 1;
+                threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown bam-to-bigwig option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("alignment bam-to-bigwig requires <input.bam|cram> <output.bw>".into());
+    }
+    print_native_tool_result(
+        "bam-to-bigwig",
+        "alignment.bam-to-bigwig.v1",
+        run_bam_to_bigwig_path(&paths[0], &paths[1], threads)?,
         json,
     )
 }
@@ -2644,6 +3057,31 @@ fn print_interval_subtract(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     )
 }
 
+fn print_interval_closest(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut json = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown interval closest option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+    }
+    if paths.len() != 3 {
+        return Err("interval closest requires <query.bed> <target.bed> <output.tsv>".into());
+    }
+    let stats = bed_closest_path(&paths[0], &paths[1], &paths[2])?;
+    print_sequence_transform_result(
+        "interval-closest",
+        "interval.closest.v1",
+        &paths[2],
+        stats,
+        json,
+    )
+}
+
 fn print_expression_matrix_qc(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
     let metrics = expression_matrix_qc_path(Path::new(path))?;
     if json {
@@ -2663,6 +3101,41 @@ fn print_expression_matrix_qc_text(metrics: &ExpressionMatrixQc) {
     println!("negative_value_count\t{}", metrics.negative_value_count);
     if let Some(percent) = metrics.zero_percent {
         println!("zero_percent\t{percent:.6}");
+    }
+    for warning in &metrics.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
+fn print_single_cell_qc(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let metrics = expression_matrix_qc_path(Path::new(path))?;
+    if json {
+        print_analysis_json("single-cell-qc", "medical.single-cell-qc.v1", metrics)?;
+    } else {
+        print_expression_matrix_qc_text(&metrics);
+    }
+    Ok(())
+}
+
+fn print_cohort_table_qc(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let metrics = cohort_table_qc_path(Path::new(path))?;
+    if json {
+        print_analysis_json("cohort-table-qc", "medical.cohort-table.qc.v1", metrics)?;
+    } else {
+        print_cohort_table_qc_text(&metrics);
+    }
+    Ok(())
+}
+
+fn print_cohort_table_qc_text(metrics: &CohortTableQc) {
+    println!("row_count\t{}", metrics.row_count);
+    println!("column_count\t{}", metrics.column_count);
+    println!("duplicate_row_count\t{}", metrics.duplicate_row_count);
+    for column in &metrics.columns {
+        println!(
+            "column\t{}\tmissing={}\tdistinct={}",
+            column.column, column.missing_count, column.distinct_value_count
+        );
     }
     for warning in &metrics.warnings {
         println!("warning\t{warning}");
@@ -2812,6 +3285,42 @@ fn print_expression_heatmap(arguments: &[String]) -> Result<(), Box<dyn Error>> 
         print_expression_heatmap_text(&result);
         Ok(())
     }
+}
+
+fn print_expression_volcano(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut positional = Vec::new();
+    let mut options = VolcanoPlotOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--padj" => {
+                index += 1;
+                options.adjusted_pvalue_threshold =
+                    parse_finite_f64(arguments.get(index), "--padj", Some(0.0))?;
+            }
+            "--log2-fold-change" => {
+                index += 1;
+                options.absolute_log2_fold_change_threshold =
+                    parse_finite_f64(arguments.get(index), "--log2-fold-change", Some(0.0))?;
+            }
+            "--max-points" => {
+                index += 1;
+                options.max_points = parse_sequence_usize(arguments.get(index), "--max-points")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown expression volcano option: {value}").into());
+            }
+            value => positional.push(value),
+        }
+        index += 1;
+    }
+    if positional.len() != 2 {
+        return Err("expression volcano requires <differential.csv> <output.svg>".into());
+    }
+    let result = render_volcano_svg_path(positional[0], positional[1], &options)?;
+    print_visualization_result("expression-volcano", "expression.volcano.v1", result, json)
 }
 
 fn parse_finite_f64(
@@ -4084,9 +4593,11 @@ fn usage() -> &'static str {
         "  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n",
         "  linxira-bio fastq trim <input.fastq[.gz]> <output.fastq> [--min-quality N] [--min-length N] [--quality-encoding phred+33|phred+64] [--json]\n",
         "  linxira-bio fastq adapter-trim <input.fastq[.gz]> <output.fastq> [--adapter SEQ ...] [--min-overlap N] [--min-length N] [--json]\n",
+        "  linxira-bio fastq deduplicate <input.fastq[.gz]> <output.fastq> [--header-umi-delimiter TEXT | --sequence-prefix-umi N] [--json]\n",
         "  linxira-bio alignment qc <input.sam[.gz]> [--json]\n",
         "  linxira-bio alignment bam-cram-qc <input.bam|cram> <output.tsv> [--reference reference.fasta] [--json]\n",
         "  linxira-bio alignment coverage <input.bam|cram> <output.tsv> [--reference reference.fasta] [--json]\n",
+        "  linxira-bio alignment bam-to-bigwig <input.bam|cram> <output.bw> [--threads N] [--json]\n",
         "  linxira-bio alignment short-read <reference.fasta> <reads.fastq> <output.bam> [--threads N] [--json]\n",
         "  linxira-bio annotation stats <input.gff3|gtf[.gz]> [--json]\n",
         "  linxira-bio annotation normalize <input.gff3|gtf[.gz]> <output.gff3> [--sort] [--json]\n",
@@ -4097,27 +4608,36 @@ fn usage() -> &'static str {
         "  linxira-bio annotation eggnog <input.tsv[.gz]> <output.tsv> [--json]\n",
         "  linxira-bio annotation plot <input.gff3|gtf[.gz]> <output.svg> [--feature-id ID | --seqid NAME] [--max-features N] [--json]\n",
         "  linxira-bio variant stats <input.vcf[.gz]> [--json]\n",
+        "  linxira-bio variant compare <left.vcf[.gz]> <right.vcf[.gz]> [--json]\n",
         "  linxira-bio variant filter <input.vcf[.gz]> <output.vcf> [--min-qual Q] [--pass-only] [--contig NAME ...] [--min-info-dp N] [--json]\n",
         "  linxira-bio variant normalize <input.vcf[.gz]> <reference.fasta[.gz]> <output.vcf> [--json]\n",
         "  linxira-bio interval intersect <left.bed[.gz]> <right.bed[.gz]> [--json]\n",
         "  linxira-bio interval merge <input.bed[.gz]> <output.bed> [--max-gap N] [--json]\n",
         "  linxira-bio interval subtract <left.bed[.gz]> <right.bed[.gz]> <output.bed> [--json]\n",
+        "  linxira-bio interval closest <query.bed[.gz]> <target.bed[.gz]> <output.tsv> [--json]\n",
         "  linxira-bio expression matrix-qc <matrix.csv|tsv[.gz]> [--json]\n",
+        "  linxira-bio medical cohort-qc <cohort.csv|tsv[.gz]> [--json]\n",
+        "  linxira-bio medical single-cell-qc <counts.csv|tsv[.gz]> [--json]\n",
+        "  linxira-bio medical pathway <genes.txt|csv|tsv> <associations.csv|tsv> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
+        "  linxira-bio medical variant-cohort <cohort.vcf[.gz]> [--json]\n",
         "  linxira-bio expression normalize <matrix.csv|tsv[.gz]> <output.tsv> [--method cpm|log2-cpm|median-ratio] [--pseudocount X] [--json]\n",
         "  linxira-bio expression pca <matrix.csv|tsv[.gz]> [--components N] [--scale] [--json]\n",
         "  linxira-bio expression cluster <matrix.csv|tsv[.gz]> [--sample-clusters N] [--feature-clusters N] [--max-iterations N] [--no-scale] [--json]\n",
         "  linxira-bio expression heatmap <matrix.csv|tsv[.gz]> [--top-features N] [--no-scale] [--json]\n",
+        "  linxira-bio expression volcano <differential.csv> <output.svg> [--padj P] [--log2-fold-change X] [--max-points N] [--json]\n",
         "  linxira-bio set venn <sets.csv|tsv[.gz]> [--include-items] [--json]\n",
         "  linxira-bio set upset <sets.csv|tsv[.gz]> [--max-intersections N] [--include-items] [--json]\n",
         "  linxira-bio enrichment custom <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
         "  linxira-bio enrichment go <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
         "  linxira-bio enrichment kegg <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
+        "  linxira-bio enrichment gsea <ranked-genes.csv|tsv> <gene-sets.csv|tsv> [--score-exponent X] [--min-set-size N] [--max-set-size N] [--permutations N] [--seed N] [--json]\n",
         "  linxira-bio enrichment visualize <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> <output.svg> --kind custom|go|kegg [--style bar|dot|network] [--min-overlap N] [--max-terms N] [--json]\n",
         "  linxira-bio similarity blast-parse <blast.tsv|xml[.gz]> [--json]\n",
         "  linxira-bio similarity blast <query.fasta> <reference.fasta> <output.tsv> [--program blastn|blastp|blastx|tblastn|tblastx] [--threads N] [--evalue X] [--max-targets N] [--outfmt 6|7] [--json]\n",
         "  linxira-bio similarity diamond <query.fasta> <reference.fasta> <output.tsv> [--mode blastp|blastx] [--threads N] [--evalue X] [--max-targets N] [--outfmt 6|7] [--json]\n",
         "  linxira-bio similarity hmmer <profile.hmm> <sequences.fasta> <output.domtblout> [--mode hmmsearch|hmmscan] [--threads N] [--evalue X] [--json]\n",
         "  linxira-bio motif meme <input.fasta> <output.meme> [--alphabet dna|rna|protein] [--distribution oops|zoops|anr] [--motifs N] [--min-width N] [--max-width N] [--threads N] [--json]\n",
+        "  linxira-bio comparative synteny-plot <anchors.tsv> <output.svg> [--json]\n",
         "  linxira-bio similarity rbh <forward.tsv|xml[.gz]> <reverse.tsv|xml[.gz]> [--max-evalue X] [--min-identity P] [--json]\n",
         "  linxira-bio protein properties <proteins.fasta[.gz]> [--json]\n",
         "  linxira-bio protein domains <interproscan.tsv|hmmer.domtblout[.gz]> [--json]\n",
@@ -4136,4 +4656,103 @@ fn usage() -> &'static str {
         "  linxira-bio structure superpose <reference.pdb|cif[.gz]> <mobile.pdb|cif[.gz]> [--atom NAME] [--json]\n",
         "  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
     )
+}
+
+#[cfg(test)]
+mod workflow_catalog_tests {
+    use super::{
+        WorkflowCatalog, WorkflowCatalogPack, WorkflowRuntimeKind, validate_workflow_catalog,
+        validate_workflow_request, validate_workflow_result,
+    };
+
+    fn pack(id: &str, capability: &str, aliases: &[&str]) -> WorkflowCatalogPack {
+        WorkflowCatalogPack {
+            id: id.to_owned(),
+            capability: capability.to_owned(),
+            capability_aliases: aliases.iter().map(|alias| (*alias).to_owned()).collect(),
+            status: "cataloged".to_owned(),
+            trust: "official".to_owned(),
+            runtime: WorkflowRuntimeKind::R,
+            manifest: "workflows/example/manifest.json".to_owned(),
+        }
+    }
+
+    #[test]
+    fn accepts_primary_and_alias_capabilities_and_preserves_request_identity() {
+        let pack = pack(
+            "org.linxira.example",
+            "expression.differential.v1",
+            &["medical.bulk-rnaseq.v1", "expression.deseq2.v1"],
+        );
+        for capability in [
+            "expression.differential.v1",
+            "medical.bulk-rnaseq.v1",
+            "expression.deseq2.v1",
+        ] {
+            let request = serde_json::json!({
+                "schema_version": "2",
+                "job_id": "alias-test",
+                "capability": capability
+            });
+            let identity = validate_workflow_request(&request, &pack).expect("valid request");
+            assert_eq!(identity.capability, capability);
+            let result = serde_json::json!({
+                "schema_version": "2",
+                "job_id": "alias-test",
+                "capability": capability,
+                "status": "ok"
+            });
+            validate_workflow_result(&result, &identity).expect("matching result identity");
+
+            let wrong_result = serde_json::json!({
+                "schema_version": "2",
+                "job_id": "alias-test",
+                "capability": "expression.differential.v1",
+                "status": "ok"
+            });
+            if capability != "expression.differential.v1" {
+                assert!(validate_workflow_result(&wrong_result, &identity).is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_duplicate_and_ambiguous_catalog_capabilities() {
+        for aliases in [
+            vec!["expression.differential.v1"],
+            vec!["medical.bulk-rnaseq.v1", "medical.bulk-rnaseq.v1"],
+        ] {
+            let catalog = WorkflowCatalog {
+                schema_version: "1".to_owned(),
+                packs: vec![pack(
+                    "org.linxira.example",
+                    "expression.differential.v1",
+                    &aliases,
+                )],
+            };
+            assert!(validate_workflow_catalog(&catalog).is_err());
+        }
+
+        let catalog = WorkflowCatalog {
+            schema_version: "1".to_owned(),
+            packs: vec![
+                pack(
+                    "org.linxira.first",
+                    "expression.differential.v1",
+                    &["medical.bulk-rnaseq.v1"],
+                ),
+                pack("org.linxira.second", "medical.bulk-rnaseq.v1", &[]),
+            ],
+        };
+        assert!(validate_workflow_catalog(&catalog).is_err());
+    }
+
+    #[test]
+    fn accepts_a_pack_without_optional_aliases() {
+        let catalog = WorkflowCatalog {
+            schema_version: "1".to_owned(),
+            packs: vec![pack("org.linxira.example", "sequence.convert.v1", &[])],
+        };
+        validate_workflow_catalog(&catalog).expect("alias-free pack remains valid");
+    }
 }

@@ -1,6 +1,6 @@
 ---
 name: analyze-functional-enrichment
-description: Normalize local GO and eggNOG-mapper annotation tables and run deterministic custom, Gene Ontology, or KEGG over-representation analysis. Use for gene-to-term association construction, eggNOG result cleanup, hypergeometric enrichment, Benjamini-Hochberg correction, mapped/unmapped query accounting, and bounded enrichment result tables.
+description: Normalize local GO and eggNOG-mapper annotation tables and run deterministic over-representation or preranked gene-set enrichment analysis. Use for gene-to-term association construction, eggNOG cleanup, custom/GO/KEGG hypergeometric enrichment, weighted GSEA, deterministic label permutations, Benjamini-Hochberg correction, mapped/unmapped accounting, and bounded enrichment results.
 ---
 
 # Analyze Functional Enrichment
@@ -57,3 +57,19 @@ When developing in the source repository, prefix commands with
 Do not treat enrichment as causal evidence or a clinical conclusion. Report
 the identifier system, association source and version, universe definition,
 filtering rules, multiple-testing method, and omitted terms.
+
+## Run Preranked GSEA
+
+Provide a headered ranked table with gene identifier and numeric score columns,
+plus a headered gene-set membership table with gene and term identifiers:
+
+```bash
+linxira-bio enrichment gsea RANKED.tsv GENE_SETS.tsv \
+  --min-set-size 15 --max-set-size 500 --permutations 1000 --seed 0 --json
+```
+
+- Preserve score direction and document how the ranking statistic was derived.
+- Review skipped sets and unmapped memberships before interpreting results.
+- Treat `nominal_p_value` as the fixed-seed gene-label permutation estimate;
+  `fdr_bh` is Benjamini-Hochberg across all tested sets.
+- Use more permutations when tail precision matters and record the seed.

@@ -1,5 +1,6 @@
 use flate2::read::MultiGzDecoder;
 use serde::Serialize;
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs::{self, File, OpenOptions};
@@ -49,6 +50,38 @@ pub struct FastqAdapterOptions {
     pub adapters: Vec<String>,
     pub min_overlap: usize,
     pub min_length: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FastqDeduplicateKey {
+    Sequence,
+    HeaderUmi { delimiter: String },
+    SequencePrefixUmi { length: usize },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FastqDeduplicateOptions {
+    pub key: FastqDeduplicateKey,
+}
+
+impl Default for FastqDeduplicateOptions {
+    fn default() -> Self {
+        Self {
+            key: FastqDeduplicateKey::Sequence,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct FastqDeduplicateSummary {
+    pub input_read_count: u64,
+    pub output_read_count: u64,
+    pub duplicate_read_count: u64,
+    pub input_bases: u64,
+    pub output_bases: u64,
+    pub strategy: String,
+    pub umi_length: Option<usize>,
+    pub warnings: Vec<String>,
 }
 
 impl Default for FastqAdapterOptions {
@@ -254,6 +287,69 @@ pub fn fastq_adapter_trim_path(
         },
         options.min_length,
     )
+}
+
+pub fn fastq_deduplicate_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &FastqDeduplicateOptions,
+) -> Result<FastqDeduplicateSummary, FastqTransformError> {
+    validate_deduplicate_options(options)?;
+    let input = input.as_ref();
+    let output = output.as_ref();
+    if output.exists() {
+        return Err(FastqTransformError::OutputAlreadyExists(output.to_owned()));
+    }
+
+    let temporary = temporary_output_path(output);
+    let result = (|| {
+        let mut reader = open_fastq(input)?;
+        let mut writer = BufWriter::new(
+            OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temporary)?,
+        );
+        let mut seen = HashSet::new();
+        let mut summary = FastqDeduplicateSummary {
+            strategy: deduplicate_strategy(options).to_owned(),
+            umi_length: match options.key {
+                FastqDeduplicateKey::SequencePrefixUmi { length } => Some(length),
+                _ => None,
+            },
+            ..FastqDeduplicateSummary::default()
+        };
+        let mut line = Vec::new();
+        while let Some(record) = read_record(&mut reader, &mut line, summary.input_read_count + 1)?
+        {
+            summary.input_read_count += 1;
+            summary.input_bases += record.sequence.len() as u64;
+            let key = deduplicate_key(&record, &options.key, summary.input_read_count)?;
+            if !seen.insert(key) {
+                summary.duplicate_read_count += 1;
+                continue;
+            }
+            summary.output_read_count += 1;
+            summary.output_bases += record.sequence.len() as u64;
+            write_record(&mut writer, &record)?;
+        }
+        if summary.input_read_count == 0 {
+            return Err(FastqTransformError::NoRecords);
+        }
+        if summary.duplicate_read_count == 0 {
+            summary
+                .warnings
+                .push("no duplicate keys were found".to_owned());
+        }
+        writer.flush()?;
+        drop(writer);
+        fs::rename(&temporary, output)?;
+        Ok(summary)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
 }
 
 fn transform_path(
@@ -491,6 +587,102 @@ fn validate_trim_options(options: &FastqTrimOptions) -> Result<(), FastqTransfor
     Ok(())
 }
 
+fn validate_deduplicate_options(
+    options: &FastqDeduplicateOptions,
+) -> Result<(), FastqTransformError> {
+    match &options.key {
+        FastqDeduplicateKey::Sequence => Ok(()),
+        FastqDeduplicateKey::HeaderUmi { delimiter } if delimiter.is_empty() => Err(
+            FastqTransformError::InvalidOption("header UMI delimiter must not be empty".to_owned()),
+        ),
+        FastqDeduplicateKey::HeaderUmi { delimiter }
+            if delimiter.chars().any(char::is_whitespace) =>
+        {
+            Err(FastqTransformError::InvalidOption(
+                "header UMI delimiter must not contain whitespace".to_owned(),
+            ))
+        }
+        FastqDeduplicateKey::SequencePrefixUmi { length: 0 } => {
+            Err(FastqTransformError::InvalidOption(
+                "sequence-prefix UMI length must be at least 1".to_owned(),
+            ))
+        }
+        _ => Ok(()),
+    }
+}
+
+fn deduplicate_strategy(options: &FastqDeduplicateOptions) -> &'static str {
+    match options.key {
+        FastqDeduplicateKey::Sequence => "sequence",
+        FastqDeduplicateKey::HeaderUmi { .. } => "sequence-and-header-umi",
+        FastqDeduplicateKey::SequencePrefixUmi { .. } => "insert-and-sequence-prefix-umi",
+    }
+}
+
+fn deduplicate_key(
+    record: &FastqRecord,
+    key: &FastqDeduplicateKey,
+    record_number: u64,
+) -> Result<Vec<u8>, FastqTransformError> {
+    let mut result = Vec::with_capacity(record.sequence.len() + 32);
+    match key {
+        FastqDeduplicateKey::Sequence => {
+            result.extend(record.sequence.iter().map(u8::to_ascii_uppercase));
+        }
+        FastqDeduplicateKey::HeaderUmi { delimiter } => {
+            let identifier = first_ascii_field(&record.header[1..]).ok_or_else(|| {
+                malformed(
+                    record_number,
+                    0,
+                    "header has no identifier for UMI extraction",
+                )
+            })?;
+            let delimiter = delimiter.as_bytes();
+            let position = identifier
+                .windows(delimiter.len())
+                .rposition(|window| window == delimiter)
+                .ok_or_else(|| {
+                    malformed(
+                        record_number,
+                        0,
+                        format!("header identifier has no UMI suffix separated by {delimiter:?}"),
+                    )
+                })?;
+            let umi = &identifier[position + delimiter.len()..];
+            if umi.is_empty() {
+                return Err(malformed(record_number, 0, "header UMI suffix is empty"));
+            }
+            result.extend(umi.iter().map(u8::to_ascii_uppercase));
+            result.push(0);
+            result.extend(record.sequence.iter().map(u8::to_ascii_uppercase));
+        }
+        FastqDeduplicateKey::SequencePrefixUmi { length } => {
+            if record.sequence.len() <= *length {
+                return Err(malformed(
+                    record_number,
+                    0,
+                    format!(
+                        "sequence length {} must exceed UMI prefix length {length}",
+                        record.sequence.len()
+                    ),
+                ));
+            }
+            result.extend(
+                record.sequence[..*length]
+                    .iter()
+                    .map(u8::to_ascii_uppercase),
+            );
+            result.push(0);
+            result.extend(
+                record.sequence[*length..]
+                    .iter()
+                    .map(u8::to_ascii_uppercase),
+            );
+        }
+    }
+    Ok(result)
+}
+
 fn trim_end_by_quality(record_quality: &[u8], options: &FastqTrimOptions) -> usize {
     let offset = options.quality_encoding.offset();
     let threshold = u16::from(offset) + u16::from(options.min_quality);
@@ -599,8 +791,9 @@ fn temporary_output_path(output: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::{
-        FastqAdapterOptions, FastqTransformQualityEncoding, FastqTrimOptions,
-        fastq_adapter_trim_path, fastq_trim_path,
+        FastqAdapterOptions, FastqDeduplicateKey, FastqDeduplicateOptions,
+        FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
+        fastq_deduplicate_path, fastq_trim_path,
     };
     use flate2::Compression;
     use flate2::write::GzEncoder;
@@ -718,6 +911,77 @@ mod tests {
             fs::read_to_string(&output).expect("protected output"),
             "protected\n"
         );
+        cleanup(&[input, output]);
+    }
+
+    #[test]
+    fn removes_exact_sequence_duplicates_case_insensitively() {
+        let input = temporary_path("deduplicate-input.fastq");
+        let output = temporary_path("deduplicate-output.fastq");
+        fs::write(
+            &input,
+            b"@first\nACGT\n+\nIIII\n@duplicate\nacgt\n+\nHHHH\n@unique\nTGCA\n+\nIIII\n",
+        )
+        .expect("write deduplicate fixture");
+
+        let summary = fastq_deduplicate_path(&input, &output, &FastqDeduplicateOptions::default())
+            .expect("deduplicate FASTQ");
+
+        assert_eq!(summary.input_read_count, 3);
+        assert_eq!(summary.output_read_count, 2);
+        assert_eq!(summary.duplicate_read_count, 1);
+        assert_eq!(summary.strategy, "sequence");
+        assert_eq!(
+            fs::read_to_string(&output).expect("deduplicated FASTQ"),
+            "@first\nACGT\n+\nIIII\n@unique\nTGCA\n+\nIIII\n"
+        );
+        cleanup(&[input, output]);
+    }
+
+    #[test]
+    fn distinguishes_header_umis_for_identical_sequences() {
+        let input = temporary_path("deduplicate-umi-input.fastq");
+        let output = temporary_path("deduplicate-umi-output.fastq");
+        fs::write(
+            &input,
+            b"@first:AAAA\nACGT\n+\nIIII\n@copy:AAAA\nACGT\n+\nIIII\n@other:CCCC\nACGT\n+\nIIII\n",
+        )
+        .expect("write UMI fixture");
+
+        let summary = fastq_deduplicate_path(
+            &input,
+            &output,
+            &FastqDeduplicateOptions {
+                key: FastqDeduplicateKey::HeaderUmi {
+                    delimiter: ":".to_owned(),
+                },
+            },
+        )
+        .expect("deduplicate UMI FASTQ");
+
+        assert_eq!(summary.output_read_count, 2);
+        assert_eq!(summary.duplicate_read_count, 1);
+        assert_eq!(summary.strategy, "sequence-and-header-umi");
+        cleanup(&[input, output]);
+    }
+
+    #[test]
+    fn validates_sequence_prefix_umi_length_without_leaving_output() {
+        let input = temporary_path("deduplicate-short-umi.fastq");
+        let output = temporary_path("deduplicate-short-umi-output.fastq");
+        fs::write(&input, b"@read\nACGT\n+\nIIII\n").expect("write short UMI fixture");
+
+        let error = fastq_deduplicate_path(
+            &input,
+            &output,
+            &FastqDeduplicateOptions {
+                key: FastqDeduplicateKey::SequencePrefixUmi { length: 4 },
+            },
+        )
+        .expect_err("UMI must leave an insert sequence");
+
+        assert!(error.to_string().contains("must exceed UMI prefix length"));
+        assert!(!output.exists());
         cleanup(&[input, output]);
     }
 

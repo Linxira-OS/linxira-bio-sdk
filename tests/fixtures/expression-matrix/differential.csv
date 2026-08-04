@@ -1,0 +1,4 @@
+gene,log2FoldChange,padj
+up,2.0,0.001
+down,-1.5,0.01
+neutral,0.1,0.8

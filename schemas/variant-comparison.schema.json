@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/variant-comparison.v1.json",
+  "title": "Linxira Bio VCF allele-set comparison result",
+  "type": "object",
+  "required": [
+    "shared_count",
+    "left_only_count",
+    "right_only_count",
+    "sample_genotypes_compared",
+    "variants"
+  ],
+  "properties": {
+    "shared_count": {"$ref": "#/$defs/count"},
+    "left_only_count": {"$ref": "#/$defs/count"},
+    "right_only_count": {"$ref": "#/$defs/count"},
+    "sample_genotypes_compared": {"const": false},
+    "variants": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/variant"}
+    }
+  },
+  "$defs": {
+    "count": {"type": "integer", "minimum": 0},
+    "variant": {
+      "type": "object",
+      "required": ["chrom", "position", "reference", "alternate", "status"],
+      "properties": {
+        "chrom": {"type": "string", "minLength": 1},
+        "position": {"type": "integer", "minimum": 1},
+        "reference": {"type": "string", "minLength": 1},
+        "alternate": {"type": "string", "minLength": 1},
+        "status": {"enum": ["shared", "left-only", "right-only"]}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -55,6 +55,8 @@ SCHEMA_FILES = (
     "schemas/expression-normalization.schema.json",
     "schemas/expression-pca.schema.json",
     "schemas/gene-density.schema.json",
+    "schemas/gsea.schema.json",
+    "schemas/interval-closest.schema.json",
     "schemas/interval-intersect.schema.json",
     "schemas/job-request-v2.schema.json",
     "schemas/job-request.schema.json",
@@ -76,6 +78,7 @@ SCHEMA_FILES = (
     "schemas/svg-visualization.schema.json",
     "schemas/third-party-dependencies.schema.json",
     "schemas/tool-catalog.schema.json",
+    "schemas/variant-comparison.schema.json",
     "schemas/workflow-pack-catalog.schema.json",
     "schemas/workflow-pack-manifest.schema.json",
 )
@@ -155,6 +158,10 @@ CAPABILITY_RESULT_CONTRACTS = (
         "schemas/enrichment.schema.json",
     ),
     (
+        "tests/fixtures/capability-results/gsea.json",
+        "schemas/gsea.schema.json",
+    ),
+    (
         "tests/fixtures/capability-results/enrichment-visualize.json",
         "schemas/svg-visualization.schema.json",
     ),
@@ -173,6 +180,10 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/gene-density.json",
         "schemas/gene-density.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/interval-closest.json",
+        "schemas/interval-closest.schema.json",
     ),
     (
         "tests/fixtures/capability-results/phylogeny-tree-transform.json",
@@ -221,6 +232,10 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/structure-superposition.json",
         "schemas/structure-superposition.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/variant-comparison.json",
+        "schemas/variant-comparison.schema.json",
     ),
 )
 

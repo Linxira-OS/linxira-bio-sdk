@@ -1,0 +1,20 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-cohort-table-qc-v2",
+  "capability": "medical.cohort-table.qc.v1",
+  "inputs": [{
+    "artifact_id": "input-cohort",
+    "role": "cohort",
+    "cardinality": "single",
+    "files": [{
+      "file_id": "input-cohort-1",
+      "path": "../cohort/participants.tsv",
+      "format": "tsv",
+      "compression": "none",
+      "size_bytes": 102,
+      "sha256": "ae22a6dbcb9a535c81cbdd8283ee7eb28e8b5b50678dcae4efa167c89763b6e2"
+    }]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {}
+}

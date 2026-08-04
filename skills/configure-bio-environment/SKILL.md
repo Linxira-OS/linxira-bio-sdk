@@ -1,6 +1,6 @@
 ---
 name: configure-bio-environment
-description: Audit and prepare a local bioinformatics software environment with Linxira Bio environment capabilities. Use when an agent must check tools, select a workload and installation scope, review a transaction preview, or configure managed runtimes, BLAST+, DIAMOND, HMMER, MUSCLE, trimAl, IQ-TREE, MEME, DSSP, genomics CLI tools, WSL, containers, Rust, or local GPU availability on Windows, Debian, or Arch Linux.
+description: Audit and prepare a local bioinformatics software environment with Linxira Bio environment capabilities. Use when an agent must check tools, select a workload and installation scope, review a transaction preview, or configure managed runtimes, BLAST+, DIAMOND, HMMER, MUSCLE, trimAl, IQ-TREE, MEME, DSSP, MCScanX, KaKs Calculator, genomics CLI tools, WSL, containers, Rust, or local GPU availability on Windows, Debian, or Arch Linux.
 ---
 
 # Configure Bio Environment
@@ -30,6 +30,7 @@ an installer, directory name, or PATH entry alone.
 - `phylogenetics`: IQ-TREE.
 - `motif-analysis`: MEME Suite.
 - `protein-structure`: DSSP.
+- `comparative-genomics`: MCScanX and KaKs Calculator.
 - `genomics-cli`: samtools, bcftools, bedtools, and minimap2.
 - `full-local`: every currently registered local analysis tool.
 
@@ -72,9 +73,11 @@ linxira-bio workflow packs --json
 `cataloged` means the script, schema, lock, test, and license notice ship with
 the product. It does not mean that dependencies are installed. Use
 `LINXIRA_BIO_WORKFLOW_PYTHON` or `LINXIRA_BIO_WORKFLOW_R` only after auditing
-the selected isolated runtime. The runner validates the packed file hashes and
+the selected isolated runtime. R packs also require
+`LINXIRA_BIO_WORKFLOW_R_LIBRARY` to select an existing project package library
+paired with that interpreter. The runner validates the packed file hashes and
 dependency-lock hash before it invokes a local interpreter; it never downloads
-dependencies itself.
+dependencies itself or mutates the global R library.
 
 A provider marked `cataloged` is not installable until
 `environment.apply.v1` becomes available. Prefer uv-managed CPython, Pixi for

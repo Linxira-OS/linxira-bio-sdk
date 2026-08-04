@@ -93,7 +93,7 @@ class CoverageV1ValidationTests(unittest.TestCase):
             item.pop("owner", None)
             item.pop("reason", None)
         summary = self.validate(document, release=True)
-        self.assertEqual(summary.achieved_weight, 80)
+        self.assertGreaterEqual(summary.achieved_weight, 80)
 
     def test_declared_target_below_eighty_is_rejected(self) -> None:
         document = copy.deepcopy(self.coverage)

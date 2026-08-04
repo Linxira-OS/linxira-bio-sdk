@@ -1,0 +1,7 @@
+gene_id	term_id	term_name	namespace
+g1	UP	Positive genes	custom
+g2	UP	Positive genes	custom
+g5	DOWN	Negative genes	custom
+g6	DOWN	Negative genes	custom
+g2	MIXED	Mixed genes	custom
+g5	MIXED	Mixed genes	custom

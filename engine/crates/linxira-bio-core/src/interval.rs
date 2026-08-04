@@ -104,6 +104,42 @@ pub struct IntervalSubtractContigStats {
     pub output_bases: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum IntervalClosestDirection {
+    Upstream,
+    Downstream,
+    Overlap,
+}
+
+impl IntervalClosestDirection {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Upstream => "upstream",
+            Self::Downstream => "downstream",
+            Self::Overlap => "overlap",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct IntervalClosestStats {
+    pub query_interval_count: u64,
+    pub target_interval_count: u64,
+    pub matched_query_count: u64,
+    pub unmatched_query_count: u64,
+    pub contigs: BTreeMap<String, IntervalClosestContigStats>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct IntervalClosestContigStats {
+    pub query_interval_count: u64,
+    pub target_interval_count: u64,
+    pub matched_query_count: u64,
+    pub unmatched_query_count: u64,
+}
+
 #[derive(Debug)]
 pub enum BedError {
     Io(io::Error),
@@ -133,7 +169,7 @@ impl Display for BedError {
                 formatter,
                 "BED processing exceeds the deterministic {resource} limit of {limit}"
             ),
-            Self::Overflow => formatter.write_str("interval intersection exceeds supported range"),
+            Self::Overflow => formatter.write_str("interval processing exceeds supported range"),
         }
     }
 }
@@ -167,6 +203,20 @@ impl Interval {
     fn length(self) -> u64 {
         self.end - self.start
     }
+}
+
+#[derive(Debug)]
+struct ClosestTargetIndex {
+    by_start: Vec<Interval>,
+    prefix_max_end: Vec<u64>,
+    by_end: Vec<Interval>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ClosestTargetMatch {
+    target: Interval,
+    distance: u64,
+    direction: IntervalClosestDirection,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -412,6 +462,87 @@ pub fn bed_subtract_path(
             stats.warnings.push(
                 "right BED input contains no intervals; left intervals are unchanged".to_owned(),
             );
+        }
+        Ok(stats.clone())
+    })
+}
+
+/// Writes one deterministic nearest-target row for each query interval that
+/// has at least one target on the same chromosome.
+///
+/// Inputs accept BED3 or wider tab-separated records; optional BED fields are
+/// ignored. Coordinates use zero-based, half-open semantics. The output is a
+/// headered TSV containing query BED3, target BED3, the non-negative interval
+/// gap, and `upstream`, `downstream`, or `overlap`. Bookended intervals have a
+/// zero gap but remain directional because they do not overlap. If targets tie
+/// on distance, the lexicographically smallest `(start, end)` target is used.
+pub fn bed_closest_path(
+    query: impl AsRef<Path>,
+    target: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+) -> Result<IntervalClosestStats, BedError> {
+    let mut work_budget = IntersectionBudget::production();
+    let mut read_budget = BedReadBudget::production();
+    let mut queries = read_bed_path(query.as_ref(), &mut read_budget, &mut work_budget)?;
+    let mut targets = read_bed_path(target.as_ref(), &mut read_budget, &mut work_budget)?;
+    let contigs = queries
+        .keys()
+        .chain(targets.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut stats = IntervalClosestStats::default();
+
+    with_new_output(output.as_ref(), |writer| {
+        writeln!(
+            writer,
+            "query_contig\tquery_start\tquery_end\ttarget_contig\ttarget_start\ttarget_end\tdistance\tdirection"
+        )?;
+        for contig in contigs {
+            let mut contig_queries = queries.remove(&contig).unwrap_or_default();
+            let contig_targets = targets.remove(&contig).unwrap_or_default();
+            contig_queries.sort_unstable_by_key(|interval| (interval.start, interval.end));
+            let index = ClosestTargetIndex::new(contig_targets);
+            let mut contig_stats = IntervalClosestContigStats {
+                query_interval_count: u64::try_from(contig_queries.len())
+                    .expect("interval count fits in u64"),
+                target_interval_count: u64::try_from(index.len())
+                    .expect("interval count fits in u64"),
+                ..Default::default()
+            };
+
+            for query_interval in contig_queries {
+                let Some(nearest) = index.closest(query_interval) else {
+                    contig_stats.unmatched_query_count = contig_stats
+                        .unmatched_query_count
+                        .checked_add(1)
+                        .ok_or(BedError::Overflow)?;
+                    continue;
+                };
+                write_closest_match(writer, &contig, query_interval, nearest)?;
+                contig_stats.matched_query_count = contig_stats
+                    .matched_query_count
+                    .checked_add(1)
+                    .ok_or(BedError::Overflow)?;
+            }
+
+            add_closest_stats(&mut stats, &contig_stats)?;
+            stats.contigs.insert(contig, contig_stats);
+        }
+        if stats.query_interval_count == 0 {
+            stats
+                .warnings
+                .push("query BED input contains no intervals".to_owned());
+        }
+        if stats.target_interval_count == 0 {
+            stats.warnings.push(
+                "target BED input contains no intervals; no closest intervals were reported"
+                    .to_owned(),
+            );
+        } else if stats.unmatched_query_count > 0 {
+            stats.warnings.push(format!(
+                "{} query interval(s) have no target on the same chromosome",
+                stats.unmatched_query_count
+            ));
         }
         Ok(stats.clone())
     })
@@ -729,6 +860,96 @@ fn record_overlap(
     Ok(())
 }
 
+impl ClosestTargetIndex {
+    fn new(mut targets: Vec<Interval>) -> Self {
+        targets.sort_unstable_by_key(|interval| (interval.start, interval.end));
+        let mut prefix_max_end = Vec::with_capacity(targets.len());
+        let mut maximum_end = 0_u64;
+        for target in &targets {
+            maximum_end = maximum_end.max(target.end);
+            prefix_max_end.push(maximum_end);
+        }
+        let mut by_end = targets.clone();
+        by_end.sort_unstable_by_key(|interval| (interval.end, interval.start));
+        Self {
+            by_start: targets,
+            prefix_max_end,
+            by_end,
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.by_start.len()
+    }
+
+    fn closest(&self, query: Interval) -> Option<ClosestTargetMatch> {
+        let downstream_index = self
+            .by_start
+            .partition_point(|target| target.start < query.end);
+        let first_possible_overlap = self.prefix_max_end[..downstream_index]
+            .partition_point(|maximum_end| *maximum_end <= query.start);
+        let overlap = (first_possible_overlap < downstream_index).then(|| ClosestTargetMatch {
+            target: self.by_start[first_possible_overlap],
+            distance: 0,
+            direction: IntervalClosestDirection::Overlap,
+        });
+
+        let upstream_count = self
+            .by_end
+            .partition_point(|target| target.end <= query.start);
+        let upstream = (upstream_count > 0).then(|| {
+            let maximum_end = self.by_end[upstream_count - 1].end;
+            let first_with_maximum_end =
+                self.by_end[..upstream_count].partition_point(|target| target.end < maximum_end);
+            let target = self.by_end[first_with_maximum_end];
+            ClosestTargetMatch {
+                target,
+                distance: query.start - target.end,
+                direction: IntervalClosestDirection::Upstream,
+            }
+        });
+        let downstream =
+            self.by_start
+                .get(downstream_index)
+                .copied()
+                .map(|target| ClosestTargetMatch {
+                    target,
+                    distance: target.start - query.end,
+                    direction: IntervalClosestDirection::Downstream,
+                });
+
+        [overlap, upstream, downstream]
+            .into_iter()
+            .flatten()
+            .min_by_key(|candidate| {
+                (
+                    candidate.distance,
+                    candidate.target.start,
+                    candidate.target.end,
+                )
+            })
+    }
+}
+
+fn write_closest_match(
+    writer: &mut impl Write,
+    contig: &str,
+    query: Interval,
+    nearest: ClosestTargetMatch,
+) -> Result<(), BedError> {
+    writeln!(
+        writer,
+        "{contig}\t{}\t{}\t{contig}\t{}\t{}\t{}\t{}",
+        query.start,
+        query.end,
+        nearest.target.start,
+        nearest.target.end,
+        nearest.distance,
+        nearest.direction.as_str()
+    )?;
+    Ok(())
+}
+
 fn merge_contig(
     writer: &mut impl Write,
     contig: &str,
@@ -987,6 +1208,29 @@ fn add_subtract_stats(
     Ok(())
 }
 
+fn add_closest_stats(
+    total: &mut IntervalClosestStats,
+    contig: &IntervalClosestContigStats,
+) -> Result<(), BedError> {
+    total.query_interval_count = total
+        .query_interval_count
+        .checked_add(contig.query_interval_count)
+        .ok_or(BedError::Overflow)?;
+    total.target_interval_count = total
+        .target_interval_count
+        .checked_add(contig.target_interval_count)
+        .ok_or(BedError::Overflow)?;
+    total.matched_query_count = total
+        .matched_query_count
+        .checked_add(contig.matched_query_count)
+        .ok_or(BedError::Overflow)?;
+    total.unmatched_query_count = total
+        .unmatched_query_count
+        .checked_add(contig.unmatched_query_count)
+        .ok_or(BedError::Overflow)?;
+    Ok(())
+}
+
 fn malformed<T>(line: usize, message: impl Into<String>) -> Result<T, BedError> {
     Err(BedError::MalformedRecord {
         line,
@@ -997,8 +1241,9 @@ fn malformed<T>(line: usize, message: impl Into<String>) -> Result<T, BedError> 
 #[cfg(test)]
 mod tests {
     use super::{
-        BedError, BedReadBudget, IntersectionBudget, Interval, IntervalMergeOptions,
-        bed_merge_path, bed_subtract_path, intersect_contig, intersect_interval_sets, read_bed,
+        BedError, BedReadBudget, ClosestTargetIndex, ClosestTargetMatch, IntersectionBudget,
+        Interval, IntervalClosestDirection, IntervalMergeOptions, bed_closest_path, bed_merge_path,
+        bed_subtract_path, intersect_contig, intersect_interval_sets, read_bed,
         read_bed_with_limits,
     };
     use flate2::Compression;
@@ -1017,6 +1262,40 @@ mod tests {
             "linxira-interval-{}-{ordinal}.{suffix}",
             std::process::id()
         ))
+    }
+
+    fn brute_force_closest(targets: &[Interval], query: Interval) -> Option<ClosestTargetMatch> {
+        targets
+            .iter()
+            .copied()
+            .map(|target| {
+                if target.end <= query.start {
+                    ClosestTargetMatch {
+                        target,
+                        distance: query.start - target.end,
+                        direction: IntervalClosestDirection::Upstream,
+                    }
+                } else if target.start >= query.end {
+                    ClosestTargetMatch {
+                        target,
+                        distance: target.start - query.end,
+                        direction: IntervalClosestDirection::Downstream,
+                    }
+                } else {
+                    ClosestTargetMatch {
+                        target,
+                        distance: 0,
+                        direction: IntervalClosestDirection::Overlap,
+                    }
+                }
+            })
+            .min_by_key(|candidate| {
+                (
+                    candidate.distance,
+                    candidate.target.start,
+                    candidate.target.end,
+                )
+            })
     }
 
     #[test]
@@ -1222,5 +1501,182 @@ mod tests {
         fs::remove_file(left).unwrap();
         fs::remove_file(right).unwrap();
         fs::remove_file(output).unwrap();
+    }
+
+    #[test]
+    fn finds_deterministic_closest_targets_for_unsorted_wide_bed() {
+        let query = fixture_path("query.bed");
+        let target = fixture_path("target.bed");
+        let first_output = fixture_path("closest.tsv");
+        let second_output = fixture_path("closest-reordered.tsv");
+        let query_rows = [
+            "chr2\t1\t2\tmissing",
+            "chr1\t30\t35\tequidistant",
+            "chr4\t10\t15\tdownstream",
+            "chr1\t10\t20\toverlap\t9",
+            "chr1\t5\t10\tbookended",
+        ];
+        let target_rows = [
+            "chr1\t40\t45\tdownstream-tie",
+            "chr3\t1\t2\ttarget-only",
+            "chr1\t20\t25\tupstream-tie",
+            "chr4\t20\t25\tdownstream",
+            "chr1\t15\t18\toverlap-later",
+            "chr1\t10\t12\toverlap-first",
+            "chr1\t0\t5\tupstream-bookended",
+        ];
+        fs::write(&query, format!("{}\n", query_rows.join("\n"))).unwrap();
+        fs::write(&target, format!("{}\n", target_rows.join("\n"))).unwrap();
+
+        let first_stats = bed_closest_path(&query, &target, &first_output).unwrap();
+
+        fs::write(
+            &query,
+            format!(
+                "{}\n",
+                query_rows
+                    .iter()
+                    .rev()
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            ),
+        )
+        .unwrap();
+        fs::write(
+            &target,
+            format!(
+                "{}\n",
+                target_rows
+                    .iter()
+                    .rev()
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            ),
+        )
+        .unwrap();
+        let second_stats = bed_closest_path(&query, &target, &second_output).unwrap();
+
+        let expected = concat!(
+            "query_contig\tquery_start\tquery_end\ttarget_contig\ttarget_start\ttarget_end\tdistance\tdirection\n",
+            "chr1\t5\t10\tchr1\t0\t5\t0\tupstream\n",
+            "chr1\t10\t20\tchr1\t10\t12\t0\toverlap\n",
+            "chr1\t30\t35\tchr1\t20\t25\t5\tupstream\n",
+            "chr4\t10\t15\tchr4\t20\t25\t5\tdownstream\n",
+        );
+        assert_eq!(fs::read_to_string(&first_output).unwrap(), expected);
+        assert_eq!(fs::read_to_string(&second_output).unwrap(), expected);
+        assert_eq!(first_stats, second_stats);
+        assert_eq!(first_stats.query_interval_count, 5);
+        assert_eq!(first_stats.target_interval_count, 7);
+        assert_eq!(first_stats.matched_query_count, 4);
+        assert_eq!(first_stats.unmatched_query_count, 1);
+        assert_eq!(first_stats.contigs["chr3"].target_interval_count, 1);
+        assert_eq!(first_stats.contigs["chr2"].unmatched_query_count, 1);
+        assert_eq!(first_stats.warnings.len(), 1);
+
+        for path in [query, target, first_output, second_output] {
+            fs::remove_file(path).unwrap();
+        }
+    }
+
+    #[test]
+    fn nested_target_is_found_as_an_overlap() {
+        let index = ClosestTargetIndex::new(vec![
+            Interval { start: 10, end: 20 },
+            Interval { start: 0, end: 100 },
+            Interval { start: 40, end: 45 },
+        ]);
+        let nearest = index
+            .closest(Interval { start: 50, end: 60 })
+            .expect("overlapping target");
+
+        assert_eq!(nearest.target.start, 0);
+        assert_eq!(nearest.target.end, 100);
+        assert_eq!(nearest.distance, 0);
+        assert_eq!(nearest.direction, IntervalClosestDirection::Overlap);
+    }
+
+    #[test]
+    fn closest_index_matches_brute_force_across_small_coordinates() {
+        let universe = (0..8)
+            .flat_map(|start| ((start + 1)..=8).map(move |end| Interval { start, end }))
+            .collect::<Vec<_>>();
+
+        for offset in 0..7 {
+            let targets = universe
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| (index + offset) % 4 != 0)
+                .map(|(_, interval)| *interval)
+                .collect::<Vec<_>>();
+            let index = ClosestTargetIndex::new(targets.clone());
+            for query in &universe {
+                let actual = index.closest(*query).map(|nearest| {
+                    (
+                        nearest.target.start,
+                        nearest.target.end,
+                        nearest.distance,
+                        nearest.direction,
+                    )
+                });
+                let expected = brute_force_closest(&targets, *query).map(|nearest| {
+                    (
+                        nearest.target.start,
+                        nearest.target.end,
+                        nearest.distance,
+                        nearest.direction,
+                    )
+                });
+                assert_eq!(actual, expected, "query [{}, {})", query.start, query.end);
+            }
+        }
+        assert!(
+            ClosestTargetIndex::new(Vec::new())
+                .closest(Interval { start: 0, end: 1 })
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn empty_target_reports_every_query_as_unmatched() {
+        let query = fixture_path("query.bed");
+        let target = fixture_path("empty-target.bed");
+        let output = fixture_path("closest.tsv");
+        fs::write(&query, b"chr1\t0\t10\nchr2\t5\t8\n").unwrap();
+        fs::write(&target, b"# no target records\n").unwrap();
+
+        let stats = bed_closest_path(&query, &target, &output).unwrap();
+
+        assert_eq!(stats.query_interval_count, 2);
+        assert_eq!(stats.target_interval_count, 0);
+        assert_eq!(stats.matched_query_count, 0);
+        assert_eq!(stats.unmatched_query_count, 2);
+        assert_eq!(stats.warnings.len(), 1);
+        assert_eq!(
+            fs::read_to_string(&output).unwrap(),
+            "query_contig\tquery_start\tquery_end\ttarget_contig\ttarget_start\ttarget_end\tdistance\tdirection\n"
+        );
+
+        for path in [query, target, output] {
+            fs::remove_file(path).unwrap();
+        }
+    }
+
+    #[test]
+    fn malformed_closest_input_does_not_create_output() {
+        let query = fixture_path("query.bed");
+        let target = fixture_path("malformed-target.bed");
+        let output = fixture_path("closest.tsv");
+        fs::write(&query, b"chr1\t0\t10\n").unwrap();
+        fs::write(&target, b"chr1\tnot-a-coordinate\t20\n").unwrap();
+
+        let error = bed_closest_path(&query, &target, &output).expect_err("malformed target");
+
+        assert!(matches!(error, BedError::MalformedRecord { line: 1, .. }));
+        assert!(!output.exists());
+        fs::remove_file(query).unwrap();
+        fs::remove_file(target).unwrap();
     }
 }

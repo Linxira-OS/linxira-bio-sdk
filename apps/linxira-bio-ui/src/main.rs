@@ -268,27 +268,42 @@ const DOCUMENTED_CAPABILITIES: &[&str] = &[
     "fastq.qc.v1",
     "fastq.trim.v1",
     "fastq.adapter.v1",
+    "fastq.deduplicate.v1",
     "alignment.qc.v1",
+    "alignment.bam-to-bigwig.v1",
     "annotation.gxf.stats.v1",
     "annotation.gxf.normalize.v1",
     "annotation.gene-position.v1",
     "annotation.sequence.extract.v1",
     "annotation.structure.visualize.v1",
+    "comparative.synteny.visualize.v1",
+    "comparative.mcscanx.v1",
+    "comparative.kaks.v1",
     "annotation.go.normalize.v1",
     "annotation.eggnog.normalize.v1",
     "enrichment.overrepresentation.v1",
     "enrichment.go.v1",
     "enrichment.kegg.v1",
+    "enrichment.gsea.v1",
     "enrichment.visualize.v1",
     "genome.gene-density.v1",
     "interval.intersect.v1",
     "interval.merge.v1",
     "interval.subtract.v1",
+    "interval.closest.v1",
     "expression.matrix.qc.v1",
+    "expression.differential.v1",
+    "medical.bulk-rnaseq.v1",
+    "medical.cohort-table.qc.v1",
+    "medical.pathway-ruo.v1",
+    "medical.variant-cohort.v1",
+    "medical.single-cell-qc.v1",
     "expression.normalize.v1",
     "expression.pca.v1",
     "expression.cluster.v1",
     "expression.heatmap.v1",
+    "expression.volcano.v1",
+    "motif.visualize.v1",
     "set.venn.v1",
     "set.upset.v1",
     "protein.properties.v1",
@@ -352,12 +367,20 @@ struct BioApp {
     enrichment_include_genes: bool,
     enrichment_visual_kind: String,
     enrichment_visual_style: String,
+    gsea_score_exponent: f64,
+    gsea_min_set_size: usize,
+    gsea_max_set_size: usize,
+    gsea_permutations: u32,
+    gsea_seed: u64,
     gene_density_feature_type: String,
     gene_density_window_size: u64,
     gene_density_step_size: u64,
     kmer_size: usize,
     kmer_canonical: bool,
     epcr_max_amplicon: usize,
+    fastq_deduplicate_mode: String,
+    fastq_umi_delimiter: String,
+    fastq_umi_length: usize,
     variant_filter_min_qual: f64,
     variant_filter_pass_only: bool,
     variant_filter_min_dp: u64,
@@ -370,6 +393,13 @@ struct BioApp {
     expression_cluster_scale: bool,
     expression_heatmap_top_features: usize,
     expression_heatmap_scale: bool,
+    differential_feature_id_column: String,
+    differential_sample_id_column: String,
+    differential_condition_column: String,
+    differential_reference_level: String,
+    differential_contrast_level: String,
+    differential_alpha: f64,
+    differential_min_total_count: u64,
     interpret_pdb_b_factors_as_plddt: bool,
     structure_contact_cutoff: f64,
     structure_contact_atom: String,
@@ -398,6 +428,7 @@ struct BioApp {
     native_evalue: f64,
     native_max_targets: usize,
     native_outfmt: u8,
+    kaks_method: String,
     phylogeny_reroot_label: String,
     job_history: Vec<JobRecord>,
     analysis_job_id: Option<String>,
@@ -454,12 +485,20 @@ impl BioApp {
             enrichment_include_genes: false,
             enrichment_visual_kind: "go".to_owned(),
             enrichment_visual_style: "bar".to_owned(),
+            gsea_score_exponent: 1.0,
+            gsea_min_set_size: 15,
+            gsea_max_set_size: 500,
+            gsea_permutations: 1_000,
+            gsea_seed: 0,
             gene_density_feature_type: "gene".to_owned(),
             gene_density_window_size: 1_000_000,
             gene_density_step_size: 1_000_000,
             kmer_size: 21,
             kmer_canonical: true,
             epcr_max_amplicon: 5_000,
+            fastq_deduplicate_mode: "sequence".to_owned(),
+            fastq_umi_delimiter: ":".to_owned(),
+            fastq_umi_length: 8,
             variant_filter_min_qual: 20.0,
             variant_filter_pass_only: true,
             variant_filter_min_dp: 0,
@@ -472,6 +511,13 @@ impl BioApp {
             expression_cluster_scale: true,
             expression_heatmap_top_features: 50,
             expression_heatmap_scale: true,
+            differential_feature_id_column: "feature_id".to_owned(),
+            differential_sample_id_column: "sample_id".to_owned(),
+            differential_condition_column: "condition".to_owned(),
+            differential_reference_level: "control".to_owned(),
+            differential_contrast_level: "treatment".to_owned(),
+            differential_alpha: 0.05,
+            differential_min_total_count: 10,
             interpret_pdb_b_factors_as_plddt: false,
             structure_contact_cutoff: 8.0,
             structure_contact_atom: "CA".to_owned(),
@@ -505,6 +551,7 @@ impl BioApp {
             native_evalue: 1e-3,
             native_max_targets: 50,
             native_outfmt: 6,
+            kaks_method: "NG".to_owned(),
             phylogeny_reroot_label: String::new(),
             job_history: Vec::new(),
             analysis_job_id: None,
@@ -950,6 +997,23 @@ impl BioApp {
                     );
                 }
             }
+            if route.capability == "fastq.deduplicate.v1" {
+                match self.fastq_deduplicate_mode.as_str() {
+                    "header-umi" => {
+                        parameters.insert(
+                            "header_umi_delimiter".to_owned(),
+                            Value::String(self.fastq_umi_delimiter.clone()),
+                        );
+                    }
+                    "sequence-prefix-umi" => {
+                        parameters.insert(
+                            "sequence_prefix_umi".to_owned(),
+                            serde_json::json!(self.fastq_umi_length),
+                        );
+                    }
+                    _ => {}
+                }
+            }
             if route.capability == "expression.normalize.v1" {
                 parameters.insert(
                     "method".to_owned(),
@@ -959,6 +1023,9 @@ impl BioApp {
                     "pseudocount".to_owned(),
                     serde_json::json!(self.expression_pseudocount),
                 );
+            }
+            if route.capability == "comparative.kaks.v1" {
+                parameters.insert("method".to_owned(), Value::String(self.kaks_method.clone()));
             }
             if route.capability == "protein.domain.visualize.v1" {
                 if !self.protein_domain_visual_sequence_id.trim().is_empty() {
@@ -1079,6 +1146,32 @@ impl BioApp {
                 "scale_rows": self.expression_heatmap_scale,
             });
         }
+        if matches!(
+            route.capability,
+            "expression.differential.v1" | "medical.bulk-rnaseq.v1"
+        ) {
+            let output_directory =
+                derived_analysis_output_path(&dataset_path, route.capability, "results");
+            request.parameters = serde_json::json!({
+                "output_directory": output_directory.to_string_lossy(),
+                "feature_id_column": self.differential_feature_id_column.trim(),
+                "sample_id_column": self.differential_sample_id_column.trim(),
+                "condition_column": self.differential_condition_column.trim(),
+                "reference_level": self.differential_reference_level.trim(),
+                "contrast_level": self.differential_contrast_level.trim(),
+                "alpha": self.differential_alpha,
+                "min_total_count": self.differential_min_total_count,
+            });
+        }
+        if route.capability == "enrichment.gsea.v1" {
+            request.parameters = serde_json::json!({
+                "exponent": self.gsea_score_exponent,
+                "min_set_size": self.gsea_min_set_size,
+                "max_set_size": self.gsea_max_set_size,
+                "permutations": self.gsea_permutations,
+                "seed": self.gsea_seed,
+            });
+        }
         if matches!(route.capability, "set.venn.v1" | "set.upset.v1") {
             request.parameters = serde_json::json!({
                 "include_items": false,
@@ -1087,7 +1180,10 @@ impl BioApp {
         }
         if matches!(
             route.capability,
-            "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1"
+            "enrichment.overrepresentation.v1"
+                | "enrichment.go.v1"
+                | "enrichment.kegg.v1"
+                | "medical.pathway-ruo.v1"
         ) {
             request.parameters = serde_json::json!({
                 "min_overlap": self.enrichment_min_overlap,
@@ -1653,6 +1749,8 @@ impl BioApp {
                                     "m8",
                                     "domtblout",
                                     "hmm",
+                                    "axt",
+                                    "collinearity",
                                     "nwk",
                                     "newick",
                                     "tree",
@@ -1918,17 +2016,23 @@ impl BioApp {
                     "fastq.qc.v1",
                     "fastq.trim.v1",
                     "fastq.adapter.v1",
+                    "fastq.deduplicate.v1",
                     "alignment.qc.v1",
+                    "alignment.bam-to-bigwig.v1",
                     "annotation.gxf.stats.v1",
                     "annotation.gxf.normalize.v1",
                     "annotation.gene-position.v1",
                     "annotation.sequence.extract.v1",
                     "annotation.structure.visualize.v1",
+                    "comparative.synteny.visualize.v1",
+                    "comparative.mcscanx.v1",
+                    "comparative.kaks.v1",
                     "annotation.go.normalize.v1",
                     "annotation.eggnog.normalize.v1",
                     "enrichment.overrepresentation.v1",
                     "enrichment.go.v1",
                     "enrichment.kegg.v1",
+                    "enrichment.gsea.v1",
                     "enrichment.visualize.v1",
                     "genome.gene-density.v1",
                     "variant.stats.v1",
@@ -1937,7 +2041,14 @@ impl BioApp {
                     "interval.intersect.v1",
                     "interval.merge.v1",
                     "interval.subtract.v1",
+                    "interval.closest.v1",
                     "expression.matrix.qc.v1",
+                    "expression.differential.v1",
+                    "medical.bulk-rnaseq.v1",
+                    "medical.cohort-table.qc.v1",
+                    "medical.pathway-ruo.v1",
+                    "medical.variant-cohort.v1",
+                    "medical.single-cell-qc.v1",
                     "expression.normalize.v1",
                     "expression.pca.v1",
                     "expression.cluster.v1",
@@ -2038,15 +2149,41 @@ impl BioApp {
                         self.text("目标序列 FASTA", "Target sequence FASTA"),
                         self.text("没有可用 FASTA", "No FASTA available"),
                     ),
+                    "comparative.mcscanx.v1" => (
+                        self.text("相似性命中表", "Similarity hits table"),
+                        self.text(
+                            "没有可用 BLAST 表格结果",
+                            "No BLAST tabular result available",
+                        ),
+                    ),
+                    "expression.differential.v1" | "medical.bulk-rnaseq.v1" => (
+                        self.text("样本元数据", "Sample metadata"),
+                        self.text(
+                            "没有可用 CSV/TSV 样本元数据",
+                            "No CSV/TSV sample metadata available",
+                        ),
+                    ),
+                    "enrichment.gsea.v1" => (
+                        self.text("基因集成员表", "Gene-set membership table"),
+                        self.text(
+                            "没有可用 CSV/TSV 基因集表",
+                            "No CSV/TSV gene-set table available",
+                        ),
+                    ),
                     "enrichment.overrepresentation.v1"
                     | "enrichment.go.v1"
                     | "enrichment.kegg.v1"
+                    | "medical.pathway-ruo.v1"
                     | "enrichment.visualize.v1" => (
                         self.text("功能关联表", "Association table"),
                         self.text(
                             "没有可用 CSV/TSV 关联表",
                             "No CSV/TSV association table available",
                         ),
+                    ),
+                    "interval.closest.v1" => (
+                        self.text("目标 BED", "Target BED"),
+                        self.text("没有其他 BED", "No other BED"),
                     ),
                     _ => (
                         self.text("右侧 BED", "Right BED"),
@@ -2136,9 +2273,52 @@ impl BioApp {
                 ui.text_edit_singleline(&mut self.go_term_column);
             });
         }
+        if self.selected_capability == "fastq.deduplicate.v1" {
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("去重键", "Deduplication key"));
+                egui::ComboBox::from_id_salt("fastq-deduplicate-mode")
+                    .selected_text(match self.fastq_deduplicate_mode.as_str() {
+                        "header-umi" => self.text("序列 + 读名 UMI", "Sequence + header UMI"),
+                        "sequence-prefix-umi" => {
+                            self.text("插入序列 + 前缀 UMI", "Insert + prefix UMI")
+                        }
+                        _ => self.text("仅序列", "Sequence only"),
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(
+                            &mut self.fastq_deduplicate_mode,
+                            "sequence".to_owned(),
+                            self.language.text("仅序列", "Sequence only"),
+                        );
+                        ui.selectable_value(
+                            &mut self.fastq_deduplicate_mode,
+                            "header-umi".to_owned(),
+                            self.language
+                                .text("序列 + 读名 UMI", "Sequence + header UMI"),
+                        );
+                        ui.selectable_value(
+                            &mut self.fastq_deduplicate_mode,
+                            "sequence-prefix-umi".to_owned(),
+                            self.language
+                                .text("插入序列 + 前缀 UMI", "Insert + prefix UMI"),
+                        );
+                    });
+                if self.fastq_deduplicate_mode == "header-umi" {
+                    ui.label(self.text("UMI 分隔符", "UMI delimiter"));
+                    ui.text_edit_singleline(&mut self.fastq_umi_delimiter);
+                } else if self.fastq_deduplicate_mode == "sequence-prefix-umi" {
+                    ui.label(self.text("UMI 长度", "UMI length"));
+                    ui.add(egui::DragValue::new(&mut self.fastq_umi_length).range(1..=256));
+                }
+            });
+        }
         if matches!(
             self.selected_capability.as_str(),
-            "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1"
+            "enrichment.overrepresentation.v1"
+                | "enrichment.go.v1"
+                | "enrichment.kegg.v1"
+                | "medical.pathway-ruo.v1"
         ) {
             ui.add_space(8.0);
             let include_genes_label = self.text("结果包含命中基因", "Include overlapping genes");
@@ -2148,6 +2328,21 @@ impl BioApp {
                 ui.label(self.text("最多报告条目", "Maximum reported terms"));
                 ui.add(egui::DragValue::new(&mut self.enrichment_max_terms).range(1..=100_000));
                 ui.checkbox(&mut self.enrichment_include_genes, include_genes_label);
+            });
+        }
+        if self.selected_capability == "enrichment.gsea.v1" {
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("评分指数", "Score exponent"));
+                ui.add(egui::DragValue::new(&mut self.gsea_score_exponent).range(0.0..=10.0));
+                ui.label(self.text("最小集合", "Minimum set size"));
+                ui.add(egui::DragValue::new(&mut self.gsea_min_set_size).range(1..=2_000_000));
+                ui.label(self.text("最大集合", "Maximum set size"));
+                ui.add(egui::DragValue::new(&mut self.gsea_max_set_size).range(1..=2_000_000));
+                ui.label(self.text("置换次数", "Permutations"));
+                ui.add(egui::DragValue::new(&mut self.gsea_permutations).range(1..=100_000));
+                ui.label(self.text("种子", "Seed"));
+                ui.add(egui::DragValue::new(&mut self.gsea_seed));
             });
         }
         if self.selected_capability == "enrichment.visualize.v1" {
@@ -2211,6 +2406,19 @@ impl BioApp {
                 );
                 ui.label(self.text("步长", "Step size"));
                 ui.add(egui::DragValue::new(&mut self.gene_density_step_size).range(1..=u64::MAX));
+            });
+        }
+        if self.selected_capability == "comparative.kaks.v1" {
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.label(self.text("计算方法", "Method"));
+                egui::ComboBox::from_id_salt("comparative-kaks-method")
+                    .selected_text(&self.kaks_method)
+                    .show_ui(ui, |ui| {
+                        for method in ["NG", "LWL", "LPB", "YN"] {
+                            ui.selectable_value(&mut self.kaks_method, method.to_owned(), method);
+                        }
+                    });
             });
         }
         if self.selected_capability == "similarity.reciprocal.v1" {
@@ -2451,6 +2659,36 @@ impl BioApp {
                 }
             });
         }
+        if matches!(
+            self.selected_capability.as_str(),
+            "expression.differential.v1" | "medical.bulk-rnaseq.v1"
+        ) {
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("特征 ID 列", "Feature ID column"));
+                ui.text_edit_singleline(&mut self.differential_feature_id_column);
+                ui.label(self.text("样本 ID 列", "Sample ID column"));
+                ui.text_edit_singleline(&mut self.differential_sample_id_column);
+                ui.label(self.text("条件列", "Condition column"));
+                ui.text_edit_singleline(&mut self.differential_condition_column);
+            });
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("参考水平", "Reference level"));
+                ui.text_edit_singleline(&mut self.differential_reference_level);
+                ui.label(self.text("对比水平", "Contrast level"));
+                ui.text_edit_singleline(&mut self.differential_contrast_level);
+                ui.label("alpha");
+                ui.add(egui::DragValue::new(&mut self.differential_alpha).range(0.000001..=1.0));
+                ui.label(self.text("最低总计数", "Minimum total count"));
+                ui.add(egui::DragValue::new(&mut self.differential_min_total_count));
+            });
+            if self.selected_capability == "medical.bulk-rnaseq.v1" {
+                ui.small(self.text(
+                    "仅限科研，不提供诊断、治疗建议或临床解释。",
+                    "Research use only; no diagnosis, treatment advice, or clinical interpretation.",
+                ));
+            }
+        }
         if self.selected_capability == "expression.pca.v1" {
             ui.add_space(8.0);
             let scale_label = self.text("按特征标准化", "Scale features");
@@ -2578,7 +2816,12 @@ impl BioApp {
                 ui.label(self.text("结果契约", "Result contract"));
                 ui.monospace("AnalysisResult");
                 ui.end_row();
-                if capability_output_extension(&self.selected_capability).is_some() {
+                if capability_output_extension(&self.selected_capability).is_some()
+                    || matches!(
+                        self.selected_capability.as_str(),
+                        "expression.differential.v1" | "medical.bulk-rnaseq.v1"
+                    )
+                {
                     ui.label(self.text("输出文件", "Output file"));
                     ui.label(self.text(
                         "自动写入输入文件同目录，不覆盖已有文件",
@@ -3250,6 +3493,10 @@ fn analysis_route_for_format(format: &str) -> Option<AnalysisRoute> {
             capability: "phylogeny.tree.transform.v1",
             input_role: "tree",
         }),
+        "axt" => Some(AnalysisRoute {
+            capability: "comparative.kaks.v1",
+            input_role: "codon-alignment",
+        }),
         _ => None,
     }
 }
@@ -3279,6 +3526,10 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
         }),
         ("fastq.adapter.v1", "fastq") => Some(AnalysisRoute {
             capability: "fastq.adapter.v1",
+            input_role: "fastq",
+        }),
+        ("fastq.deduplicate.v1", "fastq") => Some(AnalysisRoute {
+            capability: "fastq.deduplicate.v1",
             input_role: "fastq",
         }),
         ("alignment.qc.v1", "sam") => Some(AnalysisRoute {
@@ -3316,6 +3567,10 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             capability: "interval.subtract.v1",
             input_role: "left-bed",
         }),
+        ("interval.closest.v1", "bed") => Some(AnalysisRoute {
+            capability: "interval.closest.v1",
+            input_role: "query-bed",
+        }),
         (
             "expression.matrix.qc.v1"
             | "expression.normalize.v1"
@@ -3332,6 +3587,56 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
                 _ => "expression.heatmap.v1",
             },
             input_role: "matrix",
+        }),
+        ("expression.volcano.v1", "csv") => Some(AnalysisRoute {
+            capability: "expression.volcano.v1",
+            input_role: "differential",
+        }),
+        ("expression.differential.v1" | "medical.bulk-rnaseq.v1", "csv" | "tsv") => {
+            Some(AnalysisRoute {
+                capability: if capability == "expression.differential.v1" {
+                    "expression.differential.v1"
+                } else {
+                    "medical.bulk-rnaseq.v1"
+                },
+                input_role: "counts",
+            })
+        }
+        ("comparative.synteny.visualize.v1", "tsv") => Some(AnalysisRoute {
+            capability: "comparative.synteny.visualize.v1",
+            input_role: "anchors",
+        }),
+        ("comparative.mcscanx.v1", "tsv") => Some(AnalysisRoute {
+            capability: "comparative.mcscanx.v1",
+            input_role: "gene-positions",
+        }),
+        ("comparative.kaks.v1", "axt") => Some(AnalysisRoute {
+            capability: "comparative.kaks.v1",
+            input_role: "codon-alignment",
+        }),
+        ("medical.cohort-table.qc.v1", "csv" | "tsv") => Some(AnalysisRoute {
+            capability: "medical.cohort-table.qc.v1",
+            input_role: "cohort",
+        }),
+        ("medical.pathway-ruo.v1", "csv" | "tsv") => Some(AnalysisRoute {
+            capability: "medical.pathway-ruo.v1",
+            input_role: "genes",
+        }),
+        ("medical.variant-cohort.v1", "vcf") => Some(AnalysisRoute {
+            capability: "medical.variant-cohort.v1",
+            input_role: "vcf",
+        }),
+        ("medical.single-cell-qc.v1", "csv" | "tsv") => Some(AnalysisRoute {
+            capability: "medical.single-cell-qc.v1",
+            input_role: "matrix",
+        }),
+        ("motif.visualize.v1", "meme-text") => Some(AnalysisRoute {
+            capability: "motif.visualize.v1",
+            input_role: "meme",
+        }),
+        ("alignment.bam-to-bigwig.v1", "bam" | "cram") => Some(AnalysisRoute {
+            capability: "alignment.bam-to-bigwig.v1",
+            input_role: "alignment",
         }),
         ("annotation.go.normalize.v1" | "annotation.eggnog.normalize.v1", "csv" | "tsv") => {
             Some(AnalysisRoute {
@@ -3353,6 +3658,10 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
                 _ => "enrichment.kegg.v1",
             },
             input_role: "genes",
+        }),
+        ("enrichment.gsea.v1", "csv" | "tsv") => Some(AnalysisRoute {
+            capability: "enrichment.gsea.v1",
+            input_role: "ranked",
         }),
         ("enrichment.visualize.v1", "csv" | "tsv") => Some(AnalysisRoute {
             capability: "enrichment.visualize.v1",
@@ -3469,18 +3778,22 @@ fn capability_requires_secondary(capability: &str) -> bool {
 
 fn secondary_input_format(capability: &str) -> Option<&'static str> {
     match capability {
-        "interval.intersect.v1" | "interval.subtract.v1" => Some("bed"),
+        "interval.intersect.v1" | "interval.subtract.v1" | "interval.closest.v1" => Some("bed"),
         "annotation.sequence.extract.v1" => Some("fasta"),
         "variant.normalize.v1" => Some("fasta"),
         "primer.epcr.v1" => Some("tsv"),
         "structure.superpose.v1" => Some("structure"),
         "similarity.reciprocal.v1" => Some("blast"),
+        "comparative.mcscanx.v1" => Some("blast-tabular"),
+        "expression.differential.v1" | "medical.bulk-rnaseq.v1" => Some("table"),
         "similarity.blast.local.v1" | "similarity.diamond.v1" | "similarity.hmmer.v1" => {
             Some("fasta")
         }
         "enrichment.overrepresentation.v1"
         | "enrichment.go.v1"
         | "enrichment.kegg.v1"
+        | "enrichment.gsea.v1"
+        | "medical.pathway-ruo.v1"
         | "enrichment.visualize.v1" => Some("table"),
         _ => None,
     }
@@ -3502,30 +3815,38 @@ fn secondary_input_matches(capability: &str, format: &str) -> bool {
 fn secondary_input_role(capability: &str) -> Option<&'static str> {
     match capability {
         "interval.intersect.v1" | "interval.subtract.v1" => Some("right-bed"),
+        "interval.closest.v1" => Some("target-bed"),
         "annotation.sequence.extract.v1" => Some("fasta"),
         "variant.normalize.v1" => Some("reference"),
         "primer.epcr.v1" => Some("primers"),
         "structure.superpose.v1" => Some("mobile"),
         "similarity.reciprocal.v1" => Some("reverse"),
+        "comparative.mcscanx.v1" => Some("similarity-hits"),
+        "expression.differential.v1" | "medical.bulk-rnaseq.v1" => Some("sample_metadata"),
         "similarity.blast.local.v1" | "similarity.diamond.v1" => Some("reference"),
         "similarity.hmmer.v1" => Some("sequences"),
         "enrichment.overrepresentation.v1"
         | "enrichment.go.v1"
         | "enrichment.kegg.v1"
+        | "medical.pathway-ruo.v1"
         | "enrichment.visualize.v1" => Some("associations"),
+        "enrichment.gsea.v1" => Some("gene-sets"),
         _ => None,
     }
 }
 
 fn capability_output_extension(capability: &str) -> Option<&'static str> {
     match capability {
-        "fastq.trim.v1" | "fastq.adapter.v1" => Some("fastq"),
+        "fastq.trim.v1" | "fastq.adapter.v1" | "fastq.deduplicate.v1" => Some("fastq"),
         "interval.merge.v1" | "interval.subtract.v1" => Some("bed"),
+        "interval.closest.v1" => Some("tsv"),
         "table.manipulate.v1" => Some("tsv"),
         "annotation.gxf.normalize.v1" => Some("gff3"),
         "annotation.gene-position.v1" => Some("tsv"),
         "annotation.sequence.extract.v1" => Some("fasta"),
         "annotation.go.normalize.v1" | "annotation.eggnog.normalize.v1" => Some("tsv"),
+        "comparative.mcscanx.v1" => Some("collinearity"),
+        "comparative.kaks.v1" => Some("tsv"),
         "sequence.kmer.count.v1" | "primer.epcr.v1" => Some("tsv"),
         "expression.normalize.v1" => Some("tsv"),
         "variant.filter.v1" | "variant.normalize.v1" => Some("vcf"),
@@ -3536,10 +3857,14 @@ fn capability_output_extension(capability: &str) -> Option<&'static str> {
         "msa.trimal.v1" => Some("fasta"),
         "phylogeny.iqtree.v1" => Some("nwk"),
         "motif.meme.v1" => Some("meme"),
+        "alignment.bam-to-bigwig.v1" => Some("bw"),
         "protein.secondary-structure.v1" => Some("dssp"),
         "annotation.structure.visualize.v1"
+        | "comparative.synteny.visualize.v1"
         | "enrichment.visualize.v1"
-        | "protein.domain.visualize.v1" => Some("svg"),
+        | "protein.domain.visualize.v1"
+        | "expression.volcano.v1"
+        | "motif.visualize.v1" => Some("svg"),
         _ => None,
     }
 }
@@ -4144,6 +4469,8 @@ fn format_hint(path: &Path) -> &'static str {
         "xml" => "blast-xml",
         "domtblout" => "protein-domains",
         "hmm" => "hmm-profile",
+        "axt" => "axt",
+        "collinearity" => "mcscanx-collinearity",
         "nwk" | "newick" | "tree" | "tre" => "newick",
         "xlsx" => "xlsx",
         "zip" => "zip",
@@ -4159,15 +4486,18 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "fastq.qc.v1" => language.text("FASTQ 质量控制", "FASTQ quality control"),
         "fastq.trim.v1" => language.text("FASTQ 质量裁剪", "FASTQ quality trimming"),
         "fastq.adapter.v1" => language.text("FASTQ 接头去除", "FASTQ adapter removal"),
+        "fastq.deduplicate.v1" => language.text("FASTQ 精确去重", "FASTQ exact deduplication"),
         "interval.intersect.v1" => language.text("BED 区间相交", "BED interval intersection"),
         "interval.merge.v1" => language.text("BED 区间合并", "BED interval merge"),
         "interval.subtract.v1" => language.text("BED 区间扣除", "BED interval subtraction"),
+        "interval.closest.v1" => language.text("BED 最近区间", "BED nearest interval"),
         "variant.stats.v1" => language.text("变异统计", "Variant statistics"),
         "variant.filter.v1" => language.text("VCF 基础过滤", "Basic VCF filtering"),
         "variant.normalize.v1" => {
             language.text("VCF 参考规范化", "Reference-guided VCF normalization")
         }
         "alignment.qc.v1" => language.text("比对质量控制", "Alignment quality control"),
+        "alignment.bam-to-bigwig.v1" => language.text("BAM/CRAM 转 BigWig", "BAM/CRAM to BigWig"),
         "annotation.gxf.stats.v1" => language.text("注释统计", "Annotation statistics"),
         "annotation.gxf.normalize.v1" => language.text("注释规范化", "Annotation normalization"),
         "annotation.gene-position.v1" => language.text("基因位置表", "Gene position table"),
@@ -4177,6 +4507,11 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "annotation.structure.visualize.v1" => {
             language.text("注释结构图", "Annotation structure plot")
         }
+        "comparative.synteny.visualize.v1" => language.text("共线性锚点图", "Synteny anchor plot"),
+        "comparative.mcscanx.v1" => {
+            language.text("基因组共线性分析", "Genome collinearity analysis")
+        }
+        "comparative.kaks.v1" => language.text("Ka/Ks 计算", "Ka/Ks calculation"),
         "annotation.go.normalize.v1" => {
             language.text("GO 注释规范化", "GO annotation normalization")
         }
@@ -4188,13 +4523,35 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         }
         "enrichment.go.v1" => language.text("GO 富集分析", "GO enrichment analysis"),
         "enrichment.kegg.v1" => language.text("KEGG 富集分析", "KEGG enrichment analysis"),
+        "enrichment.gsea.v1" => language.text("预排序 GSEA", "Preranked GSEA"),
         "enrichment.visualize.v1" => language.text("富集结果绘图", "Enrichment visualization"),
         "genome.gene-density.v1" => language.text("基因组特征密度", "Genome feature density"),
         "expression.matrix.qc.v1" => language.text("表达矩阵", "Expression matrix"),
+        "expression.differential.v1" => {
+            language.text("批量 RNA-seq 差异表达", "Bulk differential expression")
+        }
+        "medical.bulk-rnaseq.v1" => {
+            language.text("批量 RNA-seq 科研分析", "Bulk RNA-seq research workflow")
+        }
+        "medical.cohort-table.qc.v1" => {
+            language.text("研究队列表质量控制", "Research cohort table QC")
+        }
+        "medical.pathway-ruo.v1" => {
+            language.text("研究队列通路分析", "Research cohort pathway analysis")
+        }
+        "medical.variant-cohort.v1" => {
+            language.text("研究队列变异汇总", "Research cohort variant aggregation")
+        }
+        "medical.single-cell-qc.v1" => {
+            language.text("单细胞计数矩阵质量控制", "Single-cell count matrix QC")
+        }
         "expression.normalize.v1" => language.text("表达矩阵标准化", "Expression normalization"),
         "expression.pca.v1" => language.text("表达矩阵 PCA", "Expression PCA"),
         "expression.cluster.v1" => language.text("表达矩阵聚类", "Expression clustering"),
         "expression.heatmap.v1" => language.text("聚类表达热图", "Clustered expression heatmap"),
+        "expression.volcano.v1" => {
+            language.text("差异表达火山图", "Differential expression volcano plot")
+        }
         "set.venn.v1" => language.text("2–6 集合 Venn 分析", "Two-to-six-set Venn analysis"),
         "set.upset.v1" => language.text("多集合 UpSet 分析", "Multi-set UpSet analysis"),
         "protein.properties.v1" => language.text("蛋白理化性质", "Protein properties"),
@@ -4690,6 +5047,9 @@ fn metric_label(key: &str, language: Language) -> &str {
         "read1_record_count" => "Read 1 记录数",
         "read2_record_count" => "Read 2 记录数",
         "duplicate_record_count" => "重复记录数",
+        "duplicate_read_count" => "重复读段数",
+        "strategy" => "策略",
+        "umi_length" => "UMI 长度",
         "qc_fail_record_count" => "QC 失败记录数",
         "zero_mapq_record_count" => "零 MAPQ 记录数",
         "mean_mapq" => "平均 MAPQ",
@@ -4765,6 +5125,10 @@ fn metric_label(key: &str, language: Language) -> &str {
         "dropped_columns" => "删除列",
         "left_interval_count" => "左侧区间数",
         "right_interval_count" => "右侧区间数",
+        "query_interval_count" => "查询区间数",
+        "target_interval_count" => "目标区间数",
+        "matched_query_count" => "已匹配查询数",
+        "unmatched_query_count" => "未匹配查询数",
         "input_interval_count" => "输入区间数",
         "output_interval_count" => "输出区间数",
         "merged_interval_count" => "被合并区间数",
@@ -4779,6 +5143,14 @@ fn metric_label(key: &str, language: Language) -> &str {
         "left_overlapped_count" => "左侧已重叠区间数",
         "right_overlapped_count" => "右侧已重叠区间数",
         "total_overlap_bases" => "累计重叠碱基数",
+        "ranked_gene_count" => "排序基因数",
+        "input_gene_set_count" => "输入基因集数",
+        "tested_gene_set_count" => "检验基因集数",
+        "permutation_count" => "置换次数",
+        "nominal_p_value" => "名义 p 值",
+        "fdr_bh" => "BH FDR",
+        "enrichment_score" => "富集分数",
+        "leading_edge_genes" => "Leading edge 基因",
         "contigs" => "各区域统计",
         "model_count" => "模型数",
         "chain_count" => "链数",
@@ -4860,7 +5232,9 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "fastq.qc.v1" => language.text("FASTQ 质量控制", "FASTQ quality control"),
         "fastq.trim.v1" => language.text("FASTQ 质量裁剪", "FASTQ quality trimming"),
         "fastq.adapter.v1" => language.text("FASTQ 接头去除", "FASTQ adapter removal"),
+        "fastq.deduplicate.v1" => language.text("FASTQ 精确去重", "FASTQ exact deduplication"),
         "alignment.qc.v1" => language.text("SAM 比对质量控制", "SAM alignment quality control"),
+        "alignment.bam-to-bigwig.v1" => language.text("BAM/CRAM 转 BigWig", "BAM/CRAM to BigWig"),
         "annotation.gxf.stats.v1" => {
             language.text("GFF/GTF 注释统计", "GFF/GTF annotation statistics")
         }
@@ -4874,6 +5248,13 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         "annotation.structure.visualize.v1" => {
             language.text("注释结构可视化", "Annotation structure visualization")
         }
+        "comparative.synteny.visualize.v1" => {
+            language.text("共线性锚点可视化", "Synteny anchor visualization")
+        }
+        "comparative.mcscanx.v1" => {
+            language.text("基因组共线性分析", "Genome collinearity analysis")
+        }
+        "comparative.kaks.v1" => language.text("Ka/Ks 计算", "Ka/Ks calculation"),
         "annotation.go.normalize.v1" => {
             language.text("GO 注释规范化", "GO annotation normalization")
         }
@@ -4885,13 +5266,27 @@ fn document_title(capability: &str, language: Language) -> &'static str {
         }
         "enrichment.go.v1" => language.text("GO 富集分析", "GO enrichment analysis"),
         "enrichment.kegg.v1" => language.text("KEGG 富集分析", "KEGG enrichment analysis"),
+        "enrichment.gsea.v1" => language.text("预排序 GSEA", "Preranked GSEA"),
         "enrichment.visualize.v1" => language.text("富集结果可视化", "Enrichment visualization"),
         "genome.gene-density.v1" => language.text("基因组特征密度", "Genome feature density"),
         "interval.intersect.v1" => language.text("BED 区间相交", "BED interval intersection"),
         "interval.merge.v1" => language.text("BED 区间合并", "BED interval merge"),
         "interval.subtract.v1" => language.text("BED 区间扣除", "BED interval subtraction"),
+        "interval.closest.v1" => language.text("BED 最近区间", "BED nearest interval"),
         "expression.matrix.qc.v1" => {
             language.text("表达矩阵质量控制", "Expression matrix quality control")
+        }
+        "medical.cohort-table.qc.v1" => {
+            language.text("研究队列表质量控制", "Research cohort table QC")
+        }
+        "medical.pathway-ruo.v1" => {
+            language.text("研究队列通路分析", "Research cohort pathway analysis")
+        }
+        "medical.variant-cohort.v1" => {
+            language.text("研究队列变异汇总", "Research cohort variant aggregation")
+        }
+        "medical.single-cell-qc.v1" => {
+            language.text("单细胞计数矩阵质量控制", "Single-cell count matrix QC")
         }
         "expression.normalize.v1" => language.text("表达矩阵标准化", "Expression normalization"),
         "expression.pca.v1" => language.text("表达矩阵 PCA", "Expression PCA"),
@@ -5004,11 +5399,23 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         ("fastq.adapter.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/fastq.adapter.v1/en-US.md"
         )),
+        ("fastq.deduplicate.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/fastq.deduplicate.v1/zh-CN.md"
+        )),
+        ("fastq.deduplicate.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/fastq.deduplicate.v1/en-US.md"
+        )),
         ("alignment.qc.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/alignment.qc.v1/zh-CN.md"
         )),
         ("alignment.qc.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/alignment.qc.v1/en-US.md"
+        )),
+        ("alignment.bam-to-bigwig.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/alignment.bam-to-bigwig.v1/zh-CN.md"
+        )),
+        ("alignment.bam-to-bigwig.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/alignment.bam-to-bigwig.v1/en-US.md"
         )),
         ("annotation.gxf.stats.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/annotation.gxf.stats.v1/zh-CN.md"
@@ -5040,6 +5447,24 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         ("annotation.structure.visualize.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/annotation.structure.visualize.v1/en-US.md"
         )),
+        ("comparative.synteny.visualize.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/comparative.synteny.visualize.v1/zh-CN.md"
+        )),
+        ("comparative.synteny.visualize.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/comparative.synteny.visualize.v1/en-US.md"
+        )),
+        ("comparative.mcscanx.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/comparative.mcscanx.v1/zh-CN.md"
+        )),
+        ("comparative.mcscanx.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/comparative.mcscanx.v1/en-US.md"
+        )),
+        ("comparative.kaks.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/comparative.kaks.v1/zh-CN.md"
+        )),
+        ("comparative.kaks.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/comparative.kaks.v1/en-US.md"
+        )),
         ("annotation.go.normalize.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/annotation.go.normalize.v1/zh-CN.md"
         )),
@@ -5069,6 +5494,12 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("enrichment.kegg.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/enrichment.kegg.v1/en-US.md"
+        )),
+        ("enrichment.gsea.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/enrichment.gsea.v1/zh-CN.md"
+        )),
+        ("enrichment.gsea.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/enrichment.gsea.v1/en-US.md"
         )),
         ("enrichment.visualize.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/enrichment.visualize.v1/zh-CN.md"
@@ -5100,11 +5531,53 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         ("interval.subtract.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/interval.subtract.v1/en-US.md"
         )),
+        ("interval.closest.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/interval.closest.v1/zh-CN.md"
+        )),
+        ("interval.closest.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/interval.closest.v1/en-US.md"
+        )),
         ("expression.matrix.qc.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/expression.matrix.qc.v1/zh-CN.md"
         )),
         ("expression.matrix.qc.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/expression.matrix.qc.v1/en-US.md"
+        )),
+        ("expression.differential.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/expression.differential.v1/zh-CN.md"
+        )),
+        ("expression.differential.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/expression.differential.v1/en-US.md"
+        )),
+        ("medical.bulk-rnaseq.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/medical.bulk-rnaseq.v1/zh-CN.md"
+        )),
+        ("medical.bulk-rnaseq.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/medical.bulk-rnaseq.v1/en-US.md"
+        )),
+        ("medical.cohort-table.qc.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/medical.cohort-table.qc.v1/zh-CN.md"
+        )),
+        ("medical.cohort-table.qc.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/medical.cohort-table.qc.v1/en-US.md"
+        )),
+        ("medical.pathway-ruo.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/medical.pathway-ruo.v1/zh-CN.md"
+        )),
+        ("medical.pathway-ruo.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/medical.pathway-ruo.v1/en-US.md"
+        )),
+        ("medical.variant-cohort.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/medical.variant-cohort.v1/zh-CN.md"
+        )),
+        ("medical.variant-cohort.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/medical.variant-cohort.v1/en-US.md"
+        )),
+        ("medical.single-cell-qc.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/medical.single-cell-qc.v1/zh-CN.md"
+        )),
+        ("medical.single-cell-qc.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/medical.single-cell-qc.v1/en-US.md"
         )),
         ("expression.normalize.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/expression.normalize.v1/zh-CN.md"
@@ -5129,6 +5602,18 @@ fn capability_document(capability: &str, language: Language) -> Option<&'static 
         )),
         ("expression.heatmap.v1", Language::EnUs) => Some(include_str!(
             "../../../docs/capabilities/expression.heatmap.v1/en-US.md"
+        )),
+        ("expression.volcano.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/expression.volcano.v1/zh-CN.md"
+        )),
+        ("expression.volcano.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/expression.volcano.v1/en-US.md"
+        )),
+        ("motif.visualize.v1", Language::ZhCn) => Some(include_str!(
+            "../../../docs/capabilities/motif.visualize.v1/zh-CN.md"
+        )),
+        ("motif.visualize.v1", Language::EnUs) => Some(include_str!(
+            "../../../docs/capabilities/motif.visualize.v1/en-US.md"
         )),
         ("set.venn.v1", Language::ZhCn) => Some(include_str!(
             "../../../docs/capabilities/set.venn.v1/zh-CN.md"
@@ -5725,8 +6210,8 @@ mod tests {
         analysis_export_basename, analysis_result_matches, analysis_route_for_capability,
         analysis_route_for_format, build_analysis_request, capability_document,
         capability_output_extension, capability_requires_secondary, derived_analysis_output_path,
-        generation_matches, importable_file_path, inspection_is_runnable, inspection_state,
-        load_dependency_notices_from, looks_like_drive_relative_path, new_job_id,
+        format_hint, generation_matches, importable_file_path, inspection_is_runnable,
+        inspection_state, load_dependency_notices_from, looks_like_drive_relative_path, new_job_id,
         notice_platform_target_pair_is_valid, render_dependency_notice_report,
         secondary_input_matches, secondary_input_role,
     };
@@ -5873,6 +6358,91 @@ mod tests {
     }
 
     #[test]
+    fn comparative_native_routes_enforce_formats_and_roles() {
+        assert_eq!(
+            analysis_route_for_format("axt"),
+            Some(AnalysisRoute {
+                capability: "comparative.kaks.v1",
+                input_role: "codon-alignment",
+            })
+        );
+        assert_eq!(
+            analysis_route_for_capability("comparative.mcscanx.v1", "tsv"),
+            Some(AnalysisRoute {
+                capability: "comparative.mcscanx.v1",
+                input_role: "gene-positions",
+            })
+        );
+        assert!(analysis_route_for_capability("comparative.mcscanx.v1", "gff3").is_none());
+        assert!(capability_requires_secondary("comparative.mcscanx.v1"));
+        assert!(secondary_input_matches(
+            "comparative.mcscanx.v1",
+            "blast-tabular"
+        ));
+        assert!(!secondary_input_matches(
+            "comparative.mcscanx.v1",
+            "blast-xml"
+        ));
+        assert_eq!(
+            secondary_input_role("comparative.mcscanx.v1"),
+            Some("similarity-hits")
+        );
+        assert_eq!(
+            capability_output_extension("comparative.mcscanx.v1"),
+            Some("collinearity")
+        );
+
+        assert_eq!(
+            analysis_route_for_capability("comparative.kaks.v1", "axt"),
+            Some(AnalysisRoute {
+                capability: "comparative.kaks.v1",
+                input_role: "codon-alignment",
+            })
+        );
+        assert!(analysis_route_for_capability("comparative.kaks.v1", "fasta").is_none());
+        assert!(!capability_requires_secondary("comparative.kaks.v1"));
+        assert_eq!(
+            capability_output_extension("comparative.kaks.v1"),
+            Some("tsv")
+        );
+    }
+
+    #[test]
+    fn comparative_file_extensions_have_specific_format_hints() {
+        assert_eq!(format_hint(&PathBuf::from("pairs.axt")), "axt");
+        assert_eq!(
+            format_hint(&PathBuf::from("blocks.collinearity")),
+            "mcscanx-collinearity"
+        );
+    }
+
+    #[test]
+    fn differential_expression_routes_require_sample_metadata() {
+        for capability in ["expression.differential.v1", "medical.bulk-rnaseq.v1"] {
+            assert_eq!(
+                analysis_route_for_capability(capability, "csv"),
+                Some(AnalysisRoute {
+                    capability,
+                    input_role: "counts",
+                })
+            );
+            assert_eq!(
+                analysis_route_for_capability(capability, "tsv"),
+                Some(AnalysisRoute {
+                    capability,
+                    input_role: "counts",
+                })
+            );
+            assert!(capability_requires_secondary(capability));
+            assert!(secondary_input_matches(capability, "csv"));
+            assert!(secondary_input_matches(capability, "tsv"));
+            assert!(!secondary_input_matches(capability, "fasta"));
+            assert_eq!(secondary_input_role(capability), Some("sample_metadata"));
+            assert_eq!(capability_output_extension(capability), None);
+        }
+    }
+
+    #[test]
     fn similarity_domain_density_and_tree_routes_enforce_their_contracts() {
         assert_eq!(
             analysis_route_for_capability("similarity.blast.parse.v1", "blast-xml"),
@@ -5991,6 +6561,20 @@ mod tests {
             assert!(!capability_requires_secondary(capability));
             assert_eq!(capability_output_extension(capability), Some(extension));
         }
+
+        for format in ["bam", "cram"] {
+            assert_eq!(
+                analysis_route_for_capability("alignment.bam-to-bigwig.v1", format),
+                Some(AnalysisRoute {
+                    capability: "alignment.bam-to-bigwig.v1",
+                    input_role: "alignment",
+                })
+            );
+        }
+        assert_eq!(
+            capability_output_extension("alignment.bam-to-bigwig.v1"),
+            Some("bw")
+        );
 
         for format in ["pdb", "mmcif"] {
             assert_eq!(
@@ -6165,6 +6749,13 @@ mod tests {
                 input_role: "genes",
             })
         );
+        assert_eq!(
+            analysis_route_for_capability("comparative.synteny.visualize.v1", "tsv"),
+            Some(AnalysisRoute {
+                capability: "comparative.synteny.visualize.v1",
+                input_role: "anchors",
+            })
+        );
         assert!(capability_requires_secondary("enrichment.visualize.v1"));
         assert_eq!(
             secondary_input_role("enrichment.visualize.v1"),
@@ -6172,6 +6763,7 @@ mod tests {
         );
         for capability in [
             "annotation.structure.visualize.v1",
+            "comparative.synteny.visualize.v1",
             "enrichment.visualize.v1",
             "protein.domain.visualize.v1",
         ] {

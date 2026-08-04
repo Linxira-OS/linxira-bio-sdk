@@ -4,6 +4,7 @@
 
 pub mod alignment;
 pub mod annotation;
+pub mod cohort;
 pub mod coordinate;
 pub mod dataset;
 pub mod domain;

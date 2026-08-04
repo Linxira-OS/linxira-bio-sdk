@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::error::Error;
+use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -205,6 +206,7 @@ struct ToolDefinition {
     id: String,
     display_name: String,
     category: String,
+    executable_env: Option<String>,
     #[serde(default)]
     status: ToolStatus,
     #[serde(default)]
@@ -741,6 +743,20 @@ fn probe_tool(
     platform: &PlatformInfo,
     wsl_distributions: Option<&str>,
 ) -> ToolCheck {
+    probe_tool_with_env_lookup(definition, platform, wsl_distributions, &|variable| {
+        env::var_os(variable)
+    })
+}
+
+fn probe_tool_with_env_lookup<F>(
+    definition: &ToolDefinition,
+    platform: &PlatformInfo,
+    wsl_distributions: Option<&str>,
+    env_lookup: &F,
+) -> ToolCheck
+where
+    F: Fn(&str) -> Option<OsString> + ?Sized,
+{
     if definition.id.starts_with("wsl-") {
         return probe_wsl_provider(definition, wsl_distributions);
     }
@@ -748,20 +764,15 @@ fn probe_tool(
         return unavailable_tool(definition);
     }
     for probe in &definition.probes {
-        for (program, discovered_outside_path) in program_candidates(definition, probe, platform) {
+        for (program, discovered_outside_path) in
+            program_candidates_with_env(definition, probe, platform, env_lookup)
+        {
             let Ok(output) = Command::new(&program).args(&probe.args).output() else {
                 continue;
             };
-            if !output.status.success() {
-                continue;
-            }
             let stdout = decode_output(&output.stdout);
             let stderr = decode_output(&output.stderr);
-            if let Some(required) = &probe.output_contains
-                && !format!("{stdout}\n{stderr}")
-                    .to_lowercase()
-                    .contains(&required.to_lowercase())
-            {
+            if !probe_output_is_acceptable(output.status.success(), probe, &stdout, &stderr) {
                 continue;
             }
             let version = probe
@@ -786,6 +797,20 @@ fn probe_tool(
     }
 
     unavailable_tool(definition)
+}
+
+fn probe_output_is_acceptable(
+    status_success: bool,
+    probe: &ToolProbe,
+    stdout: &str,
+    stderr: &str,
+) -> bool {
+    let Some(required) = &probe.output_contains else {
+        return status_success;
+    };
+    format!("{stdout}\n{stderr}")
+        .to_lowercase()
+        .contains(&required.to_lowercase())
 }
 
 fn probe_wsl_distributions() -> Option<String> {
@@ -878,11 +903,21 @@ fn resolve_install_spec<'a>(
     (platform_install, None)
 }
 
-fn program_candidates(
+fn program_candidates_with_env<F>(
     definition: &ToolDefinition,
     probe: &ToolProbe,
     platform: &PlatformInfo,
-) -> Vec<(PathBuf, bool)> {
+    env_lookup: &F,
+) -> Vec<(PathBuf, bool)>
+where
+    F: Fn(&str) -> Option<OsString> + ?Sized,
+{
+    if let Some(variable) = definition.executable_env.as_deref()
+        && let Some(program) = env_lookup(variable)
+    {
+        return vec![(PathBuf::from(program), true)];
+    }
+
     let mut candidates = vec![(PathBuf::from(&probe.program), false)];
     if platform.family != "windows" {
         return candidates;
@@ -1093,9 +1128,14 @@ mod tests {
         ExecutionBackendAudit, PlanActionState, PlatformInfo, ToolCheck, apply_github_proxy,
         conda_channel_order_valid, decode_output, first_matching_output_line, load_catalog,
         parse_environment_mode, plan_environment, plan_environment_with_options,
-        probe_wsl_provider, summarize_execution_backends,
+        probe_output_is_acceptable, probe_tool_with_env_lookup, probe_wsl_provider,
+        program_candidates_with_env, summarize_execution_backends,
     };
-    use std::{collections::BTreeSet, path::PathBuf};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        ffi::OsString,
+        path::PathBuf,
+    };
 
     #[test]
     fn catalog_profiles_reference_registered_tools() {
@@ -1120,6 +1160,109 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn comparative_genomics_tools_are_registered_without_install_claims() {
+        let catalog = load_catalog().expect("valid embedded catalog");
+        let profile = catalog
+            .profiles
+            .iter()
+            .find(|profile| profile.id == "comparative-genomics")
+            .expect("comparative genomics profile");
+        assert_eq!(profile.tools, ["mcscanx", "kaks-calculator"]);
+
+        let full_local = catalog
+            .profiles
+            .iter()
+            .find(|profile| profile.id == "full-local")
+            .expect("full local profile");
+        for tool_id in &profile.tools {
+            assert!(full_local.tools.contains(tool_id));
+        }
+
+        for (tool_id, executable_env) in [
+            ("mcscanx", "LINXIRA_BIO_MCSCANX"),
+            ("kaks-calculator", "LINXIRA_BIO_KAKS_CALCULATOR"),
+        ] {
+            let definition = catalog
+                .tools
+                .iter()
+                .find(|tool| tool.id == tool_id)
+                .expect("comparative genomics tool");
+            assert_eq!(definition.executable_env.as_deref(), Some(executable_env));
+            assert!(definition.install.is_empty());
+        }
+    }
+
+    #[test]
+    fn executable_environment_override_is_probed_before_path() {
+        let definition = super::ToolDefinition {
+            id: "configured-test-tool".to_owned(),
+            display_name: "Configured test tool".to_owned(),
+            category: "test".to_owned(),
+            executable_env: Some("LINXIRA_BIO_TEST_EXECUTABLE".to_owned()),
+            status: super::ToolStatus::Active,
+            platforms: Vec::new(),
+            probes: vec![super::ToolProbe {
+                program: "missing-test-tool".to_owned(),
+                args: vec!["--help".to_owned()],
+                output_contains: Some("Usage".to_owned()),
+            }],
+            install: BTreeMap::new(),
+        };
+        let platform = PlatformInfo {
+            os: std::env::consts::OS.to_owned(),
+            family: std::env::consts::OS.to_owned(),
+            arch: std::env::consts::ARCH.to_owned(),
+            supported: true,
+        };
+        let configured = std::env::current_exe().expect("current test executable");
+        let check = probe_tool_with_env_lookup(&definition, &platform, None, &|variable| {
+            (variable == "LINXIRA_BIO_TEST_EXECUTABLE").then(|| configured.clone().into_os_string())
+        });
+
+        assert!(check.available);
+        assert_eq!(
+            check.command.as_deref(),
+            Some(configured.to_string_lossy().as_ref())
+        );
+        assert!(check.discovered_outside_path);
+
+        let fallback =
+            program_candidates_with_env(&definition, &definition.probes[0], &platform, &|_| {
+                None::<OsString>
+            });
+        assert_eq!(fallback[0], (PathBuf::from("missing-test-tool"), false));
+    }
+
+    #[test]
+    fn a_matching_help_signature_can_validate_a_nonzero_probe() {
+        let signed_probe = super::ToolProbe {
+            program: "scientific-tool".to_owned(),
+            args: Vec::new(),
+            output_contains: Some("Usage: scientific-tool".to_owned()),
+        };
+        assert!(probe_output_is_acceptable(
+            false,
+            &signed_probe,
+            "",
+            "Usage: scientific-tool input"
+        ));
+        assert!(!probe_output_is_acceptable(
+            false,
+            &signed_probe,
+            "unrelated failure",
+            ""
+        ));
+
+        let unsigned_probe = super::ToolProbe {
+            program: "scientific-tool".to_owned(),
+            args: Vec::new(),
+            output_contains: None,
+        };
+        assert!(!probe_output_is_acceptable(false, &unsigned_probe, "", ""));
+        assert!(probe_output_is_acceptable(true, &unsigned_probe, "", ""));
     }
 
     #[test]

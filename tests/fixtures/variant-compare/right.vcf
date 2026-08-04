@@ -1,0 +1,7 @@
+##fileformat=VCFv4.2
+##source=linxira-variant-compare-fixture
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr3	7	.	T	<DEL>	50	PASS	END=9
+chr1	11	.	C	T	50	PASS	.
+chr1	6	.	C	G	50	PASS	.
+chr2	20	.	A	C	50	PASS	.

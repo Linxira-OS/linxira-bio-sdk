@@ -1,0 +1,29 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-fastq-deduplicate-v2",
+  "capability": "fastq.deduplicate.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-fastq",
+      "role": "fastq",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-fastq-1",
+          "path": "../fastq-transform/duplicates.fastq",
+          "format": "fastq",
+          "compression": "none",
+          "size_bytes": 71,
+          "sha256": "dd2b7776f43eee2b12d2050b25874fee5e47c2eaa9e769ea477c7eb5bb99dbdc"
+        }
+      ]
+    }
+  ],
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "output": "../../../target/test-results/fastq-deduplicate-v2.fastq",
+    "header_umi_delimiter": ":"
+  }
+}

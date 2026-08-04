@@ -1,0 +1,35 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-variant-compare-v2",
+  "capability": "variant.compare.v1",
+  "inputs": [
+    {
+      "artifact_id": "left-vcf",
+      "role": "left-vcf",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "left-vcf-1",
+        "path": "../variant-compare/left.vcf",
+        "format": "vcf",
+        "compression": "none",
+        "size_bytes": 238,
+        "sha256": "98ca9b4640d582f42d23c906ae32151417a74b3d592afdef7db13daf4edce416"
+      }]
+    },
+    {
+      "artifact_id": "right-vcf",
+      "role": "right-vcf",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "right-vcf-1",
+        "path": "../variant-compare/right.vcf",
+        "format": "vcf",
+        "compression": "none",
+        "size_bytes": 203,
+        "sha256": "6893c0c877300fc8c38660a249cbdb5d76632ae04caecdcdc9897c565a447688"
+      }]
+    }
+  ],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {}
+}

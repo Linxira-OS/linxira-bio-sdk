@@ -27,6 +27,11 @@
       "tools": ["ncbi-blast", "diamond", "hmmer"]
     },
     {
+      "id": "comparative-genomics",
+      "description": "Local genome collinearity and codon substitution-rate analysis",
+      "tools": ["mcscanx", "kaks-calculator"]
+    },
+    {
       "id": "multiple-sequence-alignment",
       "description": "Local multiple sequence alignment",
       "tools": ["muscle", "trimal"]
@@ -65,6 +70,8 @@
         "ncbi-blast",
         "diamond",
         "hmmer",
+        "mcscanx",
+        "kaks-calculator",
         "muscle",
         "trimal",
         "iqtree",
@@ -371,6 +378,26 @@
           "requires_admin": true
         }
       }
+    },
+    {
+      "id": "mcscanx",
+      "display_name": "MCScanX",
+      "category": "comparative-genomics",
+      "executable_env": "LINXIRA_BIO_MCSCANX",
+      "probes": [
+        { "program": "MCScanX", "args": [], "output_contains": "Usage" }
+      ],
+      "install": {}
+    },
+    {
+      "id": "kaks-calculator",
+      "display_name": "KaKs Calculator",
+      "category": "comparative-genomics",
+      "executable_env": "LINXIRA_BIO_KAKS_CALCULATOR",
+      "probes": [
+        { "program": "KaKs_Calculator", "args": ["-h"], "output_contains": "KaKs" }
+      ],
+      "install": {}
     },
     {
       "id": "muscle",

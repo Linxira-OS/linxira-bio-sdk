@@ -1,0 +1,5 @@
+participant_id	age	group	biomarker
+p001	30	control	1.2
+p002	NA	case	2.7
+p003	42	case	.
+p003	42	case	.

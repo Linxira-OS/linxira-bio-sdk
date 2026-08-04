@@ -1,6 +1,6 @@
 ---
 name: analyze-variant-statistics
-description: Run deterministic local Linxira Bio VCF statistics, basic filtering, and reference-guided biallelic small-variant normalization. Use for VCF summaries, QUAL/FILTER/contig/INFO-DP filtering, REF validation, minimal representation, and repeat-aware left alignment.
+description: Run deterministic local Linxira Bio VCF statistics, filtering, reference-guided small-variant normalization, and allele-set comparison. Use for VCF summaries, QUAL/FILTER/contig/INFO-DP filtering, REF validation, minimal representation, repeat-aware left alignment, and shared or file-specific variant alleles.
 ---
 
 # Analyze Variant Statistics
@@ -20,6 +20,7 @@ interpret or annotate variants.
 linxira-bio variant stats INPUT.vcf --json
 linxira-bio variant filter INPUT.vcf OUTPUT.vcf --min-qual 20 --pass-only --min-info-dp 10 --json
 linxira-bio variant normalize INPUT.vcf REFERENCE.fa OUTPUT.vcf --json
+linxira-bio variant compare LEFT.vcf RIGHT.vcf --json
 ```
 
 When developing in the source repository, run:
@@ -46,10 +47,14 @@ cargo run -p linxira-bio-cli -- variant stats INPUT.vcf --json
   `GT` FORMAT field are excluded from the missingness denominator.
 - `contig_counts` reflect CHROM strings and do not validate reference identity
   or contig lengths.
+- `variant.compare.v1` splits multiallelic ALT lists, collapses duplicates, and
+  compares uppercase minimal allele representations with exact CHROM and
+  symbolic-ALT text. It does not compare sample genotypes.
 
 This summary does not establish call quality, pathogenicity, population
-frequency, sample identity, or clinical meaning. Compare cohorts only after
-normalization, reference-build checks, and equivalent filtering.
+frequency, sample identity, genotype concordance, or clinical meaning. Compare
+cohorts only after reference-build checks, equivalent filtering, and
+reference-guided normalization when repeat-aware indel equivalence matters.
 
 ## Filter And Normalize Safely
 

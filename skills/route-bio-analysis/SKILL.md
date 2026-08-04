@@ -38,7 +38,8 @@ a replacement script silently.
   conversion.
   Use the same sequence skill for exact k-mer counting and exact-match ePCR.
 - BED interval operations: use `intersect-genomic-intervals` for overlap
-  summaries, BED3 merge, and BED3 subtraction.
+  summaries, BED3 merge, BED3 subtraction, and deterministic nearest-feature
+  lookup.
 - GFF3/GTF annotation statistics, GTF-to-GFF3 normalization, feature position
   tables, gene-density profiles, and reference-guided
   gene/transcript/CDS/exon/UTR/promoter extraction: use
@@ -48,15 +49,18 @@ a replacement script silently.
   and advanced mapping reports still require a maintained native workflow.
 - VCF, BCF, variants, genotypes, and normalization: use
   `analyze-variant-statistics` for supported VCF summaries, basic filters, and
-  reference-guided biallelic small-variant normalization. BCF remains
-  recognized but unsupported.
+  reference-guided biallelic small-variant normalization, plus deterministic
+  two-file allele-set comparison. BCF remains recognized but unsupported.
 - Rectangular CSV/TSV expression matrix QC, CPM/log2-CPM/median-ratio
   normalization, PCA, deterministic sample/feature clustering, and native
   clustered heatmaps: use `analyze-expression-matrix`. Use
   `manipulate-bio-tables` for local CSV/TSV row filtering, column selection,
   column dropping, row skipping, row limiting, and delimiter conversion.
-  Differential expression, sparse containers, complete RNA-seq workflows, and
-  single-cell analysis remain external or planned.
+  For raw integer counts plus two-condition sample metadata, use
+  `analyze-differential-expression`. Sparse containers and complete upstream
+  RNA-seq processing remain external or planned.
+- Ordered gene positions plus similarity hits, codon-aligned AXT pairs, and
+  synteny anchor visualization: use `analyze-comparative-genomics`.
 - Biological identifier-set CSV/TSV tables: use `analyze-set-overlaps` for
   exact 2–6-set Venn regions or ranked 2–64-set UpSet intersections. Do not
   infer enrichment or significance from overlap counts alone.
@@ -72,8 +76,9 @@ a replacement script silently.
   remain external native workflows.
 - GO columns, standard eggNOG-mapper annotation tables, gene-to-term mappings,
   and custom/GO/KEGG over-representation analysis: use
-  `analyze-functional-enrichment`. The association table defines the tested
-  background universe; preserve its source and version.
+  `analyze-functional-enrichment`. Use the same skill for preranked GSEA. The
+  association table defines the ORA background universe; preserve its source
+  and version.
 - Newick normalization, label mapping, summaries, and single-leaf rerooting:
   use `transform-phylogenetic-trees`. Tree inference and publication rendering
   remain external or planned.

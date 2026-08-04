@@ -30,6 +30,10 @@ pub struct VcfStats {
     pub ti_tv_ratio: Option<f64>,
     pub missing_genotype_count: u64,
     pub called_genotype_count: u64,
+    /// Called genotypes containing one or more alternate alleles.
+    pub carrier_genotype_count: u64,
+    /// Alternate allele copies across called genotypes.
+    pub alternate_allele_count: u64,
     pub missing_genotype_rate: Option<f64>,
     pub contig_counts: BTreeMap<String, u64>,
     pub warnings: Vec<String>,
@@ -343,7 +347,7 @@ fn parse_record(
     }
 
     let alternate_alleles = parse_alternate_alleles(columns[4], line_number)?;
-    let (missing_genotypes, called_genotypes) =
+    let (missing_genotypes, called_genotypes, carrier_genotypes, alternate_alleles_called) =
         genotype_counts(&columns, &alternate_alleles, header, line_number)?;
 
     stats.record_count += 1;
@@ -378,6 +382,8 @@ fn parse_record(
 
     stats.missing_genotype_count += missing_genotypes;
     stats.called_genotype_count += called_genotypes;
+    stats.carrier_genotype_count += carrier_genotypes;
+    stats.alternate_allele_count += alternate_alleles_called;
     *stats
         .contig_counts
         .entry(columns[0].to_owned())
@@ -409,9 +415,9 @@ fn genotype_counts(
     alternate_alleles: &[&str],
     header: VcfHeader,
     line_number: usize,
-) -> Result<(u64, u64), VcfError> {
+) -> Result<(u64, u64, u64, u64), VcfError> {
     if header.sample_count == 0 {
-        return Ok((0, 0));
+        return Ok((0, 0, 0, 0));
     }
 
     let format_fields: Vec<&str> = columns[8].split(':').collect();
@@ -429,7 +435,7 @@ fn genotype_counts(
     }
 
     let Some(gt_index) = format_fields.iter().position(|field| *field == "GT") else {
-        return Ok((0, 0));
+        return Ok((0, 0, 0, 0));
     };
     if gt_index != 0 {
         return malformed(
@@ -440,6 +446,8 @@ fn genotype_counts(
 
     let mut missing = 0_u64;
     let mut called = 0_u64;
+    let mut carriers = 0_u64;
+    let mut alternate_alleles_called = 0_u64;
     for (sample_index, sample) in columns[9..].iter().enumerate() {
         if sample.is_empty() {
             return malformed(
@@ -458,25 +466,32 @@ fn genotype_counts(
             );
         }
         let genotype = values.get(gt_index).copied().unwrap_or(".");
-        if genotype_is_missing(genotype, alternate_alleles.len(), line_number)? {
+        let (is_missing, alternate_allele_count) =
+            genotype_summary(genotype, alternate_alleles.len(), line_number)?;
+        if is_missing {
             missing += 1;
         } else {
             called += 1;
+            alternate_alleles_called += alternate_allele_count;
+            if alternate_allele_count != 0 {
+                carriers += 1;
+            }
         }
     }
-    Ok((missing, called))
+    Ok((missing, called, carriers, alternate_alleles_called))
 }
 
-fn genotype_is_missing(
+fn genotype_summary(
     genotype: &str,
     alternate_count: usize,
     line_number: usize,
-) -> Result<bool, VcfError> {
+) -> Result<(bool, u64), VcfError> {
     if genotype.is_empty() {
         return malformed(line_number, "GT value is empty");
     }
 
     let mut missing = false;
+    let mut alternate_allele_count = 0_u64;
     for allele in genotype.split(['/', '|']) {
         if allele.is_empty() {
             return malformed(line_number, format!("invalid GT value {genotype:?}"));
@@ -500,8 +515,11 @@ fn genotype_is_missing(
                 ),
             );
         }
+        if index != 0 {
+            alternate_allele_count += 1;
+        }
     }
-    Ok(missing)
+    Ok((missing, alternate_allele_count))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -593,6 +611,8 @@ mod tests {
         assert_eq!(stats.ti_tv_ratio, Some(1.0));
         assert_eq!(stats.missing_genotype_count, 3);
         assert_eq!(stats.called_genotype_count, 11);
+        assert_eq!(stats.carrier_genotype_count, 8);
+        assert_eq!(stats.alternate_allele_count, 10);
         assert_eq!(stats.missing_genotype_rate, Some(3.0 / 14.0));
         assert_eq!(stats.contig_counts["chr1"], 2);
         assert_eq!(stats.contig_counts["chr2"], 2);
