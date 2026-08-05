@@ -1,8 +1,11 @@
+use crate::scientific_visualization::{
+    SvgVisualizationResult, VisualizationError, write_new_output,
+};
 use flate2::read::MultiGzDecoder;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Formatter, Write as _};
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
@@ -841,6 +844,217 @@ pub fn distance_matrix_path(
         distances,
         warnings,
     })
+}
+
+#[derive(Debug, Clone)]
+pub struct TreeVisualizationOptions {
+    pub width: u32,
+    pub height: u32,
+    pub font_size: u32,
+    pub show_branch_lengths: bool,
+    pub style: TreeVisualizationStyle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TreeVisualizationStyle {
+    Rectangular,
+}
+
+impl Default for TreeVisualizationOptions {
+    fn default() -> Self {
+        Self {
+            width: 800,
+            height: 600,
+            font_size: 14,
+            show_branch_lengths: true,
+            style: TreeVisualizationStyle::Rectangular,
+        }
+    }
+}
+
+pub fn render_tree_svg_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &TreeVisualizationOptions,
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    if options.width < 200 || options.width > 4096 {
+        return Err(VisualizationError::InvalidOption(format!(
+            "width must be between 200 and 4096, got {}",
+            options.width
+        )));
+    }
+    if options.height < 200 || options.height > 4096 {
+        return Err(VisualizationError::InvalidOption(format!(
+            "height must be between 200 and 4096, got {}",
+            options.height
+        )));
+    }
+    if options.font_size < 6 || options.font_size > 48 {
+        return Err(VisualizationError::InvalidOption(format!(
+            "font_size must be between 6 and 48, got {}",
+            options.font_size
+        )));
+    }
+
+    let text = read_bounded_text(input.as_ref()).map_err(|error| {
+        VisualizationError::InvalidOption(format!("failed to read Newick: {error}"))
+    })?;
+    let mut parser = NewickParser::new(&text);
+    let tree = parser.parse().map_err(|error| {
+        VisualizationError::InvalidOption(format!("failed to parse Newick: {error}"))
+    })?;
+
+    let leaf_count = count_leaves(&tree);
+    if leaf_count < 2 {
+        return Err(VisualizationError::InvalidOption(
+            "tree must have at least 2 leaves for visualization".to_owned(),
+        ));
+    }
+
+    let margin = options.font_size * 2;
+    let label_width = 200_u32;
+    let tree_area_x = margin + label_width;
+    let tree_area_width = options.width.saturating_sub(margin * 2 + label_width);
+    let tree_area_height = options.height.saturating_sub(margin * 2);
+    let spacing = tree_area_height as f64 / (leaf_count as f64 + 1.0);
+
+    let max_depth = compute_max_depth(&tree);
+
+    let mut svg = String::new();
+    push_svg_header(&mut svg, options.width, options.height);
+
+    let mut leaf_index = 0_u64;
+    let ctx = RenderContext {
+        spacing,
+        area_x: tree_area_x as f64,
+        area_width: tree_area_width as f64,
+        max_depth,
+        options,
+    };
+    render_node_rectangular(&tree, 0.0, &mut leaf_index, &ctx, &mut svg);
+
+    svg.push_str("</svg>");
+
+    write_new_output(output.as_ref(), svg.as_bytes())?;
+
+    Ok(SvgVisualizationResult {
+        visualization_type: "phylogeny-tree".to_owned(),
+        output_path: output.as_ref().to_string_lossy().into_owned(),
+        width: options.width,
+        height: options.height,
+        track_count: 1,
+        glyph_count: leaf_count,
+        warnings: Vec::new(),
+    })
+}
+
+fn count_leaves(node: &TreeNode) -> u64 {
+    if node.children.is_empty() {
+        1
+    } else {
+        node.children.iter().map(count_leaves).sum()
+    }
+}
+
+fn compute_max_depth(node: &TreeNode) -> f64 {
+    if node.children.is_empty() {
+        node.length.unwrap_or(0.0)
+    } else {
+        let child_max = node
+            .children
+            .iter()
+            .map(compute_max_depth)
+            .fold(0.0_f64, f64::max);
+        node.length.unwrap_or(0.0) + child_max
+    }
+}
+
+fn render_node_rectangular(
+    node: &TreeNode,
+    x: f64,
+    leaf_index: &mut u64,
+    ctx: &RenderContext<'_>,
+    svg: &mut String,
+) -> f64 {
+    let y: f64;
+    if node.children.is_empty() {
+        *leaf_index += 1;
+        y = ctx.spacing * (*leaf_index as f64);
+        let label_x = ctx.area_x + ctx.area_width + 4.0;
+        let label_y = y + (ctx.options.font_size as f64) * 0.35;
+        if let Some(label) = &node.label {
+            push_text(svg, label_x, label_y, ctx.options.font_size, "#222", label);
+        }
+    } else {
+        let child_ys: Vec<f64> = node
+            .children
+            .iter()
+            .map(|child| {
+                let child_x = x + node.length.unwrap_or(0.0);
+                render_node_rectangular(child, child_x, leaf_index, ctx, svg)
+            })
+            .collect();
+        let min_y = child_ys.first().copied().unwrap_or(0.0);
+        let max_y = child_ys.last().copied().unwrap_or(0.0);
+        y = (min_y + max_y) / 2.0;
+
+        let effective_depth = if ctx.max_depth > 0.0 && ctx.options.show_branch_lengths {
+            ctx.max_depth
+        } else {
+            1.0
+        };
+        let px = ctx.area_x + ctx.area_width * (x / effective_depth);
+        let child_px =
+            ctx.area_x + ctx.area_width * ((x + node.length.unwrap_or(0.0)) / effective_depth);
+
+        push_line(svg, px, min_y, px, max_y, "#555", 1.5);
+        for &child_y in &child_ys {
+            push_line(svg, px, child_y, child_px, child_y, "#555", 1.5);
+        }
+    }
+    y
+}
+
+struct RenderContext<'a> {
+    spacing: f64,
+    area_x: f64,
+    area_width: f64,
+    max_depth: f64,
+    options: &'a TreeVisualizationOptions,
+}
+
+fn push_svg_header(svg: &mut String, width: u32, height: u32) {
+    let _ = write!(
+        svg,
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" \
+         width=\"{width}\" height=\"{height}\">\n\
+         <rect width=\"{width}\" height=\"{height}\" fill=\"#fff\"/>\n"
+    );
+}
+
+fn push_text(svg: &mut String, x: f64, y: f64, font_size: u32, fill: &str, text: &str) {
+    let escaped = escape_xml(text);
+    let _ = writeln!(
+        svg,
+        "<text x=\"{x:.1}\" y=\"{y:.1}\" font-family=\"sans-serif\" \
+         font-size=\"{font_size}\" fill=\"{fill}\">{escaped}</text>"
+    );
+}
+
+fn push_line(svg: &mut String, x1: f64, y1: f64, x2: f64, y2: f64, stroke: &str, width: f64) {
+    let _ = writeln!(
+        svg,
+        "<line x1=\"{x1:.1}\" y1=\"{y1:.1}\" x2=\"{x2:.1}\" y2=\"{y2:.1}\" \
+         stroke=\"{stroke}\" stroke-width=\"{width}\"/>"
+    );
+}
+
+fn escape_xml(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
 fn is_transition(a: u8, b: u8) -> bool {

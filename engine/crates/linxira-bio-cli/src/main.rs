@@ -55,7 +55,8 @@ use linxira_bio_core::native_tools::{
 };
 use linxira_bio_core::phylogeny::{
     DistanceMatrixOptions, DistanceMatrixResult, TreeTransformOptions, TreeTransformResult,
-    distance_matrix_path, read_tree_label_map_path, transform_newick_path,
+    TreeVisualizationOptions, distance_matrix_path, read_tree_label_map_path, render_tree_svg_path,
+    transform_newick_path,
 };
 use linxira_bio_core::protein::{ProteinPropertiesResult, protein_properties_path};
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
@@ -626,6 +627,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         [phylogeny, tree, arguments @ ..] if phylogeny == "phylogeny" && tree == "tree" => {
             print_phylogeny_tree(arguments)
+        }
+        [phylogeny, tree_plot, arguments @ ..]
+            if phylogeny == "phylogeny" && tree_plot == "tree-plot" =>
+        {
+            print_phylogeny_tree_visualize(arguments)
         }
         [phylogeny, distance, arguments @ ..]
             if phylogeny == "phylogeny" && distance == "distance" =>
@@ -4413,6 +4419,70 @@ fn print_phylogeny_tree_text(result: &TreeTransformResult) {
     println!("output\t{}", result.output);
     for warning in &result.warnings {
         println!("warning\t{warning}");
+    }
+}
+
+fn print_phylogeny_tree_visualize(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = TreeVisualizationOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--width" => {
+                index += 1;
+                options.width = arguments
+                    .get(index)
+                    .ok_or("--width requires a value")?
+                    .parse()
+                    .map_err(|_| "invalid --width value")?;
+            }
+            "--height" => {
+                index += 1;
+                options.height = arguments
+                    .get(index)
+                    .ok_or("--height requires a value")?
+                    .parse()
+                    .map_err(|_| "invalid --height value")?;
+            }
+            "--font-size" => {
+                index += 1;
+                options.font_size = arguments
+                    .get(index)
+                    .ok_or("--font-size requires a value")?
+                    .parse()
+                    .map_err(|_| "invalid --font-size value")?;
+            }
+            "--no-branch-lengths" => options.show_branch_lengths = false,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown phylogeny tree-plot option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "phylogeny tree-plot")?,
+        }
+        index += 1;
+    }
+    let input = input.ok_or("phylogeny tree-plot requires an input Newick path")?;
+    let output = output.ok_or("phylogeny tree-plot requires an output SVG path")?;
+    let result = render_tree_svg_path(input, output, &options)
+        .map_err(|error| format!("tree visualization failed: {error}"))?;
+    if json {
+        print_analysis_json_with_warnings(
+            "phylogeny-tree-plot",
+            "phylogeny.tree.visualize.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        println!("output\t{}", result.output_path);
+        println!("width\t{}", result.width);
+        println!("height\t{}", result.height);
+        println!("leaf_count\t{}", result.glyph_count);
+        for warning in &result.warnings {
+            println!("warning\t{warning}");
+        }
+        Ok(())
     }
 }
 
