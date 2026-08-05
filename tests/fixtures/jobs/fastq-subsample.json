@@ -1,4 +1,5 @@
 {
+  "schema_version": "1",
   "job_id": "fastq-subsample-test",
   "capability": "fastq.subsample.v1",
   "inputs": {
