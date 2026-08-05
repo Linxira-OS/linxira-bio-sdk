@@ -58,7 +58,8 @@ use linxira_bio_core::native_tools::{
     run_trimal_path, run_wgcna_path,
 };
 use linxira_bio_core::phylogeny::{
-    DistanceMatrixOptions, TreeTransformOptions, distance_matrix_path, transform_newick_path,
+    DistanceMatrixOptions, TreeTransformOptions, TreeVisualizationOptions, distance_matrix_path,
+    render_tree_svg_path, transform_newick_path,
 };
 use linxira_bio_core::protein::protein_properties_path;
 use linxira_bio_core::scientific_visualization::{
@@ -220,6 +221,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "protein.domain.parse.v1" => run_protein_domains(base_directory, request),
         "protein.domain.visualize.v1" => run_protein_domain_visualization(base_directory, request),
         "phylogeny.tree.transform.v1" => run_phylogeny_tree(base_directory, request),
+        "phylogeny.tree.visualize.v1" => run_phylogeny_tree_visualize(base_directory, request),
         "phylogeny.distance.v1" => run_phylogeny_distance(base_directory, request),
         "phylogeny.iqtree.v1" => run_iqtree_inference(base_directory, request),
         "msa.muscle.v1" => run_muscle_alignment(base_directory, request),
@@ -1807,6 +1809,31 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 },
             )
         }
+        "phylogeny.tree.visualize.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "tree")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let options = tree_visualization_options(&request.parameters)?;
+            let result = render_tree_svg_path(input, &output, &options)
+                .map_err(|error| -> WorkerError { error.to_string().into() })?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "phylogeny-tree-visualize-warning",
+                FileArtifactSpec {
+                    artifact_id: "tree-visualization",
+                    role: "visualization",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Unknown),
+                    media_type: Some("image/svg+xml"),
+                },
+            )
+        }
         "phylogeny.distance.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "alignment")?;
             let output = required_sequence_output(&request.parameters, &request.capability)?;
@@ -2211,6 +2238,16 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             &["output", "sequence_id", "max_sequences", "max_domains"],
         ),
         "phylogeny.tree.transform.v1" => (&["tree"], &["output", "reroot_label", "label_map"]),
+        "phylogeny.tree.visualize.v1" => (
+            &["tree"],
+            &[
+                "output",
+                "width",
+                "height",
+                "font_size",
+                "show_branch_lengths",
+            ],
+        ),
         "phylogeny.distance.v1" => (&["alignment"], &["output", "model"]),
         "msa.muscle.v1" => (&["fasta"], &["output", "mode", "threads"]),
         "msa.trimal.v1" => (&["alignment"], &["output", "mode"]),
@@ -4461,6 +4498,42 @@ fn run_phylogeny_tree(base_directory: &Path, request: JobRequest) -> WorkerResul
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_phylogeny_tree_visualize(
+    base_directory: &Path,
+    request: JobRequest,
+) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "tree",
+        &[
+            "output",
+            "width",
+            "height",
+            "font_size",
+            "show_branch_lengths",
+        ],
+    )?;
+    let input = request
+        .inputs
+        .get("tree")
+        .ok_or("phylogeny.tree.visualize.v1 requires inputs.tree")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let options = tree_visualization_options(&request.parameters)?;
+    let analysis = render_tree_svg_path(input, output, &options)
+        .map_err(|error| -> WorkerError { error.to_string().into() })?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_phylogeny_distance(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     validate_v1_named_input_contract(&request, "alignment", &["output", "model"])?;
     let input = request
@@ -4854,6 +4927,28 @@ fn tree_transform_options(parameters: &serde_json::Value) -> WorkerResult<TreeTr
         reroot_label,
         label_map,
     })
+}
+
+fn tree_visualization_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<TreeVisualizationOptions> {
+    let mut options = TreeVisualizationOptions::default();
+    if let Some(value) = optional_parameter_usize(parameters, "width")? {
+        options.width = u32::try_from(value).map_err(|_| "width exceeds u32 range")?;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "height")? {
+        options.height = u32::try_from(value).map_err(|_| "height exceeds u32 range")?;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "font_size")? {
+        options.font_size = u32::try_from(value).map_err(|_| "font_size exceeds u32 range")?;
+    }
+    if let Some(value) = parameters
+        .get("show_branch_lengths")
+        .and_then(|v| v.as_bool())
+    {
+        options.show_branch_lengths = value;
+    }
+    Ok(options)
 }
 
 fn expression_normalize_options(

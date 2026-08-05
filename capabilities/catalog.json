@@ -730,6 +730,15 @@
       "output_formats": ["newick", "json"]
     },
     {
+      "id": "phylogeny.tree.visualize.v1",
+      "status": "available",
+      "category": "phylogenetics",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio phylogeny tree-plot <input.nwk> <output.svg> --json",
+      "input_formats": ["newick"],
+      "output_formats": ["svg", "json"]
+    },
+    {
       "id": "msa.muscle.v1",
       "status": "available",
       "category": "multiple-sequence-alignment",
