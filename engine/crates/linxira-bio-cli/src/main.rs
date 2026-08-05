@@ -17,8 +17,9 @@ use linxira_bio_core::coordinate::{
 use linxira_bio_core::dataset::{DatasetInspection, DatasetSupport, inspect_dataset};
 use linxira_bio_core::domain::{ProteinDomainParseResult, parse_protein_domains_path};
 use linxira_bio_core::environment::{
-    EnvironmentAudit, EnvironmentMode, EnvironmentPlan, EnvironmentPlanOptions, PlanActionState,
-    audit_environment, parse_environment_mode, plan_environment_with_options,
+    ApplyResult, EnvironmentAudit, EnvironmentMode, EnvironmentPlan, EnvironmentPlanOptions,
+    PlanActionState, apply_environment, audit_environment, parse_environment_mode,
+    plan_environment_with_options,
 };
 use linxira_bio_core::expression::{
     ExpressionClusterOptions, ExpressionClusterResult, ExpressionHeatmapOptions,
@@ -43,12 +44,13 @@ use linxira_bio_core::interval::{
     bed_merge_path, bed_subtract_path,
 };
 use linxira_bio_core::native_tools::{
-    HmmerOptions, IqtreeOptions, MemeOptions, MuscleOptions, NativeToolResult,
-    ShortReadAlignmentOptions, SimilaritySearchOptions, parse_blast_program, parse_diamond_mode,
-    parse_hmmer_mode, parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode,
-    run_bam_to_bigwig_path, run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path,
-    run_hmmer_path, run_iqtree_path, run_kaks_path, run_mcscanx_path, run_meme_path,
-    run_muscle_path, run_samtools_report_path, run_short_read_alignment_path, run_trimal_path,
+    HmmerOptions, IqtreeOptions, MemeOptions, Minimap2LongReadOptions, MuscleOptions,
+    NativeToolResult, ShortReadAlignmentOptions, SimilaritySearchOptions, SnpEffOptions,
+    parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
+    parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
+    run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path,
+    run_kaks_path, run_mcscanx_path, run_meme_path, run_minimap2_long_read_path, run_muscle_path,
+    run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path, run_trimal_path,
 };
 use linxira_bio_core::phylogeny::{
     DistanceMatrixOptions, DistanceMatrixResult, TreeTransformOptions, TreeTransformResult,
@@ -176,6 +178,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         [environment, plan, arguments @ ..] if environment == "environment" && plan == "plan" => {
             print_environment_plan(arguments)
         }
+        [environment, apply, arguments @ ..]
+            if environment == "environment" && apply == "apply" =>
+        {
+            print_environment_apply(arguments)
+        }
         [fastq, qc, arguments @ ..] if fastq == "fastq" && qc == "qc" => print_fastq_qc(arguments),
         [fastq, trim, arguments @ ..] if fastq == "fastq" && trim == "trim" => {
             print_fastq_trim(arguments)
@@ -220,6 +227,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if alignment == "alignment" && short_read == "short-read" =>
         {
             print_short_read_alignment(arguments)
+        }
+        [alignment, long_read, arguments @ ..]
+            if alignment == "alignment" && long_read == "long-read" =>
+        {
+            print_long_read_alignment(arguments)
         }
         [annotation, stats, arguments @ ..] if annotation == "annotation" && stats == "stats" => {
             print_annotation_stats(arguments)
@@ -398,6 +410,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         [variant, to_table, arguments @ ..] if variant == "variant" && to_table == "to-table" => {
             print_variant_to_table(arguments)
+        }
+        [variant, annotate, arguments @ ..] if variant == "variant" && annotate == "annotate" => {
+            print_variant_annotate(arguments)
         }
         [interval, intersect, left, right]
             if interval == "interval" && intersect == "intersect" =>
@@ -1042,6 +1057,59 @@ fn print_environment_plan(arguments: &[String]) -> Result<(), Box<dyn Error>> {
         print_plan_text(&plan);
     }
     Ok(())
+}
+
+fn print_environment_apply(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let (profile, options, json) = parse_environment_plan_arguments(arguments)?;
+    let audit = audit_environment()?;
+    let plan = plan_environment_with_options(&profile, &audit, &options)?;
+    let apply_result = apply_environment(&plan)?;
+    if json {
+        print_analysis_json("environment-apply", "environment.apply.v1", apply_result)?;
+    } else {
+        print_apply_text(&apply_result);
+    }
+    Ok(())
+}
+
+fn print_apply_text(result: &ApplyResult) {
+    println!("Linxira Bio environment apply");
+    println!("  profile : {}", result.profile);
+    println!(
+        "  platform: {} ({})",
+        result.platform.os, result.platform.family
+    );
+    println!();
+    if !result.installed.is_empty() {
+        println!("Installed:");
+        for tool in &result.installed {
+            let version = tool.version.as_deref().unwrap_or("unknown");
+            println!(
+                "  + {} ({}) -> {}",
+                tool.display_name, tool.strategy, version
+            );
+        }
+    }
+    if !result.failed.is_empty() {
+        println!("Failed:");
+        for tool in &result.failed {
+            println!(
+                "  - {} ({}) -> {}",
+                tool.display_name, tool.strategy, tool.reason
+            );
+        }
+    }
+    if result.installed.is_empty() && result.failed.is_empty() {
+        println!("No tools to install. All required tools are already available.");
+    }
+    println!();
+    println!(
+        "Summary: {} installed, {} failed, {} skipped ({} total)",
+        result.summary.installed,
+        result.summary.failed,
+        result.summary.skipped,
+        result.summary.total
+    );
 }
 
 fn parse_environment_plan_arguments(
@@ -3170,6 +3238,89 @@ fn print_short_read_alignment(arguments: &[String]) -> Result<(), Box<dyn Error>
     )
 }
 
+fn print_long_read_alignment(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = Minimap2LongReadOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--preset" => {
+                index += 1;
+                options.preset = parse_minimap2_preset(
+                    arguments.get(index).ok_or("--preset requires a value")?,
+                )?;
+            }
+            "--secondary" => options.secondary = true,
+            "--max-secondary" => {
+                index += 1;
+                options.max_secondary =
+                    parse_sequence_usize(arguments.get(index), "--max-secondary")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown long-read alignment option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err(
+            "alignment long-read requires <reference.fasta> <reads.fastq> <output.sam>".into(),
+        );
+    }
+    let result = run_minimap2_long_read_path(&paths[0], &paths[1], &paths[2], &options)?;
+    print_native_tool_result(
+        "long-read-alignment",
+        "alignment.long-read.v1",
+        result,
+        json,
+    )
+}
+
+fn print_variant_annotate(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = SnpEffOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--database" => {
+                index += 1;
+                options.database = arguments
+                    .get(index)
+                    .ok_or("--database requires a value")?
+                    .clone();
+            }
+            "--upstream-downstream" => {
+                index += 1;
+                options.upstream_downstream = Some(parse_sequence_usize(
+                    arguments.get(index),
+                    "--upstream-downstream",
+                )?);
+            }
+            "--no-stats" => options.no_stats = true,
+            "--no-log" => options.no_log = true,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown variant annotate option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("variant annotate requires <input.vcf> <output.vcf>".into());
+    }
+    let result = run_snpeff_path(&paths[0], &paths[1], &options)?;
+    print_native_tool_result("variant-annotate", "variant.annotate.v1", result, json)
+}
+
 fn print_alignment_qc(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
     let metrics = sam_qc_path(Path::new(path))?;
     if json {
@@ -4845,6 +4996,7 @@ fn usage() -> &'static str {
         "  linxira-bio doctor [--json]\n",
         "  linxira-bio environment audit [--json]\n",
         "  linxira-bio environment plan [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n",
+        "  linxira-bio environment apply [PROFILE] [--mode MODE] [--project-root PATH] [--json]\n",
         "  linxira-bio runtime catalog [--json]\n",
         "  linxira-bio workflow packs [--json]\n",
         "  linxira-bio workflow run <pack-id> <request.json> <result.json>\n",
@@ -4874,6 +5026,8 @@ fn usage() -> &'static str {
         "  linxira-bio alignment coverage <input.bam|cram> <output.tsv> [--reference reference.fasta] [--json]\n",
         "  linxira-bio alignment bam-to-bigwig <input.bam|cram> <output.bw> [--threads N] [--json]\n",
         "  linxira-bio alignment short-read <reference.fasta> <reads.fastq> <output.bam> [--threads N] [--json]\n",
+        "  linxira-bio alignment long-read <reference.fasta> <reads.fastq> <output.sam> [--preset map-ont|map-pb|map-hifi|splice] [--threads N] [--secondary] [--json]\n",
+        "  linxira-bio variant annotate <input.vcf> <output.vcf> [--database DB] [--upstream-downstream N] [--no-stats] [--json]\n",
         "  linxira-bio annotation stats <input.gff3|gtf[.gz]> [--json]\n",
         "  linxira-bio annotation normalize <input.gff3|gtf[.gz]> <output.gff3> [--sort] [--json]\n",
         "  linxira-bio annotation positions <input.gff3|gtf[.gz]> <output.tsv> [--feature-type TYPE ...] [--json]\n",

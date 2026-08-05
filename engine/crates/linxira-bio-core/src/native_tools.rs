@@ -200,6 +200,71 @@ impl Default for ShortReadAlignmentOptions {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Minimap2Preset {
+    MapOnt,
+    MapPb,
+    MapHifi,
+    Splice,
+    Asm5,
+    Asm10,
+    Asm20,
+    Sr,
+}
+
+impl Minimap2Preset {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::MapOnt => "map-ont",
+            Self::MapPb => "map-pb",
+            Self::MapHifi => "map-hifi",
+            Self::Splice => "splice",
+            Self::Asm5 => "asm5",
+            Self::Asm10 => "asm10",
+            Self::Asm20 => "asm20",
+            Self::Sr => "sr",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Minimap2LongReadOptions {
+    pub preset: Minimap2Preset,
+    pub threads: usize,
+    pub secondary: bool,
+    pub max_secondary: usize,
+}
+
+impl Default for Minimap2LongReadOptions {
+    fn default() -> Self {
+        Self {
+            preset: Minimap2Preset::MapOnt,
+            threads: 1,
+            secondary: false,
+            max_secondary: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnpEffOptions {
+    pub database: String,
+    pub upstream_downstream: Option<usize>,
+    pub no_stats: bool,
+    pub no_log: bool,
+}
+
+impl Default for SnpEffOptions {
+    fn default() -> Self {
+        Self {
+            database: "GRCh38.99".to_owned(),
+            upstream_downstream: None,
+            no_stats: false,
+            no_log: true,
+        }
+    }
+}
+
 impl Default for MemeOptions {
     fn default() -> Self {
         Self {
@@ -748,6 +813,50 @@ pub fn run_bam_to_bigwig_path(
     result
 }
 
+/// Align long reads (PacBio, ONT) to a reference with minimap2.
+pub fn run_minimap2_long_read_path(
+    reference: impl AsRef<Path>,
+    reads: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &Minimap2LongReadOptions,
+) -> Result<NativeToolResult, NativeToolError> {
+    validate_threads(options.threads)?;
+    let reference = reference.as_ref();
+    let reads = reads.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[reference, reads], output)?;
+    let executable = configured_program("LINXIRA_BIO_MINIMAP2", "minimap2");
+    let arguments = minimap2_long_read_arguments(reference, reads, output, options);
+    let result = run_native_command(&executable, &arguments, false)
+        .and_then(|_| finish_result("minimap2", "long-read", output, options.threads, 1));
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
+/// Annotate variants with snpEff.
+pub fn run_snpeff_path(
+    vcf: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &SnpEffOptions,
+) -> Result<NativeToolResult, NativeToolError> {
+    let vcf = vcf.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[vcf], output)?;
+    let executable = configured_program("LINXIRA_BIO_SNPEFF", "snpEff");
+    let arguments = snpeff_arguments(vcf, options);
+    let result = (|| {
+        let native_output = run_native_command(&executable, &arguments, false)?;
+        fs::write(output, native_output.stdout)?;
+        finish_result("snpEff", "annotate", output, 1, 1)
+    })();
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
 pub fn run_short_read_alignment_path(
     reference: impl AsRef<Path>,
     reads: impl AsRef<Path>,
@@ -989,6 +1098,67 @@ pub fn minimap2_short_read_arguments(
         reference.as_os_str().to_owned(),
         reads.as_os_str().to_owned(),
     ]
+}
+
+pub fn minimap2_long_read_arguments(
+    reference: &Path,
+    reads: &Path,
+    output: &Path,
+    options: &Minimap2LongReadOptions,
+) -> Vec<OsString> {
+    let mut args = vec![
+        OsString::from("-a"),
+        OsString::from("-x"),
+        OsString::from(options.preset.as_str()),
+        OsString::from("-t"),
+        OsString::from(options.threads.to_string()),
+        OsString::from("-o"),
+        output.as_os_str().to_owned(),
+    ];
+    if !options.secondary {
+        args.push(OsString::from("--secondary=no"));
+    } else if options.max_secondary > 0 {
+        args.push(OsString::from("-N"));
+        args.push(OsString::from(options.max_secondary.to_string()));
+    }
+    args.push(reference.as_os_str().to_owned());
+    args.push(reads.as_os_str().to_owned());
+    args
+}
+
+pub fn snpeff_arguments(vcf: &Path, options: &SnpEffOptions) -> Vec<OsString> {
+    let mut args = vec![
+        OsString::from("-v"),
+        OsString::from(&options.database),
+        vcf.as_os_str().to_owned(),
+    ];
+    if let Some(ud) = options.upstream_downstream {
+        args.push(OsString::from("-ud"));
+        args.push(OsString::from(ud.to_string()));
+    }
+    if options.no_stats {
+        args.push(OsString::from("-noStats"));
+    }
+    if options.no_log {
+        args.push(OsString::from("-noLog"));
+    }
+    args
+}
+
+pub fn parse_minimap2_preset(value: &str) -> Result<Minimap2Preset, NativeToolError> {
+    match value {
+        "map-ont" => Ok(Minimap2Preset::MapOnt),
+        "map-pb" => Ok(Minimap2Preset::MapPb),
+        "map-hifi" => Ok(Minimap2Preset::MapHifi),
+        "splice" => Ok(Minimap2Preset::Splice),
+        "asm5" => Ok(Minimap2Preset::Asm5),
+        "asm10" => Ok(Minimap2Preset::Asm10),
+        "asm20" => Ok(Minimap2Preset::Asm20),
+        "sr" => Ok(Minimap2Preset::Sr),
+        other => Err(NativeToolError::InvalidOption(format!(
+            "unknown minimap2 preset: {other}; expected map-ont, map-pb, map-hifi, splice, asm5, asm10, asm20, or sr"
+        ))),
+    }
 }
 
 pub fn samtools_sort_arguments(

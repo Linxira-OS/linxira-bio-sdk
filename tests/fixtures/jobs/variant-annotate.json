@@ -1,0 +1,12 @@
+{
+  "schema_version": "1",
+  "job_id": "variant-annotate-test",
+  "capability": "variant.annotate.v1",
+  "inputs": {
+    "vcf": "tests/fixtures/vcf/valid.vcf"
+  },
+  "parameters": {
+    "output": "tests/fixtures/vcf/annotated.vcf",
+    "database": "GRCh38.99"
+  }
+}
