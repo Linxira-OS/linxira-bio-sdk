@@ -12,6 +12,7 @@ Inspect imported data before execution. Use the deterministic Rust capabilities 
 - Use `annotation.gxf.stats.v1` for feature, sequence, source, strand, ID, and Parent counts.
 - Use `annotation.gxf.normalize.v1` to convert valid GFF3/GTF records into canonical GFF3. Set `sort=true` only when coordinate ordering is required.
 - Use `annotation.gene-position.v1` to emit a TSV coordinate table. The default feature type is `gene`; pass `feature_types` for transcripts or other records.
+- Use `annotation.gxf.to-bed.v1` to convert GFF3/GTF features to BED6 format. The default feature type is `gene`; pass `feature_types` as a string array for multiple types.
 - Use `annotation.sequence.extract.v1` with both `annotation` and `fasta` inputs to extract `gene`, `transcript`, `cds`, `exon`, `utr`, `five_prime_utr`, `three_prime_utr`, or `promoter` sequences.
 - Use `genome.gene-density.v1` for sliding-window counts and features-per-megabase summaries. The default feature type is `gene`.
 

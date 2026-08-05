@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/sequence-consensus.v1.json",
+  "title": "Linxira Bio consensus sequence result",
+  "type": "object",
+  "required": [
+    "input_sequence_count",
+    "alignment_length",
+    "consensus_length",
+    "ambiguous_position_count",
+    "gc_content",
+    "warnings"
+  ],
+  "properties": {
+    "input_sequence_count": {"type": "integer", "minimum": 1},
+    "alignment_length": {"type": "integer", "minimum": 1},
+    "consensus_length": {"type": "integer", "minimum": 0},
+    "ambiguous_position_count": {"type": "integer", "minimum": 0},
+    "gc_content": {"type": "number", "minimum": 0, "maximum": 100},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

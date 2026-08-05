@@ -1,0 +1,11 @@
+{
+  "job_id": "sequence-shuffle-test",
+  "capability": "sequence.shuffle.v1",
+  "inputs": {
+    "fasta": "tests/fixtures/sequences/tiny.fa"
+  },
+  "parameters": {
+    "output": "tests/fixtures/sequences/shuffled.fa",
+    "seed": 42
+  }
+}

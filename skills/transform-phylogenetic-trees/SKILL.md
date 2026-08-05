@@ -35,3 +35,18 @@ The CLI label map is a two-column tab-separated file containing old and new labe
 ## Limits
 
 Execution is local CPU and accepts at most 128 MiB of decompressed text and 1,000,000 nodes. It does not infer trees, align sequences, render a publication figure, or support multi-leaf clade rerooting.
+
+## Distance matrix
+
+Compute pairwise distances from a multiple sequence alignment with `phylogeny.distance.v1`:
+
+```bash
+linxira-bio phylogeny distance alignment.fa distances.tsv --model p-distance --json
+```
+
+This produces a full (N×N) TSV distance matrix with columns `seq_a`, `seq_b`, and `distance`. Supported models:
+- `p-distance`: proportion of differing sites (default)
+- `jc69`: Jukes-Cantor correction
+- `k80`: Kimura 2-parameter correction
+
+Worker v2 uses role `alignment`. Gaps between a character and a gap are treated as differences; positions where both sequences are gaps are excluded from the denominator. The JC69 and K80 corrections produce `Infinity` and a warning when the observed divergence saturates the correction formula.

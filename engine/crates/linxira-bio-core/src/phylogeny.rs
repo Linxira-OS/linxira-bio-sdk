@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Write};
+use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
 pub const MAX_NEWICK_DECOMPRESSED_BYTES: u64 = 128 * 1024 * 1024;
@@ -28,6 +28,28 @@ pub struct TreeTransformResult {
     pub warnings: Vec<String>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct DistanceMatrixOptions {
+    pub model: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DistanceMatrixResult {
+    pub sequence_count: u64,
+    pub alignment_length: u64,
+    pub compared_position_count: u64,
+    pub model: String,
+    pub distances: Vec<DistanceMatrixEntry>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DistanceMatrixEntry {
+    pub seq_a: String,
+    pub seq_b: String,
+    pub distance: f64,
+}
+
 #[derive(Debug)]
 pub enum PhylogenyError {
     Io(io::Error),
@@ -36,6 +58,10 @@ pub enum PhylogenyError {
     InvalidOption(String),
     OutputAlreadyExists(PathBuf),
     LimitExceeded { resource: &'static str, limit: u64 },
+    AlignmentEmpty,
+    AlignmentInconsistent(String),
+    InvalidModel(String),
+    EmptySequence(String),
 }
 
 impl Display for PhylogenyError {
@@ -58,6 +84,15 @@ impl Display for PhylogenyError {
                 formatter,
                 "Newick processing exceeds the deterministic {resource} limit of {limit}"
             ),
+            Self::AlignmentEmpty => formatter.write_str("alignment contains no sequences"),
+            Self::AlignmentInconsistent(msg) => formatter.write_str(msg),
+            Self::InvalidModel(model) => write!(
+                formatter,
+                "unknown distance model: {model}. Supported: p-distance, jc69, k80"
+            ),
+            Self::EmptySequence(id) => {
+                write!(formatter, "sequence {id} has zero length")
+            }
         }
     }
 }
@@ -70,7 +105,11 @@ impl Error for PhylogenyError {
             | Self::MalformedNewick { .. }
             | Self::InvalidOption(_)
             | Self::OutputAlreadyExists(_)
-            | Self::LimitExceeded { .. } => None,
+            | Self::LimitExceeded { .. }
+            | Self::AlignmentEmpty
+            | Self::AlignmentInconsistent(_)
+            | Self::InvalidModel(_)
+            | Self::EmptySequence(_) => None,
         }
     }
 }
@@ -595,8 +634,225 @@ fn read_bounded_text(path: &Path) -> Result<String, PhylogenyError> {
     String::from_utf8(bytes).map_err(|_| PhylogenyError::InvalidUtf8)
 }
 
+fn with_new_output<T>(
+    output: &Path,
+    operation: impl FnOnce(&mut BufWriter<File>) -> Result<T, PhylogenyError>,
+) -> Result<T, PhylogenyError> {
+    if output.exists() {
+        return Err(PhylogenyError::OutputAlreadyExists(output.to_owned()));
+    }
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(output)?;
+    let mut writer = BufWriter::new(file);
+    match operation(&mut writer).and_then(|value| {
+        writer.flush()?;
+        Ok(value)
+    }) {
+        Ok(value) => Ok(value),
+        Err(error) => {
+            drop(writer);
+            let _ = std::fs::remove_file(output);
+            Err(error)
+        }
+    }
+}
+
+pub fn distance_matrix_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &DistanceMatrixOptions,
+) -> Result<DistanceMatrixResult, PhylogenyError> {
+    let model = options.model.trim().to_lowercase();
+    if !matches!(model.as_str(), "p-distance" | "jc69" | "k80" | "k2p") {
+        return Err(PhylogenyError::InvalidModel(options.model.clone()));
+    }
+    let model = if model == "k2p" {
+        "k80".to_owned()
+    } else {
+        model
+    };
+
+    let mut sequences: Vec<(String, Vec<u8>)> = Vec::new();
+    crate::sequence_transform::visit_fasta_path(input.as_ref(), |record| {
+        if record.sequence.is_empty() {
+            return Err(
+                crate::sequence_transform::SequenceTransformError::InvalidOption(format!(
+                    "sequence {} has zero length",
+                    record.identifier
+                )),
+            );
+        }
+        sequences.push((record.identifier, record.sequence));
+        Ok(())
+    })
+    .map_err(|error| PhylogenyError::InvalidOption(error.to_string()))?;
+
+    if sequences.is_empty() {
+        return Err(PhylogenyError::AlignmentEmpty);
+    }
+    if sequences.len() == 1 {
+        return Err(PhylogenyError::AlignmentInconsistent(
+            "alignment contains only one sequence; at least two are required for a distance matrix"
+                .to_owned(),
+        ));
+    }
+
+    let alignment_length = sequences[0].1.len() as u64;
+    if alignment_length == 0 {
+        return Err(PhylogenyError::AlignmentInconsistent(
+            "alignment sequences have zero length".to_owned(),
+        ));
+    }
+
+    for (id, seq) in &sequences {
+        if seq.len() as u64 != alignment_length {
+            return Err(PhylogenyError::AlignmentInconsistent(format!(
+                "sequence {id} has length {} but alignment expects {alignment_length}",
+                seq.len()
+            )));
+        }
+    }
+
+    let mut warnings = Vec::new();
+    let n = sequences.len();
+    let mut distances = Vec::with_capacity(n * n);
+
+    let mut compared_position_count = 0_u64;
+    for col in 0..alignment_length as usize {
+        let mut non_gap_in_column = 0_usize;
+        for (_, seq) in &sequences {
+            let c = seq[col].to_ascii_uppercase();
+            if c != b'-' {
+                non_gap_in_column += 1;
+            }
+        }
+        if non_gap_in_column >= 2 {
+            compared_position_count += 1;
+        }
+    }
+
+    for i in 0..n {
+        for j in 0..n {
+            if i == j {
+                distances.push(DistanceMatrixEntry {
+                    seq_a: sequences[i].0.clone(),
+                    seq_b: sequences[j].0.clone(),
+                    distance: 0.0,
+                });
+                continue;
+            }
+            let mut differing = 0_u64;
+            let mut compared = 0_u64;
+            let mut transitions = 0_u64;
+            let mut transversions = 0_u64;
+            let seq_a = &sequences[i].1;
+            let seq_b = &sequences[j].1;
+            for col in 0..alignment_length as usize {
+                let a = seq_a[col].to_ascii_uppercase();
+                let b = seq_b[col].to_ascii_uppercase();
+                if a == b'-' && b == b'-' {
+                    continue;
+                }
+                if a == b'-' || b == b'-' {
+                    differing += 1;
+                    compared += 1;
+                    continue;
+                }
+                compared += 1;
+                if a != b {
+                    differing += 1;
+                    if is_transition(a, b) {
+                        transitions += 1;
+                    } else {
+                        transversions += 1;
+                    }
+                }
+            }
+            let p = if compared == 0 {
+                0.0
+            } else {
+                differing as f64 / compared as f64
+            };
+            let distance = match model.as_str() {
+                "jc69" => {
+                    if p >= 0.75 {
+                        warnings.push(format!(
+                            "jc69 correction saturated for {}-{}: p-distance {:.6} >= 0.75",
+                            sequences[i].0, sequences[j].0, p
+                        ));
+                        f64::INFINITY
+                    } else {
+                        -0.75 * (1.0 - 4.0 / 3.0 * p).ln()
+                    }
+                }
+                "k80" => {
+                    let p_trans = if compared == 0 {
+                        0.0
+                    } else {
+                        transitions as f64 / compared as f64
+                    };
+                    let p_transv = if compared == 0 {
+                        0.0
+                    } else {
+                        transversions as f64 / compared as f64
+                    };
+                    let term1 = 1.0 - 2.0 * p_trans - p_transv;
+                    let term2 = 1.0 - 2.0 * p_transv;
+                    if term1 <= 0.0 || term2 <= 0.0 {
+                        warnings.push(format!(
+                            "k80 correction saturated for {}-{}: P={:.6} Q={:.6}",
+                            sequences[i].0, sequences[j].0, p_trans, p_transv
+                        ));
+                        f64::INFINITY
+                    } else {
+                        -0.5 * (term1 * term2.sqrt()).ln()
+                    }
+                }
+                _ => p,
+            };
+            distances.push(DistanceMatrixEntry {
+                seq_a: sequences[i].0.clone(),
+                seq_b: sequences[j].0.clone(),
+                distance,
+            });
+        }
+    }
+
+    let output = output.as_ref();
+    with_new_output(output, |writer| {
+        writeln!(writer, "seq_a\tseq_b\tdistance")?;
+        for entry in &distances {
+            writeln!(
+                writer,
+                "{}\t{}\t{:.10}",
+                entry.seq_a, entry.seq_b, entry.distance
+            )?;
+        }
+        Ok(())
+    })?;
+
+    Ok(DistanceMatrixResult {
+        sequence_count: n as u64,
+        alignment_length,
+        compared_position_count,
+        model,
+        distances,
+        warnings,
+    })
+}
+
+fn is_transition(a: u8, b: u8) -> bool {
+    matches!(
+        (a, b),
+        (b'A', b'G') | (b'G', b'A') | (b'C', b'T') | (b'T', b'C')
+    )
+}
+
 #[cfg(test)]
 mod tests {
+    use super::{DistanceMatrixOptions, distance_matrix_path};
     use super::{TreeTransformOptions, transform_newick_path};
     use std::collections::BTreeMap;
     use std::fs;
@@ -652,5 +908,104 @@ mod tests {
         fs::remove_file(input).expect("remove input");
         assert!(error.to_string().contains("duplicate leaf label"));
         assert!(!output.exists());
+    }
+
+    #[test]
+    fn computes_pairwise_distance_matrix_from_alignment() {
+        let input = temporary("dist.fa", ">seq1\nATCG\n>seq2\nATCA\n>seq3\nAT-G\n");
+        let output = input.with_extension("dist.tsv");
+        let result = distance_matrix_path(
+            &input,
+            &output,
+            &DistanceMatrixOptions {
+                model: "p-distance".to_owned(),
+            },
+        )
+        .expect("compute distance matrix");
+        fs::remove_file(input).expect("remove input");
+        fs::remove_file(output).expect("remove output");
+        assert_eq!(result.sequence_count, 3);
+        assert_eq!(result.alignment_length, 4);
+        assert_eq!(result.model, "p-distance");
+        assert_eq!(result.distances.len(), 9);
+        for entry in &result.distances {
+            if entry.seq_a == entry.seq_b {
+                assert_eq!(entry.distance, 0.0);
+            }
+        }
+        let seq1_seq2 = result
+            .distances
+            .iter()
+            .find(|e| e.seq_a == "seq1" && e.seq_b == "seq2")
+            .expect("seq1-seq2 entry");
+        assert_eq!(seq1_seq2.distance, 0.25);
+        let seq1_seq3 = result
+            .distances
+            .iter()
+            .find(|e| e.seq_a == "seq1" && e.seq_b == "seq3")
+            .expect("seq1-seq3 entry");
+        assert_eq!(seq1_seq3.distance, 0.25);
+        let seq2_seq3 = result
+            .distances
+            .iter()
+            .find(|e| e.seq_a == "seq2" && e.seq_b == "seq3")
+            .expect("seq2-seq3 entry");
+        assert_eq!(seq2_seq3.distance, 0.5);
+    }
+
+    #[test]
+    fn computes_jc69_distance_from_alignment() {
+        let input = temporary("jc69.fa", ">seq1\nATCG\n>seq2\nATCA\n>seq3\nAT-G\n");
+        let output = input.with_extension("jc69.tsv");
+        let result = distance_matrix_path(
+            &input,
+            &output,
+            &DistanceMatrixOptions {
+                model: "jc69".to_owned(),
+            },
+        )
+        .expect("compute jc69 distance");
+        fs::remove_file(input).expect("remove input");
+        fs::remove_file(output).expect("remove output");
+        let seq1_seq2 = result
+            .distances
+            .iter()
+            .find(|e| e.seq_a == "seq1" && e.seq_b == "seq2")
+            .expect("seq1-seq2 entry");
+        assert!((seq1_seq2.distance - 0.304098831).abs() < 1e-6);
+    }
+
+    #[test]
+    fn distance_matrix_rejects_inconsistent_alignment() {
+        let input = temporary("bad.fa", ">seq1\nATCG\n>seq2\nATC\n");
+        let output = input.with_extension("bad.tsv");
+        let error = distance_matrix_path(
+            &input,
+            &output,
+            &DistanceMatrixOptions {
+                model: "p-distance".to_owned(),
+            },
+        )
+        .expect_err("inconsistent lengths must fail");
+        fs::remove_file(input).expect("remove input");
+        assert!(error.to_string().contains("has length"));
+    }
+
+    #[test]
+    fn distance_matrix_does_not_overwrite_existing_output() {
+        let input = temporary("overwrite.fa", ">seq1\nATCG\n>seq2\nATCG\n");
+        let output = input.with_extension("out.tsv");
+        fs::write(&output, "existing").expect("write existing");
+        let error = distance_matrix_path(
+            &input,
+            &output,
+            &DistanceMatrixOptions {
+                model: "p-distance".to_owned(),
+            },
+        )
+        .expect_err("overwrite must fail");
+        fs::remove_file(input).expect("remove input");
+        fs::remove_file(output).expect("remove output");
+        assert!(error.to_string().contains("refusing to overwrite"));
     }
 }

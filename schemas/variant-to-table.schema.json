@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/variant-to-table.v1.json",
+  "title": "Linxira Bio VCF to TSV table conversion result",
+  "type": "object",
+  "required": [
+    "input_record_count",
+    "output_record_count",
+    "sample_count",
+    "warnings"
+  ],
+  "properties": {
+    "input_record_count": { "$ref": "#/$defs/count" },
+    "output_record_count": { "$ref": "#/$defs/count" },
+    "sample_count": { "$ref": "#/$defs/count" },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "count": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

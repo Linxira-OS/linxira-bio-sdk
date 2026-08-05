@@ -144,6 +144,24 @@
       "output_formats": ["tsv", "json"]
     },
     {
+      "id": "sequence.consensus.v1",
+      "status": "available",
+      "category": "sequence-algorithms",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence consensus <input.alignment.fasta> <output.fasta> --threshold 0.5 --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
+      "id": "sequence.shuffle.v1",
+      "status": "available",
+      "category": "sequence-io",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence shuffle <input.fasta> <output.fasta> --seed 42 --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["fasta", "json"]
+    },
+    {
       "id": "primer.epcr.v1",
       "status": "available",
       "category": "sequence-algorithms",
@@ -201,6 +219,15 @@
       "command": "linxira-bio annotation positions <input.gff3|gtf> <output.tsv> --json",
       "input_formats": ["gff3", "gtf"],
       "output_formats": ["tsv", "json"]
+    },
+    {
+      "id": "annotation.gxf.to-bed.v1",
+      "status": "available",
+      "category": "genome-annotation",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio annotation to-bed <input.gff3|gtf> <output.bed> --json",
+      "input_formats": ["gff3", "gtf"],
+      "output_formats": ["bed", "json"]
     },
     {
       "id": "annotation.sequence.extract.v1",
@@ -285,6 +312,15 @@
       "category": "read-processing",
       "default_execution": "local-cpu",
       "command": "linxira-bio fastq deduplicate <input.fastq> <output.fastq> --json",
+      "input_formats": ["fastq"],
+      "output_formats": ["fastq", "json"]
+    },
+    {
+      "id": "fastq.subsample.v1",
+      "status": "available",
+      "category": "read-processing",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio fastq subsample <input.fastq> <output.fastq> --target-count 10000 --json",
       "input_formats": ["fastq"],
       "output_formats": ["fastq", "json"]
     },
@@ -405,6 +441,15 @@
       "command": "linxira-bio variant normalize <input.vcf> <reference.fasta> <output.vcf> --json",
       "input_formats": ["vcf", "fasta"],
       "output_formats": ["vcf", "json"]
+    },
+    {
+      "id": "variant.to-table.v1",
+      "status": "available",
+      "category": "variant-calling",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio variant to-table <input.vcf> <output.tsv> --json",
+      "input_formats": ["vcf"],
+      "output_formats": ["tsv", "json"]
     },
     {
       "id": "structure.pdb.summary.v1",
@@ -637,6 +682,15 @@
       "command": "linxira-bio phylogeny tree <input.nwk> <output.nwk> --json",
       "input_formats": ["newick"],
       "output_formats": ["newick", "json"]
+    },
+    {
+      "id": "phylogeny.distance.v1",
+      "status": "available",
+      "category": "phylogenetics",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio phylogeny distance <input.alignment.fasta> <output.tsv> --model p-distance --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["tsv", "json"]
     },
     {
       "id": "phylogeny.iqtree.v1",
