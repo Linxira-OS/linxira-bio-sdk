@@ -1,4 +1,5 @@
 {
+  "schema_version": "1",
   "job_id": "sequence-shuffle-test",
   "capability": "sequence.shuffle.v1",
   "inputs": {
