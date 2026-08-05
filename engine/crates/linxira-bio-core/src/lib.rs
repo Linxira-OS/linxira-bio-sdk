@@ -8,6 +8,7 @@ pub mod cohort;
 pub mod coordinate;
 pub mod dataset;
 pub mod domain;
+pub mod dotplot;
 pub mod environment;
 pub mod expression;
 pub mod fastq;

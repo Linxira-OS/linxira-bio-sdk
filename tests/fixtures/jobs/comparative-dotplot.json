@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "job_id": "dotplot",
+  "capability": "comparative.dotplot.v1",
+  "inputs": {
+    "query": "../sequences/query.fa",
+    "reference": "../sequences/reference.fa"
+  },
+  "parameters": {
+    "output": "dotplot.svg"
+  }
+}
