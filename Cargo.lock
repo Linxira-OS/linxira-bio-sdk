@@ -1888,6 +1888,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "linxira-bio-mcp"
+version = "0.1.0"
+dependencies = [
+ "linxira-bio-protocol",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "linxira-bio-protocol"
 version = "0.1.0"
 dependencies = [

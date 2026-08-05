@@ -1,13 +1,33 @@
 ---
 name: analyze-variant-statistics
-description: Run deterministic local Linxira Bio VCF statistics, filtering, reference-guided small-variant normalization, VCF-to-table conversion, and allele-set comparison. Use for VCF summaries, QUAL/FILTER/contig/INFO-DP filtering, REF validation, minimal representation, repeat-aware left alignment, and shared or file-specific variant alleles.
+description: Run deterministic local Linxira Bio VCF statistics, filtering, reference-guided small-variant normalization, VCF-to-table conversion, allele-set comparison, and functional annotation with snpEff. Use for VCF summaries, QUAL/FILTER/contig/INFO-DP filtering, REF validation, minimal representation, repeat-aware left alignment, snpEff functional annotation, and shared or file-specific variant alleles.
 ---
 
 # Analyze Variant Statistics
 
 Use the tested Rust capabilities for descriptive VCF summaries, basic record
-filters, reference-guided small-variant normalization, and VCF-to-table
-conversion. None clinically interpret or annotate variants.
+filters, reference-guided small-variant normalization, VCF-to-table conversion,
+and snpEff functional annotation. None clinically interpret or annotate
+variants beyond what snpEff provides.
+
+## Variant Annotation
+
+Annotate variants with snpEff functional predictions:
+
+```bash
+linxira-bio variant annotate INPUT.vcf OUTPUT.vcf --database GRCh38.99 --json
+```
+
+Options: `--database` (default: GRCh38.99), `--upstream-downstream N` for
+upstream/downstream interval length, `--no-stats` to skip statistics, `--no-log`
+to suppress log output.
+
+For worker v1, provide `inputs.vcf` and `parameters.output`. Optional
+parameters: `database`, `upstream_downstream`, `no_stats`, `no_log`. The
+capability is `variant.annotate.v1`.
+
+Requires snpEff on PATH or `LINXIRA_BIO_SNPEFF` override. Use
+`configure-bio-environment` when snpEff is missing.
 
 ## Run
 

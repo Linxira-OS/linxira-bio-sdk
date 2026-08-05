@@ -1,0 +1,14 @@
+{
+  "schema_version": "1",
+  "job_id": "long-read-alignment-test",
+  "capability": "alignment.long-read.v1",
+  "inputs": {
+    "reference": "tests/fixtures/sequences/tiny.fa",
+    "reads": "tests/fixtures/fastq-qc/valid.fastq"
+  },
+  "parameters": {
+    "output": "tests/fixtures/fastq-qc/long-read-aligned.sam",
+    "preset": "map-ont",
+    "threads": 1
+  }
+}

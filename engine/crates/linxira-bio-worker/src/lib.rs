@@ -22,8 +22,8 @@ use linxira_bio_core::dataset::{
 };
 use linxira_bio_core::domain::parse_protein_domains_path;
 use linxira_bio_core::environment::{
-    EnvironmentMode, EnvironmentPlanOptions, audit_environment, parse_environment_mode,
-    plan_environment_with_options,
+    EnvironmentMode, EnvironmentPlanOptions, apply_environment, audit_environment,
+    parse_environment_mode, plan_environment_with_options,
 };
 use linxira_bio_core::expression::{
     ExpressionClusterOptions, ExpressionHeatmapOptions, ExpressionNormalizeOptions,
@@ -48,12 +48,13 @@ use linxira_bio_core::interval::{
     IntervalMergeOptions, bed_closest_path, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
 use linxira_bio_core::native_tools::{
-    HmmerOptions, IqtreeOptions, MemeOptions, MuscleOptions, ShortReadAlignmentOptions,
-    SimilaritySearchOptions, parse_blast_program, parse_diamond_mode, parse_hmmer_mode,
-    parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
+    HmmerOptions, IqtreeOptions, MemeOptions, Minimap2LongReadOptions, Minimap2Preset,
+    MuscleOptions, ShortReadAlignmentOptions, SimilaritySearchOptions, SnpEffOptions,
+    parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
+    parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
     run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path,
-    run_kaks_path, run_mcscanx_path, run_meme_path, run_muscle_path, run_samtools_report_path,
-    run_short_read_alignment_path, run_trimal_path,
+    run_kaks_path, run_mcscanx_path, run_meme_path, run_minimap2_long_read_path, run_muscle_path,
+    run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path, run_trimal_path,
 };
 use linxira_bio_core::phylogeny::{
     DistanceMatrixOptions, TreeTransformOptions, distance_matrix_path, transform_newick_path,
@@ -161,6 +162,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "enrichment.visualize.v1" => run_enrichment_visualization(base_directory, request),
         "environment.audit.v1" => run_environment_audit(request),
         "environment.plan.v1" => run_environment_plan(base_directory, request),
+        "environment.apply.v1" => run_environment_apply(base_directory, request),
         "dataset.inspect.v1" => run_dataset_inspection(base_directory, request),
         "fastq.qc.v1" => run_fastq_qc(base_directory, request),
         "fastq.trim.v1" => run_fastq_trim(base_directory, request),
@@ -171,6 +173,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "alignment.coverage.v1" => run_bam_cram_report(base_directory, request, "coverage"),
         "alignment.bam-to-bigwig.v1" => run_bam_to_bigwig(base_directory, request),
         "alignment.short-read.v1" => run_short_read_alignment(base_directory, request),
+        "alignment.long-read.v1" => run_long_read_alignment(base_directory, request),
         "expression.matrix.qc.v1" => run_expression_matrix_qc(base_directory, request),
         "medical.cohort-table.qc.v1" => run_cohort_table_qc(base_directory, request),
         "medical.single-cell-qc.v1" => run_single_cell_qc(base_directory, request),
@@ -233,6 +236,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "variant.filter.v1" => run_variant_filter(base_directory, request),
         "variant.normalize.v1" => run_variant_normalize(base_directory, request),
         "variant.to-table.v1" => run_variant_to_table(base_directory, request),
+        "variant.annotate.v1" => run_variant_annotate(base_directory, request),
         capability => Err(format!("unsupported capability: {capability}").into()),
     }
 }
@@ -4139,6 +4143,102 @@ fn run_short_read_alignment(base_directory: &Path, request: JobRequest) -> Worke
     serialize_v1_native_tool_result(request, analysis)
 }
 
+fn run_long_read_alignment(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["reference", "reads"],
+        &["output", "threads", "preset", "secondary"],
+    )?;
+    let reference = request
+        .inputs
+        .get("reference")
+        .ok_or("alignment.long-read.v1 requires inputs.reference")?;
+    let reads = request
+        .inputs
+        .get("reads")
+        .ok_or("alignment.long-read.v1 requires inputs.reads")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let reference = resolve_input(base_directory, reference);
+    let reads = resolve_input(base_directory, reads);
+    ensure_distinct_input_output(&reference, &output)?;
+    ensure_distinct_input_output(&reads, &output)?;
+    let preset = match request.parameters.get("preset") {
+        Some(value) => parse_minimap2_preset(
+            value
+                .as_str()
+                .ok_or("alignment.long-read.v1 preset must be a string")?,
+        )?,
+        None => Minimap2Preset::MapOnt,
+    };
+    let analysis = run_minimap2_long_read_path(
+        reference,
+        reads,
+        output,
+        &Minimap2LongReadOptions {
+            preset,
+            threads: optional_parameter_usize(&request.parameters, "threads")?.unwrap_or(1),
+            secondary: request
+                .parameters
+                .get("secondary")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
+            max_secondary: optional_parameter_usize(&request.parameters, "max_secondary")?
+                .unwrap_or(0),
+        },
+    )?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_variant_annotate(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["vcf"],
+        &["output", "database", "upstream_downstream", "no_stats"],
+    )?;
+    let vcf = request
+        .inputs
+        .get("vcf")
+        .ok_or("variant.annotate.v1 requires inputs.vcf")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let vcf = resolve_input(base_directory, vcf);
+    ensure_distinct_input_output(&vcf, &output)?;
+    let database = match request.parameters.get("database") {
+        Some(value) => value
+            .as_str()
+            .ok_or("variant.annotate.v1 database must be a string")?
+            .to_owned(),
+        None => "GRCh38.99".to_owned(),
+    };
+    let analysis = run_snpeff_path(
+        vcf,
+        output,
+        &SnpEffOptions {
+            database,
+            upstream_downstream: optional_parameter_usize(
+                &request.parameters,
+                "upstream_downstream",
+            )?,
+            no_stats: request
+                .parameters
+                .get("no_stats")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
+            no_log: request
+                .parameters
+                .get("no_log")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(true),
+        },
+    )?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
 fn resolve_required_v1_input(
     base_directory: &Path,
     request: &JobRequest,
@@ -5022,6 +5122,49 @@ fn run_environment_plan(base_directory: &Path, request: JobRequest) -> WorkerRes
         request.job_id,
         request.capability,
         plan,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_environment_apply(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    let profile = match request.parameters.get("profile") {
+        Some(value) => value
+            .as_str()
+            .ok_or("environment apply profile must be a string")?,
+        None => "full-local",
+    };
+    let mode = match request.parameters.get("mode") {
+        Some(value) => parse_environment_mode(
+            value
+                .as_str()
+                .ok_or("environment apply mode must be a string")?,
+        )?,
+        None => EnvironmentMode::ManagedUser,
+    };
+    let project_root = match request.parameters.get("project_root") {
+        Some(value) => Some(resolve_input(
+            base_directory,
+            value
+                .as_str()
+                .ok_or("environment apply project_root must be a string")?,
+        )),
+        None => None,
+    };
+    if mode != EnvironmentMode::ProjectIsolated && project_root.is_some() {
+        return Err("project_root is only valid in project-isolated mode".into());
+    }
+    let audit = audit_environment()?;
+    let plan = plan_environment_with_options(
+        profile,
+        &audit,
+        &EnvironmentPlanOptions { mode, project_root },
+    )?;
+    let apply_result = apply_environment(&plan)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        apply_result,
         ExecutionMode::LocalCpu,
     );
     Ok(serde_json::to_string(&result)?)

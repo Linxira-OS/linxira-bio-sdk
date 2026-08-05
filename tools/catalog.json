@@ -54,7 +54,7 @@
     {
       "id": "genomics-cli",
       "description": "Common alignment, variant, interval, and mapping tools",
-      "tools": ["samtools", "bcftools", "bedtools", "minimap2"]
+      "tools": ["samtools", "bcftools", "bedtools", "minimap2", "snpeff"]
     },
     {
       "id": "full-local",
@@ -80,7 +80,8 @@
         "samtools",
         "bcftools",
         "bedtools",
-        "minimap2"
+        "minimap2",
+        "snpeff"
       ]
     }
   ],
@@ -582,6 +583,34 @@
           "strategy": "pacman",
           "package": "minimap2",
           "source_url": "https://archlinux.org/packages/extra/x86_64/minimap2/",
+          "requires_admin": true
+        }
+      }
+    },
+    {
+      "id": "snpeff",
+      "display_name": "snpEff",
+      "category": "variant-annotation",
+      "probes": [
+        { "program": "snpEff", "args": ["-version"] }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "wsl-provider",
+          "package": "snpeff",
+          "source_url": "https://learn.microsoft.com/windows/wsl/install",
+          "requires_admin": true
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "snpeff",
+          "source_url": "https://packages.debian.org/stable/snpeff",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "snpeff",
+          "source_url": "https://aur.archlinux.org/packages/snpeff",
           "requires_admin": true
         }
       }
