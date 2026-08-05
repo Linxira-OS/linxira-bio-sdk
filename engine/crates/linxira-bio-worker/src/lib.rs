@@ -48,13 +48,14 @@ use linxira_bio_core::interval::{
     IntervalMergeOptions, bed_closest_path, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
 use linxira_bio_core::native_tools::{
-    HmmerOptions, IqtreeOptions, MemeOptions, Minimap2LongReadOptions, Minimap2Preset,
-    MuscleOptions, ShortReadAlignmentOptions, SimilaritySearchOptions, SnpEffOptions,
+    HmmerOptions, IqtreeOptions, MastOptions, MemeOptions, Minimap2LongReadOptions, Minimap2Preset,
+    MuscleOptions, ShortReadAlignmentOptions, SimilaritySearchOptions, SnpEffOptions, WgcnaOptions,
     parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
     parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
     run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path,
-    run_kaks_path, run_mcscanx_path, run_meme_path, run_minimap2_long_read_path, run_muscle_path,
-    run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path, run_trimal_path,
+    run_kaks_path, run_mast_path, run_mcscanx_path, run_meme_path, run_minimap2_long_read_path,
+    run_muscle_path, run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path,
+    run_trimal_path, run_wgcna_path,
 };
 use linxira_bio_core::phylogeny::{
     DistanceMatrixOptions, TreeTransformOptions, distance_matrix_path, transform_newick_path,
@@ -237,6 +238,8 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "variant.normalize.v1" => run_variant_normalize(base_directory, request),
         "variant.to-table.v1" => run_variant_to_table(base_directory, request),
         "variant.annotate.v1" => run_variant_annotate(base_directory, request),
+        "motif.mast.v1" => run_mast(base_directory, request),
+        "expression.wgcna.v1" => run_wgcna(base_directory, request),
         capability => Err(format!("unsupported capability: {capability}").into()),
     }
 }
@@ -4067,6 +4070,99 @@ fn run_meme_discovery(base_directory: &Path, request: JobRequest) -> WorkerResul
     );
     ensure_distinct_input_output(&input, &output)?;
     let analysis = run_meme_path(input, output, &meme_options(&request.parameters)?)?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_mast(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["motif", "sequences"],
+        &["output", "evalue", "threads", "hit_list"],
+    )?;
+    let motif = request
+        .inputs
+        .get("motif")
+        .ok_or("motif.mast.v1 requires inputs.motif")?;
+    let sequences = request
+        .inputs
+        .get("sequences")
+        .ok_or("motif.mast.v1 requires inputs.sequences")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let motif = resolve_input(base_directory, motif);
+    let sequences = resolve_input(base_directory, sequences);
+    ensure_distinct_input_output(&motif, &output)?;
+    ensure_distinct_input_output(&sequences, &output)?;
+    let evalue = optional_parameter_f64(&request.parameters, "evalue")?.unwrap_or(1e-5);
+    let analysis = run_mast_path(
+        motif,
+        sequences,
+        output,
+        &MastOptions {
+            threads: optional_parameter_usize(&request.parameters, "threads")?.unwrap_or(1),
+            evalue,
+            hit_list: request
+                .parameters
+                .get("hit_list")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
+            add_self_compat: request
+                .parameters
+                .get("add_self_compat")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
+        },
+    )?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_wgcna(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "expression",
+        &[
+            "output",
+            "threads",
+            "min_expression",
+            "min_samples",
+            "min_module_size",
+            "merge_cut_height",
+            "network_type",
+            "power",
+            "log_transform",
+        ],
+    )?;
+    let input = resolve_required_v1_input(base_directory, &request, "expression")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis = run_wgcna_path(
+        input,
+        output,
+        &WgcnaOptions {
+            threads: optional_parameter_usize(&request.parameters, "threads")?.unwrap_or(1),
+            min_expression: optional_parameter_f64(&request.parameters, "min_expression")?
+                .unwrap_or(1.0),
+            min_samples: optional_parameter_usize(&request.parameters, "min_samples")?.unwrap_or(3),
+            min_module_size: optional_parameter_usize(&request.parameters, "min_module_size")?
+                .unwrap_or(30),
+            merge_cut_height: optional_parameter_f64(&request.parameters, "merge_cut_height")?
+                .unwrap_or(0.25),
+            network_type: optional_parameter_string(&request.parameters, "network_type")?
+                .unwrap_or("signed")
+                .to_owned(),
+            power: optional_parameter_usize(&request.parameters, "power")?.unwrap_or(0),
+            log_transform: request
+                .parameters
+                .get("log_transform")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(true),
+        },
+    )?;
     serialize_v1_native_tool_result(request, analysis)
 }
 

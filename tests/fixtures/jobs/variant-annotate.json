@@ -5,6 +5,7 @@
   "inputs": {
     "vcf": "tests/fixtures/vcf/valid.vcf"
   },
+  "execution": {"mode": "local-cpu"},
   "parameters": {
     "output": "tests/fixtures/vcf/annotated.vcf",
     "database": "GRCh38.99"

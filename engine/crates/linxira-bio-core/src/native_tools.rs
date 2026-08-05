@@ -265,6 +265,25 @@ impl Default for SnpEffOptions {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct MastOptions {
+    pub threads: usize,
+    pub evalue: f64,
+    pub hit_list: bool,
+    pub add_self_compat: bool,
+}
+
+impl Default for MastOptions {
+    fn default() -> Self {
+        Self {
+            threads: 1,
+            evalue: 1e-5,
+            hit_list: false,
+            add_self_compat: false,
+        }
+    }
+}
+
 impl Default for MemeOptions {
     fn default() -> Self {
         Self {
@@ -857,6 +876,38 @@ pub fn run_snpeff_path(
     result
 }
 
+pub fn run_mast_path(
+    motif: impl AsRef<Path>,
+    sequences: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &MastOptions,
+) -> Result<NativeToolResult, NativeToolError> {
+    validate_threads(options.threads)?;
+    let motif = motif.as_ref();
+    let sequences = sequences.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[motif, sequences], output)?;
+    let temporary = create_temporary_directory(output, "mast")?;
+    let generated = temporary.join("mast.txt");
+    let result = (|| {
+        let executable = configured_program("LINXIRA_BIO_MAST", "mast");
+        let arguments = mast_arguments(motif, sequences, &temporary, options);
+        run_native_command(&executable, &arguments, false)?;
+        copy_generated_output("mast", &generated, output)?;
+        finish_result("mast", "motif-scan", output, options.threads, 1)
+    })();
+    let cleanup = fs::remove_dir_all(&temporary);
+    if let Err(error) = cleanup
+        && result.is_ok()
+    {
+        return Err(NativeToolError::Io(error));
+    }
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
 pub fn run_short_read_alignment_path(
     reference: impl AsRef<Path>,
     reads: impl AsRef<Path>,
@@ -1145,6 +1196,29 @@ pub fn snpeff_arguments(vcf: &Path, options: &SnpEffOptions) -> Vec<OsString> {
     args
 }
 
+pub fn mast_arguments(
+    motif: &Path,
+    sequences: &Path,
+    output_directory: &Path,
+    options: &MastOptions,
+) -> Vec<OsString> {
+    let mut args = vec![
+        motif.as_os_str().to_owned(),
+        sequences.as_os_str().to_owned(),
+        OsString::from("-oc"),
+        output_directory.as_os_str().to_owned(),
+        OsString::from("-mt"),
+        OsString::from(options.evalue.to_string()),
+    ];
+    if options.hit_list {
+        args.push(OsString::from("-hit_list"));
+    }
+    if options.add_self_compat {
+        args.push(OsString::from("-add_self_compat"));
+    }
+    args
+}
+
 pub fn parse_minimap2_preset(value: &str) -> Result<Minimap2Preset, NativeToolError> {
     match value {
         "map-ont" => Ok(Minimap2Preset::MapOnt),
@@ -1345,6 +1419,136 @@ fn remove_incomplete_output(output: &Path) {
     if output.is_file() {
         let _ = fs::remove_file(output);
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct WgcnaOptions {
+    pub threads: usize,
+    pub min_expression: f64,
+    pub min_samples: usize,
+    pub min_module_size: usize,
+    pub merge_cut_height: f64,
+    pub network_type: String,
+    pub power: usize,
+    pub log_transform: bool,
+}
+
+impl Default for WgcnaOptions {
+    fn default() -> Self {
+        Self {
+            threads: 1,
+            min_expression: 1.0,
+            min_samples: 3,
+            min_module_size: 30,
+            merge_cut_height: 0.25,
+            network_type: "signed".to_owned(),
+            power: 0,
+            log_transform: true,
+        }
+    }
+}
+
+pub fn run_wgcna_path(
+    expression: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &WgcnaOptions,
+) -> Result<NativeToolResult, NativeToolError> {
+    let expression = expression.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[expression], output)?;
+    let temporary = create_temporary_directory(output, "wgcna")?;
+    let result = (|| {
+        let executable = configured_program("LINXIRA_BIO_RSCRIPT", "Rscript");
+        let wgcna_script = find_wgcna_script()?;
+        let request_path = temporary.join("request.json");
+        let request = serde_json::json!({
+            "schema_version": "2",
+            "job_id": "linxira-wgcna-cli",
+            "capability": "expression.wgcna.v1",
+            "inputs": [{
+                "artifact_id": "expression",
+                "role": "expression",
+                "cardinality": "single",
+                "files": [{
+                    "file_id": "expr",
+                    "path": expression.to_string_lossy(),
+                    "format": if expression.to_string_lossy().ends_with(".tsv") { "tsv" } else { "csv" },
+                    "compression": "none",
+                    "size_bytes": expression.metadata().map(|m| m.len()).unwrap_or(0)
+                }]
+            }],
+            "execution": { "mode": "local-cpu" },
+            "parameters": {
+                "output_directory": temporary.to_string_lossy(),
+                "min_expression": options.min_expression,
+                "min_samples": options.min_samples,
+                "min_module_size": options.min_module_size,
+                "merge_cut_height": options.merge_cut_height,
+                "network_type": &options.network_type,
+                "power": options.power,
+                "log_transform": options.log_transform,
+                "threads": options.threads
+            }
+        });
+        fs::write(
+            &request_path,
+            serde_json::to_vec(&request).map_err(|e| {
+                NativeToolError::InvalidOption(format!("JSON serialization failed: {e}"))
+            })?,
+        )?;
+        let result_path = temporary.join("result.json");
+        let arguments: Vec<OsString> = vec![
+            wgcna_script.into(),
+            OsString::from("--request"),
+            request_path.into(),
+            OsString::from("--result"),
+            result_path.into(),
+        ];
+        let output_result = run_native_command(&executable, &arguments, false)?;
+        let result_json = temporary.join("result.json");
+        if !result_json.exists() {
+            let stderr = String::from_utf8_lossy(&output_result.stderr);
+            return Err(NativeToolError::InvalidOption(format!(
+                "WGCNA workflow did not produce result.json: {}",
+                stderr.trim()
+            )));
+        }
+        fs::copy(&result_json, output)?;
+        finish_result("wgcna", "co-expression-network", output, options.threads, 1)
+    })();
+    let cleanup = fs::remove_dir_all(&temporary);
+    if let Err(error) = cleanup
+        && result.is_ok()
+    {
+        return Err(NativeToolError::Io(error));
+    }
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
+fn find_wgcna_script() -> Result<PathBuf, NativeToolError> {
+    if let Ok(path) = std::env::var("LINXIRA_BIO_WGCNA_SCRIPT") {
+        let script = PathBuf::from(&path);
+        if script.exists() {
+            return Ok(script);
+        }
+    }
+    let candidates = [
+        "workflows/org.linxira.expression-wgcna/src/run_wgcna.R",
+        "../workflows/org.linxira.expression-wgcna/src/run_wgcna.R",
+    ];
+    for candidate in &candidates {
+        let path = PathBuf::from(candidate);
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+    Err(NativeToolError::InvalidOption(
+        "WGCNA R script not found; set LINXIRA_BIO_WGCNA_SCRIPT or run from the project root"
+            .to_owned(),
+    ))
 }
 
 fn stderr_summary(stderr: &[u8]) -> String {

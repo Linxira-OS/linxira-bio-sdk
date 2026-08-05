@@ -604,6 +604,15 @@
       "output_formats": ["json", "svg"]
     },
     {
+      "id": "expression.wgcna.v1",
+      "status": "available",
+      "category": "expression",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio expression wgcna <expression.csv|tsv> <output.json> --json",
+      "input_formats": ["csv", "tsv"],
+      "output_formats": ["csv", "json"]
+    },
+    {
       "id": "set.venn.v1",
       "status": "available",
       "category": "statistical-analysis",
@@ -755,6 +764,15 @@
       "command": "linxira-bio motif logo <input.meme> <output.svg> --json",
       "input_formats": ["meme-text"],
       "output_formats": ["svg", "json"]
+    },
+    {
+      "id": "motif.mast.v1",
+      "status": "available",
+      "category": "motif-analysis",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio motif mast <motif.meme> <sequences.fasta> <output.txt> --json",
+      "input_formats": ["meme-text", "fasta"],
+      "output_formats": ["mast-text", "json"]
     },
     {
       "id": "protein.secondary-structure.v1",
