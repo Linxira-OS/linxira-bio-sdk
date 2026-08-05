@@ -1,6 +1,6 @@
 ---
 name: manipulate-biological-sequences
-description: Run verified local Linxira Bio FASTA sequence-manipulation and analysis capabilities. Use for FASTA extraction, filtering, reverse complements, translation, ORFs, ID normalization, merge/split, FASTA-table conversion, exact k-mer counting, and simple exact-match electronic PCR.
+description: Run verified local Linxira Bio FASTA sequence-manipulation and analysis capabilities. Use for FASTA extraction, filtering, reverse complements, translation, ORFs, ID normalization, merge/split, FASTA-table conversion, exact k-mer counting, consensus-from-alignment, sequence-order shuffling, and simple exact-match electronic PCR.
 ---
 
 # Manipulate Biological Sequences
@@ -28,6 +28,8 @@ Use these local capabilities instead of writing ad-hoc FASTA scripts.
   `id`, `description`, `length`, and `sequence`.
 - Use `sequence.from-table.v1` to rebuild FASTA from CSV/TSV columns.
 - Use `sequence.kmer.count.v1` for exact k-mer counts with optional canonical reverse-complement collapsing.
+- Use `sequence.consensus.v1` to compute a majority-rule consensus from a multiple sequence alignment FASTA.
+- Use `sequence.shuffle.v1` to randomize the order of FASTA records with a reproducible seed.
 - Use `primer.epcr.v1` for exact-match primer pairs supplied as TSV columns `id`, `forward`, and `reverse`.
 
 Run `inspect-bio-dataset` first when the input format or compression is not
@@ -49,6 +51,8 @@ linxira-bio sequence split INPUT.fa split-dir --records-per-file 1000 --json
 linxira-bio sequence to-table INPUT.fa records.tsv --delimiter tsv --json
 linxira-bio sequence from-table records.tsv OUTPUT.fa --delimiter tsv --json
 linxira-bio sequence kmer-count INPUT.fa kmers.tsv --k 21 --canonical --top-n 50 --json
+linxira-bio sequence consensus alignment.fa consensus.fa --threshold 0.5 --json
+linxira-bio sequence shuffle INPUT.fa OUTPUT.fa --seed 42 --json
 linxira-bio primer epcr reference.fa primers.tsv amplicons.tsv --max-amplicon 5000 --json
 ```
 
@@ -74,3 +78,8 @@ When developing inside the source repository, prefix commands with
   spectrum as a genome-size or error estimate without a separate model.
 - For ePCR, report exact-match and 1-based inclusive coordinate limitations;
   do not claim experimental amplification success.
+- For consensus, verify that all input sequences have the same ungapped length
+  and report the threshold used; single-sequence inputs produce a warning but
+  are not rejected.
+- For shuffle, verify the output contains the same number of sequences and
+  total residues as the input; the seed guarantees reproducibility.

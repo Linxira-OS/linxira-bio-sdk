@@ -4,7 +4,8 @@ use linxira_bio_core::alignment::{SamQcMetrics, sam_qc_path};
 use linxira_bio_core::annotation::{
     AnnotationExtractOptions, AnnotationNormalizeOptions, AnnotationStats, GeneDensityOptions,
     GeneDensityResult, GenePositionOptions, annotation_gene_positions_path, annotation_stats_path,
-    extract_annotation_sequences_path, gene_density_path, normalize_annotation_path,
+    extract_annotation_sequences_path, gene_density_path, gxf_to_bed_path,
+    normalize_annotation_path,
 };
 use linxira_bio_core::cohort::{CohortTableQc, cohort_table_qc_path};
 use linxira_bio_core::coordinate::{
@@ -28,9 +29,9 @@ use linxira_bio_core::expression::{
 };
 use linxira_bio_core::fastq::{FastqQcMetrics, FastqQcOptions, QualityEncodingMode, fastq_qc_path};
 use linxira_bio_core::fastq_transform::{
-    FastqAdapterOptions, FastqDeduplicateKey, FastqDeduplicateOptions,
+    FastqAdapterOptions, FastqDeduplicateKey, FastqDeduplicateOptions, FastqSubsampleOptions,
     FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
-    fastq_deduplicate_path, fastq_trim_path,
+    fastq_deduplicate_path, fastq_subsample_path, fastq_trim_path,
 };
 use linxira_bio_core::functional::{
     AnnotationMapResult, EggnogNormalizeResult, EnrichmentKind, EnrichmentOptions,
@@ -50,7 +51,8 @@ use linxira_bio_core::native_tools::{
     run_muscle_path, run_samtools_report_path, run_short_read_alignment_path, run_trimal_path,
 };
 use linxira_bio_core::phylogeny::{
-    TreeTransformOptions, TreeTransformResult, read_tree_label_map_path, transform_newick_path,
+    DistanceMatrixOptions, DistanceMatrixResult, TreeTransformOptions, TreeTransformResult,
+    distance_matrix_path, read_tree_label_map_path, transform_newick_path,
 };
 use linxira_bio_core::protein::{ProteinPropertiesResult, protein_properties_path};
 use linxira_bio_core::runtime::{RuntimeProviderStatus, load_runtime_catalog};
@@ -63,7 +65,8 @@ use linxira_bio_core::scientific_visualization::{
 };
 use linxira_bio_core::sequence::{SequenceStats, fasta_stats_path};
 use linxira_bio_core::sequence_analysis::{
-    EpcrOptions, KmerCountOptions, count_kmers_path, epcr_path,
+    ConsensusOptions, EpcrOptions, KmerCountOptions, ShuffleOptions, consensus_from_alignment_path,
+    count_kmers_path, epcr_path, shuffle_sequences_path,
 };
 use linxira_bio_core::sequence_transform::{
     SequenceExtractOptions, SequenceFilterOptions, SequenceFromTableOptions,
@@ -87,7 +90,7 @@ use linxira_bio_core::table::{
 use linxira_bio_core::variant::{VcfStats, vcf_stats_path};
 use linxira_bio_core::variant_transform::{
     VariantComparisonResult, VariantFilterOptions, compare_vcf_paths, filter_vcf_path,
-    normalize_vcf_path,
+    normalize_vcf_path, vcf_to_table_path,
 };
 use linxira_bio_export::export_json_file;
 use linxira_bio_protocol::{
@@ -187,6 +190,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         {
             print_fastq_deduplicate(arguments)
         }
+        [fastq, subsample, arguments @ ..] if fastq == "fastq" && subsample == "subsample" => {
+            print_fastq_subsample(arguments)
+        }
         [alignment, qc, path] if alignment == "alignment" && qc == "qc" => {
             print_alignment_qc(path, false)
         }
@@ -227,6 +233,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if annotation == "annotation" && positions == "positions" =>
         {
             print_annotation_positions(arguments)
+        }
+        [annotation, to_bed, arguments @ ..]
+            if annotation == "annotation" && to_bed == "to-bed" =>
+        {
+            print_annotation_to_bed(arguments)
         }
         [annotation, extract, arguments @ ..]
             if annotation == "annotation" && extract == "extract" =>
@@ -340,6 +351,14 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         {
             print_sequence_kmer_count(arguments)
         }
+        [sequence, consensus, arguments @ ..]
+            if sequence == "sequence" && consensus == "consensus" =>
+        {
+            print_sequence_consensus(arguments)
+        }
+        [sequence, shuffle, arguments @ ..] if sequence == "sequence" && shuffle == "shuffle" => {
+            print_sequence_shuffle(arguments)
+        }
         [primer, epcr, arguments @ ..] if primer == "primer" && epcr == "epcr" => {
             print_primer_epcr(arguments)
         }
@@ -376,6 +395,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if variant == "variant" && normalize == "normalize" =>
         {
             print_variant_normalize(arguments)
+        }
+        [variant, to_table, arguments @ ..] if variant == "variant" && to_table == "to-table" => {
+            print_variant_to_table(arguments)
         }
         [interval, intersect, left, right]
             if interval == "interval" && intersect == "intersect" =>
@@ -582,6 +604,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         [phylogeny, tree, arguments @ ..] if phylogeny == "phylogeny" && tree == "tree" => {
             print_phylogeny_tree(arguments)
+        }
+        [phylogeny, distance, arguments @ ..]
+            if phylogeny == "phylogeny" && distance == "distance" =>
+        {
+            print_phylogeny_distance(arguments)
         }
         [phylogeny, iqtree, arguments @ ..] if phylogeny == "phylogeny" && iqtree == "iqtree" => {
             print_iqtree(arguments)
@@ -1746,6 +1773,74 @@ fn print_sequence_kmer_count(arguments: &[String]) -> Result<(), Box<dyn Error>>
     )
 }
 
+fn print_sequence_consensus(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = ConsensusOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--threshold" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--threshold requires a value")?;
+                options.threshold = value
+                    .parse::<f64>()
+                    .map_err(|_| format!("--threshold requires a number, got {value:?}"))?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence consensus option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "sequence consensus")?,
+        }
+        index += 1;
+    }
+    let (input, output) = require_sequence_paths(input, output, "sequence consensus")?;
+    let summary = consensus_from_alignment_path(input, output, &options)?;
+    print_sequence_transform_result(
+        "sequence-consensus",
+        "sequence.consensus.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
+fn print_sequence_shuffle(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = ShuffleOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--seed" => {
+                index += 1;
+                options.seed = arguments
+                    .get(index)
+                    .ok_or("--seed requires a value")?
+                    .parse()?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence shuffle option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "sequence shuffle")?,
+        }
+        index += 1;
+    }
+    let (input, output) = require_sequence_paths(input, output, "sequence shuffle")?;
+    let summary = shuffle_sequences_path(input, output, &options)?;
+    print_sequence_transform_result(
+        "sequence-shuffle",
+        "sequence.shuffle.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
 fn print_primer_epcr(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     let mut paths = Vec::new();
     let mut options = EpcrOptions::default();
@@ -1984,6 +2079,60 @@ fn print_fastq_deduplicate(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     )
 }
 
+fn print_fastq_subsample(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = FastqSubsampleOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--target-count" => {
+                index += 1;
+                options.target_count = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--target-count requires a value")?
+                        .parse()?,
+                );
+            }
+            "--fraction" => {
+                index += 1;
+                options.fraction = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--fraction requires a value")?
+                        .parse()?,
+                );
+            }
+            "--seed" => {
+                index += 1;
+                options.seed = arguments
+                    .get(index)
+                    .ok_or("--seed requires a value")?
+                    .parse()?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown FASTQ subsample option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "fastq subsample")?,
+        }
+        index += 1;
+    }
+    let input = input.ok_or("fastq subsample requires an input FASTQ path")?;
+    let output = output.ok_or("fastq subsample requires an output FASTQ path")?;
+    let output = Path::new(output);
+    let summary = fastq_subsample_path(Path::new(input), output, &options)?;
+    print_sequence_transform_result(
+        "fastq-subsample",
+        "fastq.subsample.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
 fn parse_fastq_transform_quality_encoding(
     value: Option<&String>,
     option: &str,
@@ -2129,6 +2278,32 @@ fn print_variant_normalize(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     )
 }
 
+fn print_variant_to_table(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut json = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown variant to-table option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "variant to-table")?,
+        }
+    }
+    let input = input.ok_or("variant to-table requires an input VCF path")?;
+    let output = output.ok_or("variant to-table requires an output TSV path")?;
+    let output = Path::new(output);
+    let summary = vcf_to_table_path(Path::new(input), output)?;
+    print_sequence_transform_result(
+        "variant-to-table",
+        "variant.to-table.v1",
+        output,
+        summary,
+        json,
+    )
+}
+
 fn print_annotation_stats(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     let mut input = None;
     let mut json = false;
@@ -2236,6 +2411,46 @@ fn print_annotation_positions(arguments: &[String]) -> Result<(), Box<dyn Error>
     print_sequence_transform_result(
         "annotation-positions",
         "annotation.gene-position.v1",
+        Path::new(output),
+        summary,
+        json,
+    )
+}
+
+fn print_annotation_to_bed(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut feature_types = Vec::new();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--feature-types" => {
+                index += 1;
+                let raw = arguments
+                    .get(index)
+                    .ok_or("--feature-types requires a comma-separated list")?;
+                feature_types = raw.split(',').map(|s| s.trim().to_owned()).collect();
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown annotation to-bed option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "annotation to-bed")?,
+        }
+        index += 1;
+    }
+    let input = input.ok_or("annotation to-bed requires an input GFF3 or GTF path")?;
+    let output = output.ok_or("annotation to-bed requires an output BED path")?;
+    let feature_types = if feature_types.is_empty() {
+        vec!["gene".to_owned()]
+    } else {
+        feature_types
+    };
+    let summary = gxf_to_bed_path(input, output, &feature_types)?;
+    print_sequence_transform_result(
+        "annotation-to-bed",
+        "annotation.gxf.to-bed.v1",
         Path::new(output),
         summary,
         json,
@@ -3970,6 +4185,63 @@ fn print_phylogeny_tree_text(result: &TreeTransformResult) {
     }
 }
 
+fn print_phylogeny_distance(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = DistanceMatrixOptions {
+        model: "p-distance".to_owned(),
+    };
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--model" => {
+                index += 1;
+                options.model = arguments
+                    .get(index)
+                    .ok_or("--model requires a model name")?
+                    .clone();
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown phylogeny distance option: {value}").into());
+            }
+            value => assign_sequence_path(&mut input, &mut output, value, "phylogeny distance")?,
+        }
+        index += 1;
+    }
+    let input = input.ok_or("phylogeny distance requires an input alignment FASTA path")?;
+    let output = output.ok_or("phylogeny distance requires an output TSV path")?;
+    let result = distance_matrix_path(input, output, &options)?;
+    if json {
+        print_analysis_json_with_warnings(
+            "phylogeny-distance",
+            "phylogeny.distance.v1",
+            result.clone(),
+            result.warnings,
+        )
+    } else {
+        print_phylogeny_distance_text(&result);
+        Ok(())
+    }
+}
+
+fn print_phylogeny_distance_text(result: &DistanceMatrixResult) {
+    println!("sequence_count\t{}", result.sequence_count);
+    println!("alignment_length\t{}", result.alignment_length);
+    println!(
+        "compared_position_count\t{}",
+        result.compared_position_count
+    );
+    println!("model\t{}", result.model);
+    for entry in &result.distances {
+        println!("{}\t{}\t{:.10}", entry.seq_a, entry.seq_b, entry.distance);
+    }
+    for warning in &result.warnings {
+        println!("warning\t{warning}");
+    }
+}
+
 fn print_protein_properties(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
     let result = protein_properties_path(path)?;
     if json {
@@ -4589,11 +4861,14 @@ fn usage() -> &'static str {
         "  linxira-bio sequence to-table <input.fasta[.gz]> <output.csv|tsv> [--delimiter csv|tsv] [--no-header] [--json]\n",
         "  linxira-bio sequence from-table <input.csv|tsv[.gz]> <output.fasta> [--delimiter csv|tsv] [--id-column NAME] [--sequence-column NAME] [--description-column NAME|--no-description-column] [--json]\n",
         "  linxira-bio sequence kmer-count <input.fasta[.gz]> <output.tsv> [--k N] [--canonical] [--top-n N] [--json]\n",
+        "  linxira-bio sequence consensus <input.alignment.fasta> <output.fasta> [--threshold FLOAT] [--json]\n",
+        "  linxira-bio sequence shuffle <input.fasta[.gz]> <output.fasta> [--seed N] [--json]\n",
         "  linxira-bio primer epcr <reference.fasta[.gz]> <primers.tsv> <output.tsv> [--min-amplicon N] [--max-amplicon N] [--max-hits N] [--json]\n",
         "  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n",
         "  linxira-bio fastq trim <input.fastq[.gz]> <output.fastq> [--min-quality N] [--min-length N] [--quality-encoding phred+33|phred+64] [--json]\n",
         "  linxira-bio fastq adapter-trim <input.fastq[.gz]> <output.fastq> [--adapter SEQ ...] [--min-overlap N] [--min-length N] [--json]\n",
         "  linxira-bio fastq deduplicate <input.fastq[.gz]> <output.fastq> [--header-umi-delimiter TEXT | --sequence-prefix-umi N] [--json]\n",
+        "  linxira-bio fastq subsample <input.fastq[.gz]> <output.fastq> [--target-count N | --fraction F] [--seed N] [--json]\n",
         "  linxira-bio alignment qc <input.sam[.gz]> [--json]\n",
         "  linxira-bio alignment bam-cram-qc <input.bam|cram> <output.tsv> [--reference reference.fasta] [--json]\n",
         "  linxira-bio alignment coverage <input.bam|cram> <output.tsv> [--reference reference.fasta] [--json]\n",
@@ -4611,6 +4886,7 @@ fn usage() -> &'static str {
         "  linxira-bio variant compare <left.vcf[.gz]> <right.vcf[.gz]> [--json]\n",
         "  linxira-bio variant filter <input.vcf[.gz]> <output.vcf> [--min-qual Q] [--pass-only] [--contig NAME ...] [--min-info-dp N] [--json]\n",
         "  linxira-bio variant normalize <input.vcf[.gz]> <reference.fasta[.gz]> <output.vcf> [--json]\n",
+        "  linxira-bio variant to-table <input.vcf[.gz]> <output.tsv> [--json]\n",
         "  linxira-bio interval intersect <left.bed[.gz]> <right.bed[.gz]> [--json]\n",
         "  linxira-bio interval merge <input.bed[.gz]> <output.bed> [--max-gap N] [--json]\n",
         "  linxira-bio interval subtract <left.bed[.gz]> <right.bed[.gz]> <output.bed> [--json]\n",
@@ -4643,6 +4919,7 @@ fn usage() -> &'static str {
         "  linxira-bio protein domains <interproscan.tsv|hmmer.domtblout[.gz]> [--json]\n",
         "  linxira-bio protein domain-plot <interproscan.tsv|hmmer.domtblout[.gz]> <output.svg> [--sequence-id ID] [--max-sequences N] [--max-domains N] [--json]\n",
         "  linxira-bio phylogeny tree <input.nwk[.gz]> <output.nwk> [--reroot LEAF] [--label-map labels.tsv] [--json]\n",
+        "  linxira-bio phylogeny distance <input.alignment.fasta> <output.tsv> [--model p-distance|jc69|k80] [--json]\n",
         "  linxira-bio msa muscle <input.fasta> <output.fasta> [--mode align|super5] [--threads N] [--json]\n",
         "  linxira-bio msa trimal <input.alignment> <output.alignment> [--mode automated1|gappyout|strict|strictplus|nogaps] [--json]\n",
         "  linxira-bio phylogeny iqtree <alignment> <output.newick> [--threads N] [--model MODEL] [--seed N] [--json]\n",

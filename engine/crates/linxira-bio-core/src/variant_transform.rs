@@ -390,6 +390,14 @@ pub struct VariantNormalizeSummary {
     pub reference_validated_records: u64,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct VcfToTableSummary {
+    pub input_record_count: u64,
+    pub output_record_count: u64,
+    pub sample_count: u64,
+    pub warnings: Vec<String>,
+}
+
 pub fn normalize_vcf_path(
     input: impl AsRef<Path>,
     reference: impl AsRef<Path>,
@@ -685,6 +693,225 @@ fn with_new_vcf_output(
     }
 }
 
+pub fn vcf_to_table_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+) -> Result<VcfToTableSummary, VcfError> {
+    let input = input.as_ref();
+    let output = output.as_ref();
+    if output.exists() {
+        return Err(VcfError::Io(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!(
+                "refusing to overwrite existing output: {}",
+                output.display()
+            ),
+        )));
+    }
+
+    let mut magic = [0_u8; 2];
+    let magic_length = File::open(input)?.read(&mut magic)?;
+    let input_reader: Box<dyn Read> = if magic_length == magic.len() && magic == [0x1f, 0x8b] {
+        Box::new(MultiGzDecoder::new(File::open(input)?))
+    } else {
+        Box::new(File::open(input)?)
+    };
+
+    let mut reader = BufReader::new(input_reader);
+    let mut buffer = String::new();
+    let mut line_number = 0_usize;
+    let mut sample_names: Vec<String> = Vec::new();
+    let mut header_found = false;
+    let mut saw_file_format = false;
+
+    // Read header lines
+    loop {
+        line_number += 1;
+        buffer.clear();
+        let bytes_read = reader
+            .read_line(&mut buffer)
+            .map_err(|source| VcfError::ReadLine {
+                line: line_number,
+                source,
+            })?;
+        if bytes_read == 0 {
+            break;
+        }
+
+        let line = buffer.trim_end_matches(['\r', '\n']);
+        if line_number == 1 {
+            if !line.starts_with("##fileformat=VCFv") {
+                return Err(VcfError::InvalidHeader {
+                    line: 1,
+                    message: "the first line must be a ##fileformat=VCFv... declaration".to_owned(),
+                });
+            }
+            saw_file_format = true;
+            continue;
+        }
+        if line.starts_with("##") {
+            continue;
+        }
+        if line.starts_with('#') {
+            if !saw_file_format {
+                return Err(VcfError::InvalidHeader {
+                    line: line_number,
+                    message: "missing fileformat declaration".to_owned(),
+                });
+            }
+            let columns: Vec<&str> = line.split('\t').collect();
+            const REQUIRED: [&str; 8] = [
+                "#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO",
+            ];
+            if columns.len() < REQUIRED.len() {
+                return Err(VcfError::InvalidHeader {
+                    line: line_number,
+                    message: format!(
+                        "expected at least 8 tab-separated columns, found {}",
+                        columns.len()
+                    ),
+                });
+            }
+            for (index, expected) in REQUIRED.iter().enumerate() {
+                if columns[index] != *expected {
+                    return Err(VcfError::InvalidHeader {
+                        line: line_number,
+                        message: format!(
+                            "column {} must be {expected}, found {:?}",
+                            index + 1,
+                            columns[index]
+                        ),
+                    });
+                }
+            }
+            if columns.len() > REQUIRED.len() && columns[8] != "FORMAT" {
+                return Err(VcfError::InvalidHeader {
+                    line: line_number,
+                    message: format!("column 9 must be FORMAT, found {:?}", columns[8]),
+                });
+            }
+            sample_names = columns
+                .get(9..)
+                .unwrap_or_default()
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            header_found = true;
+            break;
+        }
+        return Err(VcfError::InvalidHeader {
+            line: line_number,
+            message: "record data appears before the #CHROM column header".to_owned(),
+        });
+    }
+
+    if !header_found {
+        return Err(VcfError::MissingHeader);
+    }
+
+    let sample_count = u64::try_from(sample_names.len()).expect("sample count fits in u64");
+
+    // Write output
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(output)?;
+    let mut writer = BufWriter::new(file);
+
+    let result = (|| -> Result<VcfToTableSummary, VcfError> {
+        // Write header
+        let mut header_parts = vec![
+            "CHROM".to_owned(),
+            "POS".to_owned(),
+            "ID".to_owned(),
+            "REF".to_owned(),
+            "ALT".to_owned(),
+            "QUAL".to_owned(),
+            "FILTER".to_owned(),
+            "INFO".to_owned(),
+        ];
+        for name in &sample_names {
+            header_parts.push(name.clone());
+        }
+        writeln!(writer, "{}", header_parts.join("\t")).map_err(VcfError::Io)?;
+
+        let mut input_record_count = 0_u64;
+        let mut warnings = Vec::new();
+
+        // Read records
+        loop {
+            buffer.clear();
+            let bytes_read =
+                reader
+                    .read_line(&mut buffer)
+                    .map_err(|source| VcfError::ReadLine {
+                        line: line_number + 1,
+                        source,
+                    })?;
+            if bytes_read == 0 {
+                break;
+            }
+            line_number += 1;
+
+            let line = buffer.trim_end_matches(['\r', '\n']);
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
+            let columns: Vec<&str> = line.split('\t').collect();
+            if columns.len() < 8 {
+                continue;
+            }
+
+            input_record_count += 1;
+
+            let mut row_parts = Vec::with_capacity(8 + sample_names.len());
+            for column in columns.iter().take(8) {
+                row_parts.push(column.to_string());
+            }
+            for _ in 0..sample_names.len() {
+                row_parts.push(".".to_owned());
+            }
+
+            if sample_names.is_empty() {
+                // no samples
+            } else if columns.len() > 8 {
+                let sample_cols = &columns[9..];
+                for (i, sample_col) in sample_cols.iter().enumerate() {
+                    if i < sample_names.len() {
+                        row_parts[8 + i] = sample_col.to_string();
+                    }
+                }
+            }
+
+            writeln!(writer, "{}", row_parts.join("\t")).map_err(VcfError::Io)?;
+        }
+
+        if input_record_count == 0 {
+            warnings.push("VCF contains no variant records".to_owned());
+        }
+
+        Ok(VcfToTableSummary {
+            input_record_count,
+            output_record_count: input_record_count,
+            sample_count,
+            warnings,
+        })
+    })();
+
+    match result {
+        Ok(summary) => {
+            writer.flush().map_err(VcfError::Io)?;
+            Ok(summary)
+        }
+        Err(error) => {
+            drop(writer);
+            let _ = fs::remove_file(output);
+            Err(error)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -949,5 +1176,121 @@ mod tests {
         assert!(!output.exists());
         let _ = fs::remove_file(fasta);
         let _ = fs::remove_file(input);
+    }
+
+    #[test]
+    fn converts_vcf_to_tsv_table() {
+        let input = temp_path("to-table.vcf");
+        let output = temp_path("to-table.tsv");
+        fs::write(
+            &input,
+            concat!(
+                "##fileformat=VCFv4.3\n",
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample1\tsample2\n",
+                "chr1\t100\trs1\tA\tG\t50\tPASS\tDP=20\tGT:DP\t0/1:10\t1/1:15\n",
+                "chr2\t200\t.\tC\tT,<DEL>\t.\t.\t.\tGT\t0/0\t./.\n",
+            ),
+        )
+        .unwrap();
+
+        let summary = vcf_to_table_path(&input, &output).unwrap();
+        assert_eq!(summary.input_record_count, 2);
+        assert_eq!(summary.output_record_count, 2);
+        assert_eq!(summary.sample_count, 2);
+        assert!(summary.warnings.is_empty());
+
+        let content = fs::read_to_string(&output).unwrap();
+        let lines: Vec<&str> = content.lines().collect();
+        assert_eq!(lines.len(), 3);
+        // Header
+        assert_eq!(
+            lines[0],
+            "CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tsample1\tsample2"
+        );
+        // First record
+        assert!(lines[1].starts_with("chr1\t100\trs1\tA\tG\t50\tPASS\tDP=20\t"));
+        assert!(lines[1].contains("0/1:10"));
+        assert!(lines[1].contains("1/1:15"));
+        // Second record
+        assert!(lines[2].starts_with("chr2\t200\t.\tC\tT,<DEL>\t.\t.\t.\t"));
+        assert!(lines[2].contains("0/0"));
+        assert!(lines[2].contains("./."));
+
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+
+    #[test]
+    fn converts_vcf_without_samples_to_tsv() {
+        let input = temp_path("to-table-nosamples.vcf");
+        let output = temp_path("to-table-nosamples.tsv");
+        fs::write(
+            &input,
+            concat!(
+                "##fileformat=VCFv4.3\n",
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n",
+                "chr1\t100\t.\tA\tG\t50\tPASS\t.\n",
+            ),
+        )
+        .unwrap();
+
+        let summary = vcf_to_table_path(&input, &output).unwrap();
+        assert_eq!(summary.input_record_count, 1);
+        assert_eq!(summary.sample_count, 0);
+
+        let content = fs::read_to_string(&output).unwrap();
+        let lines: Vec<&str> = content.lines().collect();
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0], "CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO");
+
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+
+    #[test]
+    fn refuses_to_overwrite_existing_output() {
+        let input = temp_path("to-table-exists.vcf");
+        let output = temp_path("to-table-exists.tsv");
+        fs::write(
+            &input,
+            concat!(
+                "##fileformat=VCFv4.3\n",
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n",
+                "chr1\t100\t.\tA\tG\t50\tPASS\t.\n",
+            ),
+        )
+        .unwrap();
+        fs::write(&output, "existing\n").unwrap();
+
+        let result = vcf_to_table_path(&input, &output);
+        assert!(result.is_err());
+
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+
+    #[test]
+    fn reads_gzip_vcf_for_to_table() {
+        let output = temp_path("to-table-gzip.tsv");
+        let vcf_content = concat!(
+            "##fileformat=VCFv4.3\n",
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n",
+            "chr1\t1\t.\tA\tG\t.\tPASS\t.\n",
+        );
+
+        use flate2::{Compression, write::GzEncoder};
+        let input = temp_path("to-table-gzip.vcf.gz");
+        let mut encoder = GzEncoder::new(fs::File::create(&input).unwrap(), Compression::default());
+        encoder.write_all(vcf_content.as_bytes()).unwrap();
+        encoder.finish().unwrap();
+
+        let summary = vcf_to_table_path(&input, &output).unwrap();
+        assert_eq!(summary.input_record_count, 1);
+
+        let content = fs::read_to_string(&output).unwrap();
+        assert!(content.contains("chr1\t1\t.\tA\tG\t.\tPASS\t."));
+
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
     }
 }

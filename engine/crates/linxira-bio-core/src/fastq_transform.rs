@@ -1,4 +1,6 @@
 use flate2::read::MultiGzDecoder;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::error::Error;
@@ -788,12 +790,197 @@ fn temporary_output_path(output: &Path) -> PathBuf {
     temporary
 }
 
+// ── Read subsampling ────────────────────────────────────────────────────────
+
+pub const DEFAULT_SUBSAMPLE_SEED: u64 = 42;
+
+#[derive(Debug, Clone)]
+pub struct FastqSubsampleOptions {
+    pub target_count: Option<u64>,
+    pub fraction: Option<f64>,
+    pub seed: u64,
+}
+
+impl Default for FastqSubsampleOptions {
+    fn default() -> Self {
+        Self {
+            target_count: None,
+            fraction: None,
+            seed: DEFAULT_SUBSAMPLE_SEED,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct FastqSubsampleSummary {
+    pub input_read_count: u64,
+    pub output_read_count: u64,
+    pub input_bases: u64,
+    pub output_bases: u64,
+    pub target_count: Option<u64>,
+    pub fraction: Option<f64>,
+    pub seed: u64,
+    pub warnings: Vec<String>,
+}
+
+pub fn fastq_subsample_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &FastqSubsampleOptions,
+) -> Result<FastqSubsampleSummary, FastqTransformError> {
+    validate_subsample_options(options)?;
+    let input = input.as_ref();
+    let output = output.as_ref();
+    if output.exists() {
+        return Err(FastqTransformError::OutputAlreadyExists(output.to_owned()));
+    }
+
+    let mut reader = open_fastq(input)?;
+    let mut line = Vec::new();
+
+    // First pass: count total reads
+    let mut total_reads = 0_u64;
+    let mut total_bases = 0_u64;
+    while let Some(record) = read_record(&mut reader, &mut line, total_reads + 1)? {
+        total_reads += 1;
+        total_bases += record.sequence.len() as u64;
+    }
+
+    if total_reads == 0 {
+        return Err(FastqTransformError::NoRecords);
+    }
+
+    let target = determine_target_count(options, total_reads)?;
+    if target == 0 {
+        return Err(FastqTransformError::InvalidOption(
+            "subsample target count is zero".to_owned(),
+        ));
+    }
+
+    let mut warnings = Vec::new();
+    let (output_count, output_bases) = if target >= total_reads {
+        warnings.push(format!(
+            "target count ({target}) is >= input read count ({total_reads}); outputting all reads"
+        ));
+        // Re-read and copy all
+        let mut reader = open_fastq(input)?;
+        let temporary = temporary_output_path(output);
+        let mut writer = BufWriter::new(
+            OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temporary)?,
+        );
+        let mut out_count = 0_u64;
+        let mut out_bases = 0_u64;
+        while let Some(record) = read_record(&mut reader, &mut line, out_count + 1)? {
+            write_record(&mut writer, &record)?;
+            out_count += 1;
+            out_bases += record.sequence.len() as u64;
+        }
+        writer.flush()?;
+        drop(writer);
+        fs::rename(&temporary, output)?;
+        (out_count, out_bases)
+    } else {
+        // Reservoir sampling: select exactly `target` reads
+        let mut rng = StdRng::seed_from_u64(options.seed);
+        let mut reservoir: Vec<FastqRecord> = Vec::with_capacity(target as usize);
+        let mut reader = open_fastq(input)?;
+
+        for i in 1_u64..=target {
+            let record =
+                read_record(&mut reader, &mut line, i)?.ok_or(FastqTransformError::NoRecords)?;
+            reservoir.push(record);
+        }
+
+        for i in (target + 1)..=total_reads {
+            let record =
+                read_record(&mut reader, &mut line, i)?.ok_or(FastqTransformError::NoRecords)?;
+            let j = rng.gen_range(0..i);
+            if j < target {
+                reservoir[j as usize] = record;
+            }
+        }
+
+        let temporary = temporary_output_path(output);
+        let mut writer = BufWriter::new(
+            OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temporary)?,
+        );
+        let mut out_count = 0_u64;
+        let mut out_bases = 0_u64;
+        for record in &reservoir {
+            write_record(&mut writer, record)?;
+            out_count += 1;
+            out_bases += record.sequence.len() as u64;
+        }
+        writer.flush()?;
+        drop(writer);
+        fs::rename(&temporary, output)?;
+        (out_count, out_bases)
+    };
+
+    Ok(FastqSubsampleSummary {
+        input_read_count: total_reads,
+        output_read_count: output_count,
+        input_bases: total_bases,
+        output_bases,
+        target_count: if options.target_count.is_some() {
+            Some(target)
+        } else {
+            None
+        },
+        fraction: options.fraction,
+        seed: options.seed,
+        warnings,
+    })
+}
+
+fn validate_subsample_options(options: &FastqSubsampleOptions) -> Result<(), FastqTransformError> {
+    match (options.target_count, options.fraction) {
+        (None, None) => Err(FastqTransformError::InvalidOption(
+            "subsample requires either --target-count or --fraction".to_owned(),
+        )),
+        (Some(_), Some(_)) => Err(FastqTransformError::InvalidOption(
+            "subsample accepts --target-count or --fraction, not both".to_owned(),
+        )),
+        (Some(0), None) => Err(FastqTransformError::InvalidOption(
+            "target-count must be at least 1".to_owned(),
+        )),
+        (None, Some(fraction)) if !(fraction.is_finite() && fraction > 0.0 && fraction <= 1.0) => {
+            Err(FastqTransformError::InvalidOption(
+                "fraction must be between 0.0 (exclusive) and 1.0".to_owned(),
+            ))
+        }
+        _ => Ok(()),
+    }
+}
+
+fn determine_target_count(
+    options: &FastqSubsampleOptions,
+    total_reads: u64,
+) -> Result<u64, FastqTransformError> {
+    if let Some(count) = options.target_count {
+        Ok(count)
+    } else if let Some(fraction) = options.fraction {
+        let count = (total_reads as f64 * fraction).ceil() as u64;
+        Ok(count.max(1))
+    } else {
+        Err(FastqTransformError::InvalidOption(
+            "subsample requires either --target-count or --fraction".to_owned(),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        FastqAdapterOptions, FastqDeduplicateKey, FastqDeduplicateOptions,
+        FastqAdapterOptions, FastqDeduplicateKey, FastqDeduplicateOptions, FastqSubsampleOptions,
         FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
-        fastq_deduplicate_path, fastq_trim_path,
+        fastq_deduplicate_path, fastq_subsample_path, fastq_trim_path,
     };
     use flate2::Compression;
     use flate2::write::GzEncoder;
@@ -982,6 +1169,88 @@ mod tests {
 
         assert!(error.to_string().contains("must exceed UMI prefix length"));
         assert!(!output.exists());
+        cleanup(&[input, output]);
+    }
+
+    #[test]
+    fn subsamples_by_target_count_with_reservoir() {
+        let input = temporary_path("subsample-count-input.fastq");
+        let output = temporary_path("subsample-count-output.fastq");
+        // 10 reads
+        let mut data = Vec::new();
+        for i in 0..10 {
+            data.extend_from_slice(format!("@read{i}\nACGT\n+\nIIII\n").as_bytes());
+        }
+        fs::write(&input, &data).expect("write subsample fixture");
+
+        let summary = fastq_subsample_path(
+            &input,
+            &output,
+            &FastqSubsampleOptions {
+                target_count: Some(5),
+                fraction: None,
+                seed: 42,
+            },
+        )
+        .expect("subsample FASTQ");
+
+        assert_eq!(summary.input_read_count, 10);
+        assert_eq!(summary.output_read_count, 5);
+        assert_eq!(summary.input_bases, 40);
+        assert_eq!(summary.output_bases, 20);
+        assert!(summary.warnings.is_empty());
+        cleanup(&[input, output]);
+    }
+
+    #[test]
+    fn subsamples_by_fraction() {
+        let input = temporary_path("subsample-fraction-input.fastq");
+        let output = temporary_path("subsample-fraction-output.fastq");
+        let mut data = Vec::new();
+        for i in 0..10 {
+            data.extend_from_slice(format!("@read{i}\nACGT\n+\nIIII\n").as_bytes());
+        }
+        fs::write(&input, &data).expect("write subsample fixture");
+
+        let summary = fastq_subsample_path(
+            &input,
+            &output,
+            &FastqSubsampleOptions {
+                target_count: None,
+                fraction: Some(0.3),
+                seed: 42,
+            },
+        )
+        .expect("subsample FASTQ");
+
+        assert_eq!(summary.input_read_count, 10);
+        assert_eq!(summary.output_read_count, 3);
+        assert!(summary.warnings.is_empty());
+        cleanup(&[input, output]);
+    }
+
+    #[test]
+    fn subsample_target_exceeds_total_warns_and_outputs_all() {
+        let input = temporary_path("subsample-overflow-input.fastq");
+        let output = temporary_path("subsample-overflow-output.fastq");
+        fs::write(&input, b"@read1\nACGT\n+\nIIII\n@read2\nTGCA\n+\nHHHH\n")
+            .expect("write subsample fixture");
+
+        let summary = fastq_subsample_path(
+            &input,
+            &output,
+            &FastqSubsampleOptions {
+                target_count: Some(100),
+                fraction: None,
+                seed: 42,
+            },
+        )
+        .expect("subsample FASTQ");
+
+        assert_eq!(summary.input_read_count, 2);
+        assert_eq!(summary.output_read_count, 2);
+        assert_eq!(summary.warnings.len(), 1);
+        assert!(summary.warnings[0].contains("outputting all reads"));
         cleanup(&[input, output]);
     }
 

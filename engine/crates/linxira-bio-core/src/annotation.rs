@@ -117,6 +117,28 @@ pub struct GenePositionSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GxfToBedOptions {
+    pub feature_types: Vec<String>,
+}
+
+impl Default for GxfToBedOptions {
+    fn default() -> Self {
+        Self {
+            feature_types: vec!["gene".to_owned()],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct GxfToBedSummary {
+    pub input_record_count: u64,
+    pub output_record_count: u64,
+    pub skipped_no_id_count: u64,
+    pub feature_types: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnnotationExtractOptions {
     pub feature_type: String,
     pub promoter_length: u64,
@@ -572,6 +594,61 @@ pub fn annotation_gene_positions_path(
         summary.warnings.push(format!(
             "{} matching records were skipped because they had no usable identifier",
             summary.missing_identifier_count
+        ));
+    }
+    Ok(summary)
+}
+
+pub fn gxf_to_bed_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    feature_types: &[String],
+) -> Result<GxfToBedSummary, AnnotationError> {
+    let parsed = read_annotation_path(input.as_ref())?;
+    let wanted = normalize_feature_types(feature_types)?;
+    let mut summary = GxfToBedSummary {
+        input_record_count: parsed.records.len() as u64,
+        feature_types: wanted.iter().cloned().collect(),
+        ..Default::default()
+    };
+    with_new_output(output.as_ref(), |writer| {
+        for record in &parsed.records {
+            if !wanted.contains(&record.feature_type.to_ascii_lowercase()) {
+                continue;
+            }
+            let name = attribute_first(
+                record,
+                &["ID", "Name", "gene_id", "transcript_id", "locus_tag"],
+            );
+            let Some(name) = name else {
+                summary.skipped_no_id_count = checked_add(summary.skipped_no_id_count, 1)?;
+                continue;
+            };
+            let score = record.score.parse::<f64>().unwrap_or(0.0_f64);
+            let bed_start = record.start.saturating_sub(1);
+            writeln!(
+                writer,
+                "{}\t{}\t{}\t{}\t{}\t{}",
+                record.seqid,
+                bed_start,
+                record.end,
+                sanitize_table_field(name),
+                score,
+                record.strand
+            )?;
+            summary.output_record_count = checked_add(summary.output_record_count, 1)?;
+        }
+        Ok(())
+    })?;
+    if summary.output_record_count == 0 {
+        summary
+            .warnings
+            .push("no annotation records matched the requested feature types".to_owned());
+    }
+    if summary.skipped_no_id_count > 0 {
+        summary.warnings.push(format!(
+            "{} matching records were skipped because they had no usable identifier",
+            summary.skipped_no_id_count
         ));
     }
     Ok(summary)
@@ -1377,5 +1454,38 @@ mod tests {
         assert_eq!(result.bins[0].feature_count, 1);
         assert_eq!(result.bins[1].feature_count, 2);
         assert_eq!(result.bins[2].feature_count, 1);
+    }
+
+    #[test]
+    fn converts_gff_to_bed() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let input_path = std::env::temp_dir().join(format!("linxira-bed-{stamp}.gff3"));
+        let output_path = std::env::temp_dir().join(format!("linxira-bed-{stamp}.bed"));
+        fs::write(
+            &input_path,
+            "##gff-version 3\nchr1\tsrc\tgene\t2\t12\t.\t+\t.\tID=g1;Name=Gene1\nchr1\tsrc\texon\t2\t4\t.\t+\t.\tID=e1;Parent=g1\nchr1\tsrc\texon\t9\t12\t.\t+\t.\tID=e2;Parent=g1\n",
+        )
+        .expect("write BED fixture");
+        let summary = gxf_to_bed_path(&input_path, &output_path, &["gene".to_owned()])
+            .expect("convert GFF to BED");
+        let bed_content = fs::read_to_string(&output_path).expect("read BED output");
+        fs::remove_file(input_path).expect("remove BED input fixture");
+        fs::remove_file(output_path).expect("remove BED output fixture");
+        assert_eq!(summary.input_record_count, 3);
+        assert_eq!(summary.output_record_count, 1);
+        assert_eq!(summary.skipped_no_id_count, 0);
+        let bed_lines: Vec<&str> = bed_content.trim().lines().collect();
+        assert_eq!(bed_lines.len(), 1);
+        let fields: Vec<&str> = bed_lines[0].split('\t').collect();
+        assert_eq!(fields.len(), 6);
+        assert_eq!(fields[0], "chr1");
+        assert_eq!(fields[1], "1"); // 0-based start
+        assert_eq!(fields[2], "12");
+        assert_eq!(fields[3], "g1");
+        assert_eq!(fields[4], "0"); // score "." parsed as 0.0
+        assert_eq!(fields[5], "+");
     }
 }

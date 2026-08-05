@@ -8,7 +8,7 @@ use linxira_bio_core::alignment::sam_qc_path;
 use linxira_bio_core::annotation::{
     AnnotationExtractOptions, AnnotationNormalizeOptions, GeneDensityOptions, GenePositionOptions,
     annotation_gene_positions_path, annotation_stats_path, extract_annotation_sequences_path,
-    gene_density_path, normalize_annotation_path,
+    gene_density_path, gxf_to_bed_path, normalize_annotation_path,
 };
 use linxira_bio_core::cohort::cohort_table_qc_path;
 use linxira_bio_core::coordinate::{
@@ -36,9 +36,9 @@ use linxira_bio_core::fastq::{
 };
 use linxira_bio_core::fastq_transform::{
     DEFAULT_ADAPTER_MIN_OVERLAP, DEFAULT_MIN_LENGTH, DEFAULT_TRIM_QUALITY, FastqAdapterOptions,
-    FastqDeduplicateKey, FastqDeduplicateOptions, FastqTransformError,
+    FastqDeduplicateKey, FastqDeduplicateOptions, FastqSubsampleOptions, FastqTransformError,
     FastqTransformQualityEncoding, FastqTrimOptions, fastq_adapter_trim_path,
-    fastq_deduplicate_path, fastq_trim_path,
+    fastq_deduplicate_path, fastq_subsample_path, fastq_trim_path,
 };
 use linxira_bio_core::functional::{
     EnrichmentKind, EnrichmentOptions, GoAnnotationOptions, GseaOptions, gsea_preranked_path,
@@ -55,7 +55,9 @@ use linxira_bio_core::native_tools::{
     run_kaks_path, run_mcscanx_path, run_meme_path, run_muscle_path, run_samtools_report_path,
     run_short_read_alignment_path, run_trimal_path,
 };
-use linxira_bio_core::phylogeny::{TreeTransformOptions, transform_newick_path};
+use linxira_bio_core::phylogeny::{
+    DistanceMatrixOptions, TreeTransformOptions, distance_matrix_path, transform_newick_path,
+};
 use linxira_bio_core::protein::protein_properties_path;
 use linxira_bio_core::scientific_visualization::{
     AnnotationStructureOptions, DomainArchitectureOptions, EnrichmentPlotStyle,
@@ -66,7 +68,8 @@ use linxira_bio_core::scientific_visualization::{
 };
 use linxira_bio_core::sequence::fasta_stats_path;
 use linxira_bio_core::sequence_analysis::{
-    EpcrOptions, KmerCountOptions, count_kmers_path, epcr_path,
+    ConsensusOptions, EpcrOptions, KmerCountOptions, ShuffleOptions, consensus_from_alignment_path,
+    count_kmers_path, epcr_path, shuffle_sequences_path,
 };
 use linxira_bio_core::sequence_transform::{
     SequenceExtractOptions, SequenceFilterOptions, SequenceFromTableOptions,
@@ -86,7 +89,7 @@ use linxira_bio_core::table::{
 };
 use linxira_bio_core::variant::vcf_stats_path;
 use linxira_bio_core::variant_transform::{
-    VariantFilterOptions, compare_vcf_paths, filter_vcf_path, normalize_vcf_path,
+    VariantFilterOptions, compare_vcf_paths, filter_vcf_path, normalize_vcf_path, vcf_to_table_path,
 };
 use linxira_bio_export::{ExportFormat, ensure_distinct_input_output, export_json_file};
 use linxira_bio_protocol::{
@@ -137,6 +140,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "annotation.gxf.stats.v1" => run_annotation_stats(base_directory, request),
         "annotation.gxf.normalize.v1" => run_annotation_normalize(base_directory, request),
         "annotation.gene-position.v1" => run_annotation_positions(base_directory, request),
+        "annotation.gxf.to-bed.v1" => run_gxf_to_bed(base_directory, request),
         "annotation.sequence.extract.v1" => run_annotation_extract(base_directory, request),
         "genome.gene-density.v1" => run_gene_density(base_directory, request),
         "annotation.go.normalize.v1" => run_go_annotations(base_directory, request),
@@ -162,6 +166,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "fastq.trim.v1" => run_fastq_trim(base_directory, request),
         "fastq.adapter.v1" => run_fastq_adapter_trim(base_directory, request),
         "fastq.deduplicate.v1" => run_fastq_deduplicate(base_directory, request),
+        "fastq.subsample.v1" => run_fastq_subsample(base_directory, request),
         "alignment.bam-cram.qc.v1" => run_bam_cram_report(base_directory, request, "stats"),
         "alignment.coverage.v1" => run_bam_cram_report(base_directory, request, "coverage"),
         "alignment.bam-to-bigwig.v1" => run_bam_to_bigwig(base_directory, request),
@@ -196,6 +201,8 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "sequence.to-table.v1" => run_sequence_to_table(base_directory, request),
         "sequence.from-table.v1" => run_sequence_from_table(base_directory, request),
         "sequence.kmer.count.v1" => run_sequence_kmer_count(base_directory, request),
+        "sequence.consensus.v1" => run_sequence_consensus(base_directory, request),
+        "sequence.shuffle.v1" => run_sequence_shuffle(base_directory, request),
         "primer.epcr.v1" => run_primer_epcr(base_directory, request),
         "set.venn.v1" => run_set_venn(base_directory, request),
         "set.upset.v1" => run_set_upset(base_directory, request),
@@ -209,6 +216,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "protein.domain.parse.v1" => run_protein_domains(base_directory, request),
         "protein.domain.visualize.v1" => run_protein_domain_visualization(base_directory, request),
         "phylogeny.tree.transform.v1" => run_phylogeny_tree(base_directory, request),
+        "phylogeny.distance.v1" => run_phylogeny_distance(base_directory, request),
         "phylogeny.iqtree.v1" => run_iqtree_inference(base_directory, request),
         "msa.muscle.v1" => run_muscle_alignment(base_directory, request),
         "msa.trimal.v1" => run_trimal_alignment(base_directory, request),
@@ -224,6 +232,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "medical.variant-cohort.v1" => run_medical_variant_cohort(base_directory, request),
         "variant.filter.v1" => run_variant_filter(base_directory, request),
         "variant.normalize.v1" => run_variant_normalize(base_directory, request),
+        "variant.to-table.v1" => run_variant_to_table(base_directory, request),
         capability => Err(format!("unsupported capability: {capability}").into()),
     }
 }
@@ -446,6 +455,34 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                     path: output,
                     format: Some(BioDataFormat::Tsv),
                     media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "annotation.gxf.to-bed.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "annotation")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let feature_types =
+                optional_string_array_parameter(&request.parameters, "feature_types")?;
+            let feature_types = if feature_types.is_empty() {
+                vec!["gene".to_owned()]
+            } else {
+                feature_types
+            };
+            let summary = gxf_to_bed_path(input, &output, &feature_types)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "bed-output",
+                    role: "bed",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Bed),
+                    media_type: Some("text/x-bed"),
                 },
             )
         }
@@ -836,6 +873,15 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 base_directory,
                 &verified_inputs,
                 |input, output| fastq_deduplicate_path(input, output, &options),
+            )
+        }
+        "fastq.subsample.v1" => {
+            let options = fastq_subsample_options(&request.parameters)?;
+            execute_fastq_transform_v2(
+                &request,
+                base_directory,
+                &verified_inputs,
+                |input, output| fastq_subsample_path(input, output, &options),
             )
         }
         "expression.matrix.qc.v1" => {
@@ -1325,6 +1371,53 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 },
             )
         }
+        "sequence.consensus.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "fasta")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let summary = consensus_from_alignment_path(
+                input,
+                &output,
+                &consensus_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "consensus-output",
+                    role: "fasta",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Fasta),
+                    media_type: Some("text/x-fasta"),
+                },
+            )
+        }
+        "sequence.shuffle.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "fasta")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let summary =
+                shuffle_sequences_path(input, &output, &shuffle_options(&request.parameters)?)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "shuffle-output",
+                    role: "fasta",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Fasta),
+                    media_type: Some("text/x-fasta"),
+                },
+            )
+        }
         "primer.epcr.v1" => {
             let fasta = resolve_v2_single_input(base_directory, &request, "fasta")?;
             let primers = resolve_v2_single_input(base_directory, &request, "primers")?;
@@ -1707,6 +1800,33 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 },
             )
         }
+        "phylogeny.distance.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "alignment")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = distance_matrix_path(
+                input,
+                &output,
+                &distance_matrix_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "phylogeny-distance-warning",
+                FileArtifactSpec {
+                    artifact_id: "distance-matrix",
+                    role: "distances",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
         "structure.pdb.summary.v1" => {
             let path = resolve_v2_single_input(base_directory, &request, "pdb")?;
             let summary = pdb_summary_path(path, pdb_options(&request.parameters)?)?;
@@ -1878,6 +1998,27 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 },
             )
         }
+        "variant.to-table.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "vcf")?;
+            let output = required_sequence_output(&request.parameters, &request.capability)?;
+            let output = resolve_input(base_directory, output);
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let summary = vcf_to_table_path(input, &output)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "variant-table",
+                    role: "tsv",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
         capability => Err(format!("unsupported capability: {capability}").into()),
     }
 }
@@ -1916,6 +2057,7 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             &["fastq"],
             &["output", "header_umi_delimiter", "sequence_prefix_umi"],
         ),
+        "fastq.subsample.v1" => (&["fastq"], &["output", "target_count", "fraction", "seed"]),
         "expression.matrix.qc.v1" => (&["matrix"], &[]),
         "medical.cohort-table.qc.v1" => (&["cohort"], &[]),
         "medical.single-cell-qc.v1" => (&["matrix"], &[]),
@@ -2017,6 +2159,8 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             ],
         ),
         "sequence.kmer.count.v1" => (&["fasta"], &["output", "k", "canonical", "top_n"]),
+        "sequence.consensus.v1" => (&["fasta"], &["output", "threshold"]),
+        "sequence.shuffle.v1" => (&["fasta"], &["output", "seed"]),
         "primer.epcr.v1" => (
             &["fasta", "primers"],
             &["output", "min_amplicon", "max_amplicon", "max_hits"],
@@ -2060,6 +2204,7 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             &["output", "sequence_id", "max_sequences", "max_domains"],
         ),
         "phylogeny.tree.transform.v1" => (&["tree"], &["output", "reroot_label", "label_map"]),
+        "phylogeny.distance.v1" => (&["alignment"], &["output", "model"]),
         "msa.muscle.v1" => (&["fasta"], &["output", "mode", "threads"]),
         "msa.trimal.v1" => (&["alignment"], &["output", "mode"]),
         "phylogeny.iqtree.v1" => (&["alignment"], &["output", "threads", "model", "seed"]),
@@ -2129,6 +2274,7 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             ],
         ),
         "variant.normalize.v1" => (&["vcf", "reference"], &["output"]),
+        "variant.to-table.v1" => (&["vcf"], &["output"]),
         capability => return Err(format!("unsupported capability: {capability}").into()),
     };
 
@@ -2785,6 +2931,18 @@ fn run_fastq_deduplicate(base_directory: &Path, request: JobRequest) -> WorkerRe
     })
 }
 
+fn run_fastq_subsample(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "fastq",
+        &["output", "target_count", "fraction", "seed"],
+    )?;
+    let options = fastq_subsample_options(&request.parameters)?;
+    execute_fastq_transform_v1(base_directory, request, |input, output| {
+        fastq_subsample_path(input, output, &options)
+    })
+}
+
 fn run_alignment_qc(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -2863,6 +3021,32 @@ fn run_annotation_positions(base_directory: &Path, request: JobRequest) -> Worke
         },
     };
     let summary = annotation_gene_positions_path(input, output, &options)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_gxf_to_bed(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "annotation", &["output", "feature_types"])?;
+    let input = request
+        .inputs
+        .get("annotation")
+        .ok_or("annotation.gxf.to-bed.v1 requires inputs.annotation")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let feature_types = optional_string_array_parameter(&request.parameters, "feature_types")?;
+    let feature_types = if feature_types.is_empty() {
+        vec!["gene".to_owned()]
+    } else {
+        feature_types
+    };
+    let summary = gxf_to_bed_path(input, output, &feature_types)?;
     let result = AnalysisResult::ok(
         request.job_id,
         request.capability,
@@ -3530,6 +3714,32 @@ fn run_variant_normalize(base_directory: &Path, request: JobRequest) -> WorkerRe
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_variant_to_table(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "vcf", &["output"])?;
+    let input = resolve_input(
+        base_directory,
+        request
+            .inputs
+            .get("vcf")
+            .ok_or("variant.to-table.v1 requires inputs.vcf")?,
+    );
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let summary = vcf_to_table_path(&input, &output)?;
+    let warnings = summary.warnings.clone();
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_pdb_summary(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     let input = request
         .inputs
@@ -4053,6 +4263,40 @@ fn run_phylogeny_tree(base_directory: &Path, request: JobRequest) -> WorkerResul
     );
     result.warnings = analysis.warnings;
     Ok(serde_json::to_string(&result)?)
+}
+
+fn run_phylogeny_distance(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "alignment", &["output", "model"])?;
+    let input = request
+        .inputs
+        .get("alignment")
+        .ok_or("phylogeny.distance.v1 requires inputs.alignment")?;
+    let output = required_sequence_output(&request.parameters, &request.capability)?;
+    let input = resolve_input(base_directory, input);
+    let output = resolve_input(base_directory, output);
+    ensure_distinct_input_output(&input, &output)?;
+    let analysis = distance_matrix_path(
+        input,
+        output,
+        &distance_matrix_options(&request.parameters)?,
+    )?;
+    let mut result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        analysis.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    result.warnings = analysis.warnings;
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn distance_matrix_options(parameters: &serde_json::Value) -> WorkerResult<DistanceMatrixOptions> {
+    let model = parameters
+        .get("model")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("p-distance")
+        .to_owned();
+    Ok(DistanceMatrixOptions { model })
 }
 
 fn run_protein_properties(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
@@ -5010,6 +5254,55 @@ fn run_sequence_kmer_count(base_directory: &Path, request: JobRequest) -> Worker
     Ok(serde_json::to_string(&result)?)
 }
 
+fn run_sequence_consensus(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_sequence_contract(&request, &["output", "threshold"])?;
+    let input = resolve_input(
+        base_directory,
+        request
+            .inputs
+            .get("fasta")
+            .ok_or("sequence.consensus.v1 requires inputs.fasta")?,
+    );
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let summary =
+        consensus_from_alignment_path(&input, &output, &consensus_options(&request.parameters)?)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
+fn run_sequence_shuffle(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_sequence_contract(&request, &["output", "seed"])?;
+    let input = resolve_input(
+        base_directory,
+        request
+            .inputs
+            .get("fasta")
+            .ok_or("sequence.shuffle.v1 requires inputs.fasta")?,
+    );
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    ensure_distinct_input_output(&input, &output)?;
+    let summary = shuffle_sequences_path(&input, &output, &shuffle_options(&request.parameters)?)?;
+    let result = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        summary,
+        ExecutionMode::LocalCpu,
+    );
+    Ok(serde_json::to_string(&result)?)
+}
+
 fn run_primer_epcr(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
     validate_v1_multi_input_contract(
         &request,
@@ -5530,6 +5823,36 @@ fn kmer_count_options(parameters: &serde_json::Value) -> WorkerResult<KmerCountO
     }
     if let Some(top_n) = optional_parameter_usize(parameters, "top_n")? {
         options.top_n = top_n;
+    }
+    Ok(options)
+}
+
+fn consensus_options(parameters: &serde_json::Value) -> WorkerResult<ConsensusOptions> {
+    let mut options = ConsensusOptions::default();
+    if let Some(threshold) = optional_parameter_f64(parameters, "threshold")? {
+        options.threshold = threshold;
+    }
+    Ok(options)
+}
+
+fn fastq_subsample_options(parameters: &serde_json::Value) -> WorkerResult<FastqSubsampleOptions> {
+    let mut options = FastqSubsampleOptions::default();
+    if let Some(count) = optional_parameter_u64(parameters, "target_count")? {
+        options.target_count = Some(count);
+    }
+    if let Some(fraction) = optional_parameter_f64(parameters, "fraction")? {
+        options.fraction = Some(fraction);
+    }
+    if let Some(seed) = optional_parameter_u64(parameters, "seed")? {
+        options.seed = seed;
+    }
+    Ok(options)
+}
+
+fn shuffle_options(parameters: &serde_json::Value) -> WorkerResult<ShuffleOptions> {
+    let mut options = ShuffleOptions::default();
+    if let Some(seed) = optional_parameter_u64(parameters, "seed")? {
+        options.seed = seed;
     }
     Ok(options)
 }

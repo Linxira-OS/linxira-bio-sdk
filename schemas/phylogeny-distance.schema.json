@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/phylogeny-distance.v1.json",
+  "title": "Linxira Bio phylogeny distance matrix result",
+  "type": "object",
+  "required": ["sequence_count", "alignment_length", "compared_position_count", "model", "distances", "warnings"],
+  "properties": {
+    "sequence_count": {"type": "integer", "minimum": 2},
+    "alignment_length": {"type": "integer", "minimum": 1},
+    "compared_position_count": {"type": "integer", "minimum": 0},
+    "model": {"type": "string", "enum": ["p-distance", "jc69", "k80"]},
+    "distances": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["seq_a", "seq_b", "distance"],
+        "properties": {
+          "seq_a": {"type": "string", "minLength": 1},
+          "seq_b": {"type": "string", "minLength": 1},
+          "distance": {"type": "number", "minimum": 0}
+        },
+        "additionalProperties": false
+      }
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

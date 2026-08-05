@@ -1,13 +1,13 @@
 ---
 name: analyze-variant-statistics
-description: Run deterministic local Linxira Bio VCF statistics, filtering, reference-guided small-variant normalization, and allele-set comparison. Use for VCF summaries, QUAL/FILTER/contig/INFO-DP filtering, REF validation, minimal representation, repeat-aware left alignment, and shared or file-specific variant alleles.
+description: Run deterministic local Linxira Bio VCF statistics, filtering, reference-guided small-variant normalization, VCF-to-table conversion, and allele-set comparison. Use for VCF summaries, QUAL/FILTER/contig/INFO-DP filtering, REF validation, minimal representation, repeat-aware left alignment, and shared or file-specific variant alleles.
 ---
 
 # Analyze Variant Statistics
 
 Use the tested Rust capabilities for descriptive VCF summaries, basic record
-filters, or reference-guided small-variant normalization. None clinically
-interpret or annotate variants.
+filters, reference-guided small-variant normalization, and VCF-to-table
+conversion. None clinically interpret or annotate variants.
 
 ## Run
 
@@ -21,6 +21,7 @@ linxira-bio variant stats INPUT.vcf --json
 linxira-bio variant filter INPUT.vcf OUTPUT.vcf --min-qual 20 --pass-only --min-info-dp 10 --json
 linxira-bio variant normalize INPUT.vcf REFERENCE.fa OUTPUT.vcf --json
 linxira-bio variant compare LEFT.vcf RIGHT.vcf --json
+linxira-bio variant to-table INPUT.vcf OUTPUT.tsv --json
 ```
 
 When developing in the source repository, run:

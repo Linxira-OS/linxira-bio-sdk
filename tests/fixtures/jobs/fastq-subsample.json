@@ -1,0 +1,12 @@
+{
+  "job_id": "fastq-subsample-test",
+  "capability": "fastq.subsample.v1",
+  "inputs": {
+    "fastq": "tests/fixtures/fastq-qc/valid.fastq"
+  },
+  "parameters": {
+    "output": "tests/fixtures/fastq-qc/subsampled.fastq",
+    "target_count": 1,
+    "seed": 42
+  }
+}
