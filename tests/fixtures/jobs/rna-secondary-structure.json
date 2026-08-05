@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "job_id": "rnafold",
+  "capability": "rna.secondary-structure.v1",
+  "inputs": {
+    "sequence": "../sequences/tiny.fa"
+  },
+  "parameters": {
+    "output": "rna-structure.txt"
+  }
+}
