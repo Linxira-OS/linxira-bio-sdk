@@ -1,0 +1,8 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-expression-wgcna",
+  "capability": "expression.wgcna.v1",
+  "inputs": {"expression": "../sequences/tiny.fa"},
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/wgcna-result.json", "threads": 2, "min_module_size": 10, "min_samples": 1, "log_transform": false}
+}

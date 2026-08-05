@@ -44,13 +44,14 @@ use linxira_bio_core::interval::{
     bed_merge_path, bed_subtract_path,
 };
 use linxira_bio_core::native_tools::{
-    HmmerOptions, IqtreeOptions, MemeOptions, Minimap2LongReadOptions, MuscleOptions,
+    HmmerOptions, IqtreeOptions, MastOptions, MemeOptions, Minimap2LongReadOptions, MuscleOptions,
     NativeToolResult, ShortReadAlignmentOptions, SimilaritySearchOptions, SnpEffOptions,
-    parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
+    WgcnaOptions, parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
     parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
     run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path,
-    run_kaks_path, run_mcscanx_path, run_meme_path, run_minimap2_long_read_path, run_muscle_path,
-    run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path, run_trimal_path,
+    run_kaks_path, run_mast_path, run_mcscanx_path, run_meme_path, run_minimap2_long_read_path,
+    run_muscle_path, run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path,
+    run_trimal_path, run_wgcna_path,
 };
 use linxira_bio_core::phylogeny::{
     DistanceMatrixOptions, DistanceMatrixResult, TreeTransformOptions, TreeTransformResult,
@@ -484,6 +485,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         {
             print_expression_volcano(arguments)
         }
+        [expression, wgcna, arguments @ ..] if expression == "expression" && wgcna == "wgcna" => {
+            print_wgcna(arguments)
+        }
         [set, venn, arguments @ ..] if set == "set" && venn == "venn" => {
             print_set_analysis(arguments, true)
         }
@@ -552,6 +556,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
                 render_motif_logo_svg_path(input, output)?,
                 false,
             )
+        }
+        [motif, mast, arguments @ ..] if motif == "motif" && mast == "mast" => {
+            print_mast(arguments)
         }
         [comparative, synteny_plot, arguments @ ..]
             if comparative == "comparative" && synteny_plot == "synteny-plot" =>
@@ -3689,6 +3696,79 @@ fn print_expression_volcano(arguments: &[String]) -> Result<(), Box<dyn Error>> 
     print_visualization_result("expression-volcano", "expression.volcano.v1", result, json)
 }
 
+fn print_wgcna(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = WgcnaOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--min-expression" => {
+                index += 1;
+                options.min_expression = arguments
+                    .get(index)
+                    .ok_or("--min-expression requires a value")?
+                    .parse::<f64>()
+                    .map_err(|_| {
+                        format!(
+                            "--min-expression requires a number, got {:?}",
+                            arguments.get(index)
+                        )
+                    })?;
+            }
+            "--min-samples" => {
+                index += 1;
+                options.min_samples = parse_sequence_usize(arguments.get(index), "--min-samples")?;
+            }
+            "--min-module-size" => {
+                index += 1;
+                options.min_module_size =
+                    parse_sequence_usize(arguments.get(index), "--min-module-size")?;
+            }
+            "--merge-cut-height" => {
+                index += 1;
+                options.merge_cut_height = arguments
+                    .get(index)
+                    .ok_or("--merge-cut-height requires a value")?
+                    .parse::<f64>()
+                    .map_err(|_| {
+                        format!(
+                            "--merge-cut-height requires a number, got {:?}",
+                            arguments.get(index)
+                        )
+                    })?;
+            }
+            "--network-type" => {
+                index += 1;
+                options.network_type = arguments
+                    .get(index)
+                    .ok_or("--network-type requires a value")?
+                    .clone();
+            }
+            "--power" => {
+                index += 1;
+                options.power = parse_sequence_usize(arguments.get(index), "--power")?;
+            }
+            "--no-log-transform" => options.log_transform = false,
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown WGCNA option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("expression wgcna requires <expression.csv|tsv> <output.json>".into());
+    }
+    let result = run_wgcna_path(&paths[0], &paths[1], &options)?;
+    print_native_tool_result("wgcna", "expression.wgcna.v1", result, json)
+}
+
 fn parse_finite_f64(
     value: Option<&String>,
     option: &str,
@@ -4897,6 +4977,43 @@ fn print_meme(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     print_native_tool_result("meme-discovery", "motif.meme.v1", result, json)
 }
 
+fn print_mast(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = MastOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--evalue" => {
+                index += 1;
+                options.evalue = arguments
+                    .get(index)
+                    .ok_or("--evalue requires a value")?
+                    .parse::<f64>()
+                    .map_err(|_| {
+                        format!("--evalue requires a number, got {:?}", arguments.get(index))
+                    })?;
+            }
+            "--hit-list" => options.hit_list = true,
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown MAST option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err("motif mast requires <motif.meme> <sequences.fasta> <output.txt>".into());
+    }
+    let result = run_mast_path(&paths[0], &paths[1], &paths[2], &options)?;
+    print_native_tool_result("mast-scan", "motif.mast.v1", result, json)
+}
+
 fn print_dssp(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     let mut paths = Vec::new();
     let mut json = false;
@@ -5055,6 +5172,7 @@ fn usage() -> &'static str {
         "  linxira-bio expression cluster <matrix.csv|tsv[.gz]> [--sample-clusters N] [--feature-clusters N] [--max-iterations N] [--no-scale] [--json]\n",
         "  linxira-bio expression heatmap <matrix.csv|tsv[.gz]> [--top-features N] [--no-scale] [--json]\n",
         "  linxira-bio expression volcano <differential.csv> <output.svg> [--padj P] [--log2-fold-change X] [--max-points N] [--json]\n",
+        "  linxira-bio expression wgcna <expression.csv|tsv> <output.json> [--min-expression X] [--min-samples N] [--min-module-size N] [--merge-cut-height X] [--network-type signed|unsigned|signed hybrid] [--power N] [--no-log-transform] [--threads N] [--json]\n",
         "  linxira-bio set venn <sets.csv|tsv[.gz]> [--include-items] [--json]\n",
         "  linxira-bio set upset <sets.csv|tsv[.gz]> [--max-intersections N] [--include-items] [--json]\n",
         "  linxira-bio enrichment custom <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
@@ -5067,6 +5185,8 @@ fn usage() -> &'static str {
         "  linxira-bio similarity diamond <query.fasta> <reference.fasta> <output.tsv> [--mode blastp|blastx] [--threads N] [--evalue X] [--max-targets N] [--outfmt 6|7] [--json]\n",
         "  linxira-bio similarity hmmer <profile.hmm> <sequences.fasta> <output.domtblout> [--mode hmmsearch|hmmscan] [--threads N] [--evalue X] [--json]\n",
         "  linxira-bio motif meme <input.fasta> <output.meme> [--alphabet dna|rna|protein] [--distribution oops|zoops|anr] [--motifs N] [--min-width N] [--max-width N] [--threads N] [--json]\n",
+        "  linxira-bio motif logo <input.meme> <output.svg> [--json]\n",
+        "  linxira-bio motif mast <motif.meme> <sequences.fasta> <output.txt> [--evalue X] [--hit-list] [--threads N] [--json]\n",
         "  linxira-bio comparative synteny-plot <anchors.tsv> <output.svg> [--json]\n",
         "  linxira-bio similarity rbh <forward.tsv|xml[.gz]> <reverse.tsv|xml[.gz]> [--max-evalue X] [--min-identity P] [--json]\n",
         "  linxira-bio protein properties <proteins.fasta[.gz]> [--json]\n",

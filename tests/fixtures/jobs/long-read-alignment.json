@@ -6,6 +6,7 @@
     "reference": "tests/fixtures/sequences/tiny.fa",
     "reads": "tests/fixtures/fastq-qc/valid.fastq"
   },
+  "execution": {"mode": "local-cpu"},
   "parameters": {
     "output": "tests/fixtures/fastq-qc/long-read-aligned.sam",
     "preset": "map-ont",

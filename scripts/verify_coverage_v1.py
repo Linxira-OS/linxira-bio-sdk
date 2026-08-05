@@ -20,12 +20,12 @@ DEFAULT_REFERENCE_INVENTORY = (
 )
 
 DOMAINS = {
-    "general-biology": 75,
+    "general-biology": 81,
     "biochemistry-structure": 15,
     "medical-omics-ruo": 10,
 }
 DOMAIN_TARGETS = {
-    "general-biology": 63,
+    "general-biology": 65,
     "biochemistry-structure": 12,
     "medical-omics-ruo": 5,
 }
@@ -111,8 +111,10 @@ def validate_coverage_documents(
 
     if coverage.get("measurement") != "weighted-functional-slices":
         raise CoverageValidationError("coverage measurement must be weighted-functional-slices")
-    if coverage.get("total_weight") != 100:
-        raise CoverageValidationError("declared total_weight must be 100")
+    if coverage.get("total_weight") != sum(DOMAINS.values()):
+        raise CoverageValidationError(
+            f"declared total_weight must equal the sum of domain budgets ({sum(DOMAINS.values())})"
+        )
 
     domain_budgets = coverage.get("domain_budgets")
     if domain_budgets != DOMAINS:
@@ -249,8 +251,10 @@ def validate_coverage_documents(
         raise CoverageValidationError(
             f"actual domain weights {dict(weights_by_domain)} do not equal {DOMAINS}"
         )
-    if sum(weights_by_domain.values()) != 100:
-        raise CoverageValidationError("actual coverage item weights must total 100")
+    if sum(weights_by_domain.values()) != coverage["total_weight"]:
+        raise CoverageValidationError(
+            f"actual coverage item weights must total {coverage['total_weight']}"
+        )
     if dict(targets_by_domain) != DOMAIN_TARGETS:
         raise CoverageValidationError(
             f"target item weights {dict(targets_by_domain)} do not equal {DOMAIN_TARGETS}"
