@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.bio/schemas/sequence-shuffle.schema.json",
+  "title": "Sequence Shuffle Result",
+  "description": "Result schema for sequence.shuffle.v1",
+  "type": "object",
+  "required": ["sequence_count", "residue_count", "seed"],
+  "properties": {
+    "sequence_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of sequences in the input FASTA"
+    },
+    "residue_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total residue count across all sequences"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Random seed used for reproducible shuffling"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.bio/schemas/fastq-subsample.schema.json",
+  "title": "FASTQ Subsample Result",
+  "description": "Result schema for fastq.subsample.v1",
+  "type": "object",
+  "required": ["input_read_count", "output_read_count", "input_bases", "output_bases", "seed"],
+  "properties": {
+    "input_read_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total reads in the input FASTQ"
+    },
+    "output_read_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Reads written to the output FASTQ"
+    },
+    "input_bases": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total bases in the input FASTQ"
+    },
+    "output_bases": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total bases in the output FASTQ"
+    },
+    "target_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Requested target read count, if specified"
+    },
+    "fraction": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1,
+      "description": "Requested sampling fraction, if specified"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Random seed used for reproducible sampling"
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Informational warnings"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "1",
+  "job_id": "seq-consensus-001",
+  "capability": "sequence.consensus.v1",
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "inputs": {
+    "fasta": "alignment.fa"
+  },
+  "parameters": {
+    "output": "consensus.fa",
+    "threshold": 0.6
+  }
+}
