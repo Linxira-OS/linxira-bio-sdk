@@ -50,3 +50,15 @@ This produces a full (N×N) TSV distance matrix with columns `seq_a`, `seq_b`, a
 - `k80`: Kimura 2-parameter correction
 
 Worker v2 uses role `alignment`. Gaps between a character and a gap are treated as differences; positions where both sequences are gaps are excluded from the denominator. The JC69 and K80 corrections produce `Infinity` and a warning when the observed divergence saturates the correction formula.
+
+## Tree visualization
+
+Render a Newick tree as a rectangular cladogram SVG with `phylogeny.tree.visualize.v1`:
+
+```bash
+linxira-bio phylogeny tree-plot input.nwk output.svg --json
+```
+
+Optional parameters: `--width`, `--height`, `--font-size`, `--no-branch-lengths`.
+
+Worker v2 uses role `tree`. The output is an SVG image with leaf labels and branch lines. Branch lengths are scaled proportionally when present and `show_branch_lengths` is true; otherwise a uniform cladogram is drawn. The tree must have at least 2 leaves. Output dimensions are clamped between 200 and 4096 pixels.
