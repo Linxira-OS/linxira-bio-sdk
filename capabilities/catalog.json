@@ -940,6 +940,24 @@
       "command": "linxira-bio comparative synteny-plot <anchors.tsv> <output.svg> [--style dual|multiple|micro|circular] --json",
       "input_formats": ["tsv"],
       "output_formats": ["svg", "json"]
+    },
+    {
+      "id": "comparative.dotplot.v1",
+      "status": "available",
+      "category": "comparative-genomics",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio comparative dotplot <query.fa> <reference.fa> <output.svg> [--width <px>] [--height <px>] [--kmer <size>] --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["svg", "json"]
+    },
+    {
+      "id": "rna.secondary-structure.v1",
+      "status": "available",
+      "category": "rna-analysis",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio rna secondary-structure <input.fa> <output.txt> [--temp <celsius>] --json",
+      "input_formats": ["fasta"],
+      "output_formats": ["txt", "json"]
     }
   ]
 }

@@ -21,6 +21,7 @@ use linxira_bio_core::dataset::{
     inspect_dataset_with_options,
 };
 use linxira_bio_core::domain::parse_protein_domains_path;
+use linxira_bio_core::dotplot::{DotplotOptions, render_dotplot_svg_path};
 use linxira_bio_core::environment::{
     EnvironmentMode, EnvironmentPlanOptions, apply_environment, audit_environment,
     parse_environment_mode, plan_environment_with_options,
@@ -54,8 +55,8 @@ use linxira_bio_core::native_tools::{
     parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
     run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path,
     run_kaks_path, run_mast_path, run_mcscanx_path, run_meme_path, run_minimap2_long_read_path,
-    run_muscle_path, run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path,
-    run_trimal_path, run_wgcna_path,
+    run_muscle_path, run_rnafold_path, run_samtools_report_path, run_short_read_alignment_path,
+    run_snpeff_path, run_trimal_path, run_wgcna_path,
 };
 use linxira_bio_core::phylogeny::{
     DistanceMatrixOptions, TreeTransformOptions, TreeVisualizationOptions, distance_matrix_path,
@@ -154,6 +155,8 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "comparative.synteny.visualize.v1" => run_synteny_visualization(base_directory, request),
         "comparative.mcscanx.v1" => run_mcscanx(base_directory, request),
         "comparative.kaks.v1" => run_kaks(base_directory, request),
+        "comparative.dotplot.v1" => run_dotplot(base_directory, request),
+        "rna.secondary-structure.v1" => run_rnafold(base_directory, request),
         "enrichment.overrepresentation.v1" => {
             run_enrichment(base_directory, request, EnrichmentKind::Custom)
         }
@@ -683,6 +686,64 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                     path: output,
                     format: Some(BioDataFormat::Tsv),
                     media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "comparative.dotplot.v1" => {
+            let query = resolve_v2_single_input(base_directory, &request, "query")?;
+            let reference = resolve_v2_single_input(base_directory, &request, "reference")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = render_dotplot_svg_path(
+                query,
+                reference,
+                &output,
+                &dotplot_options(&request.parameters)?,
+            )?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &[],
+                "dotplot",
+                FileArtifactSpec {
+                    artifact_id: "dotplot",
+                    role: "plot",
+                    kind: OutputArtifactKind::Plot,
+                    path: output,
+                    format: Some(BioDataFormat::Svg),
+                    media_type: Some("image/svg+xml"),
+                },
+            )
+        }
+        "rna.secondary-structure.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "sequence")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let temperature =
+                optional_parameter_f64(&request.parameters, "temperature")?.unwrap_or(37.0);
+            let result = run_rnafold_path(input, &output, temperature)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "rna-secondary-structure",
+                    role: "secondary-structure",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Unknown),
+                    media_type: Some("text/plain"),
                 },
             )
         }
@@ -2274,6 +2335,11 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         "comparative.synteny.visualize.v1" => (&["anchors"], &["output", "style"]),
         "comparative.mcscanx.v1" => (&["gene-positions", "similarity-hits"], &["output"]),
         "comparative.kaks.v1" => (&["codon-alignment"], &["output", "method"]),
+        "comparative.dotplot.v1" => (
+            &["query", "reference"],
+            &["output", "width", "height", "kmer"],
+        ),
+        "rna.secondary-structure.v1" => (&["sequence"], &["output", "temperature"]),
         "enrichment.overrepresentation.v1" | "enrichment.go.v1" | "enrichment.kegg.v1" => (
             &["genes", "associations"],
             &["min_overlap", "max_terms", "include_genes"],
@@ -3352,6 +3418,60 @@ fn run_kaks(base_directory: &Path, request: JobRequest) -> WorkerResult<String> 
     let method = optional_parameter_string(&request.parameters, "method")?.unwrap_or("NG");
     let analysis = run_kaks_path(input, output, method)?;
     serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_dotplot(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(
+        &request,
+        &["query", "reference"],
+        &["output", "width", "height", "kmer"],
+    )?;
+    let query = resolve_required_v1_input(base_directory, &request, "query")?;
+    let reference = resolve_required_v1_input(base_directory, &request, "reference")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let result = render_dotplot_svg_path(
+        query,
+        reference,
+        output,
+        &dotplot_options(&request.parameters)?,
+    )?;
+    let mut analysis = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        result.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    analysis.warnings = Vec::new();
+    Ok(serde_json::to_string(&analysis)?)
+}
+
+fn run_rnafold(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "sequence", &["output", "temperature"])?;
+    let input = resolve_required_v1_input(base_directory, &request, "sequence")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let temperature = optional_parameter_f64(&request.parameters, "temperature")?.unwrap_or(37.0);
+    let analysis = run_rnafold_path(input, output, temperature)?;
+    serialize_v1_native_tool_result(request, analysis)
+}
+
+fn dotplot_options(parameters: &serde_json::Value) -> WorkerResult<DotplotOptions> {
+    let mut options = DotplotOptions::default();
+    if let Some(value) = optional_parameter_usize(parameters, "width")? {
+        options.width = u32::try_from(value).map_err(|_| "width exceeds u32 range")?;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "height")? {
+        options.height = u32::try_from(value).map_err(|_| "height exceeds u32 range")?;
+    }
+    if let Some(value) = optional_parameter_usize(parameters, "kmer")? {
+        options.kmer_size = value;
+    }
+    Ok(options)
 }
 
 fn synteny_visualization_options(

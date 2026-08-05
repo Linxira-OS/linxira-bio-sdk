@@ -1073,6 +1073,50 @@ pub fn kaks_arguments(input: &Path, output: &Path, method: &str) -> Vec<OsString
     ]
 }
 
+/// Run RNAfold (ViennaRNA) to predict RNA secondary structure.
+pub fn run_rnafold_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    temperature: f64,
+) -> Result<NativeToolResult, NativeToolError> {
+    let input = input.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[input], output)?;
+    if !temperature.is_finite() || !(0.0..=100.0).contains(&temperature) {
+        return Err(NativeToolError::InvalidOption(format!(
+            "temperature must be between 0 and 100, got {temperature}"
+        )));
+    }
+    let executable = configured_program("LINXIRA_BIO_RNAFOLD", "RNAfold");
+    let arguments = rnafold_arguments(input, temperature);
+    let result = (|| {
+        let native_output = run_native_command(&executable, &arguments, false)?;
+        let stdout = String::from_utf8_lossy(&native_output.stdout);
+        let mut cleaned = String::new();
+        for line in stdout.lines() {
+            if !line.starts_with('>') {
+                cleaned.push_str(line);
+                cleaned.push('\n');
+            }
+        }
+        fs::write(output, cleaned.as_bytes())?;
+        finish_result("RNAfold", "secondary-structure", output, 1, 1)
+    })();
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
+pub fn rnafold_arguments(input: &Path, temperature: f64) -> Vec<OsString> {
+    vec![
+        OsString::from("--noPS"),
+        OsString::from("--temp"),
+        OsString::from(temperature.to_string()),
+        input.as_os_str().to_owned(),
+    ]
+}
+
 pub fn meme_arguments(
     input: &Path,
     output_directory: &Path,

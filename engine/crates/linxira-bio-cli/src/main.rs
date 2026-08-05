@@ -16,6 +16,7 @@ use linxira_bio_core::coordinate::{
 };
 use linxira_bio_core::dataset::{DatasetInspection, DatasetSupport, inspect_dataset};
 use linxira_bio_core::domain::{ProteinDomainParseResult, parse_protein_domains_path};
+use linxira_bio_core::dotplot::{DotplotOptions, render_dotplot_svg_path};
 use linxira_bio_core::environment::{
     ApplyResult, EnvironmentAudit, EnvironmentMode, EnvironmentPlan, EnvironmentPlanOptions,
     PlanActionState, apply_environment, audit_environment, parse_environment_mode,
@@ -50,8 +51,8 @@ use linxira_bio_core::native_tools::{
     parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
     run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path,
     run_kaks_path, run_mast_path, run_mcscanx_path, run_meme_path, run_minimap2_long_read_path,
-    run_muscle_path, run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path,
-    run_trimal_path, run_wgcna_path,
+    run_muscle_path, run_rnafold_path, run_samtools_report_path, run_short_read_alignment_path,
+    run_snpeff_path, run_trimal_path, run_wgcna_path,
 };
 use linxira_bio_core::phylogeny::{
     DistanceMatrixOptions, DistanceMatrixResult, TreeTransformOptions, TreeTransformResult,
@@ -605,6 +606,16 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
                 run_kaks_path(alignment, output, method)?,
                 false,
             )
+        }
+        [comparative, dotplot, arguments @ ..]
+            if comparative == "comparative" && dotplot == "dotplot" =>
+        {
+            print_dotplot(arguments)
+        }
+        [rna, secondary_structure, arguments @ ..]
+            if rna == "rna" && secondary_structure == "secondary-structure" =>
+        {
+            print_rnafold(arguments)
         }
         [similarity, rbh, arguments @ ..] if similarity == "similarity" && rbh == "rbh" => {
             print_reciprocal_best_hits(arguments)
@@ -5105,6 +5116,94 @@ fn print_dssp(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     print_native_tool_result(
         "dssp-secondary-structure",
         "protein.secondary-structure.v1",
+        result,
+        json,
+    )
+}
+
+fn print_dotplot(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = DotplotOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--width" => {
+                index += 1;
+                options.width = parse_sequence_usize(arguments.get(index), "width")? as u32;
+            }
+            "--height" => {
+                index += 1;
+                options.height = parse_sequence_usize(arguments.get(index), "height")? as u32;
+            }
+            "--kmer" => {
+                index += 1;
+                options.kmer_size = parse_sequence_usize(arguments.get(index), "kmer-size")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown dotplot option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err("comparative dotplot requires <query.fa> <reference.fa> <output.svg>".into());
+    }
+    let result = render_dotplot_svg_path(&paths[0], &paths[1], &paths[2], &options)?;
+    if json {
+        print_analysis_json("dotplot", "comparative.dotplot.v1", result)
+    } else {
+        println!("query_id\t{}", result.query_id);
+        println!("reference_id\t{}", result.reference_id);
+        println!("query_length\t{}", result.query_length);
+        println!("reference_length\t{}", result.reference_length);
+        println!("kmer_size\t{}", result.kmer_size);
+        println!("match_count\t{}", result.match_count);
+        println!("output_path\t{}", result.output_path);
+        Ok(())
+    }
+}
+
+fn print_rnafold(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut temperature = 37.0_f64;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--temp" => {
+                index += 1;
+                temperature = arguments
+                    .get(index)
+                    .ok_or("--temp requires a value")?
+                    .parse()
+                    .map_err(|_| "temperature must be a number")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown RNAfold option: {value}").into());
+            }
+            value => {
+                if input.is_none() {
+                    input = Some(PathBuf::from(value));
+                } else if output.is_none() {
+                    output = Some(PathBuf::from(value));
+                } else {
+                    return Err("too many positional arguments".into());
+                }
+            }
+        }
+        index += 1;
+    }
+    let input = input.ok_or("rna secondary-structure requires <input.fa>")?;
+    let output = output.ok_or("rna secondary-structure requires <output.txt>")?;
+    let result = run_rnafold_path(input, output, temperature)?;
+    print_native_tool_result(
+        "rnafold-secondary-structure",
+        "rna.secondary-structure.v1",
         result,
         json,
     )
