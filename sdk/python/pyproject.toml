@@ -1,0 +1,13 @@
+[project]
+name = "linxira-bio"
+version = "0.1.0"
+description = "Linxira Bio SDK - Programmatic access to bioinformatics capabilities"
+requires-python = ">=3.9"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[tool.setuptools.packages.find]
+where = ["."]

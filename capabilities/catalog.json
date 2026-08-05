@@ -32,9 +32,10 @@
     },
     {
       "id": "environment.apply.v1",
-      "status": "planned",
+      "status": "available",
       "category": "system",
       "default_execution": "local-cpu",
+      "command": "linxira-bio environment apply <profile> --json",
       "requires_explicit_approval": true
     },
     {
@@ -407,6 +408,15 @@
       "output_formats": ["bam", "json"]
     },
     {
+      "id": "alignment.long-read.v1",
+      "status": "available",
+      "category": "read-alignment",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio alignment long-read <reference.fasta> <reads.fastq> <output.sam> --preset map-ont --threads 1 --json",
+      "input_formats": ["fasta", "fastq"],
+      "output_formats": ["sam", "json"]
+    },
+    {
       "id": "variant.stats.v1",
       "status": "available",
       "category": "variant-calling",
@@ -450,6 +460,15 @@
       "command": "linxira-bio variant to-table <input.vcf> <output.tsv> --json",
       "input_formats": ["vcf"],
       "output_formats": ["tsv", "json"]
+    },
+    {
+      "id": "variant.annotate.v1",
+      "status": "available",
+      "category": "variant-calling",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio variant annotate <input.vcf> <output.vcf> --database GRCh38.99 --json",
+      "input_formats": ["vcf"],
+      "output_formats": ["vcf", "json"]
     },
     {
       "id": "structure.pdb.summary.v1",
