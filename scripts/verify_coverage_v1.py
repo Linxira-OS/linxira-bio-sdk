@@ -25,8 +25,8 @@ DOMAINS = {
     "medical-omics-ruo": 10,
 }
 DOMAIN_TARGETS = {
-    "general-biology": 66,
-    "biochemistry-structure": 12,
+    "general-biology": 67,
+    "biochemistry-structure": 13,
     "medical-omics-ruo": 5,
 }
 DISPOSITIONS = {
