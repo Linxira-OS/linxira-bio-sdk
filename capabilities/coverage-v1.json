@@ -8,10 +8,10 @@
     "medical-omics-ruo": 10
   },
   "release_target": {
-    "minimum_weight": 83,
+    "minimum_weight": 85,
     "by_domain": {
-      "general-biology": 66,
-      "biochemistry-structure": 12,
+      "general-biology": 67,
+      "biochemistry-structure": 13,
       "medical-omics-ruo": 5
     },
     "rule": "Every target_v1 item must be implemented or wrapped by an available versioned capability before release."
