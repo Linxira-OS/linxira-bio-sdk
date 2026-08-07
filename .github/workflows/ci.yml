@@ -18,9 +18,16 @@ jobs:
           msystem: UCRT64
           update: true
           install: mingw-w64-ucrt-x86_64-gcc
-      - uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: '4.6.1'
+      - name: Install R from CRAN
+        shell: pwsh
+        run: |
+          $rVersion = '4.6.1'
+          $rUrl = "https://cran.r-project.org/bin/windows/base/R-$rVersion-win.exe"
+          $rInstaller = "$env:RUNNER_TEMP\R-$rVersion-win.exe"
+          Invoke-WebRequest -Uri $rUrl -OutFile $rInstaller -RetryIntervalSec 10 -MaximumRetryCount 3
+          Start-Process -FilePath $rInstaller -ArgumentList '/VERYSILENT /DIR=C:\R /NOICONS /NORESTART' -Wait
+          Remove-Item $rInstaller
+          "C:\R\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Configure project-isolated R library
         shell: pwsh
         run: |
@@ -77,13 +84,18 @@ jobs:
     steps:
       - run: apt-get update
       - run: >-
-          apt-get install -y build-essential curl git libgl1-mesa-dev libwayland-dev
-          libx11-dev libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev
-          libxrandr-dev pkg-config python3 python3-venv
+          apt-get install -y build-essential curl dirmngr git gnupg
+          libgl1-mesa-dev libwayland-dev libx11-dev libxcursor-dev libxi-dev
+          libxinerama-dev libxkbcommon-dev libxrandr-dev pkg-config python3
+          python3-venv
       - uses: actions/checkout@v7
-      - uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: '4.6.1'
+      - name: Install R from CRAN Debian repository
+        run: |
+          gpg --keyserver keyserver.ubuntu.com --recv-key 95C0FAF38DB3CCAD0C080A7BDC78B2DDEABC47B7
+          gpg --export 95C0FAF38DB3CCAD0C080A7BDC78B2DDEABC47B7 > /etc/apt/trusted.gpg.d/cran_debian.asc
+          echo "deb https://cloud.r-project.org/bin/linux/debian bookworm-cran40/" > /etc/apt/sources.list.d/cran.list
+          apt-get update
+          apt-get install -y --no-install-recommends r-base r-base-dev
       - name: Configure project-isolated R library
         run: |
           r_library="$GITHUB_WORKSPACE/.linxira-bio/ci/r/4.6.1/library"
