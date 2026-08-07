@@ -1,13 +1,25 @@
 {
   "schema_version": "2",
-  "job_id": "rnafold-v2",
+  "job_id": "fixture-rnafold-v2",
   "capability": "rna.secondary-structure.v1",
-  "inputs": {
-    "sequence": {
-      "path": "../sequences/tiny.fa",
-      "format": "fasta"
+  "inputs": [
+    {
+      "artifact_id": "input-sequence",
+      "role": "sequence",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-sequence-1",
+          "path": "../sequences/tiny.fa",
+          "format": "fasta",
+          "compression": "none",
+          "size_bytes": 32,
+          "sha256": "D36EA1364A0451FD99584F0F36307DBC34B818CA4008C24C7705A95855172A1C"
+        }
+      ]
     }
-  },
+  ],
+  "execution": {"mode": "local-cpu"},
   "parameters": {
     "output": "rna-structure.txt"
   }

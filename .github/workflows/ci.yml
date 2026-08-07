@@ -91,9 +91,9 @@ jobs:
       - uses: actions/checkout@v7
       - name: Install R from CRAN Debian repository
         run: |
-          gpg --keyserver keyserver.ubuntu.com --recv-key 95C0FAF38DB3CCAD0C080A7BDC78B2DDEABC47B7
-          gpg --export 95C0FAF38DB3CCAD0C080A7BDC78B2DDEABC47B7 > /etc/apt/trusted.gpg.d/cran_debian.asc
-          echo "deb https://cloud.r-project.org/bin/linux/debian bookworm-cran40/" > /etc/apt/sources.list.d/cran.list
+          gpg --keyserver keyserver.ubuntu.com --recv-key '95C0FAF38DB3CCAD0C080A7BDC78B2DDEABC47B7'
+          gpg --armor --export '95C0FAF38DB3CCAD0C080A7BDC78B2DDEABC47B7' > /etc/apt/trusted.gpg.d/cran_debian_key.asc
+          echo "deb https://cloud.r-project.org/bin/linux/debian bookworm-cran46/" > /etc/apt/sources.list.d/cran.list
           apt-get update
           apt-get install -y --no-install-recommends r-base r-base-dev
       - name: Configure project-isolated R library

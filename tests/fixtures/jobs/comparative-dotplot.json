@@ -6,6 +6,9 @@
     "query": "../sequences/query.fa",
     "reference": "../sequences/reference.fa"
   },
+  "execution": {
+    "mode": "local-cpu"
+  },
   "parameters": {
     "output": "dotplot.svg"
   }

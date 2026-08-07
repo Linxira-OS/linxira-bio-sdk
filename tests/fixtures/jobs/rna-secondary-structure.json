@@ -5,6 +5,9 @@
   "inputs": {
     "sequence": "../sequences/tiny.fa"
   },
+  "execution": {
+    "mode": "local-cpu"
+  },
   "parameters": {
     "output": "rna-structure.txt"
   }
