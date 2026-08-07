@@ -43,7 +43,7 @@ linxira-bio phylogeny tree-plot tree.nwk tree.svg --width 1200 --height 800 --no
 
 渲染算法无需外部引用。
 
-## 故障排查
+## 故障排除
 
 验证输入文件是否为有效的 Newick 格式。如果树无法渲染，请检查每个叶节点是否有标签，
 以及文件是否以分号结尾。
