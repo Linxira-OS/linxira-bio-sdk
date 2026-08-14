@@ -189,6 +189,9 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "expression.differential.v1" | "medical.bulk-rnaseq.v1" => {
             workflow::execute_bulk_expression_v1(base_directory, request)
         }
+        "sequence.convert.biopython.v1" => {
+            workflow::execute_sequence_convert_v1(base_directory, request)
+        }
         "interval.intersect.v1" => run_interval_intersect(base_directory, request),
         "interval.merge.v1" => run_interval_merge(base_directory, request),
         "interval.subtract.v1" => run_interval_subtract(base_directory, request),
@@ -1037,6 +1040,9 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
         }
         "expression.differential.v1" | "medical.bulk-rnaseq.v1" => {
             workflow::execute_bulk_expression_v2(base_directory, request, &verified_inputs)
+        }
+        "sequence.convert.biopython.v1" => {
+            workflow::execute_sequence_convert_v2(base_directory, request, &verified_inputs)
         }
         "expression.volcano.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "differential")?;
@@ -2180,6 +2186,10 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
                 "alpha",
                 "min_total_count",
             ],
+        ),
+        "sequence.convert.biopython.v1" => (
+            &["sequences"],
+            &["output_directory", "output_filename", "output_format"],
         ),
         "expression.volcano.v1" => (
             &["differential"],
