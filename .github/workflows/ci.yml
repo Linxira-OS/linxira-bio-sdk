@@ -142,8 +142,11 @@ jobs:
           LINXIRA_BIO_WORKFLOW_PYTHON: ${{ github.workspace }}\.venv-convert\Scripts\python.exe
         run: |
           New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\target\test-results" | Out-Null
-          $envelope = cargo +stable-x86_64-pc-windows-gnu run --locked -p linxira-bio-cli -- sequence convert tests/fixtures/sequences/tiny.fa "$env:GITHUB_WORKSPACE\target\test-results\convert-e2e\converted.genbank" --output-format genbank 2>$null | ConvertFrom-Json
-          if ($LASTEXITCODE -ne 0) { throw "sequence convert E2E command failed" }
+          $output = cargo +stable-x86_64-pc-windows-gnu run --locked -p linxira-bio-cli -- sequence convert tests/fixtures/sequences/tiny.fa "$env:GITHUB_WORKSPACE\target\test-results\convert-e2e\converted.genbank" --output-format genbank 2>&1
+          $exitCode = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($exitCode -ne 0) { throw "sequence convert E2E command failed (exit $exitCode)" }
+          $envelope = ($output | Select-String -Pattern '^\{"schema_version"' | Select-Object -First 1).Line | ConvertFrom-Json
           if ($envelope.status -ne "ok") { throw "sequence convert E2E result not ok: $($envelope.diagnostics | ConvertTo-Json -Compress)" }
           $converted = "$env:GITHUB_WORKSPACE\target\test-results\convert-e2e\converted.genbank"
           if (-not (Test-Path -LiteralPath $converted)) { throw "converted file missing" }
