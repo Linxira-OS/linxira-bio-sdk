@@ -98,7 +98,7 @@ class WorkflowManifestTests(unittest.TestCase):
         self, pack_root: Path, manifest: dict, catalog_entry: dict
     ) -> None:
         self.assertEqual(manifest["runtime"]["version"], ">=4.6.1,<4.7.0")
-        self.assertEqual(catalog_entry["status"], "cataloged")
+        self.assertEqual(catalog_entry["status"], "installable")
         self.assertEqual(catalog_entry["capability"], "expression.differential.v1")
         self.assertEqual(
             catalog_entry["capability_aliases"],
@@ -148,7 +148,14 @@ class WorkflowManifestTests(unittest.TestCase):
             set(resolved["required_fields"]),
             {"name", "version", "repository", "source_url", "sha256", "license"},
         )
-        self.assertFalse(lock["installable"])
+        self.assertTrue(lock["installable"])
+        self.assertNotIn("install_blocker", lock)
+        entries = resolved["entries"]
+        self.assertTrue(entries, "installable lock must materialize resolved entries")
+        entry_fields = {"name", "version", "repository", "source_url", "sha256", "license"}
+        for entry in entries:
+            self.assertTrue(entry_fields.issubset(entry), f"entry missing fields: {entry}")
+            self.assertEqual(len(entry["sha256"]), 64)
 
         supported_capabilities = {
             "expression.differential.v1",
