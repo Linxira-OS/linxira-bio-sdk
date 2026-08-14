@@ -435,14 +435,17 @@ def main(arguments: list[str] | None = None) -> int:
         convert_atomic(config, started_at)
         return 0
     except (OSError, json.JSONDecodeError, RequestError, RuntimeError, ValueError) as error:
+        import traceback
+
+        message = f"{error}\n{traceback.format_exc()}"
         try:
             if not paths_alias(options.request, options.result):
                 write_error_result_atomic(
-                    options.result, error_result(job_id, str(error), started_at)
+                    options.result, error_result(job_id, message, started_at)
                 )
         except (OSError, RequestError):
             pass
-        print(f"{PACK_ID}: {error}", file=sys.stderr)
+        print(f"{PACK_ID}: {message}", file=sys.stderr)
         return 2
 
 
