@@ -536,9 +536,23 @@
     },
     {
       "id": "sequence.convert.biopython.v1",
-      "status": "planned",
+      "status": "available",
       "category": "sequence-io",
-      "default_execution": "local-cpu"
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence convert <input> <output> [--input-format fasta|fastq|genbank|embl] [--output-format fasta|fastq|genbank|embl]",
+      "input_formats": [
+        "fasta",
+        "fastq",
+        "genbank",
+        "embl"
+      ],
+      "output_formats": [
+        "fasta",
+        "fastq",
+        "genbank",
+        "embl",
+        "json"
+      ]
     },
     {
       "id": "expression.differential.v1",

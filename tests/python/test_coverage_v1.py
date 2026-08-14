@@ -57,8 +57,8 @@ class CoverageV1ValidationTests(unittest.TestCase):
 
     def test_repository_coverage_contract_is_structurally_valid(self) -> None:
         summary = self.validate()
-        self.assertEqual(summary.total_weight, 106)
-        self.assertEqual(summary.target_weight, 85)
+        self.assertEqual(summary.total_weight, 107)
+        self.assertEqual(summary.target_weight, 86)
         self.assertEqual(summary.target_by_domain, coverage_v1.DOMAIN_TARGETS)
         self.assertEqual(summary.offline_reference_count, 57)
 

@@ -20,12 +20,12 @@ DEFAULT_REFERENCE_INVENTORY = (
 )
 
 DOMAINS = {
-    "general-biology": 81,
+    "general-biology": 82,
     "biochemistry-structure": 15,
     "medical-omics-ruo": 10,
 }
 DOMAIN_TARGETS = {
-    "general-biology": 67,
+    "general-biology": 68,
     "biochemistry-structure": 13,
     "medical-omics-ruo": 5,
 }

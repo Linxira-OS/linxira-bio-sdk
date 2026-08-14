@@ -1461,6 +1461,52 @@ fn sequence_transforms_reject_invalid_options_and_existing_outputs() {
 }
 
 #[test]
+fn sequence_convert_rejects_invalid_formats_and_existing_outputs() {
+    let root = temporary_directory("sequence-convert-errors");
+    let input = root.join("input.fa");
+    let protected = root.join("protected.fa");
+    fs::write(&input, b">sequence\nACGT\n").expect("write input FASTA");
+    fs::write(&protected, b"do not replace\n").expect("write protected output");
+
+    let overwrite = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "convert"])
+        .arg(&input)
+        .arg(&protected)
+        .args(["--output-format", "fasta"])
+        .output()
+        .expect("run protected sequence convert");
+    assert!(!overwrite.status.success());
+    assert!(String::from_utf8_lossy(&overwrite.stderr).contains("refusing to overwrite"));
+    assert_eq!(
+        fs::read_to_string(&protected).expect("protected output remains"),
+        "do not replace\n"
+    );
+
+    let unknown_format = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "convert"])
+        .arg(&input)
+        .arg(root.join("out.fa"))
+        .args(["--output-format", "gff"])
+        .output()
+        .expect("run sequence convert with an unknown format");
+    assert!(!unknown_format.status.success());
+    assert!(
+        String::from_utf8_lossy(&unknown_format.stderr).contains("unsupported sequence format")
+    );
+
+    let missing_input = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "convert"])
+        .arg(root.join("missing.fa"))
+        .arg(root.join("out.fa"))
+        .output()
+        .expect("run sequence convert with a missing input");
+    assert!(!missing_input.status.success());
+    assert!(String::from_utf8_lossy(&missing_input.stderr).contains("does not exist"));
+
+    fs::remove_dir_all(root).expect("remove sequence convert error directory");
+}
+
+#[test]
 fn functional_annotation_and_enrichment_commands_emit_versioned_json() {
     let workspace = workspace_root();
     let fixtures = workspace.join("tests/fixtures/functional");
