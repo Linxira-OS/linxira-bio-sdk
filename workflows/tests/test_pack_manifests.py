@@ -41,7 +41,11 @@ class WorkflowManifestTests(unittest.TestCase):
 
     def test_cataloged_pack_manifests_are_complete_and_exact(self) -> None:
         catalog = load_json(CATALOG_PATH)
-        cataloged = [pack for pack in catalog["packs"] if pack["status"] == "cataloged"]
+        cataloged = [
+            pack
+            for pack in catalog["packs"]
+            if pack["status"] in {"cataloged", "installable"}
+        ]
         self.assertTrue(cataloged, "at least one cataloged workflow pack is required")
         for pack in cataloged:
             with self.subTest(pack=pack["id"]):
@@ -97,13 +101,15 @@ class WorkflowManifestTests(unittest.TestCase):
     def verify_r_runtime_policy(
         self, pack_root: Path, manifest: dict, catalog_entry: dict
     ) -> None:
-        self.assertEqual(manifest["runtime"]["version"], ">=4.6.1,<4.7.0")
-        self.assertEqual(catalog_entry["status"], "installable")
-        self.assertEqual(catalog_entry["capability"], "expression.differential.v1")
-        self.assertEqual(
-            catalog_entry["capability_aliases"],
-            ["medical.bulk-rnaseq.v1", "expression.deseq2.v1"],
-        )
+        pack_id = catalog_entry["id"]
+        if pack_id == "org.linxira.bulk-expression-deseq2":
+            self.verify_deseq2_r_runtime_policy(pack_root, manifest, catalog_entry)
+        elif pack_id == "org.linxira.expression-wgcna":
+            self.verify_wgcna_r_runtime_policy(pack_root, manifest, catalog_entry)
+        else:
+            self.fail(f"no R runtime policy defined for pack {pack_id}")
+
+    def verify_resolved_lock(self, pack_root: Path, manifest: dict) -> dict:
         lock = load_json(pack_root / manifest["runtime"]["dependency_lock"]["path"])
         self.assertEqual(lock["schema_version"], "2")
         self.assertEqual(lock["lock_kind"], "compatibility-and-resolution-policy")
@@ -129,18 +135,6 @@ class WorkflowManifestTests(unittest.TestCase):
         self.assertFalse(isolation["global_library_mutation"])
         self.assertFalse(isolation["global_path_mutation"])
         self.assertTrue(isolation["side_by_side_runtime_versions"])
-        requirements = {
-            package["name"]: package["version_requirement"]
-            for package in lock["direct_requirements"]
-        }
-        self.assertEqual(
-            requirements,
-            {
-                "DESeq2": ">=1.52.0,<1.53.0",
-                "jsonlite": ">=1.8.9,<3.0.0",
-                "digest": ">=0.6.37,<0.7.0",
-            },
-        )
         resolved = lock["resolved_environment_lock"]
         self.assertTrue(resolved["required_before_activation"])
         self.assertEqual(resolved["completeness"], "direct-and-transitive")
@@ -156,7 +150,31 @@ class WorkflowManifestTests(unittest.TestCase):
         for entry in entries:
             self.assertTrue(entry_fields.issubset(entry), f"entry missing fields: {entry}")
             self.assertEqual(len(entry["sha256"]), 64)
+        return lock
 
+    def verify_deseq2_r_runtime_policy(
+        self, pack_root: Path, manifest: dict, catalog_entry: dict
+    ) -> None:
+        self.assertEqual(manifest["runtime"]["version"], ">=4.6.1,<4.7.0")
+        self.assertEqual(catalog_entry["status"], "installable")
+        self.assertEqual(catalog_entry["capability"], "expression.differential.v1")
+        self.assertEqual(
+            catalog_entry["capability_aliases"],
+            ["medical.bulk-rnaseq.v1", "expression.deseq2.v1"],
+        )
+        lock = self.verify_resolved_lock(pack_root, manifest)
+        requirements = {
+            package["name"]: package["version_requirement"]
+            for package in lock["direct_requirements"]
+        }
+        self.assertEqual(
+            requirements,
+            {
+                "DESeq2": ">=1.52.0,<1.53.0",
+                "jsonlite": ">=1.8.9,<3.0.0",
+                "digest": ">=0.6.37,<0.7.0",
+            },
+        )
         supported_capabilities = {
             "expression.differential.v1",
             "medical.bulk-rnaseq.v1",
@@ -186,6 +204,63 @@ class WorkflowManifestTests(unittest.TestCase):
             if path.is_file() and path.suffix.lower() in {".json", ".md", ".r"}
         )
         self.assertNotIn("4.4.3", distributed_text)
+        for requirement in requirements.values():
+            self.assertIn(requirement, distributed_text)
+
+    def verify_wgcna_r_runtime_policy(
+        self, pack_root: Path, manifest: dict, catalog_entry: dict
+    ) -> None:
+        self.assertEqual(manifest["runtime"]["version"], ">=4.6.1,<4.7.0")
+        self.assertEqual(catalog_entry["status"], "installable")
+        self.assertEqual(catalog_entry["capability"], "expression.wgcna.v1")
+        self.assertNotIn("capability_aliases", catalog_entry)
+        lock = self.verify_resolved_lock(pack_root, manifest)
+        requirements = {
+            package["name"]: package["version_requirement"]
+            for package in lock["direct_requirements"]
+        }
+        self.assertEqual(
+            requirements,
+            {
+                "WGCNA": ">=1.72,<2.0",
+                "jsonlite": ">=1.8.9,<3.0.0",
+                "digest": ">=0.6.37,<0.7.0",
+            },
+        )
+        wgcna_requirement = next(
+            package for package in lock["direct_requirements"] if package["name"] == "WGCNA"
+        )
+        self.assertEqual(wgcna_requirement["repository"], "cran")
+        input_schema = load_json(pack_root / "schemas" / "input.schema.json")
+        output_schema = load_json(pack_root / "schemas" / "output.schema.json")
+        self.assertEqual(
+            set(input_schema["properties"]["capability"]["enum"]),
+            {"expression.wgcna.v1"},
+        )
+        self.assertEqual(
+            set(output_schema["properties"]["capability"]["enum"]),
+            {"expression.wgcna.v1"},
+        )
+        self.assertEqual(
+            set(input_schema["properties"]["parameters"]["required"]),
+            {"output_directory"},
+        )
+        parameters = input_schema["properties"]["parameters"]["properties"]
+        self.assertEqual(parameters["min_module_size"]["default"], 30)
+        self.assertEqual(parameters["merge_cut_height"]["default"], 0.25)
+        self.assertEqual(parameters["network_type"]["default"], "signed")
+        script = (pack_root / "src" / "run_wgcna.R").read_text(encoding="utf-8")
+        self.assertIn("PACKAGE_REQUIREMENTS", script)
+        self.assertIn("WGCNA::", script)
+        self.assertIn("capability = config$capability", script)
+
+        distributed_text = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in pack_root.rglob("*")
+            if path.is_file() and path.suffix.lower() in {".json", ".md", ".r"}
+        )
+        self.assertNotIn("4.4.3", distributed_text)
+        self.assertNotIn("4.3.0", distributed_text)
         for requirement in requirements.values():
             self.assertIn(requirement, distributed_text)
 

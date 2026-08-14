@@ -1,0 +1,568 @@
+{
+  "schema_version": "2",
+  "lock_kind": "compatibility-and-resolution-policy",
+  "runtime": {
+    "name": "R",
+    "preferred_version": "4.6.1",
+    "version_requirement": ">=4.6.1,<4.7.0",
+    "release_policy": "latest-stable-patch-within-tested-minor",
+    "bioconductor_release": "3.23"
+  },
+  "isolation": {
+    "scope": "project",
+    "interpreter_environment_variable": "LINXIRA_BIO_WORKFLOW_R",
+    "library_environment_variable": "LINXIRA_BIO_WORKFLOW_R_LIBRARY",
+    "declared_packages_must_resolve_from_project_library": true,
+    "all_loaded_non_base_packages_must_resolve_from_project_library": true,
+    "base_and_recommended_packages_may_resolve_from_runtime": true,
+    "global_library_mutation": false,
+    "global_path_mutation": false,
+    "side_by_side_runtime_versions": true
+  },
+  "repositories": [
+    {
+      "id": "bioconductor-bioc",
+      "url": "https://bioconductor.org/packages/3.23/bioc"
+    },
+    {
+      "id": "bioconductor-data-annotation",
+      "url": "https://bioconductor.org/packages/3.23/data/annotation"
+    },
+    {
+      "id": "bioconductor-data-experiment",
+      "url": "https://bioconductor.org/packages/3.23/data/experiment"
+    },
+    {
+      "id": "cran",
+      "url": "https://cloud.r-project.org"
+    }
+  ],
+  "direct_requirements": [
+    {
+      "name": "WGCNA",
+      "version_requirement": ">=1.72,<2.0",
+      "repository": "cran",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "name": "jsonlite",
+      "version_requirement": ">=1.8.9,<3.0.0",
+      "repository": "cran",
+      "license": "MIT"
+    },
+    {
+      "name": "digest",
+      "version_requirement": ">=0.6.37,<0.7.0",
+      "repository": "cran",
+      "license": "GPL-2.0-or-later"
+    }
+  ],
+  "resolved_environment_lock": {
+    "required_before_activation": true,
+    "scope": "one-platform-one-r-runtime-one-project-library",
+    "completeness": "direct-and-transitive",
+    "required_fields": [
+      "name",
+      "version",
+      "repository",
+      "source_url",
+      "sha256",
+      "license"
+    ],
+    "activation_policy": "verify-hashes-and-health-check-before-atomic-activation",
+    "reuse_policy": "reuse-only-when-runtime-and-complete-lock-identities-match",
+    "entries": [
+      {
+        "name": "Formula",
+        "version": "1.2-6",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/Formula_1.2-6.tar.gz",
+        "sha256": "7e611ac371c045e100a6205d92fe5104001942673798f970290fea12e33bfd37",
+        "license": "GPL-2 | GPL-3"
+      },
+      {
+        "name": "Hmisc",
+        "version": "5.2-6",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/Hmisc_5.2-6.tar.gz",
+        "sha256": "be0d8f946c48190c434a36707c984b025791c9c8874ce71e3bf872a2c951ba69",
+        "license": "GPL (>= 2)"
+      },
+      {
+        "name": "R6",
+        "version": "2.6.1",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/R6_2.6.1.tar.gz",
+        "sha256": "59c6eba8b1b912eb7e104f65053235604be853425ee67c152ac4e86a1f2073b4",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "RColorBrewer",
+        "version": "1.1-3",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/RColorBrewer_1.1-3.tar.gz",
+        "sha256": "4f42f5423c45688b39f492c7892d93f37b4541831c8ffb140364d2bd89031ac0",
+        "license": "Apache License 2.0"
+      },
+      {
+        "name": "Rcpp",
+        "version": "1.1.2",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/Rcpp_1.1.2.tar.gz",
+        "sha256": "2746cf2fb188e5f0a84dbf5c8f68915b54564ed33e5754572f174e7b32e7f4f3",
+        "license": "GPL (>= 2)"
+      },
+      {
+        "name": "S7",
+        "version": "0.2.2",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/S7_0.2.2.tar.gz",
+        "sha256": "6f33245dde05b74265b1c4d379e034bc3a8923d41e7b52e6e75a75ce97d42af7",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "WGCNA",
+        "version": "1.74",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/WGCNA_1.74.tar.gz",
+        "sha256": "4f61e117b82287f01b61bf936d5c5ea3814c9c4b0d0b90d5016dda77f1f955d6",
+        "license": "GPL (>= 2)"
+      },
+      {
+        "name": "backports",
+        "version": "1.5.1",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/backports_1.5.1.tar.gz",
+        "sha256": "b8eeeabe3c27e1486f43e0b18dae57f0e870dd7c6979d3668df76bf0d4735bad",
+        "license": "GPL-2 | GPL-3"
+      },
+      {
+        "name": "base64enc",
+        "version": "0.1-6",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/base64enc_0.1-6.tar.gz",
+        "sha256": "3c7e9d22f7409fa2989008fa6e980c3dd8e2693eb20676acf2470ae7addb0816",
+        "license": "GPL-2 | GPL-3"
+      },
+      {
+        "name": "bslib",
+        "version": "0.12.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/bslib_0.12.0.tar.gz",
+        "sha256": "26fc11793dc1fdccd6d8d2fc1d638c29c47aa0c2e5cbadc6a35af3819f5446d1",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "cachem",
+        "version": "1.1.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/cachem_1.1.0.tar.gz",
+        "sha256": "550839fc2ae5d865db475ba2c1714144f07fa0c052c72135b0e4a70287492e21",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "checkmate",
+        "version": "2.3.4",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/checkmate_2.3.4.tar.gz",
+        "sha256": "95e1068dee07d95c5e616dfd66e622cf245821acd358a77e790118c34ebd85ca",
+        "license": "BSD_3_clause + file LICENSE"
+      },
+      {
+        "name": "cli",
+        "version": "3.6.6",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/cli_3.6.6.tar.gz",
+        "sha256": "b2b58d6dd82f5798b335e39c00591686a01fd3e94399ef898e146173e36f18f9",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "colorspace",
+        "version": "2.1-3",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/colorspace_2.1-3.tar.gz",
+        "sha256": "47858800f9eed08cbcdbadba104b6502219c6f25f339c611161b374704cd03cc",
+        "license": "BSD_3_clause + file LICENSE"
+      },
+      {
+        "name": "cpp11",
+        "version": "0.5.5",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/cpp11_0.5.5.tar.gz",
+        "sha256": "72486beb0605c1229bf3d422cd536224af8dc09bd389a3116f62f4c7705c62f4",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "data.table",
+        "version": "1.18.4",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/data.table_1.18.4.tar.gz",
+        "sha256": "d65256f0050a6443770d5982b5098a2a8c894f9675ed17053416c7815cbddeb9",
+        "license": "MPL-2.0 | file LICENSE"
+      },
+      {
+        "name": "digest",
+        "version": "0.6.39",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/digest_0.6.39.tar.gz",
+        "sha256": "8bf048b49b2d17077138fae758bda56bbd53278d9437f2fdeaedf979c90a13c9",
+        "license": "GPL (>= 2)"
+      },
+      {
+        "name": "doParallel",
+        "version": "1.0.17",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/doParallel_1.0.17.tar.gz",
+        "sha256": "b96a25ad105a654d70c7b4ca27290dc9967bc47f4668b2763927a886b178abd7",
+        "license": "GPL-2"
+      },
+      {
+        "name": "dynamicTreeCut",
+        "version": "1.63-1",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/dynamicTreeCut_1.63-1.tar.gz",
+        "sha256": "831307f64eddd68dcf01bbe2963be99e5cde65a636a13ce9de229777285e4db9",
+        "license": "GPL (>= 2)"
+      },
+      {
+        "name": "evaluate",
+        "version": "1.0.5",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/evaluate_1.0.5.tar.gz",
+        "sha256": "47aac79f889a828a5f8b4756cb972d7c2966bb984cbae17a4bd2389a73270794",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "farver",
+        "version": "2.1.2",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/farver_2.1.2.tar.gz",
+        "sha256": "528823b95daab4566137711f1c842027a952bea1b2ae6ff098e2ca512b17fe25",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "fastcluster",
+        "version": "1.3.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/fastcluster_1.3.0.tar.gz",
+        "sha256": "fc214913eb804d05af7fdce53be30632220859203b6bb227be85b8a451b363fb",
+        "license": "FreeBSD | GPL-2 | file LICENSE"
+      },
+      {
+        "name": "fastmap",
+        "version": "1.2.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/fastmap_1.2.0.tar.gz",
+        "sha256": "b1da04a2915d1d057f3c2525e295ef15016a64e6667eac83a14641bbd83b9246",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "fontawesome",
+        "version": "0.5.3",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/fontawesome_0.5.3.tar.gz",
+        "sha256": "1b1909d0fad5ec4c658f5c628a195b9bd93d544afa957e68e897224cfb81fb4f",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "foreach",
+        "version": "1.5.2",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/foreach_1.5.2.tar.gz",
+        "sha256": "56338d8753f9f68f262cf532fd8a6d0fe25a71a2ff0107f3ce378feb926bafe4",
+        "license": "Apache License (== 2.0)"
+      },
+      {
+        "name": "fs",
+        "version": "2.1.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/fs_2.1.0.tar.gz",
+        "sha256": "7088af1117d65c4ceb144b532e323f197fc8243b1d704bf6edf40774789829cd",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "ggplot2",
+        "version": "4.0.3",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/ggplot2_4.0.3.tar.gz",
+        "sha256": "690224bd61642b6222adb109470988e87f786e193cca77a15c0923cf9da73fa5",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "glue",
+        "version": "1.8.1",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/glue_1.8.1.tar.gz",
+        "sha256": "1c55905d3efc3d5c199ceb0bd12218e97f0d4c64df6038ff41ecef415478a122",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "gridExtra",
+        "version": "2.3.1",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/gridExtra_2.3.1.tar.gz",
+        "sha256": "de42e501ac2c6a70bd0ffc18d7703e9b0e6b878c610df09756183c3e52445c82",
+        "license": "GPL (>= 2)"
+      },
+      {
+        "name": "gtable",
+        "version": "0.3.6",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/gtable_0.3.6.tar.gz",
+        "sha256": "d305a5fa11278b649d2d8edc5288bf28009be888a42be58ff8714018e49de0ef",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "highr",
+        "version": "0.12",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/highr_0.12.tar.gz",
+        "sha256": "e8e1d6460022a9948799602d6b95dc78fbfa318ff6f0627e95c20b7190fc612b",
+        "license": "GPL"
+      },
+      {
+        "name": "htmlTable",
+        "version": "2.5.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/htmlTable_2.5.0.tar.gz",
+        "sha256": "0f61b0f27408fefc09f17fa3270c8f26d10a1e5a7f0dd26c203d3f961268d828",
+        "license": "GPL (>= 3)"
+      },
+      {
+        "name": "htmltools",
+        "version": "0.5.9",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/htmltools_0.5.9.tar.gz",
+        "sha256": "19308618da485818f69dcfeeadd2ddc81d43a736a74519df7b3fd98e13128afd",
+        "license": "GPL (>= 2)"
+      },
+      {
+        "name": "htmlwidgets",
+        "version": "1.6.4",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/htmlwidgets_1.6.4.tar.gz",
+        "sha256": "7cb08f0b30485dac26f72e4056ec4ed8825d1398e8b9f25ed63db228fe3a0ed0",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "impute",
+        "version": "1.86.0",
+        "repository": "bioconductor-bioc",
+        "source_url": "https://bioconductor.org/packages/3.23/bioc/src/contrib/impute_1.86.0.tar.gz",
+        "sha256": "16a9f2fbe557fa77c40589d6378cbc6eec393233f51cedaef4168f204bf43d4c",
+        "license": "GPL-2"
+      },
+      {
+        "name": "isoband",
+        "version": "0.3.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/isoband_0.3.0.tar.gz",
+        "sha256": "fe8d3d58ca75bbee32f389152ac0058818f3f76f09c9867949531de7abc424ac",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "iterators",
+        "version": "1.0.14",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/iterators_1.0.14.tar.gz",
+        "sha256": "cef3075a0930e1408c764e4da56bbadd4f7d14315809df8f38dd51f80ccc677b",
+        "license": "Apache License (== 2.0)"
+      },
+      {
+        "name": "jquerylib",
+        "version": "0.1.4",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/jquerylib_0.1.4.tar.gz",
+        "sha256": "f0bcc11dcde3a6ff180277e45c24642d3da3c8690900e38f44495efbc9064411",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "jsonlite",
+        "version": "2.0.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/jsonlite_2.0.0.tar.gz",
+        "sha256": "75eb910c82b350ec33f094779da0f87bff154c232e4ae39c9896a9b89f3ac82d",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "knitr",
+        "version": "1.51",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/knitr_1.51.tar.gz",
+        "sha256": "bcfa3081677ff5c3881c7cef35f3305bbf6714b01320c81a523772663741ca11",
+        "license": "GPL"
+      },
+      {
+        "name": "labeling",
+        "version": "0.4.3",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/labeling_0.4.3.tar.gz",
+        "sha256": "c62f4fc2cc74377d7055903c5f1913b7295f7587456fe468592738a483e264f2",
+        "license": "MIT + file LICENSE | Unlimited"
+      },
+      {
+        "name": "lifecycle",
+        "version": "1.0.5",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/lifecycle_1.0.5.tar.gz",
+        "sha256": "61841e3e6edba056a88355a3f1d6698ab8d5d9cb3c05f2af0ec5a44ab516f8ee",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "magrittr",
+        "version": "2.0.5",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/magrittr_2.0.5.tar.gz",
+        "sha256": "3f5b5b1d4e6d12807a95c50b6c88cb1d8af2c5eb5213f08bfe58f278eca2ed23",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "matrixStats",
+        "version": "1.5.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/matrixStats_1.5.0.tar.gz",
+        "sha256": "12996c5f3e6fc202a43e1087f16a71b7fa93d7e908f512542c7ee89cf95dcc15",
+        "license": "Artistic-2.0"
+      },
+      {
+        "name": "memoise",
+        "version": "2.0.1",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/memoise_2.0.1.tar.gz",
+        "sha256": "f85034ee98c8ca07fb3cd826142c1cd1e1e5747075a94c75a45783bbc4fe2deb",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "mime",
+        "version": "0.13",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/mime_0.13.tar.gz",
+        "sha256": "7132834cf3c3388eff12bad376d69fbcf8275acc37d36c290e59174fe3c7f3eb",
+        "license": "GPL"
+      },
+      {
+        "name": "preprocessCore",
+        "version": "1.74.0",
+        "repository": "bioconductor-bioc",
+        "source_url": "https://bioconductor.org/packages/3.23/bioc/src/contrib/preprocessCore_1.74.0.tar.gz",
+        "sha256": "3a751512f4398cb2c50f2271caa4be88e80b371def3b9808bc9f296b529b7ff7",
+        "license": "LGPL (>= 2)"
+      },
+      {
+        "name": "rappdirs",
+        "version": "0.3.4",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/rappdirs_0.3.4.tar.gz",
+        "sha256": "2320ebc9ef3b1a32a1e63f94a6ce2c1c34d66782221a6531e786804f681abc66",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "rlang",
+        "version": "1.3.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/rlang_1.3.0.tar.gz",
+        "sha256": "80aa537d49e72265f443a15e8936128af583caa5e572086518b503cbf064279c",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "rmarkdown",
+        "version": "2.31",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/rmarkdown_2.31.tar.gz",
+        "sha256": "0c5baed4a447292f15507794d2dde6b18bae1fa6c45ea6ada8bcd99ca211fcbc",
+        "license": "GPL-3"
+      },
+      {
+        "name": "rstudioapi",
+        "version": "0.19.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/rstudioapi_0.19.0.tar.gz",
+        "sha256": "f1e3bb445a90aadc07b043493022d120493eba7ff30c0b3055442d8b77d8069a",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "sass",
+        "version": "0.4.10",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/sass_0.4.10.tar.gz",
+        "sha256": "4adb4c243f74d811276529e346deaa064bce28dbfbb837208fc85f2c47b79b30",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "scales",
+        "version": "1.4.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/scales_1.4.0.tar.gz",
+        "sha256": "d55ef5f08c92652d7a95cfa27584024723ab17873f1b2577dd488cb7c883ceee",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "stringi",
+        "version": "1.8.9",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/stringi_1.8.9.tar.gz",
+        "sha256": "427fcebd281d7ea850becce75e0807576dd394a723a814b2d487419b93275a33",
+        "license": "file LICENSE"
+      },
+      {
+        "name": "stringr",
+        "version": "1.6.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/stringr_1.6.0.tar.gz",
+        "sha256": "24f2fc5df980a7eb888659e22b9744d2316c558624015c7a7cd8c3ce3e370064",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "tinytex",
+        "version": "0.60",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/tinytex_0.60.tar.gz",
+        "sha256": "a48f0e88a6cf0cd196e950dba8743df8916918a67c472923257c82bcb8a471e8",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "vctrs",
+        "version": "0.7.3",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/vctrs_0.7.3.tar.gz",
+        "sha256": "b45078413e06ac624dddb7221a3a43908b405c8abec09822cb86638d30b0435b",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "viridisLite",
+        "version": "0.4.3",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/viridisLite_0.4.3.tar.gz",
+        "sha256": "433be9bde66234dc76301fb4ffbbc9fc74bab5c14f4548d8ef2fc0065e121ef5",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "withr",
+        "version": "3.0.3",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/withr_3.0.3.tar.gz",
+        "sha256": "d86c6454164fc85678bfc85e2a6cce42f7461d45fa9a87de71f376e7956c991e",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "xfun",
+        "version": "0.60",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/xfun_0.60.tar.gz",
+        "sha256": "6f5d4fe2067bade6d7b33916f86d756a017c068296c885a6e22c30b557b84597",
+        "license": "MIT + file LICENSE"
+      },
+      {
+        "name": "yaml",
+        "version": "2.3.12",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/yaml_2.3.12.tar.gz",
+        "sha256": "80ccf3dde851133ef3e333b818a817c296c6ccdacfc4709cd466995289cd556c",
+        "license": "BSD_3_clause + file LICENSE"
+      }
+    ]
+  },
+  "pack_lock_completeness": "runtime-and-direct-requirements",
+  "execution_policy": "require-compatible-runtime-and-project-resolved-dependencies",
+  "installable": true
+}
