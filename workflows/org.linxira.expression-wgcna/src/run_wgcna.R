@@ -4,8 +4,8 @@ PACK_ID <- "org.linxira.expression-wgcna"
 PACK_VERSION <- "0.1.0"
 PRIMARY_CAPABILITY <- "expression.wgcna.v1"
 SUPPORTED_CAPABILITIES <- c(PRIMARY_CAPABILITY)
-PREFERRED_R <- "4.4.0"
-R_VERSION_REQUIREMENT <- ">=4.3.0,<4.6.0"
+PREFERRED_R <- "4.6.1"
+R_VERSION_REQUIREMENT <- ">=4.6.1,<4.7.0"
 PACKAGE_REQUIREMENTS <- c(
   WGCNA = ">=1.72,<2.0",
   jsonlite = ">=1.8.9,<3.0.0",
@@ -163,10 +163,12 @@ read_expression_matrix <- function(path) {
 
 minimal_error_json <- function(job_id, capability, message, started_at) {
   sprintf(
-    '{"schema_version":"2","job_id":%s,"capability":%s,"status":"error","result":{},' %+%
-    '"artifacts":[],"provenance":{"engine_version":"%s","execution_mode":"local-cpu",' %+%
-    '"started_at":"%s","finished_at":"%s"},"diagnostics":[{"code":"workflow_failed",' %+%
-    '"severity":"error","message":%s}]}',
+    paste0(
+      '{"schema_version":"2","job_id":%s,"capability":%s,"status":"error","result":{},',
+      '"artifacts":[],"provenance":{"engine_version":"%s","execution_mode":"local-cpu",',
+      '"started_at":"%s","finished_at":"%s"},"diagnostics":[{"code":"workflow_failed",',
+      '"severity":"error","message":%s}]}'
+    ),
     encodeString(job_id, quote = '"'), encodeString(capability, quote = '"'),
     PACK_VERSION, started_at, format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
     encodeString(message, quote = '"')
@@ -218,8 +220,19 @@ run_analysis <- function(config, started_at, project_library) {
     filtered <- log2(filtered + 1)
   }
 
-  WGCNA::allowWGCNAThreads(nThreads = config$threads)
-  WGCNA::enableWGCNAThreads(nThreads = config$threads)
+  if (config$threads > 1L) {
+    WGCNA::allowWGCNAThreads(nThreads = config$threads)
+    WGCNA::enableWGCNAThreads(nThreads = config$threads)
+  }
+
+  # Workaround for WGCNA 1.74 (current CRAN release): blockwiseModules computes
+  # corFncAcceptsWeights from WGCNA::cor's weights.x/cosine formals and then calls
+  # do.call("cor", ..., weights.x = NULL, weights.y = NULL). Inside its foreach
+  # evaluation context that string lookup resolves to base::cor, which rejects the
+  # weights arguments ("unused arguments"). Aliasing the global cor to WGCNA::cor
+  # (default method "pearson" is identical to base::cor) keeps the intended
+  # Pearson correlation while satisfying the wrapper call.
+  assign("cor", WGCNA::cor, envir = globalenv())
 
   powers <- if (config$power == 0) {
     c(seq(1, 10, by = 1), seq(12, 30, by = 2))
@@ -401,14 +414,25 @@ run_analysis <- function(config, started_at, project_library) {
   result
 }
 
+require_exact_keys <- function(value, required, optional, context) {
+  missing <- setdiff(required, names(value))
+  if (length(missing) > 0L) {
+    request_error(sprintf("%s is missing required keys: %s", context, paste(missing, collapse = ", ")))
+  }
+  unknown <- setdiff(names(value), c(required, optional))
+  if (length(unknown) > 0L) {
+    request_error(sprintf("%s contains unsupported keys: %s", context, paste(unknown, collapse = ", ")))
+  }
+  invisible(value)
+}
+
 validate_request <- function(document, result_path) {
   request <- require_object(document, "request")
-  required_keys <- c("schema_version", "job_id", "capability", "inputs", "execution", "parameters")
-  for (key in required_keys) {
-    if (is.null(request[[key]])) {
-      request_error(sprintf("request is missing: %s", key))
-    }
-  }
+  require_exact_keys(
+    request,
+    c("schema_version", "job_id", "capability", "inputs", "execution", "parameters"),
+    character(), "request"
+  )
   if (!identical(request$schema_version, "2")) request_error("schema_version must be '2'")
   require_string(request$job_id, "job_id")
   capability <- require_string(request$capability, "capability")

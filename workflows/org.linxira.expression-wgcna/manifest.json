@@ -1,0 +1,81 @@
+{
+  "schema_version": "1",
+  "id": "org.linxira.expression-wgcna",
+  "version": "0.1.0",
+  "publisher": {
+    "name": "Linxira OS",
+    "url": "https://github.com/Linxira-OS"
+  },
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
+  "entrypoint": {
+    "path": "src/run_wgcna.R",
+    "arguments": [
+      "--request",
+      "{request}",
+      "--result",
+      "{result}"
+    ]
+  },
+  "runtime": {
+    "kind": "r",
+    "version": ">=4.6.1,<4.7.0",
+    "dependency_lock": {
+      "path": "dependencies.lock.json",
+      "sha256": "b5bb57c06b280cc670478f60870bbc7a1e6a7fdd7b4aa2176fde9fa6858d8692"
+    }
+  },
+  "input_schema": {
+    "type": "object",
+    "$ref": "schemas/input.schema.json"
+  },
+  "output_schema": {
+    "type": "object",
+    "$ref": "schemas/output.schema.json"
+  },
+  "platforms": [
+    "windows-gnu",
+    "debian",
+    "arch"
+  ],
+  "network": {
+    "access": "none",
+    "allowed_hosts": []
+  },
+  "resources": {
+    "minimum_memory_mb": 2048,
+    "minimum_disk_mb": 4096,
+    "recommended_threads": 1,
+    "gpu": "none"
+  },
+  "files": [
+    {
+      "path": "NOTICE.md",
+      "sha256": "3af634c47466790e52e46e636c898cf8316108c1b28bfa03597916dceec9bab2"
+    },
+    {
+      "path": "README.md",
+      "sha256": "97a6279bd3f5be1da9463aff4ff298f91c0daec69f5ac63f8e11e2a7ebd244df"
+    },
+    {
+      "path": "dependencies.lock.json",
+      "sha256": "b5bb57c06b280cc670478f60870bbc7a1e6a7fdd7b4aa2176fde9fa6858d8692"
+    },
+    {
+      "path": "schemas/input.schema.json",
+      "sha256": "326cb505b0d302033e05e45213628c58df9bf71f3d1af5e7f859c0bf3f739ffa"
+    },
+    {
+      "path": "schemas/output.schema.json",
+      "sha256": "9dd25c58c0050f325e74c282708b68a91c780e30347b4a3909da1314040d85ab"
+    },
+    {
+      "path": "src/run_wgcna.R",
+      "sha256": "0fc5a16817cc9fa05bdc4e70ac889cfb92b16f677c8f02d5d929f15082c47baa"
+    },
+    {
+      "path": "tests/test_validation.R",
+      "sha256": "40f8aea3e885048806c3d6b52cedde9900a5357ff133f6130871e9fbeb21ea68"
+    }
+  ]
+}
