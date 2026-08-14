@@ -10,14 +10,19 @@
   "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
   "entrypoint": {
     "path": "src/convert_sequences.py",
-    "arguments": ["--request", "{request}", "--result", "{result}"]
+    "arguments": [
+      "--request",
+      "{request}",
+      "--result",
+      "{result}"
+    ]
   },
   "runtime": {
     "kind": "python",
     "version": "3.12.x",
     "dependency_lock": {
       "path": "requirements.lock",
-      "sha256": "0ea6b41b225032c446fee70fe942ba664602d023f7d932fef8dfb4396915bbf7"
+      "sha256": "6aca8d8da1e711d8ff977335e17a4107f1a890cc4d52eb9091d99c68de5bbe95"
     }
   },
   "input_schema": {
@@ -28,7 +33,11 @@
     "type": "object",
     "$ref": "schemas/output.schema.json"
   },
-  "platforms": ["windows-gnu", "debian", "arch"],
+  "platforms": [
+    "windows-gnu",
+    "debian",
+    "arch"
+  ],
   "network": {
     "access": "none",
     "allowed_hosts": []
@@ -50,7 +59,7 @@
     },
     {
       "path": "requirements.lock",
-      "sha256": "0ea6b41b225032c446fee70fe942ba664602d023f7d932fef8dfb4396915bbf7"
+      "sha256": "6aca8d8da1e711d8ff977335e17a4107f1a890cc4d52eb9091d99c68de5bbe95"
     },
     {
       "path": "schemas/input.schema.json",
