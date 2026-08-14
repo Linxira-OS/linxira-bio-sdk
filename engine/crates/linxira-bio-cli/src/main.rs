@@ -1991,21 +1991,40 @@ fn print_sequence_convert(arguments: &[String]) -> Result<(), Box<dyn Error>> {
         )
         .into());
     }
-    // The workflow pack executes with its pack root as the working directory,
-    // so every request path must be absolute.
+    // The workflow pack creates output_directory itself and writes
+    // output_filename inside it, so the directory must not exist yet while
+    // its containing directory must exist. The pack runs with its pack root
+    // as the working directory, so every request path must be absolute.
     let input_path = fs::canonicalize(input_path)?;
     let output_directory = output_path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
-    if !output_directory.is_dir() {
+    let containing = output_directory
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(output_directory);
+    if !containing.is_dir() {
         return Err(format!(
             "sequence convert output parent directory does not exist: {}",
+            containing.display()
+        )
+        .into());
+    }
+    if output_directory.exists() {
+        return Err(format!(
+            "sequence convert output directory must not already exist: {}",
             output_directory.display()
         )
         .into());
     }
-    let output_directory = fs::canonicalize(output_directory)?
+    let output_directory = fs::canonicalize(containing)?
+        .join(
+            output_directory
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+        )
         .to_string_lossy()
         .into_owned();
     let resolved_input_format = match input_format {
@@ -2050,8 +2069,10 @@ fn print_sequence_convert(arguments: &[String]) -> Result<(), Box<dyn Error>> {
         .prefix("linxira-bio-convert-")
         .tempdir()?;
     let request_path = temporary.path().join("request.json");
-    let result_path = temporary.path().join("result.json");
-    fs::write(&request_path, serde_json::to_vec_pretty(&request)?)?;
+    // The workflow contract requires the result envelope at
+    // <output_directory>/result.json; it remains as output metadata.
+    let result_path = Path::new(&output_directory).join("result.json");
+    fs::write(&request_path, serde_json::to_vec(&request)?)?;
     run_workflow_pack(
         "org.linxira.sequence-conversion-biopython",
         &request_path,
