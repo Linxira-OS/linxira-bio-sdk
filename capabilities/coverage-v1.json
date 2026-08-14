@@ -1,16 +1,16 @@
 {
   "schema_version": "1",
   "measurement": "weighted-functional-slices",
-  "total_weight": 106,
+  "total_weight": 107,
   "domain_budgets": {
-    "general-biology": 81,
+    "general-biology": 82,
     "biochemistry-structure": 15,
     "medical-omics-ruo": 10
   },
   "release_target": {
-    "minimum_weight": 85,
+    "minimum_weight": 86,
     "by_domain": {
-      "general-biology": 67,
+      "general-biology": 68,
       "biochemistry-structure": 13,
       "medical-omics-ruo": 5
     },
@@ -97,6 +97,7 @@
     {"id": "ncbi.sequence.fetch", "name": "NCBI sequence retrieval connector", "domain": "general-biology", "weight": 1, "execution": "cloud", "target_v1": false, "disposition": "planned-with-owner", "owner": "approved-connectors", "evidence": ["scope:post-v1-cloud-backlog", "offline-reference:offline-reference-2.475.hf.053"]},
     {"id": "sequence.kmer.count", "name": "Exact k-mer counting and spectrum summary", "domain": "general-biology", "weight": 1, "execution": "local", "target_v1": true, "disposition": "implemented", "capability_ids": ["sequence.kmer.count.v1"], "evidence": ["catalog:sequence.kmer.count.v1", "test:sequence_analysis::counts_exact_and_canonical_kmers", "scope:v1-biological-coverage-plan", "offline-reference-class:biocjava.bioDoer.KmerAnalysis"]},
     {"id": "sequence.consensus", "name": "Consensus sequence from multiple alignment", "domain": "general-biology", "weight": 1, "execution": "local", "target_v1": false, "disposition": "implemented", "capability_ids": ["sequence.consensus.v1"], "evidence": ["catalog:sequence.consensus.v1", "scope:post-v1-biology-backlog"]},
+    {"id": "sequence.convert.biopython", "name": "Biopython sequence format conversion", "domain": "general-biology", "weight": 1, "execution": "local", "target_v1": true, "disposition": "implemented", "capability_ids": ["sequence.convert.biopython.v1"], "evidence": ["catalog:sequence.convert.biopython.v1", "scope:v1-biological-coverage-plan", "workflow-pack:org.linxira.sequence-conversion-biopython"]},
     {"id": "sequence.shuffle", "name": "Sequence order randomization", "domain": "general-biology", "weight": 1, "execution": "local", "target_v1": false, "disposition": "implemented", "capability_ids": ["sequence.shuffle.v1"], "evidence": ["catalog:sequence.shuffle.v1", "test:sequence_analysis::shuffles_sequences_deterministically", "scope:post-v1-biology-backlog"]},
 
     {"id": "structure.pdb.summary", "name": "PDB structure summary", "domain": "biochemistry-structure", "weight": 1, "execution": "local", "target_v1": true, "disposition": "implemented", "capability_ids": ["structure.pdb.summary.v1"], "evidence": ["catalog:structure.pdb.summary.v1"]},

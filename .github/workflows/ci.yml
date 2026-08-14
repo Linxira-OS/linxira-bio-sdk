@@ -127,6 +127,28 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "DESeq2 E2E script failed" }
           $result = Get-Content -Raw "$env:GITHUB_WORKSPACE\target\test-results\deseq2-e2e-ci\result.json" | ConvertFrom-Json
           if ($result.status -ne "ok") { throw "DESeq2 E2E result not ok: $($result.diagnostics | ConvertTo-Json -Compress)" }
+      - name: Install Python 3.12 for Biopython convert pack
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Create isolated convert environment from hashed lock
+        shell: pwsh
+        run: |
+          python -m venv "$env:GITHUB_WORKSPACE\.venv-convert"
+          & "$env:GITHUB_WORKSPACE\.venv-convert\Scripts\python.exe" -m pip install --disable-pip-version-check --require-hashes -r workflows/org.linxira.sequence-conversion-biopython/requirements.lock
+      - name: Run sequence convert E2E
+        shell: pwsh
+        env:
+          LINXIRA_BIO_WORKFLOW_PYTHON: ${{ github.workspace }}\.venv-convert\Scripts\python.exe
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\target\test-results" | Out-Null
+          $envelope = cargo +stable-x86_64-pc-windows-gnu run --locked -p linxira-bio-cli -- sequence convert tests/fixtures/sequences/tiny.fa "$env:GITHUB_WORKSPACE\target\test-results\convert-e2e\converted.genbank" --output-format genbank 2>$null | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw "sequence convert E2E command failed" }
+          if ($envelope.status -ne "ok") { throw "sequence convert E2E result not ok: $($envelope.diagnostics | ConvertTo-Json -Compress)" }
+          $converted = "$env:GITHUB_WORKSPACE\target\test-results\convert-e2e\converted.genbank"
+          if (-not (Test-Path -LiteralPath $converted)) { throw "converted file missing" }
+          $records = Select-String -LiteralPath $converted -Pattern "^LOCUS" | Measure-Object | Select-Object -ExpandProperty Count
+          if ($records -ne 3) { throw "expected 3 converted records, found $records" }
       - run: .\.venv-ci\Scripts\python.exe scripts/stage-release.py --check
       - run: cargo +stable-x86_64-pc-windows-gnu build --locked --release --workspace
       - name: Stage Windows release

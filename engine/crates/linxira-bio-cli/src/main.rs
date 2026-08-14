@@ -374,6 +374,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         [sequence, shuffle, arguments @ ..] if sequence == "sequence" && shuffle == "shuffle" => {
             print_sequence_shuffle(arguments)
         }
+        [sequence, convert, arguments @ ..] if sequence == "sequence" && convert == "convert" => {
+            print_sequence_convert(arguments)
+        }
         [primer, epcr, arguments @ ..] if primer == "primer" && epcr == "epcr" => {
             print_primer_epcr(arguments)
         }
@@ -1931,6 +1934,158 @@ fn print_sequence_shuffle(arguments: &[String]) -> Result<(), Box<dyn Error>> {
         summary,
         json,
     )
+}
+
+fn print_sequence_convert(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut input_format = None;
+    let mut output_format = None;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--input-format" => {
+                index += 1;
+                input_format =
+                    Some(parse_sequence_format(arguments.get(index).ok_or(
+                        "--input-format requires fasta, fastq, genbank, or embl",
+                    )?)?);
+            }
+            "--output-format" => {
+                index += 1;
+                output_format =
+                    Some(parse_sequence_format(arguments.get(index).ok_or(
+                        "--output-format requires fasta, fastq, genbank, or embl",
+                    )?)?);
+            }
+            value if value.starts_with('-') => {
+                return Err(format!("unknown sequence convert option: {value}").into());
+            }
+            value if input.is_none() => input = Some(value.to_owned()),
+            value if output.is_none() => output = Some(value.to_owned()),
+            value => return Err(format!("unexpected sequence convert argument: {value}").into()),
+        }
+        index += 1;
+    }
+    let input_path = Path::new(
+        input
+            .as_deref()
+            .ok_or("sequence convert requires <input> <output>")?,
+    );
+    let output_path = Path::new(
+        output
+            .as_deref()
+            .ok_or("sequence convert requires <input> <output>")?,
+    );
+    if !input_path.is_file() {
+        return Err(format!(
+            "sequence convert input does not exist: {}",
+            input_path.display()
+        )
+        .into());
+    }
+    if output_path.exists() {
+        return Err(format!(
+            "refusing to overwrite sequence convert output: {}",
+            output_path.display()
+        )
+        .into());
+    }
+    // The workflow pack executes with its pack root as the working directory,
+    // so every request path must be absolute.
+    let input_path = fs::canonicalize(input_path)?;
+    let output_directory = output_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    if !output_directory.is_dir() {
+        return Err(format!(
+            "sequence convert output parent directory does not exist: {}",
+            output_directory.display()
+        )
+        .into());
+    }
+    let output_directory = fs::canonicalize(output_directory)?
+        .to_string_lossy()
+        .into_owned();
+    let resolved_input_format = match input_format {
+        Some(format) => format,
+        None => sequence_format_from_path(&input_path)?,
+    };
+    let resolved_output_format = match output_format {
+        Some(format) => format,
+        None => sequence_format_from_path(output_path)?,
+    };
+    let output_filename = output_path
+        .file_name()
+        .ok_or("sequence convert output has no file name")?
+        .to_string_lossy()
+        .into_owned();
+    let size_bytes = fs::metadata(&input_path)?.len();
+    let request = serde_json::json!({
+        "schema_version": "2",
+        "job_id": "cli",
+        "capability": "sequence.convert.biopython.v1",
+        "inputs": [{
+            "artifact_id": "sequences",
+            "role": "sequences",
+            "cardinality": "single",
+            "files": [{
+                "file_id": "input-sequences-1",
+                "path": input_path.to_string_lossy(),
+                "format": resolved_input_format,
+                "compression": "none",
+                "size_bytes": size_bytes,
+            }],
+        }],
+        "execution": {"mode": "local-cpu"},
+        "parameters": {
+            "output_directory": output_directory,
+            "output_filename": output_filename,
+            "output_format": resolved_output_format,
+        },
+    });
+
+    let temporary = tempfile::Builder::new()
+        .prefix("linxira-bio-convert-")
+        .tempdir()?;
+    let request_path = temporary.path().join("request.json");
+    let result_path = temporary.path().join("result.json");
+    fs::write(&request_path, serde_json::to_vec_pretty(&request)?)?;
+    run_workflow_pack(
+        "org.linxira.sequence-conversion-biopython",
+        &request_path,
+        &result_path,
+    )
+}
+
+fn parse_sequence_format(value: &str) -> Result<String, Box<dyn Error>> {
+    match value {
+        "fasta" | "fastq" | "genbank" | "embl" => Ok(value.to_owned()),
+        _ => Err(format!(
+            "unsupported sequence format: {value} (expected fasta, fastq, genbank, or embl)"
+        )
+        .into()),
+    }
+}
+
+fn sequence_format_from_path(path: &Path) -> Result<String, Box<dyn Error>> {
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    match extension.as_str() {
+        "fa" | "fasta" | "fna" => Ok("fasta".to_owned()),
+        "fq" | "fastq" => Ok("fastq".to_owned()),
+        "gb" | "gbk" | "genbank" => Ok("genbank".to_owned()),
+        "embl" => Ok("embl".to_owned()),
+        _ => Err(format!(
+            "cannot infer a sequence format from extension: .{extension} \
+             (use --input-format or --output-format)"
+        )
+        .into()),
+    }
 }
 
 fn print_primer_epcr(arguments: &[String]) -> Result<(), Box<dyn Error>> {
@@ -5301,6 +5456,7 @@ fn usage() -> &'static str {
         "  linxira-bio sequence kmer-count <input.fasta[.gz]> <output.tsv> [--k N] [--canonical] [--top-n N] [--json]\n",
         "  linxira-bio sequence consensus <input.alignment.fasta> <output.fasta> [--threshold FLOAT] [--json]\n",
         "  linxira-bio sequence shuffle <input.fasta[.gz]> <output.fasta> [--seed N] [--json]\n",
+        "  linxira-bio sequence convert <input> <output> [--input-format fasta|fastq|genbank|embl] [--output-format fasta|fastq|genbank|embl]\n",
         "  linxira-bio primer epcr <reference.fasta[.gz]> <primers.tsv> <output.tsv> [--min-amplicon N] [--max-amplicon N] [--max-hits N] [--json]\n",
         "  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n",
         "  linxira-bio fastq trim <input.fastq[.gz]> <output.fastq> [--min-quality N] [--min-length N] [--quality-encoding phred+33|phred+64] [--json]\n",
