@@ -71,7 +71,7 @@
     },
     {
       "path": "src/convert_sequences.py",
-      "sha256": "d54cb5ffab5fa04533bdccaf5be94e5c86106bbd56fefe1cd3dddfc0ca3d2d77"
+      "sha256": "a592dc0df831458e2d1069ecb5ee8c3aa0381868ceb43aa6d8997b85360f5aa7"
     },
     {
       "path": "tests/test_convert_sequences.py",
