@@ -146,7 +146,8 @@ jobs:
           $exitCode = $LASTEXITCODE
           $output | ForEach-Object { Write-Host $_ }
           if ($exitCode -ne 0) { throw "sequence convert E2E command failed (exit $exitCode)" }
-          $envelope = ($output | Select-String -Pattern '^\{"schema_version"' | Select-Object -First 1).Line | ConvertFrom-Json
+          $envelope = $output | ForEach-Object { try { $_ | ConvertFrom-Json } catch { $null } } | Where-Object { $_ -and $_.status } | Select-Object -First 1
+          if ($null -eq $envelope) { throw "sequence convert E2E produced no result envelope" }
           if ($envelope.status -ne "ok") { throw "sequence convert E2E result not ok: $($envelope.diagnostics | ConvertTo-Json -Compress)" }
           $converted = "$env:GITHUB_WORKSPACE\target\test-results\convert-e2e\converted.genbank"
           if (-not (Test-Path -LiteralPath $converted)) { throw "converted file missing" }
