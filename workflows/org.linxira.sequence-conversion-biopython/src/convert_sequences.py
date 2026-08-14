@@ -314,12 +314,15 @@ def convert_atomic(config: dict[str, Any], started_at: str) -> dict[str, Any]:
             # FASTA records cannot carry a molecule type, and Biopython's
             # GenBank writer rejects records without one. Default absent
             # annotations to DNA; declared molecule types are preserved.
-            records = 0
-            with staged_output.open("w", encoding="utf-8", newline="\n") as out_handle:
-                for record in SeqIO.parse(str(input_path), config["input_format"]):
-                    record.annotations.setdefault("molecule_type", "DNA")
-                    SeqIO.write(record, out_handle, config["output_format"])
-                    records += 1
+            # Write via a str path so Biopython manages the file handle the
+            # same way SeqIO.convert does (per-record handle writes fail
+            # with "Bad file descriptor" in Biopython 1.85 on Windows).
+            records_list = list(SeqIO.parse(str(input_path), config["input_format"]))
+            for record in records_list:
+                record.annotations.setdefault("molecule_type", "DNA")
+            records = SeqIO.write(
+                records_list, str(staged_output), config["output_format"]
+            )
         else:
             records = SeqIO.convert(
                 str(input_path), config["input_format"], str(staged_output), config["output_format"]
