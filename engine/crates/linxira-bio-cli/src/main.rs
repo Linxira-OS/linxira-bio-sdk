@@ -854,6 +854,16 @@ fn run_workflow_pack(
     let result: serde_json::Value = serde_json::from_slice(&fs::read(result_path)?)?;
     validate_workflow_result(&result, &request_identity)?;
     println!("{}", serde_json::to_string(&result)?);
+    if result.get("status").and_then(|value| value.as_str()) != Some("ok") {
+        let diagnostic = result
+            .get("diagnostics")
+            .and_then(|value| value.as_array())
+            .and_then(|diagnostics| diagnostics.first())
+            .and_then(|first| first.get("message"))
+            .and_then(|value| value.as_str())
+            .unwrap_or("workflow result reported an error");
+        return Err(format!("workflow failed: {diagnostic}").into());
+    }
     Ok(())
 }
 

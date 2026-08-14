@@ -31,7 +31,9 @@ linxira-bio sequence convert reads.fastq reads.fa --output-format fasta
 ## 结果解读
 
 核对输出记录数与输入一致。FASTA 转 FASTQ 不受支持，因为 FASTA 记录没有质量
-分数；pack 会以错误信封拒绝该请求。
+分数；pack 会以错误信封拒绝该请求。FASTA 转 GenBank 或 EMBL 受支持：FASTA
+无法携带 molecule_type，pack 会为缺失该字段的记录写入默认值 `DNA`；GenBank
+或 EMBL 输入声明的 molecule_type 会保留。
 
 ## 注意事项
 

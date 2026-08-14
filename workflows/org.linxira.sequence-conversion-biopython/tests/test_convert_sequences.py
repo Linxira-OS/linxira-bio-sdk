@@ -1,12 +1,21 @@
 import importlib.util
 import io
 import json
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
+
+try:
+    import Bio  # type: ignore
+    import numpy  # type: ignore
+
+    HAVE_STACK = True
+except ImportError:
+    HAVE_STACK = False
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "src" / "convert_sequences.py"
@@ -178,6 +187,90 @@ class ValidationTests(unittest.TestCase):
             self.assertEqual(
                 json.loads((output / "result.json").read_text(encoding="utf-8"))["status"],
                 "error",
+            )
+
+
+@unittest.skipUnless(HAVE_STACK, "biopython 1.85 and numpy 2.2.4 are required")
+class ConversionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.original_python = MODULE.EXPECTED_PYTHON
+        self.original_numpy = MODULE.EXPECTED_NUMPY
+        MODULE.EXPECTED_PYTHON = sys.version_info[:2]
+        MODULE.EXPECTED_NUMPY = numpy.__version__
+
+    def tearDown(self) -> None:
+        MODULE.EXPECTED_PYTHON = self.original_python
+        MODULE.EXPECTED_NUMPY = self.original_numpy
+
+    def run_conversion(self, source: Path, output: Path, output_format: str) -> dict:
+        request = ValidationTests().request(source, output)
+        request["parameters"]["output_filename"] = f"converted.{output_format}"
+        request["parameters"]["output_format"] = output_format
+        request_path = output.parent / "request.json"
+        request_path.write_text(json.dumps(request), encoding="utf-8")
+        with redirect_stderr(io.StringIO()):
+            status = MODULE.main(
+                ["--request", str(request_path), "--result", str(output / "result.json")]
+            )
+        self.assertEqual(status, 0)
+        return json.loads((output / "result.json").read_text(encoding="utf-8"))
+
+    def test_fasta_to_genbank_defaults_molecule_type(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "input.fa"
+            source.write_text(">one\nACGTNN\n>two\nGGGG\n>three\nAT\n", encoding="utf-8")
+            output = root / "output"
+            envelope = self.run_conversion(source, output, "genbank")
+            self.assertEqual(envelope["status"], "ok")
+            self.assertEqual(envelope["result"]["records_written"], 3)
+            records = list(Bio.SeqIO.parse(output / "converted.genbank", "genbank"))
+            self.assertEqual(len(records), 3)
+            self.assertTrue(
+                all(record.annotations.get("molecule_type") == "DNA" for record in records)
+            )
+
+    def test_genbank_molecule_type_is_preserved(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "input.gb"
+            record = Bio.SeqRecord.SeqRecord(
+                Bio.Seq.Seq("ACGTNN"), id="id", name="id"
+            )
+            record.annotations["molecule_type"] = "RNA"
+            Bio.SeqIO.write(record, source, "genbank")
+            output = root / "output"
+            request = ValidationTests().request(source, output)
+            request["inputs"][0]["files"][0]["format"] = "genbank"
+            request["parameters"]["output_filename"] = "converted.gb"
+            request_path = output.parent / "request.json"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            with redirect_stderr(io.StringIO()):
+                status = MODULE.main(
+                    [
+                        "--request",
+                        str(request_path),
+                        "--result",
+                        str(output / "result.json"),
+                    ]
+                )
+            self.assertEqual(status, 0)
+            records = list(Bio.SeqIO.parse(output / "converted.gb", "genbank"))
+            self.assertEqual(records[0].annotations.get("molecule_type"), "RNA")
+
+    def test_fasta_to_embl_defaults_molecule_type(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "input.fa"
+            source.write_text(">one\nACGTNN\n>two\nGGGG\n>three\nAT\n", encoding="utf-8")
+            output = root / "output"
+            envelope = self.run_conversion(source, output, "embl")
+            self.assertEqual(envelope["status"], "ok")
+            self.assertEqual(envelope["result"]["records_written"], 3)
+            records = list(Bio.SeqIO.parse(output / "converted.embl", "embl"))
+            self.assertEqual(len(records), 3)
+            self.assertTrue(
+                all(record.annotations.get("molecule_type") == "DNA" for record in records)
             )
 
 

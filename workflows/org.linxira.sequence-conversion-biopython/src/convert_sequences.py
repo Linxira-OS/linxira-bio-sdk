@@ -310,9 +310,20 @@ def convert_atomic(config: dict[str, Any], started_at: str) -> dict[str, Any]:
     )
     staged_output = staging / config["output_filename"]
     try:
-        records = SeqIO.convert(
-            str(input_path), config["input_format"], str(staged_output), config["output_format"]
-        )
+        if config["output_format"] in {"genbank", "embl"}:
+            # FASTA records cannot carry a molecule type, and Biopython's
+            # GenBank writer rejects records without one. Default absent
+            # annotations to DNA; declared molecule types are preserved.
+            records = 0
+            with staged_output.open("w", encoding="utf-8", newline="\n") as out_handle:
+                for record in SeqIO.parse(str(input_path), config["input_format"]):
+                    record.annotations.setdefault("molecule_type", "DNA")
+                    SeqIO.write(record, out_handle, config["output_format"])
+                    records += 1
+        else:
+            records = SeqIO.convert(
+                str(input_path), config["input_format"], str(staged_output), config["output_format"]
+            )
         with staged_output.open("rb") as handle:
             os.fsync(handle.fileno())
         if sha256_file(input_path) != input_sha256:

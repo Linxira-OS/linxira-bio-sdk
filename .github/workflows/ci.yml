@@ -149,6 +149,10 @@ jobs:
           if (-not (Test-Path -LiteralPath $converted)) { throw "converted file missing" }
           $records = Select-String -LiteralPath $converted -Pattern "^LOCUS" | Measure-Object | Select-Object -ExpandProperty Count
           if ($records -ne 3) { throw "expected 3 converted records, found $records" }
+      - name: Run sequence convert pack unit tests under locked Python
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\.venv-convert\Scripts\python.exe" -m unittest discover -s workflows/org.linxira.sequence-conversion-biopython/tests -p "test_*.py"
       - run: .\.venv-ci\Scripts\python.exe scripts/stage-release.py --check
       - run: cargo +stable-x86_64-pc-windows-gnu build --locked --release --workspace
       - name: Stage Windows release
