@@ -47,7 +47,7 @@ fn lists_bundled_workflow_packs_without_claiming_installation() {
             && pack["capability"] == "expression.differential.v1"
             && pack["capability_aliases"]
                 == serde_json::json!(["medical.bulk-rnaseq.v1", "expression.deseq2.v1"])
-            && pack["status"] == "cataloged"
+            && pack["status"] == "installable"
             && pack["runtime"] == "r"
     }));
 }
