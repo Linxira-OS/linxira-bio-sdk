@@ -22,7 +22,7 @@
     "version": ">=4.6.1,<4.7.0",
     "dependency_lock": {
       "path": "dependencies.lock.json",
-      "sha256": "b5bb57c06b280cc670478f60870bbc7a1e6a7fdd7b4aa2176fde9fa6858d8692"
+      "sha256": "2ea71c51cfab826da0f80b3ce3f634cffe5ac1c5a29a04b0f5fc13b0e97fb5eb"
     }
   },
   "input_schema": {
@@ -59,7 +59,7 @@
     },
     {
       "path": "dependencies.lock.json",
-      "sha256": "b5bb57c06b280cc670478f60870bbc7a1e6a7fdd7b4aa2176fde9fa6858d8692"
+      "sha256": "2ea71c51cfab826da0f80b3ce3f634cffe5ac1c5a29a04b0f5fc13b0e97fb5eb"
     },
     {
       "path": "schemas/input.schema.json",
