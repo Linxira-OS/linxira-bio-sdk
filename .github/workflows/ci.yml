@@ -70,6 +70,63 @@ jobs:
       - run: .\.venv-ci\Scripts\python.exe -m unittest discover -s workflows/org.linxira.sequence-conversion-biopython/tests -p "test_*.py"
       - name: Validate R workflow request layer
         run: Rscript workflows/org.linxira.bulk-expression-deseq2/tests/test_validation.R
+      - name: Install project-isolated DESeq2 library
+        shell: pwsh
+        run: Rscript scripts/bootstrap-deseq2-lib.R "$env:GITHUB_WORKSPACE\.linxira-bio\ci\r\4.6.1\library"
+      - name: Run real DESeq2 workflow E2E
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\target\test-results" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\build" | Out-Null
+          $request = @{
+            schema_version = "2"
+            job_id = "ci-deseq2-e2e"
+            capability = "expression.differential.v1"
+            inputs = @(
+              @{
+                artifact_id = "counts"
+                role = "counts"
+                cardinality = "single"
+                files = @(@{
+                  file_id = "counts.csv"
+                  path = "$env:GITHUB_WORKSPACE\tests\fixtures\expression-matrix\deseq2-e2e-counts.csv"
+                  format = "csv"
+                  compression = "none"
+                  size_bytes = 7131
+                })
+              },
+              @{
+                artifact_id = "samples"
+                role = "sample_metadata"
+                cardinality = "single"
+                files = @(@{
+                  file_id = "samples.csv"
+                  path = "$env:GITHUB_WORKSPACE\tests\fixtures\expression-matrix\deseq2-e2e-samples.csv"
+                  format = "csv"
+                  compression = "none"
+                  size_bytes = 92
+                })
+              }
+            )
+            execution = @{ mode = "local-cpu" }
+            parameters = @{
+              output_directory = "$env:GITHUB_WORKSPACE\target\test-results\deseq2-e2e-ci"
+              feature_id_column = "gene_id"
+              sample_id_column = "sample_id"
+              condition_column = "condition"
+              reference_level = "control"
+              contrast_level = "treated"
+              alpha = 0.05
+              min_total_count = 10
+            }
+          } | ConvertTo-Json -Depth 6
+          Set-Content -LiteralPath "$env:GITHUB_WORKSPACE\build\deseq2-e2e-request.json" -Value $request -Encoding utf8
+          Rscript workflows/org.linxira.bulk-expression-deseq2/src/run_deseq2.R `
+            --request "$env:GITHUB_WORKSPACE\build\deseq2-e2e-request.json" `
+            --result "$env:GITHUB_WORKSPACE\target\test-results\deseq2-e2e-ci\result.json"
+          if ($LASTEXITCODE -ne 0) { throw "DESeq2 E2E script failed" }
+          $result = Get-Content -Raw "$env:GITHUB_WORKSPACE\target\test-results\deseq2-e2e-ci\result.json" | ConvertFrom-Json
+          if ($result.status -ne "ok") { throw "DESeq2 E2E result not ok: $($result.diagnostics | ConvertTo-Json -Compress)" }
       - run: .\.venv-ci\Scripts\python.exe scripts/stage-release.py --check
       - run: cargo +stable-x86_64-pc-windows-gnu build --locked --release --workspace
       - name: Stage Windows release
@@ -77,6 +134,17 @@ jobs:
           .\.venv-ci\Scripts\python.exe scripts/stage-release.py
           --platform windows --binary-dir target\release
           --output build\release-windows
+      - name: Package Windows release bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: python -c "import shutil; shutil.make_archive('build/bundle-windows', 'zip', root_dir='build/release-windows/linxira-bio-sdk')"
+      - name: Upload Windows release bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle-windows
+          path: build/bundle-windows.zip
+          if-no-files-found: error
 
   debian-bookworm:
     runs-on: ubuntu-latest
@@ -129,6 +197,16 @@ jobs:
           .venv-ci/bin/python scripts/stage-release.py
           --platform debian --binary-dir target/release
           --output build/release-debian
+      - name: Package Debian release bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python3 -c "import shutil; shutil.make_archive('build/bundle-debian', 'zip', root_dir='build/release-debian/linxira-bio-sdk')"
+      - name: Upload Debian release bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle-debian
+          path: build/bundle-debian.zip
+          if-no-files-found: error
 
   arch-linux:
     runs-on: ubuntu-latest
@@ -170,6 +248,16 @@ jobs:
           .venv-ci/bin/python scripts/stage-release.py
           --platform arch --binary-dir target/release
           --output build/release-arch
+      - name: Package Arch release bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python3 -c "import shutil; shutil.make_archive('build/bundle-arch', 'zip', root_dir='build/release-arch/linxira-bio-sdk')"
+      - name: Upload Arch release bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle-arch
+          path: build/bundle-arch.zip
+          if-no-files-found: error
 
   license-audit:
     runs-on: ubuntu-latest
@@ -196,3 +284,34 @@ jobs:
       - run: >-
           .venv-ci/bin/python scripts/generate_third_party_notices.py --offline
           --platform arch --output build/notices/arch
+
+  publish:
+    needs: [windows-gnu, debian-bookworm, arch-linux]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-bundle-*
+          path: build/bundles
+          merge-multiple: true
+      - name: Attach platform bundles to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --generate-notes || true
+          for bundle in build/bundles/*.zip; do
+            case "$bundle" in
+              *windows*) asset="linxira-bio-sdk-${version}-windows-x86_64.zip" ;;
+              *debian*) asset="linxira-bio-sdk-${version}-debian-x86_64.zip" ;;
+              *arch*) asset="linxira-bio-sdk-${version}-arch-x86_64.zip" ;;
+              *) continue ;;
+            esac
+            mv "$bundle" "$asset"
+            gh release upload "$tag" "$asset" --repo "$GITHUB_REPOSITORY" --clobber
+          done
