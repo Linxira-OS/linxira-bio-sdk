@@ -36,7 +36,10 @@ linxira-bio sequence convert reads.fastq reads.fa --output-format fasta
 
 Verify the output record count matches the input. Converting FASTA to FASTQ is
 not supported because FASTA records carry no quality scores; the pack rejects
-the request with an error envelope.
+the request with an error envelope. Converting FASTA to GenBank or EMBL is
+supported: FASTA records cannot carry a molecule type, so the pack writes
+records lacking one with the default `molecule_type: DNA`. Molecule types
+declared by GenBank/EMBL inputs are preserved.
 
 ## Caveats
 

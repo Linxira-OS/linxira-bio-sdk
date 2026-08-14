@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{fs, process};
@@ -140,6 +140,14 @@ fn workflow_runner_returns_the_packed_python_result_envelope() {
         .arg(&request)
         .arg(&result)
         .env("LINXIRA_BIO_WORKFLOW_ROOT", root.join("workflows"))
+        .env(
+            "LINXIRA_BIO_WORKFLOW_PYTHON",
+            compile_workflow_stub(&root, &temporary),
+        )
+        .env(
+            "LINXIRA_BIO_RSCRIPT_STUB_LOCK_SHA256",
+            convert_lock_sha256(&root),
+        )
         .output()
         .expect("run packed Python workflow");
 
@@ -148,12 +156,46 @@ fn workflow_runner_returns_the_packed_python_result_envelope() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("workflow JSON");
+    let result: serde_json::Value = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .rev()
+        .find_map(|line| serde_json::from_str(line).ok())
+        .expect("workflow JSON");
     assert_eq!(result["schema_version"], "2");
     assert_eq!(result["job_id"], "workflow-python-envelope");
     assert_eq!(result["capability"], "sequence.convert.biopython.v1");
-    assert!(matches!(result["status"].as_str(), Some("ok" | "error")));
+    assert_eq!(result["status"], "ok");
+    assert!(output_directory.join("converted.fasta").is_file());
     fs::remove_dir_all(temporary).expect("remove workflow test directory");
+}
+
+fn compile_workflow_stub(root: &Path, output_root: &Path) -> PathBuf {
+    let executable = output_root.join(format!("workflow-stub{}", std::env::consts::EXE_SUFFIX));
+    let output = Command::new("rustc")
+        .args(["--edition", "2021"])
+        .arg(root.join("tests/fixtures/workflows/rscript_stub.rs"))
+        .arg("-o")
+        .arg(&executable)
+        .output()
+        .expect("compile workflow stub");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    executable
+}
+
+fn convert_lock_sha256(root: &Path) -> String {
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &fs::read(root.join("workflows/org.linxira.sequence-conversion-biopython/manifest.json"))
+            .expect("read sequence convert manifest"),
+    )
+    .expect("parse sequence convert manifest");
+    manifest["runtime"]["dependency_lock"]["sha256"]
+        .as_str()
+        .expect("manifest dependency lock hash")
+        .to_owned()
 }
 
 #[test]
