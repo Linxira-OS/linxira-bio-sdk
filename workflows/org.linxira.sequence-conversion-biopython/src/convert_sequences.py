@@ -327,7 +327,9 @@ def convert_atomic(config: dict[str, Any], started_at: str) -> dict[str, Any]:
             records = SeqIO.convert(
                 str(input_path), config["input_format"], str(staged_output), config["output_format"]
             )
-        with staged_output.open("rb") as handle:
+        # Windows os.fsync requires a writable handle; a read-only "rb"
+        # handle raises EBADF ("Bad file descriptor") for the CRT _commit.
+        with staged_output.open("r+b") as handle:
             os.fsync(handle.fileno())
         if sha256_file(input_path) != input_sha256:
             raise RequestError("input file changed while conversion was running")
@@ -435,17 +437,14 @@ def main(arguments: list[str] | None = None) -> int:
         convert_atomic(config, started_at)
         return 0
     except (OSError, json.JSONDecodeError, RequestError, RuntimeError, ValueError) as error:
-        import traceback
-
-        message = f"{error}\n{traceback.format_exc()}"
         try:
             if not paths_alias(options.request, options.result):
                 write_error_result_atomic(
-                    options.result, error_result(job_id, message, started_at)
+                    options.result, error_result(job_id, str(error), started_at)
                 )
         except (OSError, RequestError):
             pass
-        print(f"{PACK_ID}: {message}", file=sys.stderr)
+        print(f"{PACK_ID}: {error}", file=sys.stderr)
         return 2
 
 
