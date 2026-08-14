@@ -1821,6 +1821,79 @@ fn executes_bulk_expression_workflows_with_isolated_rscript() {
 }
 
 #[test]
+fn executes_sequence_convert_workflows_with_isolated_python() {
+    let root = workspace_root();
+    let result_root = root.join("target/test-results");
+    std::fs::create_dir_all(&result_root).expect("create workflow result directory");
+    let stub_root =
+        std::env::temp_dir().join(format!("linxira-bio-worker-convert-{}", std::process::id()));
+    if stub_root.exists() {
+        std::fs::remove_dir_all(&stub_root).expect("remove stale convert stub directory");
+    }
+    std::fs::create_dir(&stub_root).expect("create convert stub directory");
+    let stub = compile_rscript_stub(&root, &stub_root);
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(
+            root.join("workflows/org.linxira.sequence-conversion-biopython/manifest.json"),
+        )
+        .expect("read sequence convert manifest"),
+    )
+    .expect("parse sequence convert manifest");
+    let lock_sha256 = manifest["runtime"]["dependency_lock"]["sha256"]
+        .as_str()
+        .expect("manifest dependency lock hash");
+
+    for (fixture, output_name) in [
+        ("sequence-convert-v1.json", "sequence-convert-v1"),
+        ("sequence-convert-v2.json", "sequence-convert-v2"),
+    ] {
+        let output_directory = result_root.join(output_name);
+        if output_directory.exists() {
+            std::fs::remove_dir_all(&output_directory).expect("remove stale workflow output");
+        }
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(root.join("tests/fixtures/jobs").join(fixture))
+            .env("LINXIRA_BIO_WORKFLOW_ROOT", root.join("workflows"))
+            .env("LINXIRA_BIO_WORKFLOW_PYTHON", &stub)
+            .env("LINXIRA_BIO_RSCRIPT_STUB_LOCK_SHA256", lock_sha256)
+            .env_remove("LINXIRA_BIO_RSCRIPT_STUB_MODE")
+            .env_remove("LINXIRA_BIO_RSCRIPT_STUB_TRACE")
+            .output()
+            .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
+        assert!(
+            output.status.success(),
+            "{fixture}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid workflow result");
+        assert_eq!(result["schema_version"], "2", "{fixture}");
+        assert_eq!(
+            result["capability"], "sequence.convert.biopython.v1",
+            "{fixture}"
+        );
+        assert_eq!(result["status"], "ok", "{fixture}");
+        assert_eq!(
+            result["artifacts"].as_array().map(Vec::len),
+            Some(1),
+            "{fixture}"
+        );
+        assert_eq!(
+            result["provenance"]["input_sha256"]["sequences"],
+            "d36ea1364a0451fd99584f0f36307dbc34b818ca4008c24c7705a95855172a1c",
+            "{fixture}"
+        );
+        assert!(
+            output_directory.join("converted.genbank").is_file(),
+            "{fixture}"
+        );
+        assert!(output_directory.join("result.json").is_file(), "{fixture}");
+        std::fs::remove_dir_all(output_directory).expect("remove workflow output");
+    }
+    std::fs::remove_dir_all(stub_root).expect("remove convert stub directory");
+}
+
+#[test]
 fn executes_closest_interval_and_preranked_gsea_jobs() {
     let root = workspace_root();
     let closest_output = root.join("target/test-results/interval-closest-v2.tsv");
