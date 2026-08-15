@@ -17,3 +17,4 @@ linxira-bio-protocol = { version = "0.1.0", path = "../linxira-bio-protocol" }
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
+tempfile = "3"

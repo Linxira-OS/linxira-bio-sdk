@@ -1821,6 +1821,151 @@ fn executes_bulk_expression_workflows_with_isolated_rscript() {
 }
 
 #[test]
+fn executes_sequence_convert_workflows_with_isolated_python() {
+    let root = workspace_root();
+    let result_root = root.join("target/test-results");
+    std::fs::create_dir_all(&result_root).expect("create workflow result directory");
+    let stub_root =
+        std::env::temp_dir().join(format!("linxira-bio-worker-convert-{}", std::process::id()));
+    if stub_root.exists() {
+        std::fs::remove_dir_all(&stub_root).expect("remove stale convert stub directory");
+    }
+    std::fs::create_dir(&stub_root).expect("create convert stub directory");
+    let stub = compile_rscript_stub(&root, &stub_root);
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(
+            root.join("workflows/org.linxira.sequence-conversion-biopython/manifest.json"),
+        )
+        .expect("read sequence convert manifest"),
+    )
+    .expect("parse sequence convert manifest");
+    let lock_sha256 = manifest["runtime"]["dependency_lock"]["sha256"]
+        .as_str()
+        .expect("manifest dependency lock hash");
+
+    for (fixture, output_name) in [
+        ("sequence-convert-v1.json", "sequence-convert-v1"),
+        ("sequence-convert-v2.json", "sequence-convert-v2"),
+    ] {
+        let output_directory = result_root.join(output_name);
+        if output_directory.exists() {
+            std::fs::remove_dir_all(&output_directory).expect("remove stale workflow output");
+        }
+        let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+            .arg(root.join("tests/fixtures/jobs").join(fixture))
+            .env("LINXIRA_BIO_WORKFLOW_ROOT", root.join("workflows"))
+            .env("LINXIRA_BIO_WORKFLOW_PYTHON", &stub)
+            .env("LINXIRA_BIO_RSCRIPT_STUB_LOCK_SHA256", lock_sha256)
+            .env_remove("LINXIRA_BIO_RSCRIPT_STUB_MODE")
+            .env_remove("LINXIRA_BIO_RSCRIPT_STUB_TRACE")
+            .output()
+            .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
+        assert!(
+            output.status.success(),
+            "{fixture}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("valid workflow result");
+        assert_eq!(result["schema_version"], "2", "{fixture}");
+        assert_eq!(
+            result["capability"], "sequence.convert.biopython.v1",
+            "{fixture}"
+        );
+        assert_eq!(result["status"], "ok", "{fixture}");
+        assert_eq!(
+            result["artifacts"].as_array().map(Vec::len),
+            Some(1),
+            "{fixture}"
+        );
+        assert_eq!(
+            result["provenance"]["input_sha256"]["sequences"],
+            "d36ea1364a0451fd99584f0f36307dbc34b818ca4008c24c7705a95855172a1c",
+            "{fixture}"
+        );
+        assert!(
+            output_directory.join("converted.genbank").is_file(),
+            "{fixture}"
+        );
+        assert!(output_directory.join("result.json").is_file(), "{fixture}");
+        std::fs::remove_dir_all(output_directory).expect("remove workflow output");
+    }
+    std::fs::remove_dir_all(stub_root).expect("remove convert stub directory");
+}
+
+#[test]
+fn rejects_a_workflow_pack_whose_core_compatibility_excludes_this_build() {
+    let root = workspace_root();
+    let stub_root = std::env::temp_dir().join(format!(
+        "linxira-bio-worker-core-compat-{}",
+        std::process::id()
+    ));
+    if stub_root.exists() {
+        std::fs::remove_dir_all(&stub_root).expect("remove stale core compat directory");
+    }
+    let pack_root = stub_root.join("org.linxira.bulk-expression-deseq2");
+    std::fs::create_dir_all(&pack_root).expect("create temporary workflow root");
+    let source = root.join("workflows/org.linxira.bulk-expression-deseq2");
+    for entry in std::fs::read_dir(&source).expect("read source pack") {
+        let entry = entry.expect("pack entry");
+        if entry.file_name() == "target" {
+            continue;
+        }
+        let target = pack_root.join(entry.file_name());
+        if entry.path().is_dir() {
+            std::fs::create_dir_all(&target).expect("create pack subdirectory");
+            for child in std::fs::read_dir(entry.path()).expect("read pack subdirectory") {
+                let child = child.expect("pack subdirectory entry");
+                std::fs::copy(child.path(), target.join(child.file_name()))
+                    .expect("copy pack subdirectory file");
+            }
+        } else {
+            std::fs::copy(entry.path(), target).expect("copy pack file");
+        }
+    }
+    let manifest_path = pack_root.join("manifest.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&manifest_path).expect("read copied manifest"))
+            .expect("parse copied manifest");
+    manifest["runtime"]["core_compatibility"] = serde_json::json!(">=9.0.0,<10.0.0");
+    std::fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&manifest).expect("serialize manifest"),
+    )
+    .expect("rewrite copied manifest");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(root.join("tests/fixtures/jobs/expression-differential-v2.json"))
+        .env("LINXIRA_BIO_WORKFLOW_ROOT", &stub_root)
+        .env_remove("LINXIRA_BIO_WORKFLOW_R")
+        .output()
+        .expect("run incompatible-core workflow");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("workflow_failed envelope");
+    assert_eq!(result["status"], "error");
+    assert_eq!(result["capability"], "expression.differential.v1");
+    assert!(result["diagnostics"].as_array().is_some_and(|diagnostics| {
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic["code"] == "workflow_failed"
+                && diagnostic["severity"] == "error"
+                && diagnostic["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("requires core"))
+        })
+    }));
+    assert_eq!(
+        result["provenance"]["core_version"].as_str(),
+        Some(env!("CARGO_PKG_VERSION"))
+    );
+    std::fs::remove_dir_all(stub_root).expect("remove core compat directory");
+}
+
+#[test]
 fn executes_closest_interval_and_preranked_gsea_jobs() {
     let root = workspace_root();
     let closest_output = root.join("target/test-results/interval-closest-v2.tsv");

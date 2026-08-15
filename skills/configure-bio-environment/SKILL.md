@@ -111,9 +111,19 @@ URL.
 
 ## Installation Boundary
 
-Treat `environment.apply.v1` as unavailable until the capability catalog marks
-it available. Do not translate a transaction preview into shell commands and
-execute them silently.
+Use `environment.apply.v1` to execute the approved installation plan:
+
+```bash
+linxira-bio environment apply PROFILE --mode MODE --json
+```
+
+The apply capability requires explicit user approval before execution. It
+installs missing tools using the platform-appropriate strategy (apt, pacman,
+WSL, or binary download) and returns a summary of installed, failed, and
+skipped tools.
+
+Do not translate a transaction preview into shell commands and execute them
+silently.
 
 Before any installation, present the tool, version or source, strategy,
 administrator requirement, license, download location, checksum policy, and
