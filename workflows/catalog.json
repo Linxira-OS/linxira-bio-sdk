@@ -46,6 +46,22 @@
       "trust": "official",
       "runtime": "r",
       "manifest": "workflows/org.linxira.expression-wgcna/manifest.json"
+    },
+    {
+      "id": "org.linxira.medical-survival",
+      "capability": "medical.survival.v1",
+      "status": "cataloged",
+      "trust": "official",
+      "runtime": "r",
+      "manifest": "workflows/org.linxira.medical-survival/manifest.json"
+    },
+    {
+      "id": "org.linxira.chemistry-descriptors-rdkit",
+      "capability": "chemistry.descriptors.v1",
+      "status": "cataloged",
+      "trust": "official",
+      "runtime": "python",
+      "manifest": "workflows/org.linxira.chemistry-descriptors-rdkit/manifest.json"
     }
   ]
 }

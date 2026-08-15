@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Molecular Descriptors"
+  short_description: "Compute RDKit physicochemical descriptors for SDF molecules"
+  default_prompt: "Use $analyze-molecular-descriptors to compute RDKit physicochemical descriptors for SDF molecule records."
