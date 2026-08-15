@@ -45,14 +45,15 @@ use linxira_bio_core::interval::{
     bed_merge_path, bed_subtract_path,
 };
 use linxira_bio_core::native_tools::{
-    HmmerOptions, IqtreeOptions, MastOptions, MemeOptions, Minimap2LongReadOptions, MuscleOptions,
-    NativeToolResult, ShortReadAlignmentOptions, SimilaritySearchOptions, SnpEffOptions,
-    WgcnaOptions, parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
-    parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
-    run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path,
-    run_kaks_path, run_mast_path, run_mcscanx_path, run_meme_path, run_minimap2_long_read_path,
-    run_muscle_path, run_rnafold_path, run_samtools_report_path, run_short_read_alignment_path,
-    run_snpeff_path, run_trimal_path, run_wgcna_path,
+    HmmerOptions, IqtreeOptions, Kraken2Options, MastOptions, MemeOptions, Minimap2LongReadOptions,
+    MuscleOptions, NativeToolResult, ShortReadAlignmentOptions, SimilaritySearchOptions,
+    SnpEffOptions, WgcnaOptions, parse_blast_program, parse_diamond_mode, parse_hmmer_mode,
+    parse_meme_alphabet, parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode,
+    run_bam_to_bigwig_path, run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path,
+    run_hmmer_path, run_iqtree_path, run_kaks_path, run_kraken2_path, run_mast_path,
+    run_mcscanx_path, run_meme_path, run_minimap2_long_read_path, run_muscle_path,
+    run_rnafold_path, run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path,
+    run_trimal_path, run_wgcna_path,
 };
 use linxira_bio_core::phylogeny::{
     DistanceMatrixOptions, DistanceMatrixResult, TreeTransformOptions, TreeTransformResult,
@@ -665,6 +666,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if rna == "rna" && secondary_structure == "secondary-structure" =>
         {
             print_rnafold(arguments)
+        }
+        [metagenomics, classify, arguments @ ..]
+            if metagenomics == "metagenomics" && classify == "classify" =>
+        {
+            print_metagenomics_classify(arguments)
         }
         [similarity, rbh, arguments @ ..] if similarity == "similarity" && rbh == "rbh" => {
             print_reciprocal_best_hits(arguments)
@@ -5475,6 +5481,100 @@ fn print_rnafold(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     )
 }
 
+fn print_metagenomics_classify(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut database = None;
+    let mut confidence = 0.0_f64;
+    let mut minimum_hit_groups = 2_usize;
+    let mut threads = 1_usize;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--database" => {
+                index += 1;
+                database = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--database requires a directory path")?,
+                );
+            }
+            "--confidence" => {
+                index += 1;
+                confidence = arguments
+                    .get(index)
+                    .ok_or("--confidence requires a value")?
+                    .parse()
+                    .map_err(|_| "confidence must be a number between 0 and 1")?;
+            }
+            "--minimum-hit-groups" => {
+                index += 1;
+                minimum_hit_groups = arguments
+                    .get(index)
+                    .ok_or("--minimum-hit-groups requires a value")?
+                    .parse()
+                    .map_err(|_| "minimum-hit-groups must be an integer")?;
+            }
+            "--threads" => {
+                index += 1;
+                threads = arguments
+                    .get(index)
+                    .ok_or("--threads requires a value")?
+                    .parse()
+                    .map_err(|_| "threads must be an integer")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown metagenomics classify option: {value}").into());
+            }
+            value => {
+                if input.is_none() {
+                    input = Some(PathBuf::from(value));
+                } else if output.is_none() {
+                    output = Some(PathBuf::from(value));
+                } else {
+                    return Err("too many positional arguments".into());
+                }
+            }
+        }
+        index += 1;
+    }
+    let input = input.ok_or("metagenomics classify requires <reads.fa|fq>")?;
+    let output = output.ok_or("metagenomics classify requires <output.tsv>")?;
+    let database = database.ok_or("metagenomics classify requires --database <dir>")?;
+    let options = Kraken2Options {
+        database: PathBuf::from(database),
+        confidence,
+        minimum_hit_groups,
+        threads,
+    };
+    let result = run_kraken2_path(input, output, &options)?;
+    if json {
+        let warnings = result.warnings.clone();
+        print_analysis_json_with_warnings(
+            "metagenomics-classify",
+            "metagenomics.classify.v1",
+            result,
+            warnings,
+        )
+    } else {
+        println!("tool\t{}", result.tool);
+        println!("output_path\t{}", result.output_path);
+        println!("output_bytes\t{}", result.output_bytes);
+        println!("thread_count\t{}", result.thread_count);
+        println!("total_reads\t{}", result.total_reads);
+        println!("classified_reads\t{}", result.classified_reads);
+        println!("unclassified_reads\t{}", result.unclassified_reads);
+        println!("classified_fraction\t{}", result.classified_fraction);
+        println!("taxon_count\t{}", result.taxon_count);
+        for warning in result.warnings {
+            println!("warning\t{warning}");
+        }
+        Ok(())
+    }
+}
+
 fn print_native_tool_result(
     job_id: &str,
     capability: &str,
@@ -5632,6 +5732,7 @@ fn usage() -> &'static str {
         "  linxira-bio phylogeny distance <input.alignment.fasta> <output.tsv> [--model p-distance|jc69|k80] [--json]\n",
         "  linxira-bio msa muscle <input.fasta> <output.fasta> [--mode align|super5] [--threads N] [--json]\n",
         "  linxira-bio msa trimal <input.alignment> <output.alignment> [--mode automated1|gappyout|strict|strictplus|nogaps] [--json]\n",
+        "  linxira-bio metagenomics classify <reads.fa|fq> <output.tsv> --database <kraken2-db> [--confidence FRACTION] [--minimum-hit-groups N] [--threads N] [--json]\n",
         "  linxira-bio phylogeny iqtree <alignment> <output.newick> [--threads N] [--model MODEL] [--seed N] [--json]\n",
         "  linxira-bio protein secondary-structure <structure.pdb|cif> <output.dssp> [--json]\n",
         "  linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> [--select-column NAME ...] [--drop-column NAME ...] [--filter-column NAME --filter-op equals|contains|non-empty [--filter-value VALUE]] [--skip-rows N] [--limit N] [--delimiter csv|tsv] [--output-delimiter csv|tsv] [--json]\n",

@@ -496,8 +496,28 @@ def validate_capability_documentation(capability: dict[str, object]) -> None:
             )
 
 
+def validate_embedded_docs_snapshot() -> None:
+    """The committed GUI docs snapshot must match the capability documentation."""
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "embed-docs-snapshot.py"), "--check"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        raise ValueError(
+            "stale embedded docs snapshot: "
+            + (detail or "regenerate with scripts/embed-docs-snapshot.py")
+        )
+
+
 def validate() -> None:
     schema_count, schema_instance_count, format_check_count = validate_schema_contracts()
+    validate_embedded_docs_snapshot()
     catalog = load_json("capabilities/catalog.json")
     coverage_summary = validate_coverage_files()
     tool_catalog = load_json("tools/catalog.json")

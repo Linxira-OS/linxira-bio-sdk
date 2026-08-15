@@ -78,5 +78,39 @@
       "path": "tests/test_convert_sequences.py",
       "sha256": "39ebea0be9c7f33e15e5c67d8a6cc48ff5c3464ac57743a0b9b1b70863502787"
     }
-  ]
+  ],
+  "resume": {
+    "enabled": true,
+    "state_file": "resume-state.json"
+  },
+  "contract": {
+    "inputs": [
+      {
+        "role": "sequences",
+        "formats": [
+          "fasta",
+          "fastq",
+          "genbank",
+          "embl"
+        ]
+      }
+    ],
+    "outputs": {
+      "roles": [
+        "converted-sequences"
+      ],
+      "kind": "domain-file",
+      "formats": [
+        "fasta",
+        "fastq",
+        "genbank",
+        "embl"
+      ]
+    },
+    "parameters": [
+      "output_directory",
+      "output_filename",
+      "output_format"
+    ]
+  }
 }

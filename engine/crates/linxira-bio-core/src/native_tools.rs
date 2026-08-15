@@ -1117,6 +1117,253 @@ pub fn rnafold_arguments(input: &Path, temperature: f64) -> Vec<OsString> {
     ]
 }
 
+/// Options for the Kraken2 metagenomic classifier.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Kraken2Options {
+    pub database: PathBuf,
+    pub confidence: f64,
+    pub minimum_hit_groups: usize,
+    pub threads: usize,
+}
+
+/// One row of a Kraken2 `--report` (clade-level taxonomy counts).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Kraken2TaxonRow {
+    /// Clade fraction of total reads, 0–100.
+    pub percentage: f64,
+    pub clade_count: u64,
+    pub taxon_count: u64,
+    /// Kraken2 rank code: `R`, `R1`, `D`, `P`, `C`, `O`, `F`, `G`, `S`, `S1`, `U`, …
+    pub rank: String,
+    pub taxon_id: u64,
+    pub name: String,
+}
+
+/// Structured summary of a Kraken2 classification run.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MetagenomicsClassifyResult {
+    pub tool: String,
+    pub output_path: String,
+    pub output_bytes: u64,
+    pub thread_count: usize,
+    pub command_count: u64,
+    pub total_reads: u64,
+    pub classified_reads: u64,
+    pub unclassified_reads: u64,
+    pub classified_fraction: f64,
+    pub taxon_count: usize,
+    pub warnings: Vec<String>,
+}
+
+impl Default for Kraken2Options {
+    fn default() -> Self {
+        Self {
+            database: PathBuf::new(),
+            confidence: 0.0,
+            minimum_hit_groups: 2,
+            threads: 1,
+        }
+    }
+}
+
+/// Build the shell-free Kraken2 argument vector.
+pub fn kraken2_arguments(
+    input: &Path,
+    report: &Path,
+    classified: &Path,
+    options: &Kraken2Options,
+) -> Vec<OsString> {
+    vec![
+        OsString::from("--db"),
+        options.database.as_os_str().to_owned(),
+        OsString::from("--threads"),
+        OsString::from(options.threads.to_string()),
+        OsString::from("--confidence"),
+        OsString::from(options.confidence.to_string()),
+        OsString::from("--minimum-hit-groups"),
+        OsString::from(options.minimum_hit_groups.to_string()),
+        OsString::from("--report"),
+        report.as_os_str().to_owned(),
+        OsString::from("--output"),
+        classified.as_os_str().to_owned(),
+        input.as_os_str().to_owned(),
+    ]
+}
+
+/// Parse a Kraken2 `--report` into taxonomy rows.
+///
+/// Each non-empty line has six whitespace-separated columns:
+/// `percentage clade_count taxon_count rank taxid name`. Names are left
+/// trimmed (Kraken2 indents them by rank). Malformed lines are rejected.
+pub fn parse_kraken2_report(report: &str) -> Result<Vec<Kraken2TaxonRow>, NativeToolError> {
+    let mut rows = Vec::new();
+    for (index, line) in report.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let mut fields = line.split_whitespace();
+        let percentage = fields
+            .next()
+            .ok_or_else(|| invalid_report(index, "missing percentage"))?;
+        let clade_count = fields
+            .next()
+            .ok_or_else(|| invalid_report(index, "missing clade count"))?;
+        let taxon_count = fields
+            .next()
+            .ok_or_else(|| invalid_report(index, "missing taxon count"))?;
+        let rank = fields
+            .next()
+            .ok_or_else(|| invalid_report(index, "missing rank"))?;
+        let taxon_id = fields
+            .next()
+            .ok_or_else(|| invalid_report(index, "missing taxon id"))?;
+        let name = fields.collect::<Vec<_>>().join(" ");
+        if name.is_empty() {
+            return Err(invalid_report(index, "missing taxon name"));
+        }
+        rows.push(Kraken2TaxonRow {
+            percentage: percentage
+                .parse()
+                .map_err(|_| invalid_report(index, format!("invalid percentage: {percentage}")))?,
+            clade_count: clade_count.parse().map_err(|_| {
+                invalid_report(index, format!("invalid clade count: {clade_count}"))
+            })?,
+            taxon_count: taxon_count.parse().map_err(|_| {
+                invalid_report(index, format!("invalid taxon count: {taxon_count}"))
+            })?,
+            rank: rank.to_owned(),
+            taxon_id: taxon_id
+                .parse()
+                .map_err(|_| invalid_report(index, format!("invalid taxon id: {taxon_id}")))?,
+            name,
+        });
+    }
+    if rows.is_empty() {
+        return Err(NativeToolError::InvalidOption(
+            "kraken2 report contains no taxonomy rows".to_owned(),
+        ));
+    }
+    Ok(rows)
+}
+
+fn invalid_report(line: usize, detail: impl Into<String>) -> NativeToolError {
+    NativeToolError::InvalidOption(format!(
+        "invalid kraken2 report line {}: {}",
+        line + 1,
+        detail.into()
+    ))
+}
+
+/// Render taxonomy rows as a TSV abundance table.
+pub fn render_kraken2_abundance_table(rows: &[Kraken2TaxonRow]) -> String {
+    let mut table = String::from("percentage\tclade_count\ttaxon_count\trank\ttaxon_id\tname\n");
+    for row in rows {
+        table.push_str(&format!(
+            "{:.2}\t{}\t{}\t{}\t{}\t{}\n",
+            row.percentage, row.clade_count, row.taxon_count, row.rank, row.taxon_id, row.name
+        ));
+    }
+    table
+}
+
+/// Run Kraken2 with controlled arguments (no shell) and reduce its `--report`
+/// into the abundance table written to `output`.
+pub fn run_kraken2_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &Kraken2Options,
+) -> Result<MetagenomicsClassifyResult, NativeToolError> {
+    let input = input.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[input], output)?;
+    if options.database.as_os_str().is_empty() {
+        return Err(NativeToolError::InvalidOption(
+            "kraken2 classification requires a --database directory".to_owned(),
+        ));
+    }
+    if !options.database.is_dir() {
+        return Err(NativeToolError::InvalidOption(format!(
+            "kraken2 database is not a directory: {}",
+            options.database.display()
+        )));
+    }
+    if !options.confidence.is_finite() || !(0.0..=1.0).contains(&options.confidence) {
+        return Err(NativeToolError::InvalidOption(format!(
+            "confidence must be between 0 and 1, got {}",
+            options.confidence
+        )));
+    }
+    if options.minimum_hit_groups < 1 {
+        return Err(NativeToolError::InvalidOption(format!(
+            "minimum_hit_groups must be at least 1, got {}",
+            options.minimum_hit_groups
+        )));
+    }
+    if options.threads < 1 || options.threads > MAX_THREADS {
+        return Err(NativeToolError::InvalidOption(format!(
+            "threads must be between 1 and {MAX_THREADS}, got {}",
+            options.threads
+        )));
+    }
+    let executable = configured_program("LINXIRA_BIO_KRAKEN2", "kraken2");
+    let working = create_temporary_directory(output, "kraken2")?;
+    let report_path = working.join("report.txt");
+    let classified_path = working.join("classified.txt");
+    let result = (|| {
+        let arguments = kraken2_arguments(input, &report_path, &classified_path, options);
+        run_native_command(&executable, &arguments, false)?;
+        let report = fs::read_to_string(&report_path).map_err(NativeToolError::Io)?;
+        let rows = parse_kraken2_report(&report)?;
+        let table = render_kraken2_abundance_table(&rows);
+        fs::write(output, table.as_bytes())?;
+        let (total_reads, classified_reads, unclassified_reads) = summarize_kraken2(&rows);
+        let classified_fraction = if total_reads == 0 {
+            0.0
+        } else {
+            classified_reads as f64 / total_reads as f64
+        };
+        if !output.is_file() {
+            return Err(NativeToolError::MissingOutput {
+                tool: "kraken2".to_owned(),
+                path: output.to_path_buf(),
+            });
+        }
+        Ok(MetagenomicsClassifyResult {
+            tool: "kraken2".to_owned(),
+            output_path: output.to_string_lossy().into_owned(),
+            output_bytes: fs::metadata(output)?.len(),
+            thread_count: options.threads,
+            command_count: 1,
+            total_reads,
+            classified_reads,
+            unclassified_reads,
+            classified_fraction,
+            taxon_count: rows.len(),
+            warnings: Vec::new(),
+        })
+    })();
+    let _ = fs::remove_dir_all(&working);
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
+/// Derive read totals from the report: the root (`R`) clade count is the
+/// classified total and the `unclassified` (`U`) row carries the rest.
+fn summarize_kraken2(rows: &[Kraken2TaxonRow]) -> (u64, u64, u64) {
+    let classified = rows
+        .iter()
+        .find(|row| row.rank == "R")
+        .map_or(0, |row| row.clade_count);
+    let unclassified = rows
+        .iter()
+        .find(|row| row.rank == "U")
+        .map_or(0, |row| row.clade_count);
+    (classified + unclassified, classified, unclassified)
+}
+
 pub fn meme_arguments(
     input: &Path,
     output_directory: &Path,
@@ -1619,7 +1866,7 @@ mod tests {
         samtools_report_arguments, samtools_sort_arguments, trimal_arguments,
     };
     use std::ffi::OsString;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn builds_shell_free_native_tool_arguments() {
@@ -1768,5 +2015,70 @@ mod tests {
         assert_eq!(BlastProgram::Blastn.database_type(), "nucl");
         assert_eq!(BlastProgram::Blastx.database_type(), "prot");
         assert_eq!(BlastProgram::Tblastn.database_type(), "nucl");
+    }
+
+    #[test]
+    fn kraken2_report_parses_into_the_golden_abundance_table() {
+        use super::{parse_kraken2_report, render_kraken2_abundance_table};
+        use std::fs;
+        use std::path::Path;
+
+        let root =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../tests/fixtures/metagenomics");
+        let report = fs::read_to_string(root.join("kraken2-report.txt")).expect("report fixture");
+        let golden =
+            fs::read_to_string(root.join("abundance-golden.tsv")).expect("golden table fixture");
+
+        let rows = parse_kraken2_report(&report).expect("parse synthetic kraken2 report");
+        assert_eq!(rows.len(), 16);
+        assert_eq!(rows[0].rank, "R");
+        assert_eq!(rows[0].taxon_id, 1);
+        assert_eq!(rows[0].name, "root");
+        assert_eq!(rows[3].rank, "P");
+        assert_eq!(rows[3].name, "Proteobacteria");
+        assert_eq!(rows[15].rank, "U");
+        assert_eq!(rows[15].taxon_id, 0);
+        assert_eq!(render_kraken2_abundance_table(&rows), golden);
+    }
+
+    #[test]
+    fn kraken2_report_rejects_malformed_rows() {
+        use super::parse_kraken2_report;
+
+        assert!(parse_kraken2_report("").is_err());
+        assert!(parse_kraken2_report("99.90\t999\t999\tR\t1").is_err());
+        assert!(parse_kraken2_report("nope\t999\t999\tR\t1\troot").is_err());
+        let valid = "99.90\t999\t999\tR\t1\troot\n";
+        assert!(parse_kraken2_report(valid).is_ok());
+    }
+
+    #[test]
+    fn kraken2_arguments_are_controlled_and_shell_free() {
+        use super::{Kraken2Options, kraken2_arguments};
+        use std::path::Path;
+
+        let options = Kraken2Options {
+            database: PathBuf::from("db with spaces"),
+            confidence: 0.25,
+            minimum_hit_groups: 3,
+            threads: 4,
+        };
+        let arguments = kraken2_arguments(
+            Path::new("reads with spaces.fq"),
+            Path::new("report.txt"),
+            Path::new("classified.txt"),
+            &options,
+        );
+        assert_eq!(arguments[0], OsString::from("--db"));
+        assert!(arguments.contains(&OsString::from("db with spaces")));
+        assert!(arguments.contains(&OsString::from("0.25")));
+        assert!(arguments.contains(&OsString::from("3")));
+        assert!(arguments.contains(&OsString::from("4")));
+        assert!(arguments.contains(&OsString::from("reads with spaces.fq")));
+        assert!(
+            arguments
+                .iter()
+                .all(|value| !value.to_string_lossy().contains([';', '&', '|', '$', '`']))
+        );
     }
 }
