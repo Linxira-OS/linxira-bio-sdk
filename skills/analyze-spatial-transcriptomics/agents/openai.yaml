@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Spatial Transcriptomics"
+  short_description: "Summarize 10x count matrices and barcode quality"
+  default_prompt: "Use $analyze-spatial-transcriptomics to summarize a 10x Genomics sparse expression matrix with per-barcode counts and detected genes."

@@ -116,6 +116,7 @@ pub enum BioDataFormat {
     Rds,
     Pdb,
     Mmcif,
+    Sdf,
     Axt,
     BlastTabular,
     BlastXml,

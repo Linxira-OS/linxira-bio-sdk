@@ -1,0 +1,110 @@
+{
+  "schema_version": "2",
+  "id": "org.linxira.chemistry-descriptors-rdkit",
+  "version": "0.1.0",
+  "publisher": {
+    "name": "Linxira OS",
+    "url": "https://github.com/Linxira-OS"
+  },
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
+  "entrypoint": {
+    "path": "src/descriptors.py",
+    "arguments": [
+      "--request",
+      "{request}",
+      "--result",
+      "{result}"
+    ]
+  },
+  "runtime": {
+    "kind": "python",
+    "version": "3.12.x",
+    "core_compatibility": ">=0.1.0,<1.0.0",
+    "dependency_lock": {
+      "path": "requirements.lock",
+      "sha256": "ca193793b6047f21c4f7241c8455f91ef8f49fc942bde6f5e70ff2cb23bceda1"
+    }
+  },
+  "resume": {
+    "enabled": true,
+    "state_file": "resume-state.json"
+  },
+  "contract": {
+    "inputs": [
+      {
+        "role": "molecules",
+        "formats": [
+          "sdf"
+        ]
+      }
+    ],
+    "outputs": {
+      "roles": [
+        "descriptors"
+      ],
+      "kind": "table",
+      "formats": [
+        "tsv"
+      ],
+      "media_type": "text/tab-separated-values"
+    },
+    "parameters": [
+      "output_directory",
+      "output_filename"
+    ]
+  },
+  "input_schema": {
+    "type": "object",
+    "$ref": "schemas/input.schema.json"
+  },
+  "output_schema": {
+    "type": "object",
+    "$ref": "schemas/output.schema.json"
+  },
+  "platforms": [
+    "windows-gnu",
+    "debian",
+    "arch"
+  ],
+  "network": {
+    "access": "none",
+    "allowed_hosts": []
+  },
+  "resources": {
+    "minimum_memory_mb": 512,
+    "minimum_disk_mb": 256,
+    "recommended_threads": 1,
+    "gpu": "none"
+  },
+  "files": [
+    {
+      "path": "NOTICE.md",
+      "sha256": "3458a0bb92acc8453d5bc9bd95473e94af25104b50555572779aae6bfe3778ad"
+    },
+    {
+      "path": "README.md",
+      "sha256": "ccacdbe5fbe932d630d6ed842f8aebca807797cb932cd96bfe359e1aa571d38b"
+    },
+    {
+      "path": "requirements.lock",
+      "sha256": "ca193793b6047f21c4f7241c8455f91ef8f49fc942bde6f5e70ff2cb23bceda1"
+    },
+    {
+      "path": "schemas/input.schema.json",
+      "sha256": "cf50e5ec08e8cd0bc9078d566241f00abb2042e082700a32cd6db6a42563c0b1"
+    },
+    {
+      "path": "schemas/output.schema.json",
+      "sha256": "427182d59ef2f7e13726d6aa9e1401e1f0e87af6471c76005644a7d14ae67ac8"
+    },
+    {
+      "path": "src/descriptors.py",
+      "sha256": "b886bf3adb6cbead64c40defab8d840c44e1bee5d5b7a37471ab93103a5816f9"
+    },
+    {
+      "path": "tests/test_descriptors.py",
+      "sha256": "5cbb4645198f74a8ccd66ac7bafeb115b1825471e38a29a1828f40d24ea13d09"
+    }
+  ]
+}

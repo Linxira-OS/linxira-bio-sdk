@@ -1,0 +1,87 @@
+{
+  "schema_version": "2",
+  "lock_kind": "compatibility-and-resolution-policy",
+  "runtime": {
+    "preferred_version": "4.6.1",
+    "version_requirement": ">=4.6.1,<4.7.0",
+    "bioconductor_release": null
+  },
+  "isolation": {
+    "scope": "project",
+    "interpreter_environment_variable": "LINXIRA_BIO_WORKFLOW_R",
+    "library_environment_variable": "LINXIRA_BIO_WORKFLOW_R_LIBRARY",
+    "declared_packages_must_resolve_from_project_library": true,
+    "all_loaded_non_base_packages_must_resolve_from_project_library": true,
+    "global_library_mutation": false,
+    "global_path_mutation": false,
+    "side_by_side_runtime_versions": true
+  },
+  "repositories": {
+    "cran": {
+      "url": "https://cloud.r-project.org",
+      "type": "cran"
+    }
+  },
+  "direct_requirements": [
+    {
+      "name": "survival",
+      "version_requirement": ">=3.8.0,<3.9.0",
+      "repository": "cran",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "name": "jsonlite",
+      "version_requirement": ">=1.8.9,<3.0.0",
+      "repository": "cran",
+      "license": "MIT"
+    },
+    {
+      "name": "digest",
+      "version_requirement": ">=0.6.37,<0.7.0",
+      "repository": "cran",
+      "license": "GPL-2.0-or-later"
+    }
+  ],
+  "resolved_environment_lock": {
+    "required_before_activation": true,
+    "completeness": "direct-and-transitive",
+    "required_fields": ["name", "version", "repository", "source_url", "sha256", "license"],
+    "entries": [
+      {
+        "name": "survival",
+        "version": "3.8-9",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/survival_3.8-9.tar.gz",
+        "sha256": "9aa8fadd4fb185ac48f260c9d0f69fd6dfff4a4e2724920618057aa1f5d5bfbe",
+        "license": "GPL-2.0-or-later"
+      },
+      {
+        "name": "jsonlite",
+        "version": "2.0.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/jsonlite_2.0.0.tar.gz",
+        "sha256": "75eb910c82b350ec33f094779da0f87bff154c232e4ae39c9896a9b89f3ac82d",
+        "license": "MIT"
+      },
+      {
+        "name": "digest",
+        "version": "0.6.39",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/digest_0.6.39.tar.gz",
+        "sha256": "8bf048b49b2d17077138fae758bda56bbd53278d9437f2fdeaedf979c90a13c9",
+        "license": "GPL-2.0-or-later"
+      }
+    ]
+  },
+  "pack_lock_completeness": {
+    "direct_requirements_covered": true,
+    "transitive_requirements_covered": true,
+    "sources_pinned": true,
+    "hashes_pinned": true
+  },
+  "execution_policy": {
+    "allow_global_install": false,
+    "require_approved_install": true
+  },
+  "installable": true
+}

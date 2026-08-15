@@ -14,6 +14,9 @@
     "analyze-genome-annotations",
     "analyze-sequence-similarity",
     "analyze-metagenomics",
+    "analyze-pharmacogenomics",
+    "analyze-spatial-transcriptomics",
+    "analyze-microbiome-diversity",
     "align-biological-sequences",
     "analyze-sequence-motifs",
     "analyze-functional-enrichment",
@@ -28,7 +31,10 @@
     "analyze-pdb-structure",
     "visualize-bio-results",
     "inspect-bio-dataset",
-    "export-bio-table"
+    "export-bio-table",
+    "analyze-survival-data",
+    "analyze-molecular-descriptors",
+    "analyze-metabolomics-peaks"
   ],
   "required_capabilities": [
     "system.doctor.v1",

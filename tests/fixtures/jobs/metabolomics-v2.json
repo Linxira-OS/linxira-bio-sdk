@@ -1,0 +1,23 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-metabolomics-v2",
+  "capability": "medical.metabolomics.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-mzml",
+      "role": "mzml",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "input-mzml-1",
+        "path": "../metabolomics/synthetic.mzML",
+        "format": "unknown",
+        "compression": "none",
+        "size_bytes": 1979
+      }]
+    }
+  ],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {
+    "output": "../../../target/test-results/metabolomics-v2.tsv"
+  }
+}

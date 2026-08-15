@@ -1,0 +1,55 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-spatial-transcriptomics-v2",
+  "capability": "medical.spatial-transcriptomics.v1",
+  "inputs": [
+    {
+      "artifact_id": "matrix",
+      "role": "matrix",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "matrix-1",
+          "path": "../spatial-transcriptomics/matrix.mtx",
+          "format": "unknown",
+          "compression": "none",
+          "size_bytes": 125
+        }
+      ]
+    },
+    {
+      "artifact_id": "features",
+      "role": "features",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "features-1",
+          "path": "../spatial-transcriptomics/features.tsv",
+          "format": "tsv",
+          "compression": "none",
+          "size_bytes": 152
+        }
+      ]
+    },
+    {
+      "artifact_id": "barcodes",
+      "role": "barcodes",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "barcodes-1",
+          "path": "../spatial-transcriptomics/barcodes.tsv",
+          "format": "tsv",
+          "compression": "none",
+          "size_bytes": 36
+        }
+      ]
+    }
+  ],
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "output": "../../../target/test-results/spatial-transcriptomics-v2/barcode-rank.tsv"
+  }
+}

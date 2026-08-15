@@ -20,6 +20,8 @@ const BULK_EXPRESSION_MANIFEST: &str = "manifest.json";
 const MEDICAL_BULK_CAPABILITY: &str = "medical.bulk-rnaseq.v1";
 const BULK_EXPRESSION_PACK: &str = "org.linxira.bulk-expression-deseq2";
 const SEQUENCE_CONVERT_PACK: &str = "org.linxira.sequence-conversion-biopython";
+const MEDICAL_SURVIVAL_PACK: &str = "org.linxira.medical-survival";
+const CHEMISTRY_DESCRIPTORS_PACK: &str = "org.linxira.chemistry-descriptors-rdkit";
 
 #[derive(Debug, Clone, PartialEq)]
 struct WorkflowContract {
@@ -386,6 +388,56 @@ pub(super) fn execute_sequence_convert_v2(
     let contract = contract_for(
         SEQUENCE_CONVERT_PACK,
         SEQUENCE_CONVERT_PACK,
+        WorkflowRuntimeKind::Python,
+    )?;
+    execute_workflow_v2(&contract, base_directory, request, verified_inputs)
+}
+
+pub(super) fn execute_medical_survival_v1(
+    base_directory: &Path,
+    request: JobRequest,
+) -> WorkerResult<String> {
+    let contract = contract_for(
+        MEDICAL_SURVIVAL_PACK,
+        MEDICAL_SURVIVAL_PACK,
+        WorkflowRuntimeKind::R,
+    )?;
+    execute_workflow_v1(&contract, base_directory, request)
+}
+
+pub(super) fn execute_medical_survival_v2(
+    base_directory: &Path,
+    request: JobRequestV2,
+    verified_inputs: &BTreeMap<String, String>,
+) -> WorkerResult<String> {
+    let contract = contract_for(
+        MEDICAL_SURVIVAL_PACK,
+        MEDICAL_SURVIVAL_PACK,
+        WorkflowRuntimeKind::R,
+    )?;
+    execute_workflow_v2(&contract, base_directory, request, verified_inputs)
+}
+
+pub(super) fn execute_chemistry_descriptors_v1(
+    base_directory: &Path,
+    request: JobRequest,
+) -> WorkerResult<String> {
+    let contract = contract_for(
+        CHEMISTRY_DESCRIPTORS_PACK,
+        CHEMISTRY_DESCRIPTORS_PACK,
+        WorkflowRuntimeKind::Python,
+    )?;
+    execute_workflow_v1(&contract, base_directory, request)
+}
+
+pub(super) fn execute_chemistry_descriptors_v2(
+    base_directory: &Path,
+    request: JobRequestV2,
+    verified_inputs: &BTreeMap<String, String>,
+) -> WorkerResult<String> {
+    let contract = contract_for(
+        CHEMISTRY_DESCRIPTORS_PACK,
+        CHEMISTRY_DESCRIPTORS_PACK,
         WorkflowRuntimeKind::Python,
     )?;
     execute_workflow_v2(&contract, base_directory, request, verified_inputs)
@@ -1292,6 +1344,7 @@ fn sequence_or_table_format_from_path(path: &Path) -> WorkerResult<BioDataFormat
         "fq" | "fastq" => Ok(BioDataFormat::Fastq),
         "gb" | "gbk" | "genbank" => Ok(BioDataFormat::Genbank),
         "embl" => Ok(BioDataFormat::Embl),
+        "sdf" => Ok(BioDataFormat::Sdf),
         _ => Err(
             format!("cannot infer a supported input format from extension: .{extension}").into(),
         ),
