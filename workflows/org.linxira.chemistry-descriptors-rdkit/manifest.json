@@ -23,7 +23,7 @@
     "core_compatibility": ">=0.1.0,<1.0.0",
     "dependency_lock": {
       "path": "requirements.lock",
-      "sha256": "ca193793b6047f21c4f7241c8455f91ef8f49fc942bde6f5e70ff2cb23bceda1"
+      "sha256": "07445ad9d7b2b304bc96d4be805b0e2bc84b1ecba8ac13d78a41c9c92b4c7478"
     }
   },
   "resume": {
@@ -88,7 +88,7 @@
     },
     {
       "path": "requirements.lock",
-      "sha256": "ca193793b6047f21c4f7241c8455f91ef8f49fc942bde6f5e70ff2cb23bceda1"
+      "sha256": "07445ad9d7b2b304bc96d4be805b0e2bc84b1ecba8ac13d78a41c9c92b4c7478"
     },
     {
       "path": "schemas/input.schema.json",
