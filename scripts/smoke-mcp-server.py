@@ -51,7 +51,10 @@ def main() -> int:
     doc = Path(args.doc) if args.doc else repo_root / "docs/capabilities/sequence.stats.v1/en-US.md"
     if not doc.is_file():
         raise SystemExit(f"capability document not found: {doc}")
-    doc_uri = doc.resolve().as_uri()
+    # file:/// + posix: Windows "C:/..." (3-slash URI, strips to absolute);
+    # POSIX "/__w/..." yields "file:////__w/..." (4-slash), server strips
+    # "file:///" leaving the leading "/" so the absolute path is preserved.
+    doc_uri = "file:///" + doc.resolve().as_posix()
 
     # Runtime catalog override: point LINXIRA_BIO_WORKFLOW_ROOT at a directory
     # with a single marker capability and assert tools/list reflects it.
