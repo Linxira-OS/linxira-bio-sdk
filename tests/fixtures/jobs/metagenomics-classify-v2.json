@@ -1,0 +1,28 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-metagenomics-classify-v2",
+  "capability": "metagenomics.classify.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-reads",
+      "role": "reads",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "input-reads-1",
+        "path": "../sequences/tiny.fa",
+        "format": "fasta",
+        "compression": "none",
+        "size_bytes": 32,
+        "sha256": "d36ea1364a0451fd99584f0f36307dbc34b818ca4008c24c7705a95855172a1c"
+      }]
+    }
+  ],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {
+    "output": "../../../target/test-results/metagenomics-classify-v2/abundance.tsv",
+    "database": "../../../tests/fixtures/metagenomics",
+    "confidence": 0.25,
+    "minimum_hit_groups": 3,
+    "threads": 2
+  }
+}

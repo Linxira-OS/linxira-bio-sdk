@@ -69,9 +69,26 @@ fn main() -> ExitCode {
     let mode = env::var("LINXIRA_BIO_RSCRIPT_STUB_MODE").unwrap_or_default();
     let lock_sha256 = env::var("LINXIRA_BIO_RSCRIPT_STUB_LOCK_SHA256")
         .unwrap_or_else(|_| "0".repeat(64));
+    let role_hashes_fragment =
+        env::var("LINXIRA_BIO_RSCRIPT_STUB_ROLE_HASHES").unwrap_or_else(|_| {
+            if is_convert {
+                format!("\"sequences\":\"{TINY_FA_SHA256}\"")
+            } else {
+                format!(
+                    "\"counts\":\"{COUNTS_SHA256}\",\"sample_metadata\":\"{SAMPLES_SHA256}\""
+                )
+            }
+        });
     if mode == "missing-package" {
         let payload = error_envelope(&job_id, &capability);
         return write_result(&result_path, &payload, ExitCode::from(2));
+    }
+    if mode == "die-at-step-2" {
+        // Simulate an interrupted multi-step workflow: step 2 is reached but
+        // the process exits non-zero without a result envelope.
+        let marker = output_directory.join("step-2.started");
+        let _ = fs::write(marker, "step 2 reached\n");
+        return ExitCode::from(3);
     }
 
     if is_convert {
@@ -82,6 +99,7 @@ fn main() -> ExitCode {
             &output_directory,
             &result_path,
             &lock_sha256,
+            &role_hashes_fragment,
         );
     }
 
@@ -103,6 +121,7 @@ fn main() -> ExitCode {
         &differential_path,
         &normalized_path,
         &lock_sha256,
+        &role_hashes_fragment,
     );
     write_result(&result_path, &payload, ExitCode::SUCCESS)
 }
@@ -114,6 +133,7 @@ fn run_convert_stub(
     output_directory: &Path,
     result_path: &Path,
     lock_sha256: &str,
+    role_hashes_fragment: &str,
 ) -> ExitCode {
     let Some(output_filename) = json_string_field(request, "output_filename") else {
         eprintln!("convert request lacks output_filename");
@@ -134,7 +154,7 @@ fn run_convert_stub(
             "\"format\":\"{}\",\"size_bytes\":{},\"sha256\":\"{}\"}}],",
             "\"provenance\":{{\"engine_version\":\"stub-1\",\"execution_mode\":\"local-cpu\",",
             "\"core_version\":\"{}\",",
-            "\"software\":[],\"input_sha256\":{{\"sequences\":\"{}\"}},",
+            "\"software\":[],\"input_sha256\":{{{}}},",
             "\"dependency_lock_sha256\":\"{}\"}},\"diagnostics\":[]}}"
         ),
         json_quote(job_id),
@@ -145,7 +165,7 @@ fn run_convert_stub(
         CONVERTED.len(),
         CONVERTED_SHA256,
         core_version(),
-        TINY_FA_SHA256,
+        role_hashes_fragment,
         lock_sha256,
     );
     write_result(result_path, &payload, ExitCode::SUCCESS)
@@ -157,6 +177,7 @@ fn success_envelope(
     differential: &Path,
     normalized: &Path,
     lock_sha256: &str,
+    role_hashes_fragment: &str,
 ) -> String {
     let diagnostics = if capability == "medical.bulk-rnaseq.v1" {
         r#"[{"code":"research_use_only","severity":"warning","message":"Research use only; no diagnosis or clinical interpretation is provided."}]"#
@@ -183,8 +204,8 @@ fn success_envelope(
             "\"size_bytes\":71,\"sha256\":\"{}\"}}],",
             "\"provenance\":{{\"engine_version\":\"stub-1\",\"execution_mode\":\"local-cpu\",",
             "\"core_version\":\"{}\",",
-            "\"software\":[],\"input_sha256\":{{\"counts\":\"{}\",",
-            "\"sample_metadata\":\"{}\"}},\"dependency_lock_sha256\":\"{}\"}},",
+            "\"software\":[],\"input_sha256\":{{{}}},",
+            "\"dependency_lock_sha256\":\"{}\"}},",
             "\"diagnostics\":{}}}"
         ),
         json_quote(job_id),
@@ -194,8 +215,7 @@ fn success_envelope(
         json_quote(&normalized.to_string_lossy()),
         NORMALIZED_SHA256,
         core_version(),
-        COUNTS_SHA256,
-        SAMPLES_SHA256,
+        role_hashes_fragment,
         lock_sha256,
         diagnostics
     )

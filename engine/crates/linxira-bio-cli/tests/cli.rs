@@ -1900,6 +1900,28 @@ fn executes_controlled_native_tool_wrappers_without_a_shell() {
             "mkdssp",
             1,
         ),
+        (
+            vec![
+                "metagenomics".to_owned(),
+                "classify".to_owned(),
+                fasta.to_string_lossy().into_owned(),
+                output_root
+                    .join("abundance.tsv")
+                    .to_string_lossy()
+                    .into_owned(),
+                "--database".to_owned(),
+                output_root.to_string_lossy().into_owned(),
+                "--confidence".to_owned(),
+                "0.25".to_owned(),
+                "--minimum-hit-groups".to_owned(),
+                "3".to_owned(),
+                "--json".to_owned(),
+            ],
+            "metagenomics.classify.v1",
+            output_root.join("abundance.tsv"),
+            "kraken2",
+            1,
+        ),
     ];
 
     for (arguments, capability, output_path, tool, command_count) in cases {
@@ -1916,6 +1938,7 @@ fn executes_controlled_native_tool_wrappers_without_a_shell() {
             .env("LINXIRA_BIO_MKDSSP", &stub)
             .env("LINXIRA_BIO_SAMTOOLS", &stub)
             .env("LINXIRA_BIO_MINIMAP2", &stub)
+            .env("LINXIRA_BIO_KRAKEN2", &stub)
             .output()
             .unwrap_or_else(|error| panic!("run {capability}: {error}"));
         assert!(

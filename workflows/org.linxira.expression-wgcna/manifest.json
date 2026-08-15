@@ -78,5 +78,44 @@
       "path": "tests/test_validation.R",
       "sha256": "40f8aea3e885048806c3d6b52cedde9900a5357ff133f6130871e9fbeb21ea68"
     }
-  ]
+  ],
+  "resume": {
+    "enabled": true,
+    "state_file": "resume-state.json"
+  },
+  "contract": {
+    "inputs": [
+      {
+        "role": "expression",
+        "formats": [
+          "csv",
+          "tsv"
+        ]
+      }
+    ],
+    "outputs": {
+      "roles": [
+        "module-assignments",
+        "module-eigengenes",
+        "module-summary",
+        "scale-free-fit"
+      ],
+      "kind": "table",
+      "formats": [
+        "csv"
+      ],
+      "media_type": "text/csv"
+    },
+    "parameters": [
+      "output_directory",
+      "min_expression",
+      "min_samples",
+      "min_module_size",
+      "merge_cut_height",
+      "network_type",
+      "power",
+      "log_transform",
+      "threads"
+    ]
+  }
 }
