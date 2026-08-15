@@ -221,6 +221,106 @@ jobs:
         run: |
           cargo build --locked -p linxira-bio-mcp
           .venv-ci/bin/python scripts/smoke-mcp-server.py
+      - name: Validate survival workflow request layer
+        run: Rscript workflows/org.linxira.medical-survival/tests/test_validation.R
+      - name: Install project-isolated survival library
+        run: Rscript scripts/bootstrap-survival-lib.R "$GITHUB_WORKSPACE/.linxira-bio/ci/r/4.6.1/library"
+      - name: Run real survival workflow E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/build"
+          python3 - <<'PY'
+          import json
+          request = {
+            "schema_version": "2",
+            "job_id": "ci-survival-e2e",
+            "capability": "medical.survival.v1",
+            "inputs": [{
+              "artifact_id": "cohort",
+              "role": "cohort",
+              "cardinality": "single",
+              "files": [{
+                "file_id": "cohort.csv",
+                "path": "tests/fixtures/cohort/survival-cohort.csv",
+                "format": "csv",
+                "compression": "none",
+                "size_bytes": 702,
+              }],
+            }],
+            "execution": {"mode": "local-cpu"},
+            "parameters": {
+              "output_directory": "target/test-results/survival-e2e-ci",
+              "time_column": "time",
+              "event_column": "event",
+              "group_column": "treatment",
+              "reference_level": "control",
+            },
+          }
+          json.dump(request, open("build/survival-e2e-request.json", "w"), indent=2)
+          PY
+          Rscript workflows/org.linxira.medical-survival/src/run_survival.R \
+            --request "$GITHUB_WORKSPACE/build/survival-e2e-request.json" \
+            --result "$GITHUB_WORKSPACE/target/test-results/survival-e2e-ci/result.json"
+          python3 - <<'PY'
+          import json
+          result = json.load(open("target/test-results/survival-e2e-ci/result.json"))
+          assert result["status"] == "ok", result.get("diagnostics")
+          assert result["result"]["n_observations"] == 40, result["result"]["n_observations"]
+          assert len(result["result"]["rows"]) >= 1, "expected at least one model term"
+          print("survival E2E ok:", result["result"]["n_observations"], "observations")
+          PY
+      - name: Create isolated descriptors environment from hashed lock
+        run: |
+          python3 -m venv "$GITHUB_WORKSPACE/.venv-descriptors"
+          "$GITHUB_WORKSPACE/.venv-descriptors/bin/python" -m pip install --disable-pip-version-check --require-hashes -r workflows/org.linxira.chemistry-descriptors-rdkit/requirements.lock
+      - name: Run chemistry descriptors pack tests under locked Python
+        run: |
+          "$GITHUB_WORKSPACE/.venv-descriptors/bin/python" -m pip install --disable-pip-version-check jsonschema
+          "$GITHUB_WORKSPACE/.venv-descriptors/bin/python" -m unittest discover -s workflows/org.linxira.chemistry-descriptors-rdkit/tests -p "test_*.py"
+      - name: Run chemistry descriptors E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/build"
+          python3 - <<'PY'
+          import json
+          request = {
+            "schema_version": "2",
+            "job_id": "ci-descriptors-e2e",
+            "capability": "chemistry.descriptors.v1",
+            "inputs": [{
+              "artifact_id": "molecules",
+              "role": "molecules",
+              "cardinality": "single",
+              "files": [{
+                "file_id": "molecules.sdf",
+                "path": "tests/fixtures/chemistry/aspirin.sdf",
+                "format": "sdf",
+                "compression": "none",
+                "size_bytes": 1077,
+              }],
+            }],
+            "execution": {"mode": "local-cpu"},
+            "parameters": {
+              "output_directory": "target/test-results/descriptors-e2e-ci",
+              "output_filename": "descriptors.tsv",
+            },
+          }
+          json.dump(request, open("build/descriptors-e2e-request.json", "w"), indent=2)
+          PY
+          "$GITHUB_WORKSPACE/.venv-descriptors/bin/python" workflows/org.linxira.chemistry-descriptors-rdkit/src/descriptors.py \
+            --request "$GITHUB_WORKSPACE/build/descriptors-e2e-request.json" \
+            --result "$GITHUB_WORKSPACE/target/test-results/descriptors-e2e-ci/result.json"
+          python3 - <<'PY'
+          import json
+          result = json.load(open("target/test-results/descriptors-e2e-ci/result.json"))
+          assert result["status"] == "ok", result.get("diagnostics")
+          assert result["result"]["molecule_count"] == 1, result["result"]["molecule_count"]
+          table = open("target/test-results/descriptors-e2e-ci/descriptors.tsv").read()
+          assert table.startswith("molecule_index\tmolecular_weight\tlogp"), table[:80]
+          print("descriptors E2E ok: molecule_count", result["result"]["molecule_count"])
+          PY
       - run: .venv-ci/bin/python scripts/validate-repository.py
       - run: .venv-ci/bin/python -m unittest discover -s tests/python -p "test_*.py"
       - run: .venv-ci/bin/python -m unittest discover -s workflows/tests -p "test_*.py"

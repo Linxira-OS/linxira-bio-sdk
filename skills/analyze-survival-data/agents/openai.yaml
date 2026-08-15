@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Survival Data"
+  short_description: "Fit research-only Cox models and summarize survival"
+  default_prompt: "Use $analyze-survival-data to fit a Cox proportional-hazards model on a cohort table and summarize hazard ratios and Kaplan-Meier estimates."

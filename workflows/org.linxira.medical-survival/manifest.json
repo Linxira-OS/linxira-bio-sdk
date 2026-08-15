@@ -1,0 +1,115 @@
+{
+  "schema_version": "2",
+  "id": "org.linxira.medical-survival",
+  "version": "0.1.0",
+  "publisher": {
+    "name": "Linxira OS",
+    "url": "https://github.com/Linxira-OS"
+  },
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
+  "entrypoint": {
+    "path": "src/run_survival.R",
+    "arguments": [
+      "--request",
+      "{request}",
+      "--result",
+      "{result}"
+    ]
+  },
+  "runtime": {
+    "kind": "r",
+    "version": ">=4.6.1,<4.7.0",
+    "core_compatibility": ">=0.1.0,<1.0.0",
+    "dependency_lock": {
+      "path": "dependencies.lock.json",
+      "sha256": "76a553f8cf6069a7210f885bd02d6af2024992e23a6a903fd56eddbfa51f7d96"
+    }
+  },
+  "resume": {
+    "enabled": true,
+    "state_file": "resume-state.json"
+  },
+  "contract": {
+    "inputs": [
+      {
+        "role": "cohort",
+        "formats": [
+          "csv",
+          "tsv"
+        ]
+      }
+    ],
+    "outputs": {
+      "roles": [
+        "cox-results",
+        "km-summary"
+      ],
+      "kind": "table",
+      "formats": [
+        "csv"
+      ],
+      "media_type": "text/csv"
+    },
+    "parameters": [
+      "output_directory",
+      "time_column",
+      "event_column",
+      "group_column",
+      "reference_level"
+    ]
+  },
+  "input_schema": {
+    "type": "object",
+    "$ref": "schemas/input.schema.json"
+  },
+  "output_schema": {
+    "type": "object",
+    "$ref": "schemas/output.schema.json"
+  },
+  "platforms": [
+    "windows-gnu",
+    "debian",
+    "arch"
+  ],
+  "network": {
+    "access": "none",
+    "allowed_hosts": []
+  },
+  "resources": {
+    "minimum_memory_mb": 512,
+    "minimum_disk_mb": 256,
+    "recommended_threads": 1,
+    "gpu": "none"
+  },
+  "files": [
+    {
+      "path": "dependencies.lock.json",
+      "sha256": "76a553f8cf6069a7210f885bd02d6af2024992e23a6a903fd56eddbfa51f7d96"
+    },
+    {
+      "path": "NOTICE.md",
+      "sha256": "e82f01c65f73814d4026bcf985381c704125d6b0cf9cf732a205d2b381b091d0"
+    },
+    {
+      "path": "README.md",
+      "sha256": "70695057a67effdd362098495af848c15a93667b3c409d033d5367ec4b069bf0"
+    },
+    {
+      "path": "schemas/input.schema.json",
+      "sha256": "927a1690c3913b2f55a3b9f744958d44faf755cba1768e4971e5453443ae7daa"
+    },
+    {
+      "path": "schemas/output.schema.json",
+      "sha256": "913aabb6e658d9bb5992118af8a57eb3c3a3779cd51a22ef320c231947b697b7"
+    },
+    {
+      "path": "src/run_survival.R",
+      "sha256": "aca9edc4f741b107a9bb08d8aa5d9e3041f0c7b02e17e6ee8b64dfc113dfb45f"
+    },
+    {
+      "path": "tests/test_validation.R",
+      "sha256": "f1b8ee3f6ab43b230f28d66803b673daa22d0188eb1efd1db1ceb264a3c742d6"
+    }
+  ]
+}

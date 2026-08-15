@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from generate_third_party_notices import (
@@ -282,6 +283,257 @@ CHINESE_CAPABILITY_SECTIONS = (
     "故障排除",
 )
 
+# ---------------------------------------------------------------------------
+# P2.5 split-readiness gates.
+#
+# The repository is being split into two independently consumable trees:
+#   * the methods tree: skills/, workflows/, schemas/, capabilities/, docs/,
+#     runtimes/, tools/, profiles/ (plus skill-pack.json), and
+#   * the core tree: engine/, apps/, sdk/.
+# Neither side may reference the other's paths: the methods tree must not name
+# core paths, and the core tree must not compile in methods paths.
+# ---------------------------------------------------------------------------
+
+METHODS_TREE_ROOTS = (
+    "skills/",
+    "workflows/",
+    "schemas/",
+    "capabilities/",
+    "docs/",
+    "runtimes/",
+    "tools/",
+    "profiles/",
+)
+METHODS_TREE_FILE = "skill-pack.json"
+CORE_TREE_ROOTS = ("engine/", "apps/", "sdk/")
+
+# Runtime environment contract names through which the core tree may read the
+# methods tree. References that go through these variables are allowed.
+APPROVED_RUNTIME_ENV_CONTRACTS = (
+    "LINXIRA_BIO_WORKFLOW_ROOT",
+    "LINXIRA_BIO_DOCS_ROOT",
+    "LINXIRA_BIO_CATALOG",
+    "LINXIRA_BIO_WORKER",
+)
+
+# Compile-time references from the core tree into the methods tree that are
+# explicitly approved. Keys are repo-relative file paths; values are path
+# tokens (exact matches, or directory prefixes when the entry ends with "/").
+# Any other methods-tree path token found in the core tree fails the gate.
+CORE_METHODS_REFERENCE_ALLOWLIST = {
+    "engine/crates/linxira-bio-cli/src/main.rs": {
+        # Embedded release snapshots, also resolved at runtime under
+        # LINXIRA_BIO_WORKFLOW_ROOT (approved env contract).
+        "capabilities/catalog.json",
+        "workflows/catalog.json",
+        # Test helper fixture data.
+        "workflows/example/manifest.json",
+    },
+    "engine/crates/linxira-bio-cli/tests/cli.rs": {
+        # Integration tests read a workflow manifest and assert the runtime
+        # catalog source path.
+        "workflows/org.linxira.sequence-conversion-biopython/manifest.json",
+        "capabilities/catalog.json",
+    },
+    "engine/crates/linxira-bio-core/src/environment.rs": {
+        # Embedded release snapshot of the tool catalog.
+        "tools/catalog.json",
+    },
+    "engine/crates/linxira-bio-core/src/native_tools.rs": {
+        # Runtime candidate paths for locating the WGCNA workflow script.
+        "workflows/org.linxira.expression-wgcna/src/run_wgcna.R",
+    },
+    "engine/crates/linxira-bio-core/src/runtime.rs": {
+        # Embedded release snapshot of the runtime catalog.
+        "runtimes/catalog.json",
+    },
+    "engine/crates/linxira-bio-mcp/src/main.rs": {
+        # Embedded release snapshot of the capability catalog.
+        "capabilities/catalog.json",
+    },
+    "engine/crates/linxira-bio-protocol/src/lib.rs": {
+        # Embedded release snapshots of the public schemas.
+        "schemas/job-request.schema.json",
+        "schemas/analysis-result.schema.json",
+        "schemas/artifact.schema.json",
+        "schemas/dataset-manifest.schema.json",
+        "schemas/job-request-v2.schema.json",
+        "schemas/analysis-result-v2.schema.json",
+        "schemas/workflow-pack-manifest.schema.json",
+    },
+    "engine/crates/linxira-bio-worker/src/workflow.rs": {
+        # APPROVED exception: embedded release fallback snapshot of the
+        # workflow catalog; runtime reads go through LINXIRA_BIO_WORKFLOW_ROOT.
+        "workflows/catalog.json",
+    },
+    "engine/crates/linxira-bio-worker/tests/worker.rs": {
+        # Integration tests read workflow pack manifests from the repo.
+        "workflows/org.linxira.bulk-expression-deseq2",
+        "workflows/org.linxira.bulk-expression-deseq2/manifest.json",
+        "workflows/org.linxira.sequence-conversion-biopython/manifest.json",
+    },
+    "apps/linxira-bio-ui/src/docs_snapshot.rs": {
+        # APPROVED exception: offline snapshot fallback of the capability
+        # documentation; runtime reads go through LINXIRA_BIO_DOCS_ROOT.
+        "docs/capabilities/",
+    },
+    "apps/linxira-bio-ui/src/main.rs": {
+        # Test writes an external documentation root under capabilities/.
+        "capabilities/sequence.stats.v1",
+    },
+    "sdk/python/linxira_bio/catalog.py": {
+        # Runtime catalog resolution relative to the installed package
+        # (LINXIRA_BIO_CATALOG approved env contract).
+        "capabilities/catalog.json",
+    },
+}
+
+_PATH_SEGMENT_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyz"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "0123456789._/-"
+)
+
+
+def _is_path_segment_char(character: str) -> bool:
+    return character in _PATH_SEGMENT_CHARS
+
+
+def _is_root_reference_start(line: str, position: int) -> bool:
+    """True when a root match at `position` starts a repo-root-level path."""
+    if position == 0:
+        return True
+    before = line[:position]
+    if not _is_path_segment_char(before[-1]):
+        return True
+    # A `../` chain also dereferences from the repo root (e.g.
+    # `include_str!("../../../../capabilities/catalog.json")`).
+    return re.search(r"(?:\.\./)+$", before) is not None
+
+
+def _path_reference_tokens(
+    line: str, roots: tuple[str, ...]
+) -> list[tuple[str, int]]:
+    """Path-like tokens starting with any of `roots`, with their positions."""
+    tokens: list[tuple[str, int]] = []
+    for root in roots:
+        start = 0
+        while True:
+            position = line.find(root, start)
+            if position < 0:
+                break
+            end = position + len(root)
+            while end < len(line) and _is_path_segment_char(line[end]):
+                end += 1
+            token = line[position:end]
+            if (
+                len(token) > len(root)
+                and _is_root_reference_start(line, position)
+            ):
+                tokens.append((token, position))
+            start = end
+    return tokens
+
+
+def _iter_repo_text_files(relative_root: str) -> list[tuple[Path, str]]:
+    """Text files under `relative_root`; binary files are skipped."""
+    files: list[tuple[Path, str]] = []
+    root = ROOT / relative_root
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        try:
+            content = path.read_bytes()
+        except OSError:
+            continue
+        if b"\x00" in content:
+            continue
+        files.append((path, content.decode("utf-8", errors="replace")))
+    return files
+
+
+def _is_mcp_method_token(token: str) -> bool:
+    """MCP JSON-RPC method names such as `tools/list` are not repo paths."""
+    return re.fullmatch(r"tools/[a-z_]+", token) is not None
+
+
+def _methods_references(text: str) -> list[tuple[int, str]]:
+    """(line, token) references to the methods tree found in `text`."""
+    found: list[tuple[int, str]] = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        for token, position in _path_reference_tokens(line, METHODS_TREE_ROOTS):
+            if "://" in line[:position]:
+                continue  # URL, not a repo path.
+            if _is_mcp_method_token(token):
+                continue  # MCP JSON-RPC method name, not a repo path.
+            found.append((line_number, token))
+        if METHODS_TREE_FILE in line:
+            found.append((line_number, METHODS_TREE_FILE))
+    return found
+
+
+def validate_core_tree_self_containment() -> None:
+    """The core tree must not reference methods-tree paths (P2.5 gate)."""
+    violations: list[str] = []
+    for relative_root in CORE_TREE_ROOTS:
+        for path, text in _iter_repo_text_files(relative_root):
+            relative = display_path(path)
+            allowed = CORE_METHODS_REFERENCE_ALLOWLIST.get(relative, ())
+            for line_number, token in _methods_references(text):
+                if any(
+                    allowed_token == token
+                    or (
+                        allowed_token.endswith("/")
+                        and token.startswith(allowed_token)
+                    )
+                    for allowed_token in allowed
+                ):
+                    continue
+                violations.append(
+                    f"{relative}:{line_number}: references the methods tree: "
+                    f"{token!r}"
+                )
+    if violations:
+        raise ValueError(
+            "core tree must be self-contained: engine/, apps/, and sdk/ may "
+            "only read the methods tree through the approved runtime env "
+            f"contracts {', '.join(APPROVED_RUNTIME_ENV_CONTRACTS)}; offending "
+            "compile-time/path references:\n" + "\n".join(violations)
+        )
+
+
+def _is_path_style_reference(line: str, position: int) -> bool:
+    """True when the token at `position` is a path reference, not prose."""
+    before = line[:position]
+    if "://" in before:
+        return False  # URL.
+    return before.endswith(('"', "'", "`")) or before.endswith("](")
+
+
+def validate_methods_tree_self_containment() -> None:
+    """Methods trees must not reference engine/, apps/, or sdk/ paths."""
+    violations: list[str] = []
+    for relative_root in METHODS_TREE_ROOTS:
+        for path, text in _iter_repo_text_files(relative_root):
+            relative = display_path(path)
+            for line_number, line in enumerate(text.splitlines(), start=1):
+                for token, position in _path_reference_tokens(
+                    line, CORE_TREE_ROOTS
+                ):
+                    if not _is_path_style_reference(line, position):
+                        continue
+                    violations.append(
+                        f"{relative}:{line_number}: references a core path: "
+                        f"{token!r}"
+                    )
+    if violations:
+        raise ValueError(
+            "methods tree must be self-contained: skills/, workflows/, "
+            "schemas/, capabilities/, docs/, runtimes/, tools/, and profiles/ "
+            "must not reference engine/, apps/, or sdk/ paths; offending "
+            "references:\n" + "\n".join(violations)
+        )
+
 
 def load_json(relative_path: str) -> object:
     path = ROOT / relative_path
@@ -516,6 +768,8 @@ def validate_embedded_docs_snapshot() -> None:
 
 
 def validate() -> None:
+    validate_methods_tree_self_containment()
+    validate_core_tree_self_containment()
     schema_count, schema_instance_count, format_check_count = validate_schema_contracts()
     validate_embedded_docs_snapshot()
     catalog = load_json("capabilities/catalog.json")
