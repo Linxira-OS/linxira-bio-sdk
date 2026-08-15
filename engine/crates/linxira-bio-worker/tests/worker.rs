@@ -1894,6 +1894,78 @@ fn executes_sequence_convert_workflows_with_isolated_python() {
 }
 
 #[test]
+fn rejects_a_workflow_pack_whose_core_compatibility_excludes_this_build() {
+    let root = workspace_root();
+    let stub_root = std::env::temp_dir().join(format!(
+        "linxira-bio-worker-core-compat-{}",
+        std::process::id()
+    ));
+    if stub_root.exists() {
+        std::fs::remove_dir_all(&stub_root).expect("remove stale core compat directory");
+    }
+    let pack_root = stub_root.join("org.linxira.bulk-expression-deseq2");
+    std::fs::create_dir_all(&pack_root).expect("create temporary workflow root");
+    let source = root.join("workflows/org.linxira.bulk-expression-deseq2");
+    for entry in std::fs::read_dir(&source).expect("read source pack") {
+        let entry = entry.expect("pack entry");
+        if entry.file_name() == "target" {
+            continue;
+        }
+        let target = pack_root.join(entry.file_name());
+        if entry.path().is_dir() {
+            std::fs::create_dir_all(&target).expect("create pack subdirectory");
+            for child in std::fs::read_dir(entry.path()).expect("read pack subdirectory") {
+                let child = child.expect("pack subdirectory entry");
+                std::fs::copy(child.path(), target.join(child.file_name()))
+                    .expect("copy pack subdirectory file");
+            }
+        } else {
+            std::fs::copy(entry.path(), target).expect("copy pack file");
+        }
+    }
+    let manifest_path = pack_root.join("manifest.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&manifest_path).expect("read copied manifest"))
+            .expect("parse copied manifest");
+    manifest["runtime"]["core_compatibility"] = serde_json::json!(">=9.0.0,<10.0.0");
+    std::fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&manifest).expect("serialize manifest"),
+    )
+    .expect("rewrite copied manifest");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(root.join("tests/fixtures/jobs/expression-differential-v2.json"))
+        .env("LINXIRA_BIO_WORKFLOW_ROOT", &stub_root)
+        .env_remove("LINXIRA_BIO_WORKFLOW_R")
+        .output()
+        .expect("run incompatible-core workflow");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("workflow_failed envelope");
+    assert_eq!(result["status"], "error");
+    assert_eq!(result["capability"], "expression.differential.v1");
+    assert!(result["diagnostics"].as_array().is_some_and(|diagnostics| {
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic["code"] == "workflow_failed"
+                && diagnostic["severity"] == "error"
+                && diagnostic["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("requires core"))
+        })
+    }));
+    assert_eq!(
+        result["provenance"]["core_version"].as_str(),
+        Some(env!("CARGO_PKG_VERSION"))
+    );
+    std::fs::remove_dir_all(stub_root).expect("remove core compat directory");
+}
+
+#[test]
 fn executes_closest_interval_and_preranked_gsea_jobs() {
     let root = workspace_root();
     let closest_output = root.join("target/test-results/interval-closest-v2.tsv");

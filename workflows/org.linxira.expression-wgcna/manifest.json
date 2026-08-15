@@ -1,5 +1,5 @@
 {
-  "schema_version": "1",
+  "schema_version": "2",
   "id": "org.linxira.expression-wgcna",
   "version": "0.1.0",
   "publisher": {
@@ -20,6 +20,7 @@
   "runtime": {
     "kind": "r",
     "version": ">=4.6.1,<4.7.0",
+    "core_compatibility": ">=0.1.0,<1.0.0",
     "dependency_lock": {
       "path": "dependencies.lock.json",
       "sha256": "2ea71c51cfab826da0f80b3ce3f634cffe5ac1c5a29a04b0f5fc13b0e97fb5eb"
@@ -71,7 +72,7 @@
     },
     {
       "path": "src/run_wgcna.R",
-      "sha256": "0fc5a16817cc9fa05bdc4e70ac889cfb92b16f677c8f02d5d929f15082c47baa"
+      "sha256": "0ab8df2350addd407bee940be9656c02be5bd0b8e7b432e1434a57ca0aef925e"
     },
     {
       "path": "tests/test_validation.R",

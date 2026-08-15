@@ -1952,6 +1952,74 @@ fn compile_native_tool_stub(root: &std::path::Path, output_root: &std::path::Pat
     executable
 }
 
+#[test]
+fn capabilities_command_uses_the_runtime_catalog_when_workflow_root_is_configured() {
+    let temporary = temporary_directory("runtime-capability-catalog");
+    let catalog_dir = temporary.join("capabilities");
+    fs::create_dir(&catalog_dir).expect("create capabilities directory");
+    fs::write(
+        catalog_dir.join("catalog.json"),
+        serde_json::json!({
+            "schema_version": "1",
+            "product": "linxira-bio-sdk",
+            "capabilities": [{
+                "id": "test.runtime-catalog.v1",
+                "status": "available",
+                "category": "system",
+                "default_execution": "local-cpu",
+                "command": "linxira-bio capabilities --json"
+            }]
+        })
+        .to_string(),
+    )
+    .expect("write runtime capability catalog");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["capabilities", "--json"])
+        .env("LINXIRA_BIO_WORKFLOW_ROOT", &temporary)
+        .output()
+        .expect("list runtime capabilities");
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let catalog: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("capability catalog JSON");
+    let capabilities = catalog["capabilities"]
+        .as_array()
+        .expect("capability array");
+    assert!(capabilities.iter().any(|capability| {
+        capability["id"] == "test.runtime-catalog.v1" && capability["status"] == "available"
+    }));
+    assert!(
+        capabilities
+            .iter()
+            .all(|capability| capability["id"] != "sequence.stats.v1")
+    );
+
+    let text = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["capabilities"])
+        .env("LINXIRA_BIO_WORKFLOW_ROOT", &temporary)
+        .output()
+        .expect("list runtime capabilities as text");
+    assert!(text.status.success());
+    let stdout = String::from_utf8(text.stdout).expect("UTF-8 capability listing");
+    assert!(stdout.contains("test.runtime-catalog.v1"));
+    let canonical_root = temporary.canonicalize().expect("canonical catalog root");
+    let expected_source = format!(
+        "Catalog source: {} (runtime)",
+        canonical_root.join("capabilities/catalog.json").display()
+    );
+    assert!(
+        stdout.contains(&expected_source),
+        "expected runtime catalog source annotation, got: {stdout}"
+    );
+
+    fs::remove_dir_all(temporary).expect("remove runtime catalog test directory");
+}
+
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")

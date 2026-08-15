@@ -2,6 +2,10 @@
 
 //! Stable job and result contracts shared by CLI, GUI, workers, and agents.
 
+//! Shared protocol types for Linxira Bio jobs, results, and workflow packs.
+
+pub mod semver_range;
+
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -308,6 +312,8 @@ pub struct ProvenanceV2 {
     pub engine_version: String,
     pub execution_mode: ExecutionMode,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub core_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub started_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finished_at: Option<String>,
@@ -391,6 +397,7 @@ fn provenance_v2(execution_mode: ExecutionMode) -> ProvenanceV2 {
     ProvenanceV2 {
         engine_version: env!("CARGO_PKG_VERSION").to_owned(),
         execution_mode,
+        core_version: Some(env!("CARGO_PKG_VERSION").to_owned()),
         started_at: None,
         finished_at: None,
         software: Vec::new(),
@@ -426,6 +433,7 @@ pub struct DependencyLock {
 pub struct WorkflowRuntime {
     pub kind: WorkflowRuntimeKind,
     pub version: String,
+    pub core_compatibility: String,
     pub dependency_lock: DependencyLock,
 }
 
@@ -680,7 +688,7 @@ mod tests {
     fn workflow_pack_manifest_captures_runtime_and_permissions() {
         let manifest: WorkflowPackManifest = serde_json::from_str(
             r#"{
-                "schema_version": "1",
+                "schema_version": "2",
                 "id": "org.linxira.bulk-expression-deseq2",
                 "version": "1.0.0",
                 "publisher": {"name": "Linxira OS", "url": "https://linxira.org"},
@@ -689,6 +697,7 @@ mod tests {
                 "runtime": {
                     "kind": "r",
                     "version": ">=4.4,<5",
+                    "core_compatibility": ">=0.1.0,<1.0.0",
                     "dependency_lock": {"path": "renv.lock", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
                 },
                 "input_schema": {"type": "object"},
@@ -705,8 +714,32 @@ mod tests {
         .expect("valid workflow pack manifest");
 
         assert_eq!(manifest.runtime.kind, WorkflowRuntimeKind::R);
+        assert_eq!(manifest.runtime.core_compatibility, ">=0.1.0,<1.0.0");
         assert_eq!(manifest.network.access, NetworkAccess::None);
         assert_eq!(manifest.files.len(), 2);
+    }
+
+    #[test]
+    fn v2_envelope_provenance_records_core_version() {
+        let result = AnalysisResultV2::ok(
+            "job-1",
+            "sequence.stats.v1",
+            serde_json::json!({"sequence_count": 3}),
+            ExecutionMode::LocalCpu,
+        );
+        let serialized = serde_json::to_string(&result).expect("serialize envelope");
+        let parsed: AnalysisResultV2<serde_json::Value> =
+            serde_json::from_str(&serialized).expect("parse envelope");
+        assert_eq!(
+            parsed.provenance.core_version.as_deref(),
+            Some(env!("CARGO_PKG_VERSION"))
+        );
+        // Legacy envelopes without core_version still parse.
+        let legacy: AnalysisResultV2<serde_json::Value> = serde_json::from_str(
+            r#"{"schema_version":"2","job_id":"job-1","capability":"sequence.stats.v1","status":"ok","result":{},"artifacts":[],"provenance":{"engine_version":"0.1.1","execution_mode":"local-cpu"},"diagnostics":[]}"#,
+        )
+        .expect("legacy envelope parses");
+        assert_eq!(legacy.provenance.core_version, None);
     }
 
     #[test]

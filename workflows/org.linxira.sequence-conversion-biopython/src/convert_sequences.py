@@ -52,6 +52,10 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def core_version() -> str:
+    return os.environ.get("LINXIRA_BIO_CORE_VERSION", "unknown")
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -377,9 +381,10 @@ def success_result(
                 "sha256": output_sha256,
             }
         ],
-        "provenance": {
+            "provenance": {
             "engine_version": PACK_VERSION,
             "execution_mode": "local-cpu",
+            "core_version": core_version(),
             "started_at": started_at,
             "finished_at": utc_now(),
             "software": [
@@ -406,6 +411,7 @@ def error_result(job_id: str, message: str, started_at: str) -> dict[str, Any]:
         "provenance": {
             "engine_version": PACK_VERSION,
             "execution_mode": "local-cpu",
+            "core_version": core_version(),
             "started_at": started_at,
             "finished_at": utc_now(),
         },

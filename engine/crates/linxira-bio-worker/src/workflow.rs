@@ -1,8 +1,9 @@
 use super::{WorkerResult, sha256_file, validate_v1_multi_input_contract};
 use linxira_bio_protocol::{
     AnalysisResultV2, ArtifactFile, BioDataFormat, CompressionFormat, DiagnosticSeverity,
-    InputArtifact, InputCardinality, JobRequest, JobRequestV2, JobStatus, NetworkAccess,
-    OutputArtifactKind, WorkflowPackManifest, WorkflowRuntimeKind,
+    ExecutionMode, InputArtifact, InputCardinality, JobRequest, JobRequestV2, JobStatus,
+    NetworkAccess, OutputArtifactKind, WorkflowPackManifest, WorkflowRuntimeKind,
+    semver_range::core_compatibility_matches,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -370,7 +371,18 @@ fn execute_prepared_request(
     contract: &WorkflowContract,
     prepared: PreparedWorkflowRequest,
 ) -> WorkerResult<String> {
-    let pack = load_verified_workflow_pack(contract)?;
+    let pack = match load_verified_workflow_pack(contract) {
+        Ok(pack) => pack,
+        Err(error) => {
+            return Ok(serde_json::to_string(&AnalysisResultV2::error(
+                prepared.request.job_id,
+                prepared.request.capability,
+                "workflow_failed",
+                error.to_string(),
+                ExecutionMode::LocalCpu,
+            ))?);
+        }
+    };
     let temporary = TemporaryRequestDirectory::create()?;
     let request_path = temporary.write_request(&prepared.request)?;
     let mut output_directory = WorkflowOutputDirectory::new(prepared.output_directory.clone());
@@ -393,6 +405,7 @@ fn execute_prepared_request(
         .arg("--result")
         .arg(&result_path)
         .current_dir(&pack.root)
+        .env("LINXIRA_BIO_CORE_VERSION", env!("CARGO_PKG_VERSION"))
         .output()?;
 
     if !result_path.is_file() {
@@ -479,6 +492,9 @@ fn validate_success_result(
     if result.provenance.input_sha256 != prepared.role_hashes {
         return Err("workflow provenance input hashes do not match verified inputs".into());
     }
+    if result.provenance.core_version.as_deref() != Some(env!("CARGO_PKG_VERSION")) {
+        return Err("workflow provenance core version does not match this build".into());
+    }
     if result.provenance.dependency_lock_sha256.as_deref()
         != Some(pack.dependency_lock_sha256.as_str())
     {
@@ -555,7 +571,7 @@ fn load_verified_workflow_pack(contract: &WorkflowContract) -> WorkerResult<Veri
     let pack_root = safe_pack_path(&workflow_root, contract.pack_directory)?;
     let manifest_path = safe_pack_path(&pack_root, BULK_EXPRESSION_MANIFEST)?;
     let manifest: WorkflowPackManifest = serde_json::from_slice(&fs::read(&manifest_path)?)?;
-    if manifest.schema_version != "1"
+    if manifest.schema_version != "2"
         || manifest.id != contract.pack_id
         || manifest.runtime.kind != contract.runtime
         || manifest.network.access != NetworkAccess::None
@@ -563,6 +579,18 @@ fn load_verified_workflow_pack(contract: &WorkflowContract) -> WorkerResult<Veri
         return Err(format!(
             "workflow manifest identity or policy is invalid: {}",
             manifest_path.display()
+        )
+        .into());
+    }
+    if !core_compatibility_matches(
+        &manifest.runtime.core_compatibility,
+        env!("CARGO_PKG_VERSION"),
+    ) {
+        return Err(format!(
+            "workflow pack {} requires core {} but this build is {}",
+            manifest.id,
+            manifest.runtime.core_compatibility,
+            env!("CARGO_PKG_VERSION")
         )
         .into());
     }
@@ -824,7 +852,7 @@ mod tests {
         let script_hash = format!("{:x}", Sha256::digest(b"original\n"));
         let lock_hash = format!("{:x}", Sha256::digest(b"{}\n"));
         let manifest: WorkflowPackManifest = serde_json::from_value(serde_json::json!({
-            "schema_version": "1",
+            "schema_version": "2",
             "id": "org.linxira.test",
             "version": "1.0.0",
             "publisher": {"name": "Linxira OS"},
@@ -836,6 +864,7 @@ mod tests {
             "runtime": {
                 "kind": "r",
                 "version": ">=4.6.1,<4.7.0",
+                "core_compatibility": ">=0.1.0,<1.0.0",
                 "dependency_lock": {"path": "dependencies.lock.json", "sha256": lock_hash}
             },
             "input_schema": {},
