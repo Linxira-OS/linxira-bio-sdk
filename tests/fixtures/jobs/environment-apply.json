@@ -1,0 +1,13 @@
+{
+  "schema_version": "1",
+  "job_id": "environment-apply-test",
+  "capability": "environment.apply.v1",
+  "inputs": {},
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "profile": "local-core",
+    "mode": "use-existing"
+  }
+}

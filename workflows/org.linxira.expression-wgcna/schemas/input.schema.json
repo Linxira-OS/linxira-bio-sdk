@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/workflows/expression-wgcna/input.v1.json",
+  "type": "object",
+  "required": ["schema_version", "job_id", "capability", "inputs", "execution", "parameters"],
+  "properties": {
+    "schema_version": { "const": "2" },
+    "job_id": { "type": "string", "minLength": 1 },
+    "capability": {
+      "enum": ["expression.wgcna.v1"]
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": { "$ref": "#/$defs/inputArtifact" },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "required": ["role"],
+            "properties": { "role": { "const": "expression" } }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    },
+    "execution": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": { "mode": { "const": "local-cpu" } },
+      "additionalProperties": false
+    },
+    "parameters": {
+      "type": "object",
+      "required": ["output_directory"],
+      "properties": {
+        "output_directory": { "type": "string", "minLength": 1 },
+        "min_expression": { "type": "number", "minimum": 0, "default": 1 },
+        "min_samples": { "type": "integer", "minimum": 0, "default": 3 },
+        "min_module_size": { "type": "integer", "minimum": 0, "default": 30 },
+        "merge_cut_height": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.25 },
+        "network_type": { "enum": ["unsigned", "signed", "signed hybrid"], "default": "signed" },
+        "power": { "type": "integer", "minimum": 0, "default": 0 },
+        "log_transform": { "type": "boolean", "default": true },
+        "threads": { "type": "integer", "minimum": 0, "default": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "inputArtifact": {
+      "type": "object",
+      "required": ["artifact_id", "role", "cardinality", "files"],
+      "properties": {
+        "artifact_id": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["expression"] },
+        "cardinality": { "const": "single" },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["file_id", "path", "format", "compression", "size_bytes"],
+            "properties": {
+              "file_id": { "type": "string", "minLength": 1 },
+              "path": { "type": "string", "minLength": 1 },
+              "format": { "enum": ["csv", "tsv"] },
+              "compression": { "const": "none" },
+              "size_bytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740992 },
+              "sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

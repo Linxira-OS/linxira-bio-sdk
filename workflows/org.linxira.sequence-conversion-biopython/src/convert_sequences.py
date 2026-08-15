@@ -52,6 +52,10 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def core_version() -> str:
+    return os.environ.get("LINXIRA_BIO_CORE_VERSION", "unknown")
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -310,10 +314,26 @@ def convert_atomic(config: dict[str, Any], started_at: str) -> dict[str, Any]:
     )
     staged_output = staging / config["output_filename"]
     try:
-        records = SeqIO.convert(
-            str(input_path), config["input_format"], str(staged_output), config["output_format"]
-        )
-        with staged_output.open("rb") as handle:
+        if config["output_format"] in {"genbank", "embl"}:
+            # FASTA records cannot carry a molecule type, and Biopython's
+            # GenBank writer rejects records without one. Default absent
+            # annotations to DNA; declared molecule types are preserved.
+            # Write via a str path so Biopython manages the file handle the
+            # same way SeqIO.convert does (per-record handle writes fail
+            # with "Bad file descriptor" in Biopython 1.85 on Windows).
+            records_list = list(SeqIO.parse(str(input_path), config["input_format"]))
+            for record in records_list:
+                record.annotations.setdefault("molecule_type", "DNA")
+            records = SeqIO.write(
+                records_list, str(staged_output), config["output_format"]
+            )
+        else:
+            records = SeqIO.convert(
+                str(input_path), config["input_format"], str(staged_output), config["output_format"]
+            )
+        # Windows os.fsync requires a writable handle; a read-only "rb"
+        # handle raises EBADF ("Bad file descriptor") for the CRT _commit.
+        with staged_output.open("r+b") as handle:
             os.fsync(handle.fileno())
         if sha256_file(input_path) != input_sha256:
             raise RequestError("input file changed while conversion was running")
@@ -361,9 +381,10 @@ def success_result(
                 "sha256": output_sha256,
             }
         ],
-        "provenance": {
+            "provenance": {
             "engine_version": PACK_VERSION,
             "execution_mode": "local-cpu",
+            "core_version": core_version(),
             "started_at": started_at,
             "finished_at": utc_now(),
             "software": [
@@ -390,6 +411,7 @@ def error_result(job_id: str, message: str, started_at: str) -> dict[str, Any]:
         "provenance": {
             "engine_version": PACK_VERSION,
             "execution_mode": "local-cpu",
+            "core_version": core_version(),
             "started_at": started_at,
             "finished_at": utc_now(),
         },

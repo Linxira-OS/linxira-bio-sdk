@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{fs, process};
@@ -47,7 +47,7 @@ fn lists_bundled_workflow_packs_without_claiming_installation() {
             && pack["capability"] == "expression.differential.v1"
             && pack["capability_aliases"]
                 == serde_json::json!(["medical.bulk-rnaseq.v1", "expression.deseq2.v1"])
-            && pack["status"] == "cataloged"
+            && pack["status"] == "installable"
             && pack["runtime"] == "r"
     }));
 }
@@ -140,6 +140,14 @@ fn workflow_runner_returns_the_packed_python_result_envelope() {
         .arg(&request)
         .arg(&result)
         .env("LINXIRA_BIO_WORKFLOW_ROOT", root.join("workflows"))
+        .env(
+            "LINXIRA_BIO_WORKFLOW_PYTHON",
+            compile_workflow_stub(&root, &temporary),
+        )
+        .env(
+            "LINXIRA_BIO_RSCRIPT_STUB_LOCK_SHA256",
+            convert_lock_sha256(&root),
+        )
         .output()
         .expect("run packed Python workflow");
 
@@ -148,12 +156,46 @@ fn workflow_runner_returns_the_packed_python_result_envelope() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("workflow JSON");
+    let result: serde_json::Value = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .rev()
+        .find_map(|line| serde_json::from_str(line).ok())
+        .expect("workflow JSON");
     assert_eq!(result["schema_version"], "2");
     assert_eq!(result["job_id"], "workflow-python-envelope");
     assert_eq!(result["capability"], "sequence.convert.biopython.v1");
-    assert!(matches!(result["status"].as_str(), Some("ok" | "error")));
+    assert_eq!(result["status"], "ok");
+    assert!(output_directory.join("converted.fasta").is_file());
     fs::remove_dir_all(temporary).expect("remove workflow test directory");
+}
+
+fn compile_workflow_stub(root: &Path, output_root: &Path) -> PathBuf {
+    let executable = output_root.join(format!("workflow-stub{}", std::env::consts::EXE_SUFFIX));
+    let output = Command::new("rustc")
+        .args(["--edition", "2021"])
+        .arg(root.join("tests/fixtures/workflows/rscript_stub.rs"))
+        .arg("-o")
+        .arg(&executable)
+        .output()
+        .expect("compile workflow stub");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    executable
+}
+
+fn convert_lock_sha256(root: &Path) -> String {
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &fs::read(root.join("workflows/org.linxira.sequence-conversion-biopython/manifest.json"))
+            .expect("read sequence convert manifest"),
+    )
+    .expect("parse sequence convert manifest");
+    manifest["runtime"]["dependency_lock"]["sha256"]
+        .as_str()
+        .expect("manifest dependency lock hash")
+        .to_owned()
 }
 
 #[test]
@@ -1461,6 +1503,52 @@ fn sequence_transforms_reject_invalid_options_and_existing_outputs() {
 }
 
 #[test]
+fn sequence_convert_rejects_invalid_formats_and_existing_outputs() {
+    let root = temporary_directory("sequence-convert-errors");
+    let input = root.join("input.fa");
+    let protected = root.join("protected.fa");
+    fs::write(&input, b">sequence\nACGT\n").expect("write input FASTA");
+    fs::write(&protected, b"do not replace\n").expect("write protected output");
+
+    let overwrite = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "convert"])
+        .arg(&input)
+        .arg(&protected)
+        .args(["--output-format", "fasta"])
+        .output()
+        .expect("run protected sequence convert");
+    assert!(!overwrite.status.success());
+    assert!(String::from_utf8_lossy(&overwrite.stderr).contains("refusing to overwrite"));
+    assert_eq!(
+        fs::read_to_string(&protected).expect("protected output remains"),
+        "do not replace\n"
+    );
+
+    let unknown_format = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "convert"])
+        .arg(&input)
+        .arg(root.join("out.fa"))
+        .args(["--output-format", "gff"])
+        .output()
+        .expect("run sequence convert with an unknown format");
+    assert!(!unknown_format.status.success());
+    assert!(
+        String::from_utf8_lossy(&unknown_format.stderr).contains("unsupported sequence format")
+    );
+
+    let missing_input = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "convert"])
+        .arg(root.join("missing.fa"))
+        .arg(root.join("out.fa"))
+        .output()
+        .expect("run sequence convert with a missing input");
+    assert!(!missing_input.status.success());
+    assert!(String::from_utf8_lossy(&missing_input.stderr).contains("does not exist"));
+
+    fs::remove_dir_all(root).expect("remove sequence convert error directory");
+}
+
+#[test]
 fn functional_annotation_and_enrichment_commands_emit_versioned_json() {
     let workspace = workspace_root();
     let fixtures = workspace.join("tests/fixtures/functional");
@@ -1862,6 +1950,74 @@ fn compile_native_tool_stub(root: &std::path::Path, output_root: &std::path::Pat
         String::from_utf8_lossy(&output.stderr)
     );
     executable
+}
+
+#[test]
+fn capabilities_command_uses_the_runtime_catalog_when_workflow_root_is_configured() {
+    let temporary = temporary_directory("runtime-capability-catalog");
+    let catalog_dir = temporary.join("capabilities");
+    fs::create_dir(&catalog_dir).expect("create capabilities directory");
+    fs::write(
+        catalog_dir.join("catalog.json"),
+        serde_json::json!({
+            "schema_version": "1",
+            "product": "linxira-bio-sdk",
+            "capabilities": [{
+                "id": "test.runtime-catalog.v1",
+                "status": "available",
+                "category": "system",
+                "default_execution": "local-cpu",
+                "command": "linxira-bio capabilities --json"
+            }]
+        })
+        .to_string(),
+    )
+    .expect("write runtime capability catalog");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["capabilities", "--json"])
+        .env("LINXIRA_BIO_WORKFLOW_ROOT", &temporary)
+        .output()
+        .expect("list runtime capabilities");
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let catalog: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("capability catalog JSON");
+    let capabilities = catalog["capabilities"]
+        .as_array()
+        .expect("capability array");
+    assert!(capabilities.iter().any(|capability| {
+        capability["id"] == "test.runtime-catalog.v1" && capability["status"] == "available"
+    }));
+    assert!(
+        capabilities
+            .iter()
+            .all(|capability| capability["id"] != "sequence.stats.v1")
+    );
+
+    let text = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["capabilities"])
+        .env("LINXIRA_BIO_WORKFLOW_ROOT", &temporary)
+        .output()
+        .expect("list runtime capabilities as text");
+    assert!(text.status.success());
+    let stdout = String::from_utf8(text.stdout).expect("UTF-8 capability listing");
+    assert!(stdout.contains("test.runtime-catalog.v1"));
+    let canonical_root = temporary.canonicalize().expect("canonical catalog root");
+    let expected_source = format!(
+        "Catalog source: {} (runtime)",
+        canonical_root.join("capabilities/catalog.json").display()
+    );
+    assert!(
+        stdout.contains(&expected_source),
+        "expected runtime catalog source annotation, got: {stdout}"
+    );
+
+    fs::remove_dir_all(temporary).expect("remove runtime catalog test directory");
 }
 
 fn workspace_root() -> PathBuf {

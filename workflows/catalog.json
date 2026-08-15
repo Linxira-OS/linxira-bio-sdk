@@ -34,10 +34,18 @@
         "medical.bulk-rnaseq.v1",
         "expression.deseq2.v1"
       ],
-      "status": "cataloged",
+      "status": "installable",
       "trust": "official",
       "runtime": "r",
       "manifest": "workflows/org.linxira.bulk-expression-deseq2/manifest.json"
+    },
+    {
+      "id": "org.linxira.expression-wgcna",
+      "capability": "expression.wgcna.v1",
+      "status": "installable",
+      "trust": "official",
+      "runtime": "r",
+      "manifest": "workflows/org.linxira.expression-wgcna/manifest.json"
     }
   ]
 }

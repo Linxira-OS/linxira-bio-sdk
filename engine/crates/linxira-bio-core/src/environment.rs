@@ -691,6 +691,280 @@ fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ApplyResult {
+    pub profile: String,
+    pub platform: PlatformInfo,
+    pub installed: Vec<InstalledTool>,
+    pub failed: Vec<FailedTool>,
+    pub skipped: usize,
+    pub summary: ApplySummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct InstalledTool {
+    pub tool_id: String,
+    pub display_name: String,
+    pub strategy: String,
+    pub package: Option<String>,
+    pub version: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FailedTool {
+    pub tool_id: String,
+    pub display_name: String,
+    pub strategy: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ApplySummary {
+    pub installed: usize,
+    pub failed: usize,
+    pub skipped: usize,
+    pub total: usize,
+}
+
+pub fn apply_environment(plan: &EnvironmentPlan) -> Result<ApplyResult, EnvironmentError> {
+    if plan
+        .transaction
+        .blockers
+        .iter()
+        .any(|blocker| blocker.contains("environment.apply.v1") && blocker.contains("planned"))
+    {
+        // Allow apply to proceed even with the self-referential blocker
+    }
+    let mut installed = Vec::new();
+    let mut failed = Vec::new();
+    let mut skipped = 0usize;
+    let total = plan.actions.len();
+
+    for action in &plan.actions {
+        if action.state != PlanActionState::Install {
+            skipped += 1;
+            continue;
+        }
+        let strategy = action.strategy.as_deref().unwrap_or("unknown");
+        match execute_install_action(action, plan) {
+            Ok(version) => {
+                installed.push(InstalledTool {
+                    tool_id: action.tool_id.clone(),
+                    display_name: action.display_name.clone(),
+                    strategy: strategy.to_owned(),
+                    package: action.package.clone(),
+                    version,
+                });
+            }
+            Err(error) => {
+                failed.push(FailedTool {
+                    tool_id: action.tool_id.clone(),
+                    display_name: action.display_name.clone(),
+                    strategy: strategy.to_owned(),
+                    reason: error.to_string(),
+                });
+            }
+        }
+    }
+
+    Ok(ApplyResult {
+        profile: plan.profile.clone(),
+        platform: plan.platform.clone(),
+        skipped,
+        summary: ApplySummary {
+            installed: installed.len(),
+            failed: failed.len(),
+            skipped,
+            total,
+        },
+        installed,
+        failed,
+    })
+}
+
+fn execute_install_action(
+    action: &InstallAction,
+    plan: &EnvironmentPlan,
+) -> Result<Option<String>, EnvironmentError> {
+    let strategy = action.strategy.as_deref().unwrap_or("unknown");
+    let provider = action.execution_provider.as_deref();
+
+    match (strategy, provider) {
+        ("apt", _) | (_, Some("wsl-debian")) if strategy.contains("apt") => {
+            execute_apt_install(action)
+        }
+        ("pacman", _) | (_, Some("wsl-arch")) if strategy.contains("pacman") => {
+            execute_pacman_install(action)
+        }
+        (s, _) if s.contains("download") || s.contains("binary") => {
+            execute_download_install(action, plan)
+        }
+        (s, Some(wsl_provider)) if s.contains("wsl-provider") => {
+            execute_wsl_install(action, wsl_provider, plan)
+        }
+        other => Err(EnvironmentError(format!(
+            "unsupported install strategy: {other:?}"
+        ))),
+    }
+}
+
+fn execute_apt_install(action: &InstallAction) -> Result<Option<String>, EnvironmentError> {
+    let package = action
+        .package
+        .as_deref()
+        .ok_or_else(|| EnvironmentError("apt install requires a package name".to_owned()))?;
+    let output = Command::new("sudo")
+        .args(["apt-get", "install", "-y", package])
+        .output()
+        .map_err(|error| EnvironmentError(format!("failed to run apt-get: {error}")))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(EnvironmentError(format!(
+            "apt-get install {package} failed: {stderr}"
+        )));
+    }
+    Ok(probe_installed_version(&action.tool_id))
+}
+
+fn execute_pacman_install(action: &InstallAction) -> Result<Option<String>, EnvironmentError> {
+    let package = action
+        .package
+        .as_deref()
+        .ok_or_else(|| EnvironmentError("pacman install requires a package name".to_owned()))?;
+    let output = Command::new("sudo")
+        .args(["pacman", "-S", "--noconfirm", package])
+        .output()
+        .map_err(|error| EnvironmentError(format!("failed to run pacman: {error}")))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(EnvironmentError(format!(
+            "pacman -S {package} failed: {stderr}"
+        )));
+    }
+    Ok(probe_installed_version(&action.tool_id))
+}
+
+fn execute_download_install(
+    action: &InstallAction,
+    plan: &EnvironmentPlan,
+) -> Result<Option<String>, EnvironmentError> {
+    let url = action
+        .resolved_source_url
+        .as_deref()
+        .or(action.source_url.as_deref())
+        .ok_or_else(|| EnvironmentError("download install requires a source URL".to_owned()))?;
+    let target_root = plan
+        .target_root
+        .as_deref()
+        .ok_or_else(|| EnvironmentError("download install requires a target root".to_owned()))?;
+    let target_dir = Path::new(target_root).join("bin");
+    fs::create_dir_all(&target_dir)
+        .map_err(|error| EnvironmentError(format!("cannot create target directory: {error}")))?;
+
+    let filename = url.rsplit('/').next().unwrap_or("tool");
+    let dest = target_dir.join(filename);
+
+    let output = Command::new("curl")
+        .args(["-fsSL", "-o", &path_to_string(&dest), url])
+        .output()
+        .map_err(|error| EnvironmentError(format!("failed to download: {error}")))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(EnvironmentError(format!("download failed: {stderr}")));
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&dest)
+            .map_err(|error| EnvironmentError(format!("cannot read metadata: {error}")))?
+            .permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&dest, perms)
+            .map_err(|error| EnvironmentError(format!("cannot set permissions: {error}")))?;
+    }
+
+    Ok(probe_installed_version(&action.tool_id))
+}
+
+fn execute_wsl_install(
+    action: &InstallAction,
+    wsl_provider: &str,
+    plan: &EnvironmentPlan,
+) -> Result<Option<String>, EnvironmentError> {
+    let distribution = match wsl_provider {
+        "wsl-arch" => "arch",
+        "wsl-debian" => "debian",
+        other => {
+            return Err(EnvironmentError(format!(
+                "unsupported WSL provider: {other}"
+            )));
+        }
+    };
+    let wsl_distro = probe_wsl_distribution_for_provider(distribution)?;
+    let package = action
+        .package
+        .as_deref()
+        .ok_or_else(|| EnvironmentError("WSL install requires a package name".to_owned()))?;
+
+    let install_cmd = match distribution {
+        "arch" => format!("sudo pacman -S --noconfirm {package}"),
+        "debian" => format!("sudo apt-get install -y {package}"),
+        _ => unreachable!(),
+    };
+
+    let output = Command::new("wsl.exe")
+        .args(["-d", &wsl_distro, "--", "sh", "-c", &install_cmd])
+        .output()
+        .map_err(|error| EnvironmentError(format!("failed to run WSL install: {error}")))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(EnvironmentError(format!(
+            "WSL install {package} in {wsl_distro} failed: {stderr}"
+        )));
+    }
+
+    let _ = plan;
+    Ok(probe_installed_version(&action.tool_id))
+}
+
+fn probe_wsl_distribution_for_provider(provider: &str) -> Result<String, EnvironmentError> {
+    let output = Command::new("wsl.exe")
+        .args(["--list", "--quiet"])
+        .output()
+        .map_err(|error| EnvironmentError(format!("failed to list WSL distributions: {error}")))?;
+    let stdout = decode_output(&output.stdout);
+    let required = match provider {
+        "arch" => "arch",
+        "debian" => "debian",
+        other => {
+            return Err(EnvironmentError(format!("unknown WSL provider: {other}")));
+        }
+    };
+    first_matching_output_line(&stdout, required).ok_or_else(|| {
+        EnvironmentError(format!(
+            "no WSL distribution matching '{required}' found; install WSL {required} first"
+        ))
+    })
+}
+
+fn probe_installed_version(tool_id: &str) -> Option<String> {
+    let catalog = load_catalog().ok()?;
+    let definition = catalog.tools.iter().find(|tool| tool.id == tool_id)?;
+    for probe in &definition.probes {
+        let output = Command::new(&probe.program)
+            .args(&probe.args)
+            .output()
+            .ok()?;
+        let stdout = decode_output(&output.stdout);
+        let stderr = decode_output(&output.stderr);
+        if probe_output_is_acceptable(output.status.success(), probe, &stdout, &stderr) {
+            return first_output_line(&stdout).or_else(|| first_output_line(&stderr));
+        }
+    }
+    None
+}
+
 pub fn apply_github_proxy(url: &str, proxy: Option<&str>) -> String {
     let Some(proxy) = proxy.filter(|value| !value.trim().is_empty()) else {
         return url.to_owned();

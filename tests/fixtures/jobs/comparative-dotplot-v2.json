@@ -1,0 +1,41 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-dotplot-v2",
+  "capability": "comparative.dotplot.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-query",
+      "role": "query",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-query-1",
+          "path": "../sequences/query.fa",
+          "format": "fasta",
+          "compression": "none",
+          "size_bytes": 46,
+          "sha256": "DD7B26519199D39C66ACEED418B95E449FA624CAE7DD24C5E33BBB2A4F1F495B"
+        }
+      ]
+    },
+    {
+      "artifact_id": "input-reference",
+      "role": "reference",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-reference-1",
+          "path": "../sequences/reference.fa",
+          "format": "fasta",
+          "compression": "none",
+          "size_bytes": 46,
+          "sha256": "C4ABE63271D4437840241D88220BFA8B3F78CCD8BF3EFFBE78B10AD6037ECA77"
+        }
+      ]
+    }
+  ],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {
+    "output": "dotplot.svg"
+  }
+}

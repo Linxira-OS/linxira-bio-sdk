@@ -5,6 +5,7 @@
   "inputs": {
     "fasta": "tests/fixtures/sequences/tiny.fa"
   },
+  "execution": {"mode": "local-cpu"},
   "parameters": {
     "output": "tests/fixtures/sequences/shuffled.fa",
     "seed": 42
