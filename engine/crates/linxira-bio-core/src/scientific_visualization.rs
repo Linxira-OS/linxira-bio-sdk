@@ -1191,7 +1191,7 @@ fn validate_item_limit(value: usize, name: &str) -> Result<(), VisualizationErro
     Ok(())
 }
 
-fn write_new_output(path: &Path, bytes: &[u8]) -> Result<(), VisualizationError> {
+pub(crate) fn write_new_output(path: &Path, bytes: &[u8]) -> Result<(), VisualizationError> {
     let file = OpenOptions::new()
         .write(true)
         .create_new(true)

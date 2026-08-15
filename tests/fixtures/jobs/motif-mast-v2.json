@@ -1,0 +1,33 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-motif-mast-v2",
+  "capability": "motif.mast.v1",
+  "inputs": [
+    {
+      "artifact_id": "motif",
+      "role": "motif",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "motif-1",
+        "path": "../sequences/tiny.fa",
+        "format": "meme-text",
+        "compression": "none",
+        "size_bytes": 0
+      }]
+    },
+    {
+      "artifact_id": "sequences",
+      "role": "sequences",
+      "cardinality": "single",
+      "files": [{
+        "file_id": "sequences-1",
+        "path": "../sequences/tiny.fa",
+        "format": "fasta",
+        "compression": "none",
+        "size_bytes": 0
+      }]
+    }
+  ],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/mast.txt", "evalue": 1e-5, "threads": 2, "hit_list": true}
+}

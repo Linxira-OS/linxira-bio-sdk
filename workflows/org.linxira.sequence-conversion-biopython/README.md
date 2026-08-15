@@ -19,7 +19,8 @@ python src/convert_sequences.py --request request.json --result output/result.js
 The request and result contracts are in `schemas/`. Format conversion can lose
 annotations that the destination representation cannot express. In
 particular, FASTA contains identifiers and sequence only; FASTQ output requires
-quality annotations, and GenBank output may require a molecule type annotation.
+quality annotations, and GenBank and EMBL output default a missing molecule
+type to `DNA` (FASTA cannot carry one).
 The output filename must be one portable path component: ASCII control
 characters, Win32-reserved characters (including the ADS separator `:`),
 trailing spaces or dots, `result.json`, and Windows device names are rejected

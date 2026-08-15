@@ -1,6 +1,6 @@
 ---
 name: manipulate-biological-sequences
-description: Run verified local Linxira Bio FASTA sequence-manipulation and analysis capabilities. Use for FASTA extraction, filtering, reverse complements, translation, ORFs, ID normalization, merge/split, FASTA-table conversion, exact k-mer counting, consensus-from-alignment, sequence-order shuffling, and simple exact-match electronic PCR.
+description: Run verified local Linxira Bio FASTA sequence-manipulation and analysis capabilities. Use for FASTA extraction, filtering, reverse complements, translation, ORFs, ID normalization, merge/split, FASTA-table conversion, exact k-mer counting, consensus-from-alignment, sequence-order shuffling, Biopython-backed sequence format conversion, and simple exact-match electronic PCR.
 ---
 
 # Manipulate Biological Sequences
@@ -30,6 +30,7 @@ Use these local capabilities instead of writing ad-hoc FASTA scripts.
 - Use `sequence.kmer.count.v1` for exact k-mer counts with optional canonical reverse-complement collapsing.
 - Use `sequence.consensus.v1` to compute a majority-rule consensus from a multiple sequence alignment FASTA.
 - Use `sequence.shuffle.v1` to randomize the order of FASTA records with a reproducible seed.
+- Use `sequence.convert.biopython.v1` to convert between FASTA, FASTQ, GenBank, and EMBL via the locked Biopython workflow pack (requires the project Python 3.12 runtime).
 - Use `primer.epcr.v1` for exact-match primer pairs supplied as TSV columns `id`, `forward`, and `reverse`.
 
 Run `inspect-bio-dataset` first when the input format or compression is not
@@ -53,6 +54,7 @@ linxira-bio sequence from-table records.tsv OUTPUT.fa --delimiter tsv --json
 linxira-bio sequence kmer-count INPUT.fa kmers.tsv --k 21 --canonical --top-n 50 --json
 linxira-bio sequence consensus alignment.fa consensus.fa --threshold 0.5 --json
 linxira-bio sequence shuffle INPUT.fa OUTPUT.fa --seed 42 --json
+linxira-bio sequence convert INPUT.fasta OUTPUT.genbank --output-format genbank
 linxira-bio primer epcr reference.fa primers.tsv amplicons.tsv --max-amplicon 5000 --json
 ```
 
@@ -83,3 +85,6 @@ When developing inside the source repository, prefix commands with
   are not rejected.
 - For shuffle, verify the output contains the same number of sequences and
   total residues as the input; the seed guarantees reproducibility.
+- For convert, confirm the input and output formats are one of FASTA, FASTQ,
+  GenBank, or EMBL; FASTA-to-FASTQ conversion without quality scores is not
+  supported, and sequence counts must match between input and output.

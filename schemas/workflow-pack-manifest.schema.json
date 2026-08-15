@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://linxira.org/schemas/bio/workflow-pack-manifest.v1.json",
+  "$id": "https://linxira.org/schemas/bio/workflow-pack-manifest.v2.json",
   "title": "Linxira Bio workflow pack manifest",
   "type": "object",
   "required": [
@@ -9,7 +9,7 @@
     "resources", "files"
   ],
   "properties": {
-    "schema_version": { "const": "1" },
+    "schema_version": { "const": "2" },
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$"
@@ -43,10 +43,16 @@
     },
     "runtime": {
       "type": "object",
-      "required": ["kind", "version", "dependency_lock"],
+      "required": ["kind", "version", "core_compatibility", "dependency_lock"],
       "properties": {
         "kind": { "enum": ["python", "r", "java", "native"] },
         "version": { "type": "string", "minLength": 1 },
+        "core_compatibility": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Semver range of Linxira Bio core versions this pack is compatible with",
+          "pattern": "^(>=|<=|>|<|=|~|\\^)?\\s*[0-9]+\\.[0-9]+(\\.[0-9]+)?(\\s*,\\s*(>=|<=|>|<|=|~|\\^)?\\s*[0-9]+\\.[0-9]+(\\.[0-9]+)?)*$"
+        },
         "dependency_lock": {
           "type": "object",
           "required": ["path", "sha256"],

@@ -1,6 +1,6 @@
 ---
 name: align-biological-sequences
-description: Run verified local multiple-sequence alignment and trimming capabilities on biological FASTA data. Use when an agent must align nucleotide or protein sequences with MUSCLE, trim an alignment with trimAl, preserve deterministic output artifacts, or verify the required native executables.
+description: Run verified local multiple-sequence alignment, trimming, and read-alignment capabilities on biological FASTA data. Use when an agent must align nucleotide or protein sequences with MUSCLE, trim an alignment with trimAl, align short reads with minimap2+samtools, align long reads (PacBio/ONT) with minimap2, preserve deterministic output artifacts, or verify the required native executables.
 ---
 
 # Align Biological Sequences
@@ -8,6 +8,31 @@ description: Run verified local multiple-sequence alignment and trimming capabil
 Inspect the FASTA input before execution. Use the versioned Rust capability to
 control the native tool; do not generate an alignment implementation in Python
 or R.
+
+## Long-Read Alignment
+
+Align PacBio or Oxford Nanopore reads to a reference with minimap2:
+
+```bash
+linxira-bio alignment long-read REFERENCE.fa READS.fastq OUTPUT.sam --preset map-ont --threads 4 --json
+```
+
+Presets: `map-ont` (default), `map-pb`, `map-hifi`, `splice`, `asm5`, `asm10`,
+`asm20`, `sr`. Use `--secondary` to output secondary alignments, and
+`--max-secondary N` to limit them.
+
+For worker v1, provide `inputs.reference`, `inputs.reads`, and
+`parameters.output`. Optional parameters: `preset`, `threads`, `secondary`,
+`max_secondary`. The capability is `alignment.long-read.v1`.
+
+## Short-Read Alignment
+
+```bash
+linxira-bio alignment short-read REFERENCE.fa READS.fastq OUTPUT.bam --threads 4 --json
+```
+
+Capability `alignment.short-read.v1` uses minimap2 for alignment and samtools
+for sorting. Inputs: `reference`, `reads`. Output: sorted BAM.
 
 ## Execute MUSCLE
 

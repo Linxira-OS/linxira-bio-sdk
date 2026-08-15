@@ -5,6 +5,7 @@ temp/
 build/
 target/
 .agents/
+.codex/
 .linxira/
 .linxira-bio/
 .venv-ci/

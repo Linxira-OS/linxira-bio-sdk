@@ -1,12 +1,12 @@
 ---
 name: analyze-expression-matrix
-description: Validate, normalize, reduce, cluster, and prepare native heatmaps for local rectangular CSV or TSV bulk-expression matrices with expression.matrix.qc.v1, expression.normalize.v1, expression.pca.v1, expression.cluster.v1, and expression.heatmap.v1. Use for matrix QC, CPM or median-ratio normalization, exploratory PCA, deterministic sample or feature clustering, and clustered heatmap preparation.
+description: Validate, normalize, reduce, cluster, prepare native heatmaps, and run WGCNA co-expression network analysis for local rectangular CSV or TSV bulk-expression matrices with expression.matrix.qc.v1, expression.normalize.v1, expression.pca.v1, expression.cluster.v1, expression.heatmap.v1, and expression.wgcna.v1. Use for matrix QC, CPM or median-ratio normalization, exploratory PCA, deterministic sample or feature clustering, clustered heatmap preparation, and weighted gene co-expression network analysis.
 ---
 
 # Analyze Expression Matrix
 
 Run deterministic Rust matrix analysis locally before selecting a statistical
-differential-expression workflow.
+differential-expression workflow or co-expression network analysis.
 
 ## Run
 
@@ -24,13 +24,36 @@ differential-expression workflow.
    - clustering: `linxira-bio expression cluster <matrix>
      --sample-clusters N --feature-clusters N --json`;
    - heatmap: `linxira-bio expression heatmap <matrix> --top-features N
-     --json`.
+     --json`;
+   - WGCNA: `linxira-bio expression wgcna <matrix.csv|tsv> <output.json>
+     --min-module-size 30 --merge-cut-height 0.25 --network-type signed
+     --threads 4 --json`.
 6. Preserve the capability version, input hash, options, warnings, and result.
 
 For an artifact-aware agent job, invoke the selected capability with one input
-whose role is `matrix`, format is `csv` or `tsv`, and execution mode is
-`local-cpu`. Normalization also requires `parameters.output` and emits a TSV
-artifact.
+whose role is `matrix` (for QC, PCA, clustering, heatmap) or `expression` (for
+WGCNA), format is `csv` or `tsv`, and execution mode is `local-cpu`.
+Normalization also requires `parameters.output` and emits a TSV artifact.
+
+### WGCNA Co-Expression Network
+
+WGCNA requires R and the WGCNA package. Set `LINXIRA_BIO_WORKFLOW_R_LIBRARY`
+to the project-isolated R package library. Key parameters:
+
+- `--min-expression X`: minimum expression threshold per gene (default 1)
+- `--min-samples N`: minimum samples meeting threshold (default 3)
+- `--min-module-size N`: minimum module size (default 30)
+- `--merge-cut-height X`: module merge threshold (default 0.25)
+- `--network-type`: `signed` (default), `unsigned`, or `signed hybrid`
+- `--power N`: soft-thresholding power (0 = auto-detect, default)
+- `--no-log-transform`: skip log2(x+1) transformation
+- `--threads N`: number of threads (default 1)
+
+Output artifacts:
+- `module-assignments.csv`: gene-to-module mapping
+- `module-eigengenes.csv`: sample eigengene values
+- `module-summary.csv`: module sizes
+- `scale-free-fit.csv`: power selection fit indices
 
 ## Validate And Interpret
 
@@ -47,6 +70,8 @@ artifact.
   retain raw counts for count-based models.
 - Treat PCA, clustering, and heatmaps as exploratory. Do not infer biological
   groups or statistical significance from them alone.
+- For WGCNA, validate the scale-free topology fit (R^2 > 0.8 recommended) and
+  review module sizes before interpreting biological relevance.
 
 Differential expression remains separate. Route raw integer counts and sample
 metadata to `analyze-differential-expression`, and preserve the design,

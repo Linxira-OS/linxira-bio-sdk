@@ -22,7 +22,7 @@
 linxira-bio sequence consensus alignment.fa consensus.fa --threshold 0.5 --json
 ```
 
-## 解读
+## 结果解读
 
 `ambiguous_position_count` 表示没有碱基达到阈值的位点数。单条序列输入会产生警告，但仍会生成有效的共识序列（去除间隔后与输入序列相同）。
 

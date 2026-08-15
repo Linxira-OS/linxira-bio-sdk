@@ -1,5 +1,14 @@
 # Exact direct and transitive Python package pins for pack 0.1.0.
-# Runtime: CPython 3.12.x. Installation is intentionally unavailable while
-# environment.apply.v1 and signed artifact resolution are not implemented.
-biopython==1.85
-numpy==2.2.4
+# Runtime: CPython 3.12.x; platforms windows-gnu, debian, arch (x86_64).
+# Hashes cover sdists and cp312 wheels pip may select on those platforms.
+# Installation is gated by environment.apply.v1; signed artifact
+# resolution is not yet implemented, so this lock is not yet consumed.
+biopython==1.85 \
+    --hash=sha256:d024ad48997ad53d53a77da24b072aaba8a550bd816af8f2e7e606a9918a3b43 \
+    --hash=sha256:d6f8efb2db03f2ec115c5e8c764dbadf635e0c9ecd4c0e91fc8216c1b62f85f5 \
+    --hash=sha256:5dafab74059de4e78f49f6b5684eddae6e7ce46f09cfa059c1d1339e8b1ea0a6
+numpy==2.2.4 \
+    --hash=sha256:4f92084defa704deadd4e0a5ab1dc52d8ac9e8a8ef617f3fbb853e79b0ea3592 \
+    --hash=sha256:11c43995255eb4127115956495f43e9343736edb7fcdb0d973defd9de14cd84f \
+    --hash=sha256:2aad3c17ed2ff455b8eaafe06bcdae0062a1db77cb99f4b9cbb5f4ecb13c5146 \
+    --hash=sha256:9ba03692a45d3eef66559efe1d1096c4b9b75c0986b5dff5530c378fb8331d4f

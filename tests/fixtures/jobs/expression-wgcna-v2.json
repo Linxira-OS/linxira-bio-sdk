@@ -1,0 +1,19 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-expression-wgcna-v2",
+  "capability": "expression.wgcna.v1",
+  "inputs": [{
+    "artifact_id": "expression",
+    "role": "expression",
+    "cardinality": "single",
+    "files": [{
+      "file_id": "expression-1",
+      "path": "../sequences/tiny.fa",
+      "format": "tsv",
+      "compression": "none",
+      "size_bytes": 0
+    }]
+  }],
+  "execution": {"mode": "local-cpu"},
+  "parameters": {"output": "../../../target/test-results/wgcna-result.json", "threads": 2, "min_module_size": 10, "min_samples": 1, "log_transform": false}
+}

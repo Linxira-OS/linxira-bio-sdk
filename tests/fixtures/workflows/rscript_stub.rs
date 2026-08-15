@@ -6,6 +6,10 @@ use std::process::ExitCode;
 
 const COUNTS_SHA256: &str = "365ec34ff99a91eaca206014e7cdf7ceba6ee8f96f120ca60b2bb05327996006";
 const SAMPLES_SHA256: &str = "daf55d07e3e55c677b2977d47eea333f284daec4db9856a0138cc33e2f9a9244";
+const TINY_FA_SHA256: &str = "d36ea1364a0451fd99584f0f36307dbc34b818ca4008c24c7705a95855172a1c";
+const CONVERTED: &str = "LOCUS       one                        1 bp    DNA     linear   UNK 01-JAN-2026\n";
+const CONVERTED_SHA256: &str =
+    "66f245a8f9ba9e86c4aeff181948c333899091645f7a340b30306e3647725be5";
 const DIFFERENTIAL: &str = "feature_id,base_mean,log2_fold_change,standard_error,statistic,p_value,adjusted_p_value\nGene1,100,1,0.2,5,0.001,0.01\n";
 const NORMALIZED: &str = "feature_id,control_1,control_2,treated_1,treated_2\nGene1,50,52,100,104\n";
 const DIFFERENTIAL_SHA256: &str =
@@ -13,10 +17,16 @@ const DIFFERENTIAL_SHA256: &str =
 const NORMALIZED_SHA256: &str =
     "f63b397d6544a76359ff7514371ac7b0713eaefc35c6508ff1e1e72298d13625";
 
+fn core_version() -> String {
+    env::var("LINXIRA_BIO_CORE_VERSION").unwrap_or_else(|_| "unknown".to_owned())
+}
+
 fn main() -> ExitCode {
     let arguments = env::args_os().skip(1).collect::<Vec<_>>();
-    if arguments.len() != 5 || !path_ends_with(&arguments[0], "run_deseq2.R") {
-        eprintln!("unexpected Rscript arguments");
+    let is_deseq2 = path_ends_with(&arguments[0], "run_deseq2.R");
+    let is_convert = path_ends_with(&arguments[0], "convert_sequences.py");
+    if arguments.len() != 5 || (!is_deseq2 && !is_convert) {
+        eprintln!("unexpected workflow interpreter arguments");
         return ExitCode::from(64);
     }
     let Some(request_path) = value_after(&arguments, "--request").map(PathBuf::from) else {
@@ -44,7 +54,7 @@ fn main() -> ExitCode {
     let Some(capability) = json_string_field(&request, "capability") else {
         return ExitCode::from(67);
     };
-    if !request.contains("\"path\":\"") || request.contains("../expression-matrix") {
+    if !request.contains("\"path\":\"") || request.contains("\"../") {
         eprintln!("worker did not rewrite relative input paths");
         return ExitCode::from(68);
     }
@@ -62,6 +72,17 @@ fn main() -> ExitCode {
     if mode == "missing-package" {
         let payload = error_envelope(&job_id, &capability);
         return write_result(&result_path, &payload, ExitCode::from(2));
+    }
+
+    if is_convert {
+        return run_convert_stub(
+            &job_id,
+            &capability,
+            &request,
+            &output_directory,
+            &result_path,
+            &lock_sha256,
+        );
     }
 
     let differential_path = output_directory.join("differential-expression.csv");
@@ -84,6 +105,50 @@ fn main() -> ExitCode {
         &lock_sha256,
     );
     write_result(&result_path, &payload, ExitCode::SUCCESS)
+}
+
+fn run_convert_stub(
+    job_id: &str,
+    capability: &str,
+    request: &str,
+    output_directory: &Path,
+    result_path: &Path,
+    lock_sha256: &str,
+) -> ExitCode {
+    let Some(output_filename) = json_string_field(request, "output_filename") else {
+        eprintln!("convert request lacks output_filename");
+        return ExitCode::from(70);
+    };
+    let output_format = json_string_field(request, "output_format").unwrap_or_else(|| "fasta".into());
+    let output_path = output_directory.join(&output_filename);
+    if fs::write(&output_path, CONVERTED).is_err() {
+        return ExitCode::from(71);
+    }
+    let payload = format!(
+        concat!(
+            "{{\"schema_version\":\"2\",\"job_id\":{},\"capability\":{},\"status\":\"ok\",",
+            "\"result\":{{\"records_written\":3,\"input_format\":\"fasta\",",
+            "\"output_format\":\"{}\"}},",
+            "\"artifacts\":[{{\"artifact_id\":\"converted-sequences\",",
+            "\"role\":\"converted-sequences\",\"kind\":\"domain-file\",\"path\":{},",
+            "\"format\":\"{}\",\"size_bytes\":{},\"sha256\":\"{}\"}}],",
+            "\"provenance\":{{\"engine_version\":\"stub-1\",\"execution_mode\":\"local-cpu\",",
+            "\"core_version\":\"{}\",",
+            "\"software\":[],\"input_sha256\":{{\"sequences\":\"{}\"}},",
+            "\"dependency_lock_sha256\":\"{}\"}},\"diagnostics\":[]}}"
+        ),
+        json_quote(job_id),
+        json_quote(capability),
+        output_format,
+        json_quote(&output_path.to_string_lossy()),
+        output_format,
+        CONVERTED.len(),
+        CONVERTED_SHA256,
+        core_version(),
+        TINY_FA_SHA256,
+        lock_sha256,
+    );
+    write_result(result_path, &payload, ExitCode::SUCCESS)
 }
 
 fn success_envelope(
@@ -117,6 +182,7 @@ fn success_envelope(
             "\"kind\":\"table\",\"path\":{},\"format\":\"csv\",\"media_type\":\"text/csv\",",
             "\"size_bytes\":71,\"sha256\":\"{}\"}}],",
             "\"provenance\":{{\"engine_version\":\"stub-1\",\"execution_mode\":\"local-cpu\",",
+            "\"core_version\":\"{}\",",
             "\"software\":[],\"input_sha256\":{{\"counts\":\"{}\",",
             "\"sample_metadata\":\"{}\"}},\"dependency_lock_sha256\":\"{}\"}},",
             "\"diagnostics\":{}}}"
@@ -127,6 +193,7 @@ fn success_envelope(
         DIFFERENTIAL_SHA256,
         json_quote(&normalized.to_string_lossy()),
         NORMALIZED_SHA256,
+        core_version(),
         COUNTS_SHA256,
         SAMPLES_SHA256,
         lock_sha256,
@@ -145,11 +212,13 @@ fn error_envelope(job_id: &str, capability: &str) -> String {
             "{{\"schema_version\":\"2\",\"job_id\":{},\"capability\":{},",
             "\"status\":\"error\",\"result\":{{}},\"artifacts\":[],",
             "\"provenance\":{{\"engine_version\":\"stub-1\",",
-            "\"execution_mode\":\"local-cpu\",\"software\":[],\"input_sha256\":{{}}}},",
+            "\"execution_mode\":\"local-cpu\",\"core_version\":\"{}\",",
+            "\"software\":[],\"input_sha256\":{{}}}},",
             "\"diagnostics\":{}}}"
         ),
         json_quote(job_id),
         json_quote(capability),
+        core_version(),
         diagnostics
     )
 }

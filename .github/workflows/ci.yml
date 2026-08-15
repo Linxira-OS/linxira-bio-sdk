@@ -18,9 +18,16 @@ jobs:
           msystem: UCRT64
           update: true
           install: mingw-w64-ucrt-x86_64-gcc
-      - uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: '4.6.1'
+      - name: Install R from CRAN
+        shell: pwsh
+        run: |
+          $rVersion = '4.6.1'
+          $rUrl = "https://cran.r-project.org/bin/windows/base/R-$rVersion-win.exe"
+          $rInstaller = "$env:RUNNER_TEMP\R-$rVersion-win.exe"
+          Invoke-WebRequest -Uri $rUrl -OutFile $rInstaller -RetryIntervalSec 10 -MaximumRetryCount 3
+          Start-Process -FilePath $rInstaller -ArgumentList '/VERYSILENT /DIR=C:\R /NOICONS /NORESTART' -Wait
+          Remove-Item $rInstaller
+          "C:\R\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Configure project-isolated R library
         shell: pwsh
         run: |
@@ -63,6 +70,94 @@ jobs:
       - run: .\.venv-ci\Scripts\python.exe -m unittest discover -s workflows/org.linxira.sequence-conversion-biopython/tests -p "test_*.py"
       - name: Validate R workflow request layer
         run: Rscript workflows/org.linxira.bulk-expression-deseq2/tests/test_validation.R
+      - name: Install project-isolated DESeq2 library
+        shell: pwsh
+        run: Rscript scripts/bootstrap-deseq2-lib.R "$env:GITHUB_WORKSPACE\.linxira-bio\ci\r\4.6.1\library"
+      - name: Run real DESeq2 workflow E2E
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\target\test-results" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\build" | Out-Null
+          $request = @{
+            schema_version = "2"
+            job_id = "ci-deseq2-e2e"
+            capability = "expression.differential.v1"
+            inputs = @(
+              @{
+                artifact_id = "counts"
+                role = "counts"
+                cardinality = "single"
+                files = @(@{
+                  file_id = "counts.csv"
+                  path = "$env:GITHUB_WORKSPACE\tests\fixtures\expression-matrix\deseq2-e2e-counts.csv"
+                  format = "csv"
+                  compression = "none"
+                  size_bytes = 7131
+                })
+              },
+              @{
+                artifact_id = "samples"
+                role = "sample_metadata"
+                cardinality = "single"
+                files = @(@{
+                  file_id = "samples.csv"
+                  path = "$env:GITHUB_WORKSPACE\tests\fixtures\expression-matrix\deseq2-e2e-samples.csv"
+                  format = "csv"
+                  compression = "none"
+                  size_bytes = 92
+                })
+              }
+            )
+            execution = @{ mode = "local-cpu" }
+            parameters = @{
+              output_directory = "$env:GITHUB_WORKSPACE\target\test-results\deseq2-e2e-ci"
+              feature_id_column = "gene_id"
+              sample_id_column = "sample_id"
+              condition_column = "condition"
+              reference_level = "control"
+              contrast_level = "treated"
+              alpha = 0.05
+              min_total_count = 10
+            }
+          } | ConvertTo-Json -Depth 6
+          Set-Content -LiteralPath "$env:GITHUB_WORKSPACE\build\deseq2-e2e-request.json" -Value $request -Encoding utf8
+          Rscript workflows/org.linxira.bulk-expression-deseq2/src/run_deseq2.R `
+            --request "$env:GITHUB_WORKSPACE\build\deseq2-e2e-request.json" `
+            --result "$env:GITHUB_WORKSPACE\target\test-results\deseq2-e2e-ci\result.json"
+          if ($LASTEXITCODE -ne 0) { throw "DESeq2 E2E script failed" }
+          $result = Get-Content -Raw "$env:GITHUB_WORKSPACE\target\test-results\deseq2-e2e-ci\result.json" | ConvertFrom-Json
+          if ($result.status -ne "ok") { throw "DESeq2 E2E result not ok: $($result.diagnostics | ConvertTo-Json -Compress)" }
+      - name: Install Python 3.12 for Biopython convert pack
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Create isolated convert environment from hashed lock
+        shell: pwsh
+        run: |
+          python -m venv "$env:GITHUB_WORKSPACE\.venv-convert"
+          & "$env:GITHUB_WORKSPACE\.venv-convert\Scripts\python.exe" -m pip install --disable-pip-version-check --require-hashes -r workflows/org.linxira.sequence-conversion-biopython/requirements.lock
+      - name: Run sequence convert E2E
+        shell: pwsh
+        env:
+          LINXIRA_BIO_WORKFLOW_PYTHON: ${{ github.workspace }}\.venv-convert\Scripts\python.exe
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\target\test-results" | Out-Null
+          $output = cargo +stable-x86_64-pc-windows-gnu run --locked -p linxira-bio-cli -- sequence convert tests/fixtures/sequences/tiny.fa "$env:GITHUB_WORKSPACE\target\test-results\convert-e2e\converted.genbank" --output-format genbank 2>&1
+          $exitCode = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($exitCode -ne 0) { throw "sequence convert E2E command failed (exit $exitCode)" }
+          $envelope = $output | ForEach-Object { try { $_ | ConvertFrom-Json } catch { $null } } | Where-Object { $_ -and $_.status } | Select-Object -First 1
+          if ($null -eq $envelope) { throw "sequence convert E2E produced no result envelope" }
+          if ($envelope.status -ne "ok") { throw "sequence convert E2E result not ok: $($envelope.diagnostics | ConvertTo-Json -Compress)" }
+          $converted = "$env:GITHUB_WORKSPACE\target\test-results\convert-e2e\converted.genbank"
+          if (-not (Test-Path -LiteralPath $converted)) { throw "converted file missing" }
+          $records = Select-String -LiteralPath $converted -Pattern "^LOCUS" | Measure-Object | Select-Object -ExpandProperty Count
+          if ($records -ne 3) { throw "expected 3 converted records, found $records" }
+      - name: Run sequence convert pack unit tests under locked Python
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\.venv-convert\Scripts\python.exe" -m pip install --disable-pip-version-check jsonschema
+          & "$env:GITHUB_WORKSPACE\.venv-convert\Scripts\python.exe" -m unittest discover -s workflows/org.linxira.sequence-conversion-biopython/tests -p "test_*.py"
       - run: .\.venv-ci\Scripts\python.exe scripts/stage-release.py --check
       - run: cargo +stable-x86_64-pc-windows-gnu build --locked --release --workspace
       - name: Stage Windows release
@@ -70,6 +165,17 @@ jobs:
           .\.venv-ci\Scripts\python.exe scripts/stage-release.py
           --platform windows --binary-dir target\release
           --output build\release-windows
+      - name: Package Windows release bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: python -c "import shutil; shutil.make_archive('build/bundle-windows', 'zip', root_dir='build/release-windows/linxira-bio-sdk')"
+      - name: Upload Windows release bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle-windows
+          path: build/bundle-windows.zip
+          if-no-files-found: error
 
   debian-bookworm:
     runs-on: ubuntu-latest
@@ -77,13 +183,18 @@ jobs:
     steps:
       - run: apt-get update
       - run: >-
-          apt-get install -y build-essential curl git libgl1-mesa-dev libwayland-dev
-          libx11-dev libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev
-          libxrandr-dev pkg-config python3 python3-venv
+          apt-get install -y build-essential curl dirmngr git gnupg
+          libgl1-mesa-dev libwayland-dev libx11-dev libxcursor-dev libxi-dev
+          libxinerama-dev libxkbcommon-dev libxrandr-dev pkg-config python3
+          python3-venv nodejs npm
       - uses: actions/checkout@v7
-      - uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: '4.6.1'
+      - name: Install R from CRAN Debian repository
+        run: |
+          gpg --keyserver keyserver.ubuntu.com --recv-key '95C0FAF38DB3CCAD0C080A7BDC78B2DDEABC47B7'
+          gpg --armor --export '95C0FAF38DB3CCAD0C080A7BDC78B2DDEABC47B7' > /etc/apt/trusted.gpg.d/cran_debian_key.asc
+          echo "deb https://cloud.r-project.org/bin/linux/debian bookworm-cran46/" > /etc/apt/sources.list.d/cran.list
+          apt-get update
+          apt-get install -y --no-install-recommends r-base r-base-dev
       - name: Configure project-isolated R library
         run: |
           r_library="$GITHUB_WORKSPACE/.linxira-bio/ci/r/4.6.1/library"
@@ -104,6 +215,12 @@ jobs:
       - run: cargo test --locked --workspace
       - run: cargo run --locked -p linxira-bio-worker -- tests/fixtures/jobs/sequence-stats.json
       - run: cargo run --locked -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
+      - name: Smoke Codex and OpenCode skill-pack installs
+        run: scripts/smoke-agent-installs.sh
+      - name: Smoke MCP server over stdio JSON-RPC
+        run: |
+          cargo build --locked -p linxira-bio-mcp
+          .venv-ci/bin/python scripts/smoke-mcp-server.py
       - run: .venv-ci/bin/python scripts/validate-repository.py
       - run: .venv-ci/bin/python -m unittest discover -s tests/python -p "test_*.py"
       - run: .venv-ci/bin/python -m unittest discover -s workflows/tests -p "test_*.py"
@@ -117,6 +234,16 @@ jobs:
           .venv-ci/bin/python scripts/stage-release.py
           --platform debian --binary-dir target/release
           --output build/release-debian
+      - name: Package Debian release bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python3 -c "import shutil; shutil.make_archive('build/bundle-debian', 'zip', root_dir='build/release-debian/linxira-bio-sdk')"
+      - name: Upload Debian release bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle-debian
+          path: build/bundle-debian.zip
+          if-no-files-found: error
 
   arch-linux:
     runs-on: ubuntu-latest
@@ -158,6 +285,16 @@ jobs:
           .venv-ci/bin/python scripts/stage-release.py
           --platform arch --binary-dir target/release
           --output build/release-arch
+      - name: Package Arch release bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python3 -c "import shutil; shutil.make_archive('build/bundle-arch', 'zip', root_dir='build/release-arch/linxira-bio-sdk')"
+      - name: Upload Arch release bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle-arch
+          path: build/bundle-arch.zip
+          if-no-files-found: error
 
   license-audit:
     runs-on: ubuntu-latest
@@ -184,3 +321,34 @@ jobs:
       - run: >-
           .venv-ci/bin/python scripts/generate_third_party_notices.py --offline
           --platform arch --output build/notices/arch
+
+  publish:
+    needs: [windows-gnu, debian-bookworm, arch-linux]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-bundle-*
+          path: build/bundles
+          merge-multiple: true
+      - name: Attach platform bundles to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --generate-notes || true
+          for bundle in build/bundles/*.zip; do
+            case "$bundle" in
+              *windows*) asset="linxira-bio-sdk-${version}-windows-x86_64.zip" ;;
+              *debian*) asset="linxira-bio-sdk-${version}-debian-x86_64.zip" ;;
+              *arch*) asset="linxira-bio-sdk-${version}-arch-x86_64.zip" ;;
+              *) continue ;;
+            esac
+            mv "$bundle" "$asset"
+            gh release upload "$tag" "$asset" --repo "$GITHUB_REPOSITORY" --clobber
+          done

@@ -1,8 +1,9 @@
 use super::{WorkerResult, sha256_file, validate_v1_multi_input_contract};
 use linxira_bio_protocol::{
     AnalysisResultV2, ArtifactFile, BioDataFormat, CompressionFormat, DiagnosticSeverity,
-    InputArtifact, InputCardinality, JobRequest, JobRequestV2, JobStatus, NetworkAccess,
-    OutputArtifactKind, WorkflowPackManifest, WorkflowRuntimeKind,
+    ExecutionMode, InputArtifact, InputCardinality, JobRequest, JobRequestV2, JobStatus,
+    NetworkAccess, OutputArtifactKind, WorkflowPackManifest, WorkflowRuntimeKind,
+    semver_range::core_compatibility_matches,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -13,21 +14,76 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-const BULK_EXPRESSION_PACK_ID: &str = "org.linxira.bulk-expression-deseq2";
-const BULK_EXPRESSION_PACK_DIRECTORY: &str = "org.linxira.bulk-expression-deseq2";
 const BULK_EXPRESSION_MANIFEST: &str = "manifest.json";
-const DIFFERENTIAL_CAPABILITY: &str = "expression.differential.v1";
 const MEDICAL_BULK_CAPABILITY: &str = "medical.bulk-rnaseq.v1";
-const WORKFLOW_PARAMETERS: &[&str] = &[
-    "output_directory",
-    "feature_id_column",
-    "sample_id_column",
-    "condition_column",
-    "reference_level",
-    "contrast_level",
-    "alpha",
-    "min_total_count",
-];
+
+struct WorkflowContract {
+    capabilities: &'static [&'static str],
+    pack_id: &'static str,
+    pack_directory: &'static str,
+    roles: &'static [&'static str],
+    input_formats: &'static [BioDataFormat],
+    parameters: &'static [&'static str],
+    artifact_count: usize,
+    artifact_roles: &'static [&'static str],
+    artifact_kind: OutputArtifactKind,
+    artifact_formats: &'static [BioDataFormat],
+    artifact_media_type: Option<&'static str>,
+    runtime: WorkflowRuntimeKind,
+}
+
+const BULK_EXPRESSION_CONTRACT: WorkflowContract = WorkflowContract {
+    capabilities: &[
+        "expression.differential.v1",
+        "medical.bulk-rnaseq.v1",
+        "expression.deseq2.v1",
+    ],
+    pack_id: "org.linxira.bulk-expression-deseq2",
+    pack_directory: "org.linxira.bulk-expression-deseq2",
+    roles: &["counts", "sample_metadata"],
+    input_formats: &[BioDataFormat::Csv, BioDataFormat::Tsv],
+    parameters: &[
+        "output_directory",
+        "feature_id_column",
+        "sample_id_column",
+        "condition_column",
+        "reference_level",
+        "contrast_level",
+        "alpha",
+        "min_total_count",
+    ],
+    artifact_count: 2,
+    artifact_roles: &["differential-expression", "normalized-counts"],
+    artifact_kind: OutputArtifactKind::Table,
+    artifact_formats: &[BioDataFormat::Csv],
+    artifact_media_type: Some("text/csv"),
+    runtime: WorkflowRuntimeKind::R,
+};
+
+const SEQUENCE_CONVERT_CONTRACT: WorkflowContract = WorkflowContract {
+    capabilities: &["sequence.convert.biopython.v1"],
+    pack_id: "org.linxira.sequence-conversion-biopython",
+    pack_directory: "org.linxira.sequence-conversion-biopython",
+    roles: &["sequences"],
+    input_formats: &[
+        BioDataFormat::Fasta,
+        BioDataFormat::Fastq,
+        BioDataFormat::Genbank,
+        BioDataFormat::Embl,
+    ],
+    parameters: &["output_directory", "output_filename", "output_format"],
+    artifact_count: 1,
+    artifact_roles: &["converted-sequences"],
+    artifact_kind: OutputArtifactKind::DomainFile,
+    artifact_formats: &[
+        BioDataFormat::Fasta,
+        BioDataFormat::Fastq,
+        BioDataFormat::Genbank,
+        BioDataFormat::Embl,
+    ],
+    artifact_media_type: None,
+    runtime: WorkflowRuntimeKind::Python,
+};
 
 static TEMPORARY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -120,15 +176,26 @@ pub(super) fn execute_bulk_expression_v1(
     base_directory: &Path,
     request: JobRequest,
 ) -> WorkerResult<String> {
-    ensure_supported_capability(&request.capability)?;
-    validate_v1_multi_input_contract(
-        &request,
-        &["counts", "sample_metadata"],
-        WORKFLOW_PARAMETERS,
-    )?;
-    let (request, verified_inputs) = convert_v1_request(request, base_directory)?;
-    let prepared = prepare_v2_request(request, Path::new("."), &verified_inputs)?;
-    execute_prepared_request(prepared)
+    execute_workflow_v1(&BULK_EXPRESSION_CONTRACT, base_directory, request)
+}
+
+pub(super) fn execute_sequence_convert_v1(
+    base_directory: &Path,
+    request: JobRequest,
+) -> WorkerResult<String> {
+    execute_workflow_v1(&SEQUENCE_CONVERT_CONTRACT, base_directory, request)
+}
+
+fn execute_workflow_v1(
+    contract: &WorkflowContract,
+    base_directory: &Path,
+    request: JobRequest,
+) -> WorkerResult<String> {
+    ensure_supported_capability(contract, &request.capability)?;
+    validate_v1_multi_input_contract(&request, contract.roles, contract.parameters)?;
+    let (request, verified_inputs) = convert_v1_request(contract, request, base_directory)?;
+    let prepared = prepare_v2_request(contract, request, Path::new("."), &verified_inputs)?;
+    execute_prepared_request(contract, prepared)
 }
 
 pub(super) fn execute_bulk_expression_v2(
@@ -136,30 +203,58 @@ pub(super) fn execute_bulk_expression_v2(
     request: JobRequestV2,
     verified_inputs: &BTreeMap<String, String>,
 ) -> WorkerResult<String> {
-    ensure_supported_capability(&request.capability)?;
-    let prepared = prepare_v2_request(request, base_directory, verified_inputs)?;
-    execute_prepared_request(prepared)
+    execute_workflow_v2(
+        &BULK_EXPRESSION_CONTRACT,
+        base_directory,
+        request,
+        verified_inputs,
+    )
+}
+
+pub(super) fn execute_sequence_convert_v2(
+    base_directory: &Path,
+    request: JobRequestV2,
+    verified_inputs: &BTreeMap<String, String>,
+) -> WorkerResult<String> {
+    execute_workflow_v2(
+        &SEQUENCE_CONVERT_CONTRACT,
+        base_directory,
+        request,
+        verified_inputs,
+    )
+}
+
+fn execute_workflow_v2(
+    contract: &WorkflowContract,
+    base_directory: &Path,
+    request: JobRequestV2,
+    verified_inputs: &BTreeMap<String, String>,
+) -> WorkerResult<String> {
+    ensure_supported_capability(contract, &request.capability)?;
+    let prepared = prepare_v2_request(contract, request, base_directory, verified_inputs)?;
+    execute_prepared_request(contract, prepared)
 }
 
 fn convert_v1_request(
+    contract: &WorkflowContract,
     request: JobRequest,
     base_directory: &Path,
 ) -> WorkerResult<(JobRequestV2, BTreeMap<String, String>)> {
-    let mut inputs = Vec::with_capacity(2);
+    let mut inputs = Vec::with_capacity(contract.roles.len());
     let mut verified_inputs = BTreeMap::new();
-    for role in ["counts", "sample_metadata"] {
+    for role in contract.roles {
         let configured = request
             .inputs
-            .get(role)
+            .get(*role)
             .ok_or_else(|| format!("{} requires inputs.{role}", request.capability))?;
         let path = canonical_existing_input(base_directory, configured)?;
-        let format = table_format_from_path(&path)?;
+        let format = sequence_or_table_format_from_path(&path)?;
         let sha256 = sha256_file(&path)?;
         let file_id = format!("input-{role}-1");
         verified_inputs.insert(file_id.clone(), sha256.clone());
         inputs.push(InputArtifact {
             artifact_id: format!("input-{role}"),
-            role: role.to_owned(),
+            role: role.to_string(),
             cardinality: InputCardinality::Single,
             files: vec![ArtifactFile {
                 file_id,
@@ -189,23 +284,25 @@ fn convert_v1_request(
 }
 
 fn prepare_v2_request(
+    contract: &WorkflowContract,
     mut request: JobRequestV2,
     base_directory: &Path,
     verified_inputs: &BTreeMap<String, String>,
 ) -> WorkerResult<PreparedWorkflowRequest> {
-    if request.inputs.len() != 2 {
+    if request.inputs.len() != contract.roles.len() {
         return Err(format!(
-            "{} requires exactly two input artifacts",
-            request.capability
+            "{} requires exactly {} input artifacts",
+            request.capability,
+            contract.roles.len()
         )
         .into());
     }
 
     let mut roles = BTreeSet::new();
-    let mut inputs = Vec::with_capacity(2);
+    let mut inputs = Vec::with_capacity(contract.roles.len());
     let mut role_hashes = BTreeMap::new();
     for artifact in &mut request.inputs {
-        if !matches!(artifact.role.as_str(), "counts" | "sample_metadata") {
+        if !contract.roles.contains(&artifact.role.as_str()) {
             return Err(format!(
                 "{} does not accept input role {}",
                 request.capability, artifact.role
@@ -219,11 +316,11 @@ fn prepare_v2_request(
             return Err(format!("input role {} requires exactly one file", artifact.role).into());
         }
         let file = &mut artifact.files[0];
-        if !matches!(file.format, BioDataFormat::Csv | BioDataFormat::Tsv) {
-            return Err(format!("input role {} requires csv or tsv format", artifact.role).into());
+        if !contract.input_formats.contains(&file.format) {
+            return Err(format!("input role {} has unsupported format", artifact.role).into());
         }
         if file.compression != CompressionFormat::None {
-            return Err("bulk expression workflow does not support compressed inputs".into());
+            return Err("workflow does not support compressed inputs".into());
         }
         let path = canonical_existing_input(base_directory, &file.path)?;
         let actual_sha256 = sha256_file(&path)?;
@@ -242,8 +339,15 @@ fn prepare_v2_request(
             sha256: actual_sha256,
         });
     }
-    if roles != BTreeSet::from(["counts".to_owned(), "sample_metadata".to_owned()]) {
-        return Err("bulk expression workflow requires counts and sample_metadata inputs".into());
+    let expected_roles: BTreeSet<String> =
+        contract.roles.iter().map(|role| role.to_string()).collect();
+    if roles != expected_roles {
+        return Err(format!(
+            "{} requires {} inputs",
+            request.capability,
+            contract.roles.join(" and ")
+        )
+        .into());
     }
 
     let output_directory = resolve_output_directory(base_directory, &request.parameters)?;
@@ -263,15 +367,37 @@ fn prepare_v2_request(
     })
 }
 
-fn execute_prepared_request(prepared: PreparedWorkflowRequest) -> WorkerResult<String> {
-    let pack = load_verified_workflow_pack()?;
+fn execute_prepared_request(
+    contract: &WorkflowContract,
+    prepared: PreparedWorkflowRequest,
+) -> WorkerResult<String> {
+    let pack = match load_verified_workflow_pack(contract) {
+        Ok(pack) => pack,
+        Err(error) => {
+            return Ok(serde_json::to_string(&AnalysisResultV2::error(
+                prepared.request.job_id,
+                prepared.request.capability,
+                "workflow_failed",
+                error.to_string(),
+                ExecutionMode::LocalCpu,
+            ))?);
+        }
+    };
     let temporary = TemporaryRequestDirectory::create()?;
     let request_path = temporary.write_request(&prepared.request)?;
     let mut output_directory = WorkflowOutputDirectory::new(prepared.output_directory.clone());
     let result_path = prepared.output_directory.join("result.json");
-    let executable = env::var_os("LINXIRA_BIO_WORKFLOW_R")
+    let (variable, fallback) = match contract.runtime {
+        WorkflowRuntimeKind::R => ("LINXIRA_BIO_WORKFLOW_R", "Rscript"),
+        WorkflowRuntimeKind::Python => (
+            "LINXIRA_BIO_WORKFLOW_PYTHON",
+            if cfg!(windows) { "python" } else { "python3" },
+        ),
+        _ => return Err("workflow runtime kind is not implemented by this worker".into()),
+    };
+    let executable = env::var_os(variable)
         .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| OsString::from("Rscript"));
+        .unwrap_or_else(|| OsString::from(fallback));
     let process = Command::new(executable)
         .arg(&pack.entrypoint)
         .arg("--request")
@@ -279,11 +405,12 @@ fn execute_prepared_request(prepared: PreparedWorkflowRequest) -> WorkerResult<S
         .arg("--result")
         .arg(&result_path)
         .current_dir(&pack.root)
+        .env("LINXIRA_BIO_CORE_VERSION", env!("CARGO_PKG_VERSION"))
         .output()?;
 
     if !result_path.is_file() {
         return Err(format!(
-            "bulk expression workflow exited with {} without a result envelope: {}",
+            "workflow exited with {} without a result envelope: {}",
             process.status,
             stderr_summary(&process.stderr)
         )
@@ -292,7 +419,7 @@ fn execute_prepared_request(prepared: PreparedWorkflowRequest) -> WorkerResult<S
     ensure_inputs_unchanged(&prepared.inputs)?;
     let result: AnalysisResultV2<serde_json::Value> =
         serde_json::from_slice(&fs::read(&result_path)?)?;
-    validate_workflow_result(&result, &prepared, &pack)?;
+    validate_workflow_result(contract, &result, &prepared, &pack)?;
     match result.status {
         JobStatus::Ok if !process.status.success() => {
             return Err(format!(
@@ -313,6 +440,7 @@ fn execute_prepared_request(prepared: PreparedWorkflowRequest) -> WorkerResult<S
 }
 
 fn validate_workflow_result(
+    contract: &WorkflowContract,
     result: &AnalysisResultV2<serde_json::Value>,
     prepared: &PreparedWorkflowRequest,
     pack: &VerifiedWorkflowPack,
@@ -333,7 +461,7 @@ fn validate_workflow_result(
     }
 
     match result.status {
-        JobStatus::Ok => validate_success_result(result, prepared, pack),
+        JobStatus::Ok => validate_success_result(contract, result, prepared, pack),
         JobStatus::Error => {
             if !result.artifacts.is_empty()
                 || !result
@@ -349,6 +477,7 @@ fn validate_workflow_result(
 }
 
 fn validate_success_result(
+    contract: &WorkflowContract,
     result: &AnalysisResultV2<serde_json::Value>,
     prepared: &PreparedWorkflowRequest,
     pack: &VerifiedWorkflowPack,
@@ -363,23 +492,34 @@ fn validate_success_result(
     if result.provenance.input_sha256 != prepared.role_hashes {
         return Err("workflow provenance input hashes do not match verified inputs".into());
     }
+    if result.provenance.core_version.as_deref() != Some(env!("CARGO_PKG_VERSION")) {
+        return Err("workflow provenance core version does not match this build".into());
+    }
     if result.provenance.dependency_lock_sha256.as_deref()
         != Some(pack.dependency_lock_sha256.as_str())
     {
         return Err("workflow provenance dependency lock hash is invalid".into());
     }
-    if result.artifacts.len() != 2 {
-        return Err("bulk expression workflow must produce exactly two artifacts".into());
+    if result.artifacts.len() != contract.artifact_count {
+        return Err(format!(
+            "workflow must produce exactly {} artifacts",
+            contract.artifact_count
+        )
+        .into());
     }
 
     let output_root = fs::canonicalize(&prepared.output_directory)?;
     let mut roles = BTreeSet::new();
     for artifact in &result.artifacts {
-        if artifact.kind != OutputArtifactKind::Table
-            || artifact.format != Some(BioDataFormat::Csv)
-            || artifact.media_type.as_deref() != Some("text/csv")
+        if artifact.kind != contract.artifact_kind
+            || !artifact
+                .format
+                .is_some_and(|format| contract.artifact_formats.contains(&format))
+            || contract
+                .artifact_media_type
+                .is_some_and(|expected| artifact.media_type.as_deref() != Some(expected))
         {
-            return Err("bulk expression workflow artifacts must be CSV tables".into());
+            return Err("workflow produced an unexpected artifact kind or format".into());
         }
         if !roles.insert(artifact.role.as_str()) {
             return Err(format!("workflow repeats artifact role {}", artifact.role).into());
@@ -402,8 +542,13 @@ fn validate_success_result(
             return Err(format!("workflow artifact metadata mismatch: {}", artifact.path).into());
         }
     }
-    if roles != BTreeSet::from(["differential-expression", "normalized-counts"]) {
-        return Err("bulk expression workflow returned unexpected artifact roles".into());
+    let expected_roles: BTreeSet<&str> = contract.artifact_roles.iter().copied().collect();
+    if roles != expected_roles {
+        return Err(format!(
+            "workflow returned unexpected artifact roles: {}",
+            roles.into_iter().collect::<Vec<_>>().join(", ")
+        )
+        .into());
     }
     Ok(())
 }
@@ -421,22 +566,38 @@ fn ensure_inputs_unchanged(inputs: &[PreparedInput]) -> WorkerResult<()> {
     Ok(())
 }
 
-fn load_verified_workflow_pack() -> WorkerResult<VerifiedWorkflowPack> {
+fn load_verified_workflow_pack(contract: &WorkflowContract) -> WorkerResult<VerifiedWorkflowPack> {
     let workflow_root = workflow_root()?;
-    let pack_root = safe_pack_path(&workflow_root, BULK_EXPRESSION_PACK_DIRECTORY)?;
+    let pack_root = safe_pack_path(&workflow_root, contract.pack_directory)?;
     let manifest_path = safe_pack_path(&pack_root, BULK_EXPRESSION_MANIFEST)?;
     let manifest: WorkflowPackManifest = serde_json::from_slice(&fs::read(&manifest_path)?)?;
-    if manifest.schema_version != "1"
-        || manifest.id != BULK_EXPRESSION_PACK_ID
-        || manifest.runtime.kind != WorkflowRuntimeKind::R
+    if manifest.schema_version != "2"
+        || manifest.id != contract.pack_id
+        || manifest.runtime.kind != contract.runtime
         || manifest.network.access != NetworkAccess::None
     {
-        return Err("bulk expression workflow manifest identity or policy is invalid".into());
+        return Err(format!(
+            "workflow manifest identity or policy is invalid: {}",
+            manifest_path.display()
+        )
+        .into());
+    }
+    if !core_compatibility_matches(
+        &manifest.runtime.core_compatibility,
+        env!("CARGO_PKG_VERSION"),
+    ) {
+        return Err(format!(
+            "workflow pack {} requires core {} but this build is {}",
+            manifest.id,
+            manifest.runtime.core_compatibility,
+            env!("CARGO_PKG_VERSION")
+        )
+        .into());
     }
     if manifest.entrypoint.arguments.as_slice()
         != ["--request", "{request}", "--result", "{result}"]
     {
-        return Err("bulk expression workflow has unsupported entrypoint arguments".into());
+        return Err("workflow has unsupported entrypoint arguments".into());
     }
     let dependency_lock_sha256 = verify_workflow_pack_files(&pack_root, &manifest)?;
     let entrypoint = safe_pack_path(&pack_root, &manifest.entrypoint.path)?;
@@ -480,7 +641,7 @@ fn canonical_workflow_root(path: &Path) -> WorkerResult<PathBuf> {
     let root = fs::canonicalize(path)?;
     if !root.is_dir()
         || !root
-            .join(BULK_EXPRESSION_PACK_DIRECTORY)
+            .join("org.linxira.bulk-expression-deseq2")
             .join(BULK_EXPRESSION_MANIFEST)
             .is_file()
     {
@@ -627,14 +788,31 @@ fn table_format_from_path(path: &Path) -> WorkerResult<BioDataFormat> {
     }
 }
 
-fn ensure_supported_capability(capability: &str) -> WorkerResult<()> {
-    if matches!(
-        capability,
-        DIFFERENTIAL_CAPABILITY | MEDICAL_BULK_CAPABILITY
-    ) {
+fn ensure_supported_capability(contract: &WorkflowContract, capability: &str) -> WorkerResult<()> {
+    if contract.capabilities.contains(&capability) {
         Ok(())
     } else {
-        Err(format!("unsupported bulk expression capability: {capability}").into())
+        Err(format!("unsupported workflow capability: {capability}").into())
+    }
+}
+
+fn sequence_or_table_format_from_path(path: &Path) -> WorkerResult<BioDataFormat> {
+    if let Ok(format) = table_format_from_path(path) {
+        return Ok(format);
+    }
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    match extension.as_str() {
+        "fa" | "fasta" | "fna" => Ok(BioDataFormat::Fasta),
+        "fq" | "fastq" => Ok(BioDataFormat::Fastq),
+        "gb" | "gbk" | "genbank" => Ok(BioDataFormat::Genbank),
+        "embl" => Ok(BioDataFormat::Embl),
+        _ => Err(
+            format!("cannot infer a supported input format from extension: .{extension}").into(),
+        ),
     }
 }
 
@@ -674,7 +852,7 @@ mod tests {
         let script_hash = format!("{:x}", Sha256::digest(b"original\n"));
         let lock_hash = format!("{:x}", Sha256::digest(b"{}\n"));
         let manifest: WorkflowPackManifest = serde_json::from_value(serde_json::json!({
-            "schema_version": "1",
+            "schema_version": "2",
             "id": "org.linxira.test",
             "version": "1.0.0",
             "publisher": {"name": "Linxira OS"},
@@ -686,6 +864,7 @@ mod tests {
             "runtime": {
                 "kind": "r",
                 "version": ">=4.6.1,<4.7.0",
+                "core_compatibility": ">=0.1.0,<1.0.0",
                 "dependency_lock": {"path": "dependencies.lock.json", "sha256": lock_hash}
             },
             "input_schema": {},

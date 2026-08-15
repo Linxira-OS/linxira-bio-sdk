@@ -15,8 +15,9 @@ the agent skills that select and validate them.
   `sequence.reverse-complement.v1`, `sequence.translate.v1`, and
   `sequence.orf.v1`, `sequence.id.normalize.v1`, `sequence.merge.v1`,
   `sequence.split.v1`, `sequence.to-table.v1`, and
-  `sequence.from-table.v1`, `sequence.kmer.count.v1`, and `primer.epcr.v1`
-  capabilities.
+  `sequence.from-table.v1`, `sequence.kmer.count.v1`, `sequence.consensus.v1`,
+  `sequence.shuffle.v1`, `sequence.convert.biopython.v1`, and
+  `primer.epcr.v1` capabilities.
 - Read `skills/analyze-fastq-quality/SKILL.md` for the implemented
   `fastq.qc.v1` capability.
 - Read `skills/process-fastq-reads/SKILL.md` for the implemented

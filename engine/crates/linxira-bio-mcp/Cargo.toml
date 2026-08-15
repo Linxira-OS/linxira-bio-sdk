@@ -1,0 +1,16 @@
+[package]
+name = "linxira-bio-mcp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "linxira-bio-mcp"
+path = "src/main.rs"
+
+[dependencies]
+linxira-bio-protocol = { version = "0.1.0", path = "../linxira-bio-protocol" }
+serde = { workspace = true }
+serde_json = { workspace = true }

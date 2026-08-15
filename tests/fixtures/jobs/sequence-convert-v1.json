@@ -1,0 +1,14 @@
+{
+  "schema_version": "1",
+  "job_id": "fixture-sequence-convert-v1",
+  "capability": "sequence.convert.biopython.v1",
+  "inputs": {
+    "sequences": "../sequences/tiny.fa"
+  },
+  "execution": {"mode": "local-cpu"},
+  "parameters": {
+    "output_directory": "../../../target/test-results/sequence-convert-v1",
+    "output_filename": "converted.genbank",
+    "output_format": "genbank"
+  }
+}
