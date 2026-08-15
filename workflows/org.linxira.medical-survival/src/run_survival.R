@@ -185,14 +185,21 @@ run_analysis <- function(config, started_at, project_library) {
   fit <- survival::survfit(formula, data = data)
   summary_fit <- summary(fit)
   group_levels <- levels(data[[config$group_column]])
+  km_table <- summary_fit$table
+  median_lookup <- if (is.matrix(km_table)) {
+    stats::setNames(km_table[, "median"], rownames(km_table))
+  } else {
+    stats::setNames(km_table["median"], rownames(km_table))
+  }
   km_rows <- lapply(seq_along(group_levels), function(index) {
     level <- group_levels[[index]]
     mask <- data[[config$group_column]] == level
+    median_value <- median_lookup[[paste0(config$group_column, "=", level)]]
     list(
       group = level,
       n = sum(mask),
       events = sum(data[[config$event_column]][mask]),
-      median_survival = if (is.na(fit[index]$median)) NA_real_ else unname(fit[index]$median)
+      median_survival = if (is.null(median_value) || is.na(median_value)) NA_real_ else unname(median_value)
     )
   })
   cox_path <- file.path(config$output_directory, "cox-results.csv")
@@ -202,9 +209,6 @@ run_analysis <- function(config, started_at, project_library) {
   utils::write.csv(cox_table, cox_path, row.names = FALSE, na = "")
   km_table <- do.call(rbind, lapply(km_rows, function(row) data.frame(row, stringsAsFactors = FALSE)))
   utils::write.csv(km_table, km_path, row.names = FALSE, na = "")
-  if (!file.exists(config$result_path)) {
-    request_error("result path directory does not exist")
-  }
   list(
     schema_version = "2",
     job_id = config$job_id,
@@ -255,7 +259,7 @@ run_analysis <- function(config, started_at, project_library) {
       input_sha256 = list(cohort = digest::digest(file = config$cohort_path, algo = "sha256", serialize = FALSE)),
       command = c("Rscript", "src/run_survival.R", "--request", "<request>", "--result", "<result>"),
       dependency_lock_sha256 = digest::digest(
-        file = file.path(SCRIPT_DIRECTORY, "dependencies.lock.json"),
+        file = file.path(PACK_ROOT, "dependencies.lock.json"),
         algo = "sha256", serialize = FALSE
       )
     ),
@@ -297,6 +301,7 @@ SCRIPT_DIRECTORY <- if (length(file_argument) == 1L) {
 } else {
   "."
 }
+PACK_ROOT <- dirname(SCRIPT_DIRECTORY)
 
 main <- function() {
   started_at <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
