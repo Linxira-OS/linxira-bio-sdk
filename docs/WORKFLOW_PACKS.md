@@ -8,6 +8,10 @@ Every installable pack must provide a manifest conforming to
 `schemas/workflow-pack-manifest.schema.json`, an immutable dependency lock,
 file checksums, SPDX-compatible license metadata, input and output schemas,
 platform declarations, resource requirements, and an explicit network policy.
+The manifest declares a `runtime.core_compatibility` semver range (for example
+`">=0.1.0,<1.0.0"`); the CLI and worker refuse to launch a pack whose range
+excludes the running core build, and every result envelope records
+`provenance.core_version` so consumers can audit which core produced it.
 The pack is installed into an application-owned user directory and never
 changes global Python, R, Java, `PATH`, or package libraries by default.
 

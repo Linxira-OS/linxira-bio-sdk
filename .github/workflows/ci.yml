@@ -186,7 +186,7 @@ jobs:
           apt-get install -y build-essential curl dirmngr git gnupg
           libgl1-mesa-dev libwayland-dev libx11-dev libxcursor-dev libxi-dev
           libxinerama-dev libxkbcommon-dev libxrandr-dev pkg-config python3
-          python3-venv
+          python3-venv nodejs npm
       - uses: actions/checkout@v7
       - name: Install R from CRAN Debian repository
         run: |
@@ -215,6 +215,12 @@ jobs:
       - run: cargo test --locked --workspace
       - run: cargo run --locked -p linxira-bio-worker -- tests/fixtures/jobs/sequence-stats.json
       - run: cargo run --locked -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
+      - name: Smoke Codex and OpenCode skill-pack installs
+        run: scripts/smoke-agent-installs.sh
+      - name: Smoke MCP server over stdio JSON-RPC
+        run: |
+          cargo build --locked -p linxira-bio-mcp
+          .venv-ci/bin/python scripts/smoke-mcp-server.py
       - run: .venv-ci/bin/python scripts/validate-repository.py
       - run: .venv-ci/bin/python -m unittest discover -s tests/python -p "test_*.py"
       - run: .venv-ci/bin/python -m unittest discover -s workflows/tests -p "test_*.py"

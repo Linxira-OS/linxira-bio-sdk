@@ -82,6 +82,14 @@ class WorkflowManifestTests(unittest.TestCase):
 
         entrypoint = manifest["entrypoint"]["path"]
         lock = manifest["runtime"]["dependency_lock"]
+        core_compatibility = manifest["runtime"]["core_compatibility"]
+        self.assertIsInstance(core_compatibility, str)
+        self.assertRegex(
+            core_compatibility,
+            r"^(>=|<=|>|<|=|~|\^)?\s*\d+\.\d+(\.\d+)?"
+            r"(\s*,\s*(>=|<=|>|<|=|~|\^)?\s*\d+\.\d+(\.\d+)?)*$",
+            "core_compatibility must be a comma-separated semver range",
+        )
         self.assertIn(entrypoint, declared)
         self.assertIn(lock["path"], declared)
         self.assertEqual(lock["sha256"].lower(), declared[lock["path"]])

@@ -3,19 +3,48 @@
 use linxira_bio_protocol::{ExecutionMode, ExecutionRequest, JobRequest};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::env;
+use std::fs;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // ---------------------------------------------------------------------------
-// Catalog (embedded at compile time)
+// Catalog (runtime-loaded with an embedded snapshot fallback)
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
 struct Catalog {
     #[serde(default)]
     capabilities: Vec<CapabilityEntry>,
+}
+
+/// Load the capability catalog from the runtime catalog root
+/// (`LINXIRA_BIO_WORKFLOW_ROOT` when set, else `<cwd>/workflows`, mirroring the
+/// CLI) and fall back to the embedded snapshot when the runtime file is absent.
+fn load_capability_catalog() -> Catalog {
+    let root = env::var_os("LINXIRA_BIO_WORKFLOW_ROOT")
+        .map(PathBuf::from)
+        .filter(|value| !value.as_os_str().is_empty())
+        .unwrap_or_else(|| PathBuf::from("workflows"));
+    let runtime_text = match fs::canonicalize(&root) {
+        Ok(root) => {
+            let candidate = root.join("capabilities").join("catalog.json");
+            if candidate.is_file() {
+                fs::read_to_string(&candidate).ok()
+            } else {
+                None
+            }
+        }
+        Err(_) => None,
+    };
+    let text = runtime_text
+        .unwrap_or_else(|| include_str!("../../../../capabilities/catalog.json").to_owned());
+    serde_json::from_str(&text).unwrap_or_else(|error| {
+        eprintln!("fatal: failed to parse catalog.json: {error}");
+        std::process::exit(1);
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -683,13 +712,7 @@ fn guess_mime_type(file_name: &str) -> &'static str {
 // ---------------------------------------------------------------------------
 
 fn main() {
-    let catalog: Catalog = {
-        let text = include_str!("../../../../capabilities/catalog.json");
-        serde_json::from_str(text).unwrap_or_else(|e| {
-            eprintln!("fatal: failed to parse catalog.json: {e}");
-            std::process::exit(1);
-        })
-    };
+    let catalog: Catalog = load_capability_catalog();
 
     let worker_path = match find_worker_binary() {
         Some(p) => p,
