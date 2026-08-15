@@ -17,6 +17,10 @@ const DIFFERENTIAL_SHA256: &str =
 const NORMALIZED_SHA256: &str =
     "f63b397d6544a76359ff7514371ac7b0713eaefc35c6508ff1e1e72298d13625";
 
+fn core_version() -> String {
+    env::var("LINXIRA_BIO_CORE_VERSION").unwrap_or_else(|_| "unknown".to_owned())
+}
+
 fn main() -> ExitCode {
     let arguments = env::args_os().skip(1).collect::<Vec<_>>();
     let is_deseq2 = path_ends_with(&arguments[0], "run_deseq2.R");
@@ -129,6 +133,7 @@ fn run_convert_stub(
             "\"role\":\"converted-sequences\",\"kind\":\"domain-file\",\"path\":{},",
             "\"format\":\"{}\",\"size_bytes\":{},\"sha256\":\"{}\"}}],",
             "\"provenance\":{{\"engine_version\":\"stub-1\",\"execution_mode\":\"local-cpu\",",
+            "\"core_version\":\"{}\",",
             "\"software\":[],\"input_sha256\":{{\"sequences\":\"{}\"}},",
             "\"dependency_lock_sha256\":\"{}\"}},\"diagnostics\":[]}}"
         ),
@@ -139,6 +144,7 @@ fn run_convert_stub(
         output_format,
         CONVERTED.len(),
         CONVERTED_SHA256,
+        core_version(),
         TINY_FA_SHA256,
         lock_sha256,
     );
@@ -176,6 +182,7 @@ fn success_envelope(
             "\"kind\":\"table\",\"path\":{},\"format\":\"csv\",\"media_type\":\"text/csv\",",
             "\"size_bytes\":71,\"sha256\":\"{}\"}}],",
             "\"provenance\":{{\"engine_version\":\"stub-1\",\"execution_mode\":\"local-cpu\",",
+            "\"core_version\":\"{}\",",
             "\"software\":[],\"input_sha256\":{{\"counts\":\"{}\",",
             "\"sample_metadata\":\"{}\"}},\"dependency_lock_sha256\":\"{}\"}},",
             "\"diagnostics\":{}}}"
@@ -186,6 +193,7 @@ fn success_envelope(
         DIFFERENTIAL_SHA256,
         json_quote(&normalized.to_string_lossy()),
         NORMALIZED_SHA256,
+        core_version(),
         COUNTS_SHA256,
         SAMPLES_SHA256,
         lock_sha256,
@@ -204,11 +212,13 @@ fn error_envelope(job_id: &str, capability: &str) -> String {
             "{{\"schema_version\":\"2\",\"job_id\":{},\"capability\":{},",
             "\"status\":\"error\",\"result\":{{}},\"artifacts\":[],",
             "\"provenance\":{{\"engine_version\":\"stub-1\",",
-            "\"execution_mode\":\"local-cpu\",\"software\":[],\"input_sha256\":{{}}}},",
+            "\"execution_mode\":\"local-cpu\",\"core_version\":\"{}\",",
+            "\"software\":[],\"input_sha256\":{{}}}},",
             "\"diagnostics\":{}}}"
         ),
         json_quote(job_id),
         json_quote(capability),
+        core_version(),
         diagnostics
     )
 }

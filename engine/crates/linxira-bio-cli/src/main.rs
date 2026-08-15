@@ -100,6 +100,7 @@ use linxira_bio_core::variant_transform::{
 use linxira_bio_export::export_json_file;
 use linxira_bio_protocol::{
     AnalysisResult, ExecutionMode, WorkflowPackManifest, WorkflowRuntimeKind,
+    semver_range::core_compatibility_matches,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -112,6 +113,51 @@ use std::process::{Command, ExitCode};
 
 const CAPABILITY_CATALOG: &str = include_str!("../../../../capabilities/catalog.json");
 const WORKFLOW_CATALOG: &str = include_str!("../../../../workflows/catalog.json");
+
+/// Resolve `relative` (e.g. `capabilities/catalog.json`) under the runtime
+/// catalog root. The runtime root is `LINXIRA_BIO_WORKFLOW_ROOT` when set and
+/// non-empty, otherwise `<cwd>/workflows`. Returns `None` when the root or the
+/// file does not exist so callers can fall back to the embedded snapshot.
+fn runtime_catalog_file(relative: &str) -> Result<Option<PathBuf>, Box<dyn Error>> {
+    let root = env::var_os("LINXIRA_BIO_WORKFLOW_ROOT")
+        .map(PathBuf::from)
+        .filter(|value| !value.as_os_str().is_empty())
+        .unwrap_or_else(|| PathBuf::from("workflows"));
+    let root = match fs::canonicalize(&root) {
+        Ok(root) => root,
+        Err(_) => return Ok(None),
+    };
+    let candidate = root.join(relative);
+    if candidate.is_file() {
+        Ok(Some(candidate))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Load the capability catalog: the runtime file when present, else the
+/// embedded snapshot. A present-but-invalid runtime catalog is an error.
+fn load_capability_catalog() -> Result<serde_json::Value, Box<dyn Error>> {
+    match runtime_catalog_file("capabilities/catalog.json")? {
+        Some(path) => {
+            let text = fs::read_to_string(&path)?;
+            let catalog: serde_json::Value = serde_json::from_str(&text)?;
+            if catalog
+                .get("schema_version")
+                .and_then(serde_json::Value::as_str)
+                != Some("1")
+            {
+                return Err(format!(
+                    "runtime capability catalog has an unsupported schema: {}",
+                    path.display()
+                )
+                .into());
+            }
+            Ok(catalog)
+        }
+        None => Ok(serde_json::from_str(CAPABILITY_CATALOG)?),
+    }
+}
 
 #[derive(Debug, Deserialize)]
 struct WorkflowCatalog {
@@ -699,25 +745,30 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
 }
 
 fn print_capabilities(json: bool) -> Result<(), Box<dyn Error>> {
+    let source = runtime_catalog_file("capabilities/catalog.json")?;
+    let catalog = load_capability_catalog()?;
     if json {
-        println!("{CAPABILITY_CATALOG}");
-    } else {
-        let catalog: serde_json::Value = serde_json::from_str(CAPABILITY_CATALOG)?;
-        println!("Available:");
-        if let Some(capabilities) = catalog
-            .get("capabilities")
-            .and_then(serde_json::Value::as_array)
-        {
-            for capability in capabilities.iter().filter(|capability| {
-                capability.get("status").and_then(serde_json::Value::as_str) == Some("available")
-            }) {
-                if let Some(id) = capability.get("id").and_then(serde_json::Value::as_str) {
-                    println!("  {id}");
-                }
+        println!("{}", serde_json::to_string(&catalog)?);
+        return Ok(());
+    }
+    println!("Available:");
+    if let Some(capabilities) = catalog
+        .get("capabilities")
+        .and_then(serde_json::Value::as_array)
+    {
+        for capability in capabilities.iter().filter(|capability| {
+            capability.get("status").and_then(serde_json::Value::as_str) == Some("available")
+        }) {
+            if let Some(id) = capability.get("id").and_then(serde_json::Value::as_str) {
+                println!("  {id}");
             }
         }
-        println!();
-        println!("Run with --json for the complete catalog, including planned capabilities.");
+    }
+    println!();
+    println!("Run with --json for the complete catalog, including planned capabilities.");
+    match source {
+        Some(path) => println!("Catalog source: {} (runtime)", path.display()),
+        None => println!("Catalog source: embedded snapshot"),
     }
     Ok(())
 }
@@ -747,6 +798,7 @@ fn print_runtime_catalog(json: bool) -> Result<(), Box<dyn Error>> {
 }
 
 fn print_workflow_packs(json: bool) -> Result<(), Box<dyn Error>> {
+    let source = runtime_catalog_file("workflows/catalog.json")?;
     let catalog = load_workflow_catalog()?;
     if json {
         println!("{}", serde_json::to_string_pretty(&catalog.packs)?);
@@ -758,6 +810,10 @@ fn print_workflow_packs(json: bool) -> Result<(), Box<dyn Error>> {
             "{}\t{}\t{}\t{:?}\t{}",
             pack.id, pack.capability, pack.status, pack.runtime, pack.trust
         );
+    }
+    match source {
+        Some(path) => println!("Catalog source: {} (runtime)", path.display()),
+        None => println!("Catalog source: embedded snapshot"),
     }
     Ok(())
 }
@@ -805,13 +861,25 @@ fn run_workflow_pack(
         .parent()
         .ok_or("workflow manifest has no parent")?;
     let manifest: WorkflowPackManifest = serde_json::from_slice(&fs::read(&manifest_path)?)?;
-    if manifest.schema_version != "1"
+    if manifest.schema_version != "2"
         || manifest.id != pack.id
         || manifest.runtime.kind != pack.runtime
     {
         return Err(format!(
             "workflow manifest identity mismatch: {}",
             manifest_path.display()
+        )
+        .into());
+    }
+    if !core_compatibility_matches(
+        &manifest.runtime.core_compatibility,
+        env!("CARGO_PKG_VERSION"),
+    ) {
+        return Err(format!(
+            "workflow pack {} requires core {} but this build is {}",
+            manifest.id,
+            manifest.runtime.core_compatibility,
+            env!("CARGO_PKG_VERSION")
         )
         .into());
     }
@@ -842,6 +910,7 @@ fn run_workflow_pack(
         .arg("--result")
         .arg(result_path)
         .current_dir(pack_root)
+        .env("LINXIRA_BIO_CORE_VERSION", env!("CARGO_PKG_VERSION"))
         .status()?;
 
     if !result_path.is_file() {
@@ -868,7 +937,11 @@ fn run_workflow_pack(
 }
 
 fn load_workflow_catalog() -> Result<WorkflowCatalog, Box<dyn Error>> {
-    let catalog: WorkflowCatalog = serde_json::from_str(WORKFLOW_CATALOG)?;
+    let text = match runtime_catalog_file("workflows/catalog.json")? {
+        Some(path) => fs::read_to_string(&path)?,
+        None => WORKFLOW_CATALOG.to_owned(),
+    };
+    let catalog: WorkflowCatalog = serde_json::from_str(&text)?;
     validate_workflow_catalog(&catalog)?;
     Ok(catalog)
 }
@@ -1001,6 +1074,13 @@ fn validate_workflow_result(
         )
     {
         return Err("workflow output is not a valid result envelope for the request".into());
+    }
+    if result
+        .pointer("/provenance/core_version")
+        .and_then(serde_json::Value::as_str)
+        != Some(env!("CARGO_PKG_VERSION"))
+    {
+        return Err("workflow output provenance core version does not match this build".into());
     }
     Ok(())
 }
@@ -5607,7 +5687,8 @@ mod workflow_catalog_tests {
                 "schema_version": "2",
                 "job_id": "alias-test",
                 "capability": capability,
-                "status": "ok"
+                "status": "ok",
+                "provenance": {"core_version": env!("CARGO_PKG_VERSION")}
             });
             validate_workflow_result(&result, &identity).expect("matching result identity");
 
@@ -5615,7 +5696,8 @@ mod workflow_catalog_tests {
                 "schema_version": "2",
                 "job_id": "alias-test",
                 "capability": "expression.differential.v1",
-                "status": "ok"
+                "status": "ok",
+                "provenance": {"core_version": env!("CARGO_PKG_VERSION")}
             });
             if capability != "expression.differential.v1" {
                 assert!(validate_workflow_result(&wrong_result, &identity).is_err());

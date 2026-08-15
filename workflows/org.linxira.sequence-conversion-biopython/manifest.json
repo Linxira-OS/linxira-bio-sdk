@@ -1,5 +1,5 @@
 {
-  "schema_version": "1",
+  "schema_version": "2",
   "id": "org.linxira.sequence-conversion-biopython",
   "version": "0.1.0",
   "publisher": {
@@ -20,6 +20,7 @@
   "runtime": {
     "kind": "python",
     "version": "3.12.x",
+    "core_compatibility": ">=0.1.0,<1.0.0",
     "dependency_lock": {
       "path": "requirements.lock",
       "sha256": "6aca8d8da1e711d8ff977335e17a4107f1a890cc4d52eb9091d99c68de5bbe95"
@@ -71,7 +72,7 @@
     },
     {
       "path": "src/convert_sequences.py",
-      "sha256": "a592dc0df831458e2d1069ecb5ee8c3aa0381868ceb43aa6d8997b85360f5aa7"
+      "sha256": "6146cdb09ccee8b26c74b20b4e1d7144c7587614244df1363e2d41b460921db1"
     },
     {
       "path": "tests/test_convert_sequences.py",

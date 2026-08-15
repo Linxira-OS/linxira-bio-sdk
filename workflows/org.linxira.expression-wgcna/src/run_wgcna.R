@@ -12,6 +12,11 @@ PACKAGE_REQUIREMENTS <- c(
   digest = ">=0.6.37,<0.7.0"
 )
 
+core_version <- function() {
+  value <- Sys.getenv("LINXIRA_BIO_CORE_VERSION", unset = "")
+  if (nzchar(value)) value else "unknown"
+}
+
 request_error <- function(message) {
   stop(structure(list(message = message, call = NULL), class = c("request_error", "error", "condition")))
 }
@@ -166,11 +171,11 @@ minimal_error_json <- function(job_id, capability, message, started_at) {
     paste0(
       '{"schema_version":"2","job_id":%s,"capability":%s,"status":"error","result":{},',
       '"artifacts":[],"provenance":{"engine_version":"%s","execution_mode":"local-cpu",',
-      '"started_at":"%s","finished_at":"%s"},"diagnostics":[{"code":"workflow_failed",',
+      '"core_version":"%s","started_at":"%s","finished_at":"%s"},"diagnostics":[{"code":"workflow_failed",',
       '"severity":"error","message":%s}]}'
     ),
     encodeString(job_id, quote = '"'), encodeString(capability, quote = '"'),
-    PACK_VERSION, started_at, format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+    PACK_VERSION, core_version(), started_at, format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
     encodeString(message, quote = '"')
   )
 }
@@ -386,6 +391,7 @@ run_analysis <- function(config, started_at, project_library) {
     provenance = list(
       engine_version = PACK_VERSION,
       execution_mode = "local-cpu",
+      core_version = core_version(),
       started_at = started_at,
       finished_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
       software = c(list(list(name = "R", version = paste(
