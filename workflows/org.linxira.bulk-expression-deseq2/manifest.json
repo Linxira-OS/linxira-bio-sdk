@@ -10,7 +10,12 @@
   "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
   "entrypoint": {
     "path": "src/run_deseq2.R",
-    "arguments": ["--request", "{request}", "--result", "{result}"]
+    "arguments": [
+      "--request",
+      "{request}",
+      "--result",
+      "{result}"
+    ]
   },
   "runtime": {
     "kind": "r",
@@ -29,7 +34,11 @@
     "type": "object",
     "$ref": "schemas/output.schema.json"
   },
-  "platforms": ["windows-gnu", "debian", "arch"],
+  "platforms": [
+    "windows-gnu",
+    "debian",
+    "arch"
+  ],
   "network": {
     "access": "none",
     "allowed_hosts": []
@@ -69,5 +78,48 @@
       "path": "tests/test_validation.R",
       "sha256": "d72ffa181373d8981708a24c6ba0ba45b28ae52c91239d761d8e795790aa600f"
     }
-  ]
+  ],
+  "resume": {
+    "enabled": true,
+    "state_file": "resume-state.json"
+  },
+  "contract": {
+    "inputs": [
+      {
+        "role": "counts",
+        "formats": [
+          "csv",
+          "tsv"
+        ]
+      },
+      {
+        "role": "sample_metadata",
+        "formats": [
+          "csv",
+          "tsv"
+        ]
+      }
+    ],
+    "outputs": {
+      "roles": [
+        "differential-expression",
+        "normalized-counts"
+      ],
+      "kind": "table",
+      "formats": [
+        "csv"
+      ],
+      "media_type": "text/csv"
+    },
+    "parameters": [
+      "output_directory",
+      "feature_id_column",
+      "sample_id_column",
+      "condition_column",
+      "reference_level",
+      "contrast_level",
+      "alpha",
+      "min_total_count"
+    ]
+  }
 }

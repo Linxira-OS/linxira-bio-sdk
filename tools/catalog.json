@@ -9,52 +9,91 @@
     {
       "id": "scripting",
       "description": "Python, R, and Java runtimes for compatible analysis workflows",
-      "tools": ["python", "r", "java"]
+      "tools": [
+        "python",
+        "r",
+        "java"
+      ]
     },
     {
       "id": "managed-runtimes",
       "description": "User-scoped runtime managers and their Python, R, and Java runtimes",
-      "tools": ["uv", "pixi", "rig", "miniforge", "python", "r", "java"]
+      "tools": [
+        "uv",
+        "pixi",
+        "rig",
+        "miniforge",
+        "python",
+        "r",
+        "java"
+      ]
     },
     {
       "id": "containers",
       "description": "Platform-appropriate local container and Unix execution backends",
-      "tools": ["wsl-arch", "wsl-debian", "docker", "podman"]
+      "tools": [
+        "wsl-arch",
+        "wsl-debian",
+        "docker",
+        "podman"
+      ]
     },
     {
       "id": "sequence-search",
       "description": "Local nucleotide and protein database search",
-      "tools": ["ncbi-blast", "diamond", "hmmer"]
+      "tools": [
+        "ncbi-blast",
+        "diamond",
+        "hmmer"
+      ]
     },
     {
       "id": "comparative-genomics",
       "description": "Local genome collinearity and codon substitution-rate analysis",
-      "tools": ["mcscanx", "kaks-calculator"]
+      "tools": [
+        "mcscanx",
+        "kaks-calculator"
+      ]
     },
     {
       "id": "multiple-sequence-alignment",
       "description": "Local multiple sequence alignment",
-      "tools": ["muscle", "trimal"]
+      "tools": [
+        "muscle",
+        "trimal"
+      ]
     },
     {
       "id": "phylogenetics",
       "description": "Local maximum-likelihood phylogenetic inference",
-      "tools": ["iqtree"]
+      "tools": [
+        "iqtree"
+      ]
     },
     {
       "id": "motif-analysis",
       "description": "Local de novo sequence motif discovery",
-      "tools": ["meme"]
+      "tools": [
+        "meme"
+      ]
     },
     {
       "id": "protein-structure",
       "description": "Local coordinate-derived protein structure annotation",
-      "tools": ["mkdssp"]
+      "tools": [
+        "mkdssp"
+      ]
     },
     {
       "id": "genomics-cli",
       "description": "Common alignment, variant, interval, and mapping tools",
-      "tools": ["samtools", "bcftools", "bedtools", "minimap2", "snpeff"]
+      "tools": [
+        "samtools",
+        "bcftools",
+        "bedtools",
+        "minimap2",
+        "snpeff"
+      ]
     },
     {
       "id": "full-local",
@@ -91,7 +130,12 @@
       "display_name": "Conda",
       "category": "runtime-manager",
       "probes": [
-        { "program": "conda", "args": ["--version"] }
+        {
+          "program": "conda",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {}
     },
@@ -100,7 +144,14 @@
       "display_name": "Miniforge",
       "category": "runtime-manager",
       "probes": [
-        { "program": "conda", "args": ["info", "--json"], "output_contains": "miniforge" }
+        {
+          "program": "conda",
+          "args": [
+            "info",
+            "--json"
+          ],
+          "output_contains": "miniforge"
+        }
       ],
       "install": {
         "windows": {
@@ -128,7 +179,12 @@
       "display_name": "uv",
       "category": "runtime-manager",
       "probes": [
-        { "program": "uv", "args": ["--version"] }
+        {
+          "program": "uv",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -156,7 +212,12 @@
       "display_name": "Pixi",
       "category": "runtime-manager",
       "probes": [
-        { "program": "pixi", "args": ["--version"] }
+        {
+          "program": "pixi",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -184,7 +245,12 @@
       "display_name": "rig",
       "category": "runtime-manager",
       "probes": [
-        { "program": "rig", "args": ["--version"] }
+        {
+          "program": "rig",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -212,8 +278,18 @@
       "display_name": "Python",
       "category": "runtime",
       "probes": [
-        { "program": "python", "args": ["--version"] },
-        { "program": "python3", "args": ["--version"] }
+        {
+          "program": "python",
+          "args": [
+            "--version"
+          ]
+        },
+        {
+          "program": "python3",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -241,8 +317,18 @@
       "display_name": "R",
       "category": "runtime",
       "probes": [
-        { "program": "Rscript", "args": ["--version"] },
-        { "program": "R", "args": ["--version"] }
+        {
+          "program": "Rscript",
+          "args": [
+            "--version"
+          ]
+        },
+        {
+          "program": "R",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -270,8 +356,19 @@
       "display_name": "Java",
       "category": "runtime",
       "probes": [
-        { "program": "java", "args": ["-version"], "output_contains": "version" },
-        { "program": "javac", "args": ["-version"] }
+        {
+          "program": "java",
+          "args": [
+            "-version"
+          ],
+          "output_contains": "version"
+        },
+        {
+          "program": "javac",
+          "args": [
+            "-version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -299,8 +396,18 @@
       "display_name": "NCBI BLAST+",
       "category": "sequence-search",
       "probes": [
-        { "program": "blastn", "args": ["-version"] },
-        { "program": "blastp", "args": ["-version"] }
+        {
+          "program": "blastn",
+          "args": [
+            "-version"
+          ]
+        },
+        {
+          "program": "blastp",
+          "args": [
+            "-version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -328,7 +435,12 @@
       "display_name": "DIAMOND",
       "category": "sequence-search",
       "probes": [
-        { "program": "diamond", "args": ["version"] }
+        {
+          "program": "diamond",
+          "args": [
+            "version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -356,8 +468,18 @@
       "display_name": "HMMER",
       "category": "sequence-search",
       "probes": [
-        { "program": "hmmsearch", "args": ["-h"] },
-        { "program": "hmmscan", "args": ["-h"] }
+        {
+          "program": "hmmsearch",
+          "args": [
+            "-h"
+          ]
+        },
+        {
+          "program": "hmmscan",
+          "args": [
+            "-h"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -386,7 +508,11 @@
       "category": "comparative-genomics",
       "executable_env": "LINXIRA_BIO_MCSCANX",
       "probes": [
-        { "program": "MCScanX", "args": [], "output_contains": "Usage" }
+        {
+          "program": "MCScanX",
+          "args": [],
+          "output_contains": "Usage"
+        }
       ],
       "install": {}
     },
@@ -396,7 +522,13 @@
       "category": "comparative-genomics",
       "executable_env": "LINXIRA_BIO_KAKS_CALCULATOR",
       "probes": [
-        { "program": "KaKs_Calculator", "args": ["-h"], "output_contains": "KaKs" }
+        {
+          "program": "KaKs_Calculator",
+          "args": [
+            "-h"
+          ],
+          "output_contains": "KaKs"
+        }
       ],
       "install": {}
     },
@@ -405,7 +537,12 @@
       "display_name": "MUSCLE",
       "category": "multiple-sequence-alignment",
       "probes": [
-        { "program": "muscle", "args": ["-version"] }
+        {
+          "program": "muscle",
+          "args": [
+            "-version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -432,11 +569,33 @@
       "id": "trimal",
       "display_name": "trimAl",
       "category": "multiple-sequence-alignment",
-      "probes": [{ "program": "trimal", "args": ["--version"] }],
+      "probes": [
+        {
+          "program": "trimal",
+          "args": [
+            "--version"
+          ]
+        }
+      ],
       "install": {
-        "windows": {"strategy": "wsl-provider", "package": "trimal", "source_url": "https://github.com/inab/trimal", "requires_admin": true},
-        "debian": {"strategy": "apt", "package": "trimal", "source_url": "https://packages.debian.org/stable/trimal", "requires_admin": true},
-        "arch": {"strategy": "bioconda", "package": "trimal", "source_url": "https://anaconda.org/bioconda/trimal", "requires_admin": false}
+        "windows": {
+          "strategy": "wsl-provider",
+          "package": "trimal",
+          "source_url": "https://github.com/inab/trimal",
+          "requires_admin": true
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "trimal",
+          "source_url": "https://packages.debian.org/stable/trimal",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "bioconda",
+          "package": "trimal",
+          "source_url": "https://anaconda.org/bioconda/trimal",
+          "requires_admin": false
+        }
       }
     },
     {
@@ -444,35 +603,104 @@
       "display_name": "IQ-TREE",
       "category": "phylogenetics",
       "probes": [
-        { "program": "iqtree3", "args": ["--version"] },
-        { "program": "iqtree2", "args": ["--version"] }
+        {
+          "program": "iqtree3",
+          "args": [
+            "--version"
+          ]
+        },
+        {
+          "program": "iqtree2",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {
-        "windows": {"strategy": "official-archive", "package": "IQ-TREE", "source_url": "https://github.com/iqtree/iqtree3/releases", "requires_admin": false},
-        "debian": {"strategy": "apt", "package": "iqtree", "source_url": "https://packages.debian.org/stable/iqtree", "requires_admin": true},
-        "arch": {"strategy": "bioconda", "package": "iqtree", "source_url": "https://anaconda.org/bioconda/iqtree", "requires_admin": false}
+        "windows": {
+          "strategy": "official-archive",
+          "package": "IQ-TREE",
+          "source_url": "https://github.com/iqtree/iqtree3/releases",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "iqtree",
+          "source_url": "https://packages.debian.org/stable/iqtree",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "bioconda",
+          "package": "iqtree",
+          "source_url": "https://anaconda.org/bioconda/iqtree",
+          "requires_admin": false
+        }
       }
     },
     {
       "id": "meme",
       "display_name": "MEME Suite",
       "category": "motif-analysis",
-      "probes": [{ "program": "meme", "args": ["-version"] }],
+      "probes": [
+        {
+          "program": "meme",
+          "args": [
+            "-version"
+          ]
+        }
+      ],
       "install": {
-        "windows": {"strategy": "wsl-provider", "package": "meme", "source_url": "https://meme-suite.org/meme/doc/download.html", "requires_admin": true},
-        "debian": {"strategy": "apt", "package": "meme", "source_url": "https://packages.debian.org/stable/meme", "requires_admin": true},
-        "arch": {"strategy": "bioconda", "package": "meme", "source_url": "https://anaconda.org/bioconda/meme", "requires_admin": false}
+        "windows": {
+          "strategy": "wsl-provider",
+          "package": "meme",
+          "source_url": "https://meme-suite.org/meme/doc/download.html",
+          "requires_admin": true
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "meme",
+          "source_url": "https://packages.debian.org/stable/meme",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "bioconda",
+          "package": "meme",
+          "source_url": "https://anaconda.org/bioconda/meme",
+          "requires_admin": false
+        }
       }
     },
     {
       "id": "mkdssp",
       "display_name": "DSSP",
       "category": "protein-structure",
-      "probes": [{ "program": "mkdssp", "args": ["--version"] }],
+      "probes": [
+        {
+          "program": "mkdssp",
+          "args": [
+            "--version"
+          ]
+        }
+      ],
       "install": {
-        "windows": {"strategy": "wsl-provider", "package": "dssp", "source_url": "https://github.com/PDB-REDO/dssp/releases", "requires_admin": true},
-        "debian": {"strategy": "apt", "package": "dssp", "source_url": "https://packages.debian.org/stable/dssp", "requires_admin": true},
-        "arch": {"strategy": "bioconda", "package": "dssp", "source_url": "https://anaconda.org/bioconda/dssp", "requires_admin": false}
+        "windows": {
+          "strategy": "wsl-provider",
+          "package": "dssp",
+          "source_url": "https://github.com/PDB-REDO/dssp/releases",
+          "requires_admin": true
+        },
+        "debian": {
+          "strategy": "apt",
+          "package": "dssp",
+          "source_url": "https://packages.debian.org/stable/dssp",
+          "requires_admin": true
+        },
+        "arch": {
+          "strategy": "bioconda",
+          "package": "dssp",
+          "source_url": "https://anaconda.org/bioconda/dssp",
+          "requires_admin": false
+        }
       }
     },
     {
@@ -480,7 +708,12 @@
       "display_name": "samtools",
       "category": "alignment-files",
       "probes": [
-        { "program": "samtools", "args": ["--version"] }
+        {
+          "program": "samtools",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -508,7 +741,12 @@
       "display_name": "bcftools",
       "category": "variant-files",
       "probes": [
-        { "program": "bcftools", "args": ["--version"] }
+        {
+          "program": "bcftools",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -536,7 +774,12 @@
       "display_name": "bedtools",
       "category": "genome-intervals",
       "probes": [
-        { "program": "bedtools", "args": ["--version"] }
+        {
+          "program": "bedtools",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -564,7 +807,12 @@
       "display_name": "minimap2",
       "category": "read-alignment",
       "probes": [
-        { "program": "minimap2", "args": ["--version"] }
+        {
+          "program": "minimap2",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -592,7 +840,12 @@
       "display_name": "snpEff",
       "category": "variant-annotation",
       "probes": [
-        { "program": "snpEff", "args": ["-version"] }
+        {
+          "program": "snpEff",
+          "args": [
+            "-version"
+          ]
+        }
       ],
       "install": {
         "windows": {
@@ -619,11 +872,16 @@
       "id": "wsl-arch",
       "display_name": "WSL Arch Linux",
       "category": "execution",
-      "platforms": ["windows"],
+      "platforms": [
+        "windows"
+      ],
       "probes": [
         {
           "program": "wsl.exe",
-          "args": ["--list", "--quiet"],
+          "args": [
+            "--list",
+            "--quiet"
+          ],
           "output_contains": "arch"
         }
       ],
@@ -640,11 +898,16 @@
       "id": "wsl-debian",
       "display_name": "WSL Debian",
       "category": "execution",
-      "platforms": ["windows"],
+      "platforms": [
+        "windows"
+      ],
       "probes": [
         {
           "program": "wsl.exe",
-          "args": ["--list", "--quiet"],
+          "args": [
+            "--list",
+            "--quiet"
+          ],
           "output_contains": "debian"
         }
       ],
@@ -662,11 +925,16 @@
       "display_name": "Linxira WSL",
       "category": "execution",
       "status": "planned",
-      "platforms": ["windows"],
+      "platforms": [
+        "windows"
+      ],
       "probes": [
         {
           "program": "wsl.exe",
-          "args": ["--list", "--quiet"],
+          "args": [
+            "--list",
+            "--quiet"
+          ],
           "output_contains": "linxira"
         }
       ],
@@ -677,7 +945,13 @@
       "display_name": "NVIDIA GPU driver",
       "category": "acceleration",
       "probes": [
-        { "program": "nvidia-smi", "args": ["--query-gpu=name,driver_version,memory.total", "--format=csv,noheader"] }
+        {
+          "program": "nvidia-smi",
+          "args": [
+            "--query-gpu=name,driver_version,memory.total",
+            "--format=csv,noheader"
+          ]
+        }
       ],
       "install": {}
     },
@@ -686,7 +960,12 @@
       "display_name": "Docker",
       "category": "execution",
       "probes": [
-        { "program": "docker", "args": ["--version"] }
+        {
+          "program": "docker",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {}
     },
@@ -694,9 +973,17 @@
       "id": "podman",
       "display_name": "Podman",
       "category": "execution",
-      "platforms": ["debian", "arch"],
+      "platforms": [
+        "debian",
+        "arch"
+      ],
       "probes": [
-        { "program": "podman", "args": ["--version"] }
+        {
+          "program": "podman",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {
         "debian": {
@@ -718,9 +1005,47 @@
       "display_name": "Rust toolchain",
       "category": "development",
       "probes": [
-        { "program": "rustc", "args": ["--version"] }
+        {
+          "program": "rustc",
+          "args": [
+            "--version"
+          ]
+        }
       ],
       "install": {}
+    },
+    {
+      "id": "kraken2",
+      "display_name": "Kraken2",
+      "category": "taxonomic-classification",
+      "probes": [
+        {
+          "program": "kraken2",
+          "args": [
+            "--version"
+          ]
+        }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "conda",
+          "package": "kraken2",
+          "source_url": "https://anaconda.org/bioconda/kraken2",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "conda",
+          "package": "kraken2",
+          "source_url": "https://anaconda.org/bioconda/kraken2",
+          "requires_admin": false
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "kraken2",
+          "source_url": "https://archlinux.org/packages/extra/x86_64/kraken2/",
+          "requires_admin": true
+        }
+      }
     }
   ]
 }

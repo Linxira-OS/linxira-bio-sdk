@@ -49,14 +49,15 @@ use linxira_bio_core::interval::{
     IntervalMergeOptions, bed_closest_path, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
 use linxira_bio_core::native_tools::{
-    HmmerOptions, IqtreeOptions, MastOptions, MemeOptions, Minimap2LongReadOptions, Minimap2Preset,
-    MuscleOptions, ShortReadAlignmentOptions, SimilaritySearchOptions, SnpEffOptions, WgcnaOptions,
-    parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
-    parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
-    run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path,
-    run_kaks_path, run_mast_path, run_mcscanx_path, run_meme_path, run_minimap2_long_read_path,
-    run_muscle_path, run_rnafold_path, run_samtools_report_path, run_short_read_alignment_path,
-    run_snpeff_path, run_trimal_path, run_wgcna_path,
+    HmmerOptions, IqtreeOptions, Kraken2Options, MastOptions, MemeOptions, Minimap2LongReadOptions,
+    Minimap2Preset, MuscleOptions, ShortReadAlignmentOptions, SimilaritySearchOptions,
+    SnpEffOptions, WgcnaOptions, parse_blast_program, parse_diamond_mode, parse_hmmer_mode,
+    parse_meme_alphabet, parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode,
+    run_bam_to_bigwig_path, run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path,
+    run_hmmer_path, run_iqtree_path, run_kaks_path, run_kraken2_path, run_mast_path,
+    run_mcscanx_path, run_meme_path, run_minimap2_long_read_path, run_muscle_path,
+    run_rnafold_path, run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path,
+    run_trimal_path, run_wgcna_path,
 };
 use linxira_bio_core::phylogeny::{
     DistanceMatrixOptions, TreeTransformOptions, TreeVisualizationOptions, distance_matrix_path,
@@ -135,8 +136,11 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
     if request.schema_version != SCHEMA_VERSION {
         return Err(format!("unsupported job schema: {}", request.schema_version).into());
     }
-    if request.execution.mode != ExecutionMode::LocalCpu {
-        return Err("the current worker supports local-cpu execution only".into());
+    if !matches!(
+        request.execution.mode,
+        ExecutionMode::LocalCpu | ExecutionMode::Container
+    ) {
+        return Err("the current worker supports local-cpu and container execution only".into());
     }
 
     match request.capability.as_str() {
@@ -157,6 +161,7 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "comparative.kaks.v1" => run_kaks(base_directory, request),
         "comparative.dotplot.v1" => run_dotplot(base_directory, request),
         "rna.secondary-structure.v1" => run_rnafold(base_directory, request),
+        "metagenomics.classify.v1" => run_metagenomics_classify(base_directory, request),
         "enrichment.overrepresentation.v1" => {
             run_enrichment(base_directory, request, EnrichmentKind::Custom)
         }
@@ -275,8 +280,22 @@ pub fn execute_request_v2(request: JobRequestV2, base_directory: &Path) -> Worke
 }
 
 fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> WorkerResult<String> {
-    if request.execution.mode != ExecutionMode::LocalCpu {
-        return Err("the current worker supports local-cpu execution only".into());
+    if !matches!(
+        request.execution.mode,
+        ExecutionMode::LocalCpu | ExecutionMode::Container
+    ) {
+        return Err("the current worker supports local-cpu and container execution only".into());
+    }
+    if request.execution.mode == ExecutionMode::Container
+        && !matches!(
+            request.capability.as_str(),
+            "expression.differential.v1"
+                | "medical.bulk-rnaseq.v1"
+                | "expression.deseq2.v1"
+                | "sequence.convert.biopython.v1"
+        )
+    {
+        return Err("container execution is only supported for workflow pack capabilities".into());
     }
     validate_v2_contract(&request)?;
     for input in &request.inputs {
@@ -1043,6 +1062,32 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
         }
         "sequence.convert.biopython.v1" => {
             workflow::execute_sequence_convert_v2(base_directory, request, &verified_inputs)
+        }
+        "metagenomics.classify.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "reads")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let options = kraken2_options(&request.parameters)?;
+            let result = run_kraken2_path(input, &output, &options)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "abundance-table",
+                    role: "abundance",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
         }
         "expression.volcano.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "differential")?;
@@ -2190,6 +2235,16 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         "sequence.convert.biopython.v1" => (
             &["sequences"],
             &["output_directory", "output_filename", "output_format"],
+        ),
+        "metagenomics.classify.v1" => (
+            &["reads"],
+            &[
+                "output",
+                "database",
+                "confidence",
+                "minimum_hit_groups",
+                "threads",
+            ],
         ),
         "expression.volcano.v1" => (
             &["differential"],
@@ -3468,6 +3523,50 @@ fn run_rnafold(base_directory: &Path, request: JobRequest) -> WorkerResult<Strin
     let temperature = optional_parameter_f64(&request.parameters, "temperature")?.unwrap_or(37.0);
     let analysis = run_rnafold_path(input, output, temperature)?;
     serialize_v1_native_tool_result(request, analysis)
+}
+
+fn run_metagenomics_classify(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "reads",
+        &[
+            "output",
+            "database",
+            "confidence",
+            "minimum_hit_groups",
+            "threads",
+        ],
+    )?;
+    let input = resolve_required_v1_input(base_directory, &request, "reads")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let options = kraken2_options(&request.parameters)?;
+    let result = run_kraken2_path(input, output, &options)?;
+    let mut analysis = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        result.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    analysis.warnings = result.warnings;
+    Ok(serde_json::to_string(&analysis)?)
+}
+
+fn kraken2_options(parameters: &serde_json::Value) -> WorkerResult<Kraken2Options> {
+    let database = optional_parameter_string(parameters, "database")?
+        .ok_or("metagenomics.classify.v1 requires string parameters.database")?;
+    let confidence = optional_parameter_f64(parameters, "confidence")?.unwrap_or(0.0);
+    let minimum_hit_groups =
+        optional_parameter_usize(parameters, "minimum_hit_groups")?.unwrap_or(2);
+    let threads = optional_parameter_usize(parameters, "threads")?.unwrap_or(1);
+    Ok(Kraken2Options {
+        database: PathBuf::from(database),
+        confidence,
+        minimum_hit_groups,
+        threads,
+    })
 }
 
 fn dotplot_options(parameters: &serde_json::Value) -> WorkerResult<DotplotOptions> {

@@ -41,6 +41,88 @@
       },
       "additionalProperties": false
     },
+    "resume": {
+      "type": "object",
+      "required": ["enabled", "state_file"],
+      "properties": {
+        "enabled": { "const": true },
+        "state_file": {
+          "$ref": "#/$defs/relativePath",
+          "description": "State file written inside the output directory; a matching state replays the recorded result without re-running the pack"
+        }
+      },
+      "additionalProperties": false
+    },
+    "contract": {
+      "type": "object",
+      "required": ["inputs", "outputs", "parameters"],
+      "properties": {
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": ["role", "formats"],
+            "properties": {
+              "role": { "type": "string", "minLength": 1 },
+              "formats": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "fasta", "fastq", "csv", "tsv", "bed", "gff3", "gtf", "vcf", "sam",
+                    "bam", "bcf", "cram", "bigwig", "genbank", "embl", "h5ad", "loom",
+                    "hdf5", "rds", "pdb", "mmcif", "axt", "blast-tabular", "blast-xml",
+                    "protein-domains", "meme-text", "mcscanx-collinearity", "newick",
+                    "svg", "xlsx", "json", "jsonl", "parquet", "zip", "unknown"
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "required": ["roles", "kind", "formats"],
+          "properties": {
+            "roles": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "kind": { "enum": ["table", "plot", "domain-file", "log", "report", "directory"] },
+            "formats": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "fasta", "fastq", "csv", "tsv", "bed", "gff3", "gtf", "vcf", "sam",
+                  "bam", "bcf", "cram", "bigwig", "genbank", "embl", "h5ad", "loom",
+                  "hdf5", "rds", "pdb", "mmcif", "axt", "blast-tabular", "blast-xml",
+                  "protein-domains", "meme-text", "mcscanx-collinearity", "newick",
+                  "svg", "xlsx", "json", "jsonl", "parquet", "zip", "unknown"
+                ]
+              }
+            },
+            "media_type": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        "parameters": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false,
+      "description": "Explicit execution contract; executors derive input roles, formats, parameters, and artifact requirements from this declaration"
+    },
     "runtime": {
       "type": "object",
       "required": ["kind", "version", "core_compatibility", "dependency_lock"],

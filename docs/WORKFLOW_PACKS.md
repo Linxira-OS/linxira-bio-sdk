@@ -53,3 +53,32 @@ requires the managed installer, a complete
 resolved direct-and-transitive environment lock with source hashes and license
 evidence, cross-platform fixture runs, and an executor that validates the
 manifest before launch.
+
+## Resume
+
+A manifest may declare `resume: {"enabled": true, "state_file": "..."}`. When
+enabled, the worker writes a completion-state file (request identity, input
+hashes, dependency lock hash, core version, and the recorded result envelope)
+inside the output directory after a successful run. A later run with identical
+inputs, core build, and dependency lock replays the recorded envelope without
+re-invoking the pack, provided every recorded artifact still exists and
+verifies. Any mismatch — changed inputs, a stale or absent state file, an
+incomplete result, or missing artifacts — falls through to a fresh pack run.
+Interrupted runs never write state and never preserve partial output
+directories.
+
+## Container Execution
+
+Workflow packs can run with `execution: {"mode": "container"}` when a
+container runtime is available. The worker resolves `docker` then `podman`
+(override with `LINXIRA_BIO_CONTAINER_RUNTIME`) and requires
+`LINXIRA_BIO_CONTAINER_IMAGE` to name an image that already contains the
+pack's runtime and dependencies. The workflow root, the request directory, and
+every input file's parent directory are mounted read-only; the output parent
+is mounted read-write, and the entrypoint runs inside the container with the
+interpreter from `LINXIRA_BIO_CONTAINER_INTERPRETER` (default `Rscript` for R
+packs, `python3` otherwise). Result artifact paths are remapped back to host
+locations and validated exactly like local runs, and the recorded provenance
+carries `execution_mode: container`. Container execution is only accepted for
+workflow-pack capabilities; requesting it without an available runtime is a
+structured error, never a silent fallback.

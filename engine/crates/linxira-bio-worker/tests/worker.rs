@@ -1577,9 +1577,19 @@ fn executes_native_tool_workflows_with_versioned_artifacts() {
             true,
             1,
         ),
+        (
+            "metagenomics-classify-v2.json",
+            "metagenomics.classify.v1",
+            "metagenomics-classify-v2/abundance.tsv",
+            true,
+            1,
+        ),
     ];
     for (_, _, output_name, _, _) in &cases {
         let path = result_root.join(output_name);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).expect("create native-tool output directory");
+        }
         if path.exists() {
             std::fs::remove_file(path).expect("remove stale native-tool output");
         }
@@ -1600,6 +1610,7 @@ fn executes_native_tool_workflows_with_versioned_artifacts() {
             .env("LINXIRA_BIO_BAMCOVERAGE", &stub)
             .env("LINXIRA_BIO_MCSCANX", &stub)
             .env("LINXIRA_BIO_KAKS_CALCULATOR", &stub)
+            .env("LINXIRA_BIO_KRAKEN2", &stub)
             .output()
             .unwrap_or_else(|error| panic!("run {fixture}: {error}"));
         assert!(
@@ -1641,6 +1652,21 @@ fn executes_native_tool_workflows_with_versioned_artifacts() {
                         .expect("read MCScanX collinearity output")
                         .contains("## Alignment 0:")
                 );
+            }
+            if capability == "metagenomics.classify.v1" {
+                assert_eq!(result["artifacts"][0]["role"], "abundance");
+                assert_eq!(result["artifacts"][0]["format"], "tsv");
+                let table = std::fs::read_to_string(&output_path).expect("read abundance table");
+                assert!(
+                    table.starts_with(
+                        "percentage\tclade_count\ttaxon_count\trank\ttaxon_id\tname\n"
+                    )
+                );
+                assert!(table.contains("Escherichia"));
+                assert!(table.contains("unclassified"));
+                assert_eq!(result["result"]["classified_reads"], 999);
+                assert_eq!(result["result"]["unclassified_reads"], 1);
+                assert_eq!(result["result"]["total_reads"], 1000);
             }
             if capability == "comparative.kaks.v1" {
                 assert_eq!(result["artifacts"][0]["kind"], "table");
@@ -1966,6 +1992,206 @@ fn rejects_a_workflow_pack_whose_core_compatibility_excludes_this_build() {
 }
 
 #[test]
+fn resumes_a_completed_workflow_without_reinvoking_the_pack() {
+    let root = workspace_root();
+    let result_root = root.join("target/test-results");
+    std::fs::create_dir_all(&result_root).expect("create workflow result directory");
+    let stub_root =
+        std::env::temp_dir().join(format!("linxira-bio-worker-resume-{}", std::process::id()));
+    if stub_root.exists() {
+        std::fs::remove_dir_all(&stub_root).expect("remove stale resume stub directory");
+    }
+    std::fs::create_dir(&stub_root).expect("create resume stub directory");
+    let stub = compile_rscript_stub(&root, &stub_root);
+    let library = stub_root.join("r-library");
+    std::fs::create_dir(&library).expect("create isolated R library fixture");
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root.join("workflows/org.linxira.bulk-expression-deseq2/manifest.json"))
+            .expect("read bulk expression manifest"),
+    )
+    .expect("parse bulk expression manifest");
+    let lock_sha256 = manifest["runtime"]["dependency_lock"]["sha256"]
+        .as_str()
+        .expect("manifest dependency lock hash");
+    assert_eq!(manifest["resume"]["enabled"], true);
+
+    let fixture = root.join("tests/fixtures/jobs/expression-differential-v2.json");
+    let resume_output = result_root.join("expression-differential-v2-resume");
+    let changed_output = result_root.join("expression-differential-v2-resume-changed");
+    for directory in [&resume_output, &changed_output] {
+        if directory.exists() {
+            std::fs::remove_dir_all(directory).expect("remove stale workflow output");
+        }
+    }
+    let state_path = resume_output.join("resume-state.json");
+
+    // Dedicated fixture copies so runs never collide with fixed repository paths.
+    let base_fixture = |output: &std::path::Path, job_id: &str| -> serde_json::Value {
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&fixture).expect("read base fixture"))
+                .expect("parse base fixture");
+        value["job_id"] = serde_json::json!(job_id);
+        value["parameters"]["output_directory"] = serde_json::json!(output.to_string_lossy());
+        for artifact in value["inputs"].as_array_mut().expect("inputs array") {
+            for file in artifact["files"].as_array_mut().expect("files array") {
+                let relative = file["path"].as_str().expect("input path");
+                let resolved = root
+                    .join("tests/fixtures/jobs")
+                    .join(relative)
+                    .canonicalize()
+                    .expect("resolve fixture input");
+                file["path"] = serde_json::json!(resolved.to_string_lossy());
+            }
+        }
+        value
+    };
+    let run = |trace: &std::path::Path,
+               mode: Option<&str>,
+               request: &std::path::Path,
+               role_hashes: Option<&str>|
+     -> serde_json::Value {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"));
+        command
+            .arg(request)
+            .env("LINXIRA_BIO_WORKFLOW_ROOT", root.join("workflows"))
+            .env("LINXIRA_BIO_WORKFLOW_R", &stub)
+            .env("LINXIRA_BIO_WORKFLOW_R_LIBRARY", &library)
+            .env("LINXIRA_BIO_RSCRIPT_STUB_LOCK_SHA256", lock_sha256)
+            .env("LINXIRA_BIO_RSCRIPT_STUB_TRACE", trace);
+        match mode {
+            Some(mode) => {
+                command.env("LINXIRA_BIO_RSCRIPT_STUB_MODE", mode);
+            }
+            None => {
+                command.env_remove("LINXIRA_BIO_RSCRIPT_STUB_MODE");
+            }
+        }
+        match role_hashes {
+            Some(hashes) => {
+                command.env("LINXIRA_BIO_RSCRIPT_STUB_ROLE_HASHES", hashes);
+            }
+            None => {
+                command.env_remove("LINXIRA_BIO_RSCRIPT_STUB_ROLE_HASHES");
+            }
+        }
+        let output = command.output().expect("run workflow");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice(&output.stdout).expect("workflow envelope")
+    };
+    let first_request = stub_root.join("resume-first.json");
+    std::fs::write(
+        &first_request,
+        serde_json::to_vec_pretty(&base_fixture(&resume_output, "resume-first"))
+            .expect("serialize"),
+    )
+    .expect("write first fixture");
+
+    // Run 1: interrupted at step 2 (non-zero exit, no result envelope) ->
+    // error envelope, no resume state, output directory cleaned up.
+    let trace1 = stub_root.join("resume-trace-1");
+    let interrupted = run(&trace1, Some("die-at-step-2"), &first_request, None);
+    assert_eq!(interrupted["status"], "error");
+    assert!(
+        !state_path.exists(),
+        "interrupted run must not write resume state"
+    );
+    assert!(
+        !resume_output.exists(),
+        "interrupted run must not preserve a partial output directory"
+    );
+
+    // Run 2: inputs fixed -> the pack runs and records completion state.
+    let trace2 = stub_root.join("resume-trace-2");
+    let completed = run(&trace2, None, &first_request, None);
+    assert_eq!(
+        completed["status"],
+        "ok",
+        "run 2 failed: {}",
+        serde_json::to_string(&completed).expect("serialize envelope")
+    );
+    assert!(trace2.is_file(), "successful run must invoke the pack");
+    assert!(
+        state_path.is_file(),
+        "successful run must write resume state"
+    );
+
+    // Run 3: identical inputs -> replay from state; the pack is not invoked.
+    let trace3 = stub_root.join("resume-trace-3");
+    let replayed = run(&trace3, None, &first_request, None);
+    assert_eq!(replayed["status"], "ok");
+    assert_eq!(replayed["job_id"], completed["job_id"]);
+    assert_eq!(replayed["capability"], completed["capability"]);
+    assert!(
+        !trace3.exists(),
+        "resumed run must not invoke the pack again"
+    );
+
+    // Run 4: changed input invalidates the state -> the pack runs again.
+    let counts_source = root.join("tests/fixtures/expression-matrix/deseq2-counts.csv");
+    let mut changed_counts = std::fs::read_to_string(&counts_source).expect("read counts fixture");
+    changed_counts.push_str("GeneX,0,1,2,3\n");
+    let changed_input = stub_root.join("counts-modified.csv");
+    std::fs::write(&changed_input, changed_counts).expect("write modified counts");
+    let changed_size = std::fs::metadata(&changed_input)
+        .expect("modified input metadata")
+        .len();
+    let changed_hash = {
+        use sha2::{Digest, Sha256};
+        format!(
+            "{:x}",
+            Sha256::digest(std::fs::read(&changed_input).expect("read modified input"))
+        )
+    };
+    let mut changed_fixture = base_fixture(&changed_output, "resume-changed");
+    changed_fixture["inputs"][0]["files"][0]["path"] =
+        serde_json::json!(changed_input.to_string_lossy());
+    changed_fixture["inputs"][0]["files"][0]["size_bytes"] = serde_json::json!(changed_size);
+    changed_fixture["inputs"][0]["files"][0]["sha256"] = serde_json::json!(changed_hash);
+    let changed_request = stub_root.join("resume-changed.json");
+    std::fs::write(
+        &changed_request,
+        serde_json::to_vec_pretty(&changed_fixture).expect("serialize changed fixture"),
+    )
+    .expect("write changed fixture");
+
+    let trace4 = stub_root.join("resume-trace-4");
+    let samples_hash = {
+        use sha2::{Digest, Sha256};
+        format!(
+            "{:x}",
+            Sha256::digest(
+                std::fs::read(root.join("tests/fixtures/expression-matrix/deseq2-samples.csv"))
+                    .expect("read samples fixture")
+            )
+        )
+    };
+    let role_hashes_fragment = format!(
+        "\"counts\":\"{}\",\"sample_metadata\":\"{samples_hash}\"",
+        changed_hash
+    );
+    let rerun = run(&trace4, None, &changed_request, Some(&role_hashes_fragment));
+    assert_eq!(
+        rerun["status"],
+        "ok",
+        "run 4 failed: {}",
+        serde_json::to_string(&rerun).expect("serialize envelope")
+    );
+    assert!(
+        trace4.is_file(),
+        "changed inputs must invalidate the resume state and rerun the pack"
+    );
+
+    for directory in [&resume_output, &changed_output] {
+        std::fs::remove_dir_all(directory).expect("remove workflow output");
+    }
+    std::fs::remove_dir_all(stub_root).expect("remove resume stub directory");
+}
+
+#[test]
 fn executes_closest_interval_and_preranked_gsea_jobs() {
     let root = workspace_root();
     let closest_output = root.join("target/test-results/interval-closest-v2.tsv");
@@ -2018,6 +2244,201 @@ fn executes_closest_interval_and_preranked_gsea_jobs() {
             .map(|hashes| hashes.len()),
         Some(2)
     );
+}
+
+#[test]
+fn executes_a_workflow_pack_through_a_container_runtime() {
+    let root = workspace_root();
+    let result_root = root.join("target/test-results");
+    std::fs::create_dir_all(&result_root).expect("create workflow result directory");
+    let stub_root = std::env::temp_dir().join(format!(
+        "linxira-bio-worker-container-{}",
+        std::process::id()
+    ));
+    if stub_root.exists() {
+        std::fs::remove_dir_all(&stub_root).expect("remove stale container stub directory");
+    }
+    std::fs::create_dir(&stub_root).expect("create container stub directory");
+    let stub = compile_rscript_stub(&root, &stub_root);
+    let runtime = compile_container_runtime_stub(&root, &stub_root);
+    let library = stub_root.join("r-library");
+    std::fs::create_dir(&library).expect("create isolated R library fixture");
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root.join("workflows/org.linxira.bulk-expression-deseq2/manifest.json"))
+            .expect("read bulk expression manifest"),
+    )
+    .expect("parse bulk expression manifest");
+    let lock_sha256 = manifest["runtime"]["dependency_lock"]["sha256"]
+        .as_str()
+        .expect("manifest dependency lock hash");
+
+    let output_directory = result_root.join("expression-differential-v2-container");
+    if output_directory.exists() {
+        std::fs::remove_dir_all(&output_directory).expect("remove stale workflow output");
+    }
+    let mut request: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root.join("tests/fixtures/jobs/expression-differential-v2.json"))
+            .expect("read base fixture"),
+    )
+    .expect("parse base fixture");
+    request["job_id"] = serde_json::json!("fixture-container-deseq2");
+    request["execution"]["mode"] = serde_json::json!("container");
+    request["parameters"]["output_directory"] =
+        serde_json::json!(output_directory.to_string_lossy());
+    for artifact in request["inputs"].as_array_mut().expect("inputs array") {
+        for file in artifact["files"].as_array_mut().expect("files array") {
+            let relative = file["path"].as_str().expect("input path");
+            let resolved = root
+                .join("tests/fixtures/jobs")
+                .join(relative)
+                .canonicalize()
+                .expect("resolve fixture input");
+            file["path"] = serde_json::json!(resolved.to_string_lossy());
+        }
+    }
+    let request_path = stub_root.join("container-request.json");
+    std::fs::write(
+        &request_path,
+        serde_json::to_vec_pretty(&request).expect("serialize container request"),
+    )
+    .expect("write container request");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(&request_path)
+        .env("LINXIRA_BIO_WORKFLOW_ROOT", root.join("workflows"))
+        .env("LINXIRA_BIO_CONTAINER_RUNTIME", &runtime)
+        .env("LINXIRA_BIO_CONTAINER_IMAGE", "linxira-bio-fixture")
+        .env("LINXIRA_BIO_CONTAINER_INTERPRETER", &stub)
+        .env("LINXIRA_BIO_WORKFLOW_R_LIBRARY", &library)
+        .env("LINXIRA_BIO_RSCRIPT_STUB_LOCK_SHA256", lock_sha256)
+        .output()
+        .expect("run container workflow");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("container workflow envelope");
+    assert_eq!(
+        result["status"],
+        "ok",
+        "{}",
+        serde_json::to_string(&result).expect("serialize envelope")
+    );
+    assert_eq!(result["capability"], "expression.differential.v1");
+    assert_eq!(
+        result["provenance"]["execution_mode"], "container",
+        "container execution must be recorded in provenance"
+    );
+    assert_eq!(result["artifacts"].as_array().map(Vec::len), Some(2));
+    let artifact_path = result["artifacts"][0]["path"]
+        .as_str()
+        .expect("artifact path")
+        .to_owned();
+    assert!(
+        artifact_path.starts_with(&output_directory.to_string_lossy().into_owned()),
+        "artifact paths must be remapped back to host locations: {artifact_path}"
+    );
+    assert!(
+        output_directory
+            .join("differential-expression.csv")
+            .is_file()
+    );
+    assert!(output_directory.join("result.json").is_file());
+
+    std::fs::remove_dir_all(output_directory).expect("remove workflow output");
+    std::fs::remove_dir_all(stub_root).expect("remove container stub directory");
+}
+
+#[test]
+fn container_workflow_without_a_runtime_returns_a_structured_error() {
+    let root = workspace_root();
+    let result_root = root.join("target/test-results");
+    std::fs::create_dir_all(&result_root).expect("create workflow result directory");
+    let output_directory = result_root.join("expression-differential-v2-no-container");
+    if output_directory.exists() {
+        std::fs::remove_dir_all(&output_directory).expect("remove stale workflow output");
+    }
+    let mut request: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root.join("tests/fixtures/jobs/expression-differential-v2.json"))
+            .expect("read base fixture"),
+    )
+    .expect("parse base fixture");
+    request["job_id"] = serde_json::json!("fixture-container-unavailable");
+    request["execution"]["mode"] = serde_json::json!("container");
+    request["parameters"]["output_directory"] =
+        serde_json::json!(output_directory.to_string_lossy());
+    for artifact in request["inputs"].as_array_mut().expect("inputs array") {
+        for file in artifact["files"].as_array_mut().expect("files array") {
+            let relative = file["path"].as_str().expect("input path");
+            let resolved = root
+                .join("tests/fixtures/jobs")
+                .join(relative)
+                .canonicalize()
+                .expect("resolve fixture input");
+            file["path"] = serde_json::json!(resolved.to_string_lossy());
+        }
+    }
+    let request_path = output_directory
+        .parent()
+        .expect("result parent")
+        .join("no-container.json");
+    std::fs::create_dir_all(request_path.parent().expect("request parent")).expect("create dir");
+    std::fs::write(
+        &request_path,
+        serde_json::to_vec_pretty(&request).expect("serialize"),
+    )
+    .expect("write request");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(&request_path)
+        .env("LINXIRA_BIO_WORKFLOW_ROOT", root.join("workflows"))
+        .env(
+            "LINXIRA_BIO_CONTAINER_RUNTIME",
+            "definitely-not-a-runtime-xyz",
+        )
+        .env("LINXIRA_BIO_CONTAINER_IMAGE", "linxira-bio-fixture")
+        .output()
+        .expect("run unavailable container workflow");
+    assert!(output.status.success());
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("structured container error");
+    assert_eq!(result["status"], "error");
+    assert!(result["diagnostics"].as_array().is_some_and(|diagnostics| {
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic["code"] == "job-failed"
+                && diagnostic["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("container runtime"))
+        })
+    }));
+    if output_directory.exists() {
+        std::fs::remove_dir_all(output_directory).expect("remove workflow output");
+    }
+}
+
+fn compile_container_runtime_stub(
+    root: &std::path::Path,
+    output_root: &std::path::Path,
+) -> PathBuf {
+    let executable = output_root.join(format!(
+        "container-runtime-stub{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    let output = Command::new("rustc")
+        .args(["--edition", "2021"])
+        .arg(root.join("tests/fixtures/workflows/container_runtime_stub.rs"))
+        .arg("-o")
+        .arg(&executable)
+        .output()
+        .expect("compile container runtime stub");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    executable
 }
 
 fn compile_rscript_stub(root: &std::path::Path, output_root: &std::path::Path) -> PathBuf {
