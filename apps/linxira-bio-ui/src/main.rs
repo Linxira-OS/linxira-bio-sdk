@@ -185,6 +185,15 @@ enum Language {
     EnUs,
 }
 
+impl Language {
+    fn locale(self) -> &'static str {
+        match self {
+            Self::ZhCn => "zh-CN",
+            Self::EnUs => "en-US",
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum LegalDocument {
     ProjectLicense,
@@ -3288,7 +3297,7 @@ impl BioApp {
         ui.separator();
 
         if let Some(document) = capability_document(&self.document_capability, self.language) {
-            render_markdown_document(ui, document);
+            render_markdown_document(ui, &document);
         } else {
             ui.colored_label(
                 egui::Color32::from_rgb(170, 70, 40),
@@ -5343,466 +5352,54 @@ fn document_title(capability: &str, language: Language) -> &'static str {
     }
 }
 
-fn capability_document(capability: &str, language: Language) -> Option<&'static str> {
-    match (capability, language) {
-        ("dataset.inspect.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/dataset.inspect.v1/zh-CN.md"
-        )),
-        ("dataset.inspect.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/dataset.inspect.v1/en-US.md"
-        )),
-        ("table.export.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/table.export.v1/zh-CN.md"
-        )),
-        ("table.export.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/table.export.v1/en-US.md"
-        )),
-        ("table.manipulate.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/table.manipulate.v1/zh-CN.md"
-        )),
-        ("table.manipulate.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/table.manipulate.v1/en-US.md"
-        )),
-        ("sequence.stats.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/sequence.stats.v1/zh-CN.md"
-        )),
-        ("sequence.stats.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/sequence.stats.v1/en-US.md"
-        )),
-        ("sequence.kmer.count.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/sequence.kmer.count.v1/zh-CN.md"
-        )),
-        ("sequence.kmer.count.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/sequence.kmer.count.v1/en-US.md"
-        )),
-        ("primer.epcr.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/primer.epcr.v1/zh-CN.md"
-        )),
-        ("primer.epcr.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/primer.epcr.v1/en-US.md"
-        )),
-        ("fastq.qc.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/fastq.qc.v1/zh-CN.md"
-        )),
-        ("fastq.qc.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/fastq.qc.v1/en-US.md"
-        )),
-        ("fastq.trim.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/fastq.trim.v1/zh-CN.md"
-        )),
-        ("fastq.trim.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/fastq.trim.v1/en-US.md"
-        )),
-        ("fastq.adapter.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/fastq.adapter.v1/zh-CN.md"
-        )),
-        ("fastq.adapter.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/fastq.adapter.v1/en-US.md"
-        )),
-        ("fastq.deduplicate.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/fastq.deduplicate.v1/zh-CN.md"
-        )),
-        ("fastq.deduplicate.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/fastq.deduplicate.v1/en-US.md"
-        )),
-        ("alignment.qc.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/alignment.qc.v1/zh-CN.md"
-        )),
-        ("alignment.qc.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/alignment.qc.v1/en-US.md"
-        )),
-        ("alignment.bam-to-bigwig.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/alignment.bam-to-bigwig.v1/zh-CN.md"
-        )),
-        ("alignment.bam-to-bigwig.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/alignment.bam-to-bigwig.v1/en-US.md"
-        )),
-        ("annotation.gxf.stats.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/annotation.gxf.stats.v1/zh-CN.md"
-        )),
-        ("annotation.gxf.stats.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/annotation.gxf.stats.v1/en-US.md"
-        )),
-        ("annotation.gxf.normalize.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/annotation.gxf.normalize.v1/zh-CN.md"
-        )),
-        ("annotation.gxf.normalize.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/annotation.gxf.normalize.v1/en-US.md"
-        )),
-        ("annotation.gene-position.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/annotation.gene-position.v1/zh-CN.md"
-        )),
-        ("annotation.gene-position.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/annotation.gene-position.v1/en-US.md"
-        )),
-        ("annotation.sequence.extract.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/annotation.sequence.extract.v1/zh-CN.md"
-        )),
-        ("annotation.sequence.extract.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/annotation.sequence.extract.v1/en-US.md"
-        )),
-        ("annotation.structure.visualize.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/annotation.structure.visualize.v1/zh-CN.md"
-        )),
-        ("annotation.structure.visualize.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/annotation.structure.visualize.v1/en-US.md"
-        )),
-        ("comparative.synteny.visualize.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/comparative.synteny.visualize.v1/zh-CN.md"
-        )),
-        ("comparative.synteny.visualize.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/comparative.synteny.visualize.v1/en-US.md"
-        )),
-        ("comparative.mcscanx.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/comparative.mcscanx.v1/zh-CN.md"
-        )),
-        ("comparative.mcscanx.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/comparative.mcscanx.v1/en-US.md"
-        )),
-        ("comparative.kaks.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/comparative.kaks.v1/zh-CN.md"
-        )),
-        ("comparative.kaks.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/comparative.kaks.v1/en-US.md"
-        )),
-        ("annotation.go.normalize.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/annotation.go.normalize.v1/zh-CN.md"
-        )),
-        ("annotation.go.normalize.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/annotation.go.normalize.v1/en-US.md"
-        )),
-        ("annotation.eggnog.normalize.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/annotation.eggnog.normalize.v1/zh-CN.md"
-        )),
-        ("annotation.eggnog.normalize.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/annotation.eggnog.normalize.v1/en-US.md"
-        )),
-        ("enrichment.overrepresentation.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/enrichment.overrepresentation.v1/zh-CN.md"
-        )),
-        ("enrichment.overrepresentation.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/enrichment.overrepresentation.v1/en-US.md"
-        )),
-        ("enrichment.go.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/enrichment.go.v1/zh-CN.md"
-        )),
-        ("enrichment.go.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/enrichment.go.v1/en-US.md"
-        )),
-        ("enrichment.kegg.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/enrichment.kegg.v1/zh-CN.md"
-        )),
-        ("enrichment.kegg.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/enrichment.kegg.v1/en-US.md"
-        )),
-        ("enrichment.gsea.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/enrichment.gsea.v1/zh-CN.md"
-        )),
-        ("enrichment.gsea.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/enrichment.gsea.v1/en-US.md"
-        )),
-        ("enrichment.visualize.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/enrichment.visualize.v1/zh-CN.md"
-        )),
-        ("enrichment.visualize.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/enrichment.visualize.v1/en-US.md"
-        )),
-        ("genome.gene-density.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/genome.gene-density.v1/zh-CN.md"
-        )),
-        ("genome.gene-density.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/genome.gene-density.v1/en-US.md"
-        )),
-        ("interval.intersect.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/interval.intersect.v1/zh-CN.md"
-        )),
-        ("interval.intersect.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/interval.intersect.v1/en-US.md"
-        )),
-        ("interval.merge.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/interval.merge.v1/zh-CN.md"
-        )),
-        ("interval.merge.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/interval.merge.v1/en-US.md"
-        )),
-        ("interval.subtract.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/interval.subtract.v1/zh-CN.md"
-        )),
-        ("interval.subtract.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/interval.subtract.v1/en-US.md"
-        )),
-        ("interval.closest.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/interval.closest.v1/zh-CN.md"
-        )),
-        ("interval.closest.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/interval.closest.v1/en-US.md"
-        )),
-        ("expression.matrix.qc.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/expression.matrix.qc.v1/zh-CN.md"
-        )),
-        ("expression.matrix.qc.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/expression.matrix.qc.v1/en-US.md"
-        )),
-        ("expression.differential.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/expression.differential.v1/zh-CN.md"
-        )),
-        ("expression.differential.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/expression.differential.v1/en-US.md"
-        )),
-        ("medical.bulk-rnaseq.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/medical.bulk-rnaseq.v1/zh-CN.md"
-        )),
-        ("medical.bulk-rnaseq.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/medical.bulk-rnaseq.v1/en-US.md"
-        )),
-        ("medical.cohort-table.qc.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/medical.cohort-table.qc.v1/zh-CN.md"
-        )),
-        ("medical.cohort-table.qc.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/medical.cohort-table.qc.v1/en-US.md"
-        )),
-        ("medical.pathway-ruo.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/medical.pathway-ruo.v1/zh-CN.md"
-        )),
-        ("medical.pathway-ruo.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/medical.pathway-ruo.v1/en-US.md"
-        )),
-        ("medical.variant-cohort.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/medical.variant-cohort.v1/zh-CN.md"
-        )),
-        ("medical.variant-cohort.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/medical.variant-cohort.v1/en-US.md"
-        )),
-        ("medical.single-cell-qc.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/medical.single-cell-qc.v1/zh-CN.md"
-        )),
-        ("medical.single-cell-qc.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/medical.single-cell-qc.v1/en-US.md"
-        )),
-        ("expression.normalize.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/expression.normalize.v1/zh-CN.md"
-        )),
-        ("expression.normalize.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/expression.normalize.v1/en-US.md"
-        )),
-        ("expression.pca.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/expression.pca.v1/zh-CN.md"
-        )),
-        ("expression.pca.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/expression.pca.v1/en-US.md"
-        )),
-        ("expression.cluster.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/expression.cluster.v1/zh-CN.md"
-        )),
-        ("expression.cluster.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/expression.cluster.v1/en-US.md"
-        )),
-        ("expression.heatmap.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/expression.heatmap.v1/zh-CN.md"
-        )),
-        ("expression.heatmap.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/expression.heatmap.v1/en-US.md"
-        )),
-        ("expression.volcano.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/expression.volcano.v1/zh-CN.md"
-        )),
-        ("expression.volcano.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/expression.volcano.v1/en-US.md"
-        )),
-        ("motif.visualize.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/motif.visualize.v1/zh-CN.md"
-        )),
-        ("motif.visualize.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/motif.visualize.v1/en-US.md"
-        )),
-        ("set.venn.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/set.venn.v1/zh-CN.md"
-        )),
-        ("set.venn.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/set.venn.v1/en-US.md"
-        )),
-        ("set.upset.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/set.upset.v1/zh-CN.md"
-        )),
-        ("set.upset.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/set.upset.v1/en-US.md"
-        )),
-        ("protein.properties.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/protein.properties.v1/zh-CN.md"
-        )),
-        ("protein.properties.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/protein.properties.v1/en-US.md"
-        )),
-        ("similarity.blast.local.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/similarity.blast.local.v1/zh-CN.md"
-        )),
-        ("similarity.blast.local.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/similarity.blast.local.v1/en-US.md"
-        )),
-        ("similarity.diamond.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/similarity.diamond.v1/zh-CN.md"
-        )),
-        ("similarity.diamond.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/similarity.diamond.v1/en-US.md"
-        )),
-        ("similarity.hmmer.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/similarity.hmmer.v1/zh-CN.md"
-        )),
-        ("similarity.hmmer.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/similarity.hmmer.v1/en-US.md"
-        )),
-        ("similarity.blast.parse.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/similarity.blast.parse.v1/zh-CN.md"
-        )),
-        ("similarity.blast.parse.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/similarity.blast.parse.v1/en-US.md"
-        )),
-        ("similarity.reciprocal.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/similarity.reciprocal.v1/zh-CN.md"
-        )),
-        ("similarity.reciprocal.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/similarity.reciprocal.v1/en-US.md"
-        )),
-        ("protein.domain.parse.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/protein.domain.parse.v1/zh-CN.md"
-        )),
-        ("protein.domain.parse.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/protein.domain.parse.v1/en-US.md"
-        )),
-        ("protein.domain.visualize.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/protein.domain.visualize.v1/zh-CN.md"
-        )),
-        ("protein.domain.visualize.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/protein.domain.visualize.v1/en-US.md"
-        )),
-        ("phylogeny.tree.transform.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/phylogeny.tree.transform.v1/zh-CN.md"
-        )),
-        ("phylogeny.tree.transform.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/phylogeny.tree.transform.v1/en-US.md"
-        )),
-        ("msa.muscle.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/msa.muscle.v1/zh-CN.md"
-        )),
-        ("msa.muscle.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/msa.muscle.v1/en-US.md"
-        )),
-        ("msa.trimal.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/msa.trimal.v1/zh-CN.md"
-        )),
-        ("msa.trimal.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/msa.trimal.v1/en-US.md"
-        )),
-        ("phylogeny.iqtree.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/phylogeny.iqtree.v1/zh-CN.md"
-        )),
-        ("phylogeny.iqtree.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/phylogeny.iqtree.v1/en-US.md"
-        )),
-        ("motif.meme.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/motif.meme.v1/zh-CN.md"
-        )),
-        ("motif.meme.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/motif.meme.v1/en-US.md"
-        )),
-        ("variant.stats.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/variant.stats.v1/zh-CN.md"
-        )),
-        ("variant.stats.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/variant.stats.v1/en-US.md"
-        )),
-        ("variant.filter.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/variant.filter.v1/zh-CN.md"
-        )),
-        ("variant.filter.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/variant.filter.v1/en-US.md"
-        )),
-        ("variant.normalize.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/variant.normalize.v1/zh-CN.md"
-        )),
-        ("variant.normalize.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/variant.normalize.v1/en-US.md"
-        )),
-        ("structure.pdb.summary.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/structure.pdb.summary.v1/zh-CN.md"
-        )),
-        ("structure.pdb.summary.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/structure.pdb.summary.v1/en-US.md"
-        )),
-        ("structure.viewer.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/structure.viewer.v1/zh-CN.md"
-        )),
-        ("structure.viewer.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/structure.viewer.v1/en-US.md"
-        )),
-        ("structure.mmcif.summary.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/structure.mmcif.summary.v1/zh-CN.md"
-        )),
-        ("structure.mmcif.summary.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/structure.mmcif.summary.v1/en-US.md"
-        )),
-        ("structure.sequence.extract.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/structure.sequence.extract.v1/zh-CN.md"
-        )),
-        ("structure.sequence.extract.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/structure.sequence.extract.v1/en-US.md"
-        )),
-        ("structure.contact-map.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/structure.contact-map.v1/zh-CN.md"
-        )),
-        ("structure.contact-map.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/structure.contact-map.v1/en-US.md"
-        )),
-        ("structure.geometry.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/structure.geometry.v1/zh-CN.md"
-        )),
-        ("structure.geometry.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/structure.geometry.v1/en-US.md"
-        )),
-        ("structure.superpose.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/structure.superpose.v1/zh-CN.md"
-        )),
-        ("structure.superpose.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/structure.superpose.v1/en-US.md"
-        )),
-        ("protein.secondary-structure.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/protein.secondary-structure.v1/zh-CN.md"
-        )),
-        ("protein.secondary-structure.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/protein.secondary-structure.v1/en-US.md"
-        )),
-        ("environment.audit.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/environment.audit.v1/zh-CN.md"
-        )),
-        ("environment.audit.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/environment.audit.v1/en-US.md"
-        )),
-        ("environment.plan.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/environment.plan.v1/zh-CN.md"
-        )),
-        ("environment.plan.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/environment.plan.v1/en-US.md"
-        )),
-        ("runtime.catalog.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/runtime.catalog.v1/zh-CN.md"
-        )),
-        ("runtime.catalog.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/runtime.catalog.v1/en-US.md"
-        )),
-        ("system.doctor.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/system.doctor.v1/zh-CN.md"
-        )),
-        ("system.doctor.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/system.doctor.v1/en-US.md"
-        )),
-        ("system.worker.v1", Language::ZhCn) => Some(include_str!(
-            "../../../docs/capabilities/system.worker.v1/zh-CN.md"
-        )),
-        ("system.worker.v1", Language::EnUs) => Some(include_str!(
-            "../../../docs/capabilities/system.worker.v1/en-US.md"
-        )),
-        _ => None,
+fn capability_document(capability: &str, language: Language) -> Option<String> {
+    capability_document_from_root(docs_root().as_deref(), capability, language).or_else(|| {
+        docs_snapshot::embedded_document(capability, language.locale()).map(str::to_owned)
+    })
+}
+
+/// Read a capability document from an explicit documentation root.
+fn capability_document_from_root(
+    root: Option<&Path>,
+    capability: &str,
+    language: Language,
+) -> Option<String> {
+    let root = root?;
+    let path = root
+        .join("capabilities")
+        .join(capability)
+        .join(format!("{}.md", language.locale()));
+    fs::read_to_string(path).ok()
+}
+
+/// Resolve the documentation root: `LINXIRA_BIO_DOCS_ROOT` when set, then
+/// exe-relative locations, then the development tree.
+fn docs_root() -> Option<PathBuf> {
+    if let Some(configured) = std::env::var_os("LINXIRA_BIO_DOCS_ROOT")
+        && !configured.is_empty()
+    {
+        return Some(PathBuf::from(configured));
     }
+    if let Ok(executable) = std::env::current_exe() {
+        for candidate in [
+            executable.parent()?.join("docs"),
+            executable.parent()?.join("resources/docs"),
+            executable.parent()?.join("../share/linxira-bio/docs"),
+        ] {
+            if candidate.is_dir() {
+                return Some(candidate);
+            }
+        }
+    }
+    let development = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../docs");
+    if development.is_dir() {
+        return Some(development);
+    }
+    None
+}
+
+mod docs_snapshot {
+    include!("docs_snapshot.rs");
 }
 
 fn analysis_export_basename(result: &Value) -> String {
@@ -6209,11 +5806,11 @@ mod tests {
         AnalysisRoute, DOCUMENTED_CAPABILITIES, DatasetState, ImportPathIssue, Language,
         analysis_export_basename, analysis_result_matches, analysis_route_for_capability,
         analysis_route_for_format, build_analysis_request, capability_document,
-        capability_output_extension, capability_requires_secondary, derived_analysis_output_path,
-        format_hint, generation_matches, importable_file_path, inspection_is_runnable,
-        inspection_state, load_dependency_notices_from, looks_like_drive_relative_path, new_job_id,
-        notice_platform_target_pair_is_valid, render_dependency_notice_report,
-        secondary_input_matches, secondary_input_role,
+        capability_document_from_root, capability_output_extension, capability_requires_secondary,
+        derived_analysis_output_path, format_hint, generation_matches, importable_file_path,
+        inspection_is_runnable, inspection_state, load_dependency_notices_from,
+        looks_like_drive_relative_path, new_job_id, notice_platform_target_pair_is_valid,
+        render_dependency_notice_report, secondary_input_matches, secondary_input_role,
     };
     use linxira_bio_protocol::ExecutionMode;
     use serde_json::json;
@@ -6892,6 +6489,32 @@ mod tests {
             assert!(capability_document(capability, Language::ZhCn).is_some());
             assert!(capability_document(capability, Language::EnUs).is_some());
         }
+    }
+
+    #[test]
+    fn documentation_loads_from_an_external_root_with_embedded_fallback() {
+        let root = std::env::temp_dir().join(format!(
+            "linxira-bio-ui-docs-{}-{}",
+            std::process::id(),
+            super::new_job_id()
+        ));
+        let directory = root.join("capabilities/sequence.stats.v1");
+        fs::create_dir_all(&directory).expect("create external docs directory");
+        fs::write(directory.join("en-US.md"), "# External documentation\n").expect("write doc");
+
+        let document =
+            capability_document_from_root(Some(&root), "sequence.stats.v1", Language::EnUs)
+                .expect("external document");
+        assert_eq!(document, "# External documentation\n");
+        assert!(
+            capability_document_from_root(Some(&root), "sequence.stats.v1", Language::ZhCn)
+                .is_none(),
+            "missing locale in the external root must not leak the embedded copy"
+        );
+        let fallback =
+            capability_document("dataset.inspect.v1", Language::EnUs).expect("document available");
+        assert!(fallback.starts_with("# "));
+        fs::remove_dir_all(root).expect("remove external docs directory");
     }
 
     #[test]

@@ -2,8 +2,8 @@ use super::{WorkerResult, sha256_file, validate_v1_multi_input_contract};
 use linxira_bio_protocol::{
     AnalysisResultV2, ArtifactFile, BioDataFormat, CompressionFormat, DiagnosticSeverity,
     ExecutionMode, InputArtifact, InputCardinality, JobRequest, JobRequestV2, JobStatus,
-    NetworkAccess, OutputArtifactKind, WorkflowPackManifest, WorkflowRuntimeKind,
-    semver_range::core_compatibility_matches,
+    NetworkAccess, OutputArtifactKind, WorkflowPackManifest, WorkflowResumeConfig,
+    WorkflowRuntimeKind, semver_range::core_compatibility_matches,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -14,76 +14,212 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use serde::{Deserialize, Serialize};
+
 const BULK_EXPRESSION_MANIFEST: &str = "manifest.json";
 const MEDICAL_BULK_CAPABILITY: &str = "medical.bulk-rnaseq.v1";
+const BULK_EXPRESSION_PACK: &str = "org.linxira.bulk-expression-deseq2";
+const SEQUENCE_CONVERT_PACK: &str = "org.linxira.sequence-conversion-biopython";
 
+#[derive(Debug, Clone, PartialEq)]
 struct WorkflowContract {
-    capabilities: &'static [&'static str],
-    pack_id: &'static str,
-    pack_directory: &'static str,
-    roles: &'static [&'static str],
-    input_formats: &'static [BioDataFormat],
-    parameters: &'static [&'static str],
+    capabilities: Vec<String>,
+    pack_id: String,
+    pack_directory: String,
+    roles: Vec<String>,
+    input_formats: Vec<BioDataFormat>,
+    parameters: Vec<String>,
     artifact_count: usize,
-    artifact_roles: &'static [&'static str],
+    artifact_roles: Vec<String>,
     artifact_kind: OutputArtifactKind,
-    artifact_formats: &'static [BioDataFormat],
-    artifact_media_type: Option<&'static str>,
+    artifact_formats: Vec<BioDataFormat>,
+    artifact_media_type: Option<String>,
     runtime: WorkflowRuntimeKind,
 }
 
-const BULK_EXPRESSION_CONTRACT: WorkflowContract = WorkflowContract {
-    capabilities: &[
-        "expression.differential.v1",
-        "medical.bulk-rnaseq.v1",
-        "expression.deseq2.v1",
-    ],
-    pack_id: "org.linxira.bulk-expression-deseq2",
-    pack_directory: "org.linxira.bulk-expression-deseq2",
-    roles: &["counts", "sample_metadata"],
-    input_formats: &[BioDataFormat::Csv, BioDataFormat::Tsv],
-    parameters: &[
-        "output_directory",
-        "feature_id_column",
-        "sample_id_column",
-        "condition_column",
-        "reference_level",
-        "contrast_level",
-        "alpha",
-        "min_total_count",
-    ],
-    artifact_count: 2,
-    artifact_roles: &["differential-expression", "normalized-counts"],
-    artifact_kind: OutputArtifactKind::Table,
-    artifact_formats: &[BioDataFormat::Csv],
-    artifact_media_type: Some("text/csv"),
-    runtime: WorkflowRuntimeKind::R,
-};
+/// Release fallback contracts used when a pack manifest does not declare an
+/// explicit `contract` (for example a third-party pack predating the
+/// declaration). Official packs must declare the contract.
+fn bulk_expression_fallback_contract() -> WorkflowContract {
+    WorkflowContract {
+        capabilities: vec![
+            "expression.differential.v1".to_owned(),
+            "medical.bulk-rnaseq.v1".to_owned(),
+            "expression.deseq2.v1".to_owned(),
+        ],
+        pack_id: BULK_EXPRESSION_PACK.to_owned(),
+        pack_directory: BULK_EXPRESSION_PACK.to_owned(),
+        roles: vec!["counts".to_owned(), "sample_metadata".to_owned()],
+        input_formats: vec![BioDataFormat::Csv, BioDataFormat::Tsv],
+        parameters: vec![
+            "output_directory".to_owned(),
+            "feature_id_column".to_owned(),
+            "sample_id_column".to_owned(),
+            "condition_column".to_owned(),
+            "reference_level".to_owned(),
+            "contrast_level".to_owned(),
+            "alpha".to_owned(),
+            "min_total_count".to_owned(),
+        ],
+        artifact_count: 2,
+        artifact_roles: vec![
+            "differential-expression".to_owned(),
+            "normalized-counts".to_owned(),
+        ],
+        artifact_kind: OutputArtifactKind::Table,
+        artifact_formats: vec![BioDataFormat::Csv],
+        artifact_media_type: Some("text/csv".to_owned()),
+        runtime: WorkflowRuntimeKind::R,
+    }
+}
 
-const SEQUENCE_CONVERT_CONTRACT: WorkflowContract = WorkflowContract {
-    capabilities: &["sequence.convert.biopython.v1"],
-    pack_id: "org.linxira.sequence-conversion-biopython",
-    pack_directory: "org.linxira.sequence-conversion-biopython",
-    roles: &["sequences"],
-    input_formats: &[
-        BioDataFormat::Fasta,
-        BioDataFormat::Fastq,
-        BioDataFormat::Genbank,
-        BioDataFormat::Embl,
-    ],
-    parameters: &["output_directory", "output_filename", "output_format"],
-    artifact_count: 1,
-    artifact_roles: &["converted-sequences"],
-    artifact_kind: OutputArtifactKind::DomainFile,
-    artifact_formats: &[
-        BioDataFormat::Fasta,
-        BioDataFormat::Fastq,
-        BioDataFormat::Genbank,
-        BioDataFormat::Embl,
-    ],
-    artifact_media_type: None,
-    runtime: WorkflowRuntimeKind::Python,
-};
+fn sequence_convert_fallback_contract() -> WorkflowContract {
+    WorkflowContract {
+        capabilities: vec!["sequence.convert.biopython.v1".to_owned()],
+        pack_id: SEQUENCE_CONVERT_PACK.to_owned(),
+        pack_directory: SEQUENCE_CONVERT_PACK.to_owned(),
+        roles: vec!["sequences".to_owned()],
+        input_formats: vec![
+            BioDataFormat::Fasta,
+            BioDataFormat::Fastq,
+            BioDataFormat::Genbank,
+            BioDataFormat::Embl,
+        ],
+        parameters: vec![
+            "output_directory".to_owned(),
+            "output_filename".to_owned(),
+            "output_format".to_owned(),
+        ],
+        artifact_count: 1,
+        artifact_roles: vec!["converted-sequences".to_owned()],
+        artifact_kind: OutputArtifactKind::DomainFile,
+        artifact_formats: vec![
+            BioDataFormat::Fasta,
+            BioDataFormat::Fastq,
+            BioDataFormat::Genbank,
+            BioDataFormat::Embl,
+        ],
+        artifact_media_type: None,
+        runtime: WorkflowRuntimeKind::Python,
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct WorkflowCatalogEntry {
+    id: String,
+    capability: String,
+    #[serde(default)]
+    capability_aliases: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WorkflowCatalog {
+    schema_version: String,
+    packs: Vec<WorkflowCatalogEntry>,
+}
+
+/// Resolve the workflow-pack catalog: the runtime catalog below the workflow
+/// root when present, else the embedded release snapshot.
+fn load_workflow_catalog() -> WorkerResult<WorkflowCatalog> {
+    const EMBEDDED: &str = include_str!("../../../../workflows/catalog.json");
+    let text = match workflow_root() {
+        Ok(root) => {
+            let candidate = root.join("workflows").join("catalog.json");
+            if candidate.is_file() {
+                fs::read_to_string(&candidate)?
+            } else {
+                EMBEDDED.to_owned()
+            }
+        }
+        Err(_) => EMBEDDED.to_owned(),
+    };
+    let catalog: WorkflowCatalog = serde_json::from_str(&text)?;
+    if catalog.schema_version != "1" || catalog.packs.is_empty() {
+        return Err("workflow catalog is invalid".into());
+    }
+    Ok(catalog)
+}
+
+/// Load the execution contract for a workflow pack. The pack's manifest
+/// `contract` declaration is authoritative; the release fallback is used only
+/// when the manifest lacks the declaration.
+fn contract_for(
+    pack_id: &str,
+    pack_directory: &str,
+    runtime: WorkflowRuntimeKind,
+) -> WorkerResult<WorkflowContract> {
+    let fallback = |mut contract: WorkflowContract| -> WorkerResult<WorkflowContract> {
+        contract.capabilities = capabilities_for_pack(pack_id)?;
+        contract.pack_id = pack_id.to_owned();
+        contract.pack_directory = pack_directory.to_owned();
+        contract.runtime = runtime;
+        Ok(contract)
+    };
+    let root = workflow_root()?;
+    let manifest_path = safe_pack_path(&root, pack_directory)?.join(BULK_EXPRESSION_MANIFEST);
+    let manifest: WorkflowPackManifest = serde_json::from_slice(&fs::read(manifest_path)?)?;
+    let Some(declared) = manifest.contract.as_ref() else {
+        return match pack_id {
+            BULK_EXPRESSION_PACK => fallback(bulk_expression_fallback_contract()),
+            SEQUENCE_CONVERT_PACK => fallback(sequence_convert_fallback_contract()),
+            _ => Err(format!("no workflow contract fallback for pack {pack_id}").into()),
+        };
+    };
+    if declared.inputs.is_empty()
+        || declared.outputs.roles.is_empty()
+        || declared.parameters.is_empty()
+    {
+        return Err(format!("workflow pack {pack_id} declares an empty contract").into());
+    }
+    let mut roles = Vec::with_capacity(declared.inputs.len());
+    let mut input_formats = Vec::new();
+    for input in &declared.inputs {
+        if roles.contains(&input.role) {
+            return Err(
+                format!("workflow pack {pack_id} repeats input role {}", input.role).into(),
+            );
+        }
+        roles.push(input.role.clone());
+        for format in &input.formats {
+            if !input_formats.contains(format) {
+                input_formats.push(*format);
+            }
+        }
+    }
+    Ok(WorkflowContract {
+        capabilities: capabilities_for_pack(pack_id)?,
+        pack_id: pack_id.to_owned(),
+        pack_directory: pack_directory.to_owned(),
+        roles,
+        input_formats,
+        parameters: declared.parameters.clone(),
+        artifact_count: declared.outputs.roles.len(),
+        artifact_roles: declared.outputs.roles.clone(),
+        artifact_kind: declared.outputs.kind,
+        artifact_formats: declared.outputs.formats.clone(),
+        artifact_media_type: declared.outputs.media_type.clone(),
+        runtime,
+    })
+}
+
+/// Capabilities served by a pack, from the workflow catalog
+/// (`capability` plus `capability_aliases`).
+fn capabilities_for_pack(pack_id: &str) -> WorkerResult<Vec<String>> {
+    let catalog = load_workflow_catalog()?;
+    let entry = catalog
+        .packs
+        .iter()
+        .find(|candidate| candidate.id == pack_id)
+        .ok_or_else(|| format!("workflow catalog lacks pack {pack_id}"))?;
+    let mut capabilities = Vec::with_capacity(entry.capability_aliases.len() + 1);
+    capabilities.push(entry.capability.clone());
+    for alias in &entry.capability_aliases {
+        if !capabilities.contains(alias) {
+            capabilities.push(alias.clone());
+        }
+    }
+    Ok(capabilities)
+}
 
 static TEMPORARY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -91,6 +227,22 @@ struct VerifiedWorkflowPack {
     root: PathBuf,
     entrypoint: PathBuf,
     dependency_lock_sha256: String,
+    resume: Option<WorkflowResumeConfig>,
+}
+
+/// Completion state written into the workflow output directory when a
+/// resume-enabled pack finishes successfully. A later run with identical
+/// inputs and still-valid artifacts replays the recorded envelope.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct WorkflowResumeState {
+    schema_version: String,
+    job_id: String,
+    capability: String,
+    core_version: String,
+    execution_mode: ExecutionMode,
+    input_sha256: BTreeMap<String, String>,
+    dependency_lock_sha256: String,
+    result: AnalysisResultV2<serde_json::Value>,
 }
 
 struct PreparedInput {
@@ -112,6 +264,7 @@ struct TemporaryRequestDirectory {
 struct WorkflowOutputDirectory {
     path: PathBuf,
     preserve: bool,
+    created: bool,
 }
 
 impl TemporaryRequestDirectory {
@@ -153,9 +306,11 @@ impl Drop for TemporaryRequestDirectory {
 
 impl WorkflowOutputDirectory {
     fn new(path: PathBuf) -> Self {
+        let created = !path.exists();
         Self {
             path,
             preserve: false,
+            created,
         }
     }
 
@@ -166,7 +321,7 @@ impl WorkflowOutputDirectory {
 
 impl Drop for WorkflowOutputDirectory {
     fn drop(&mut self) {
-        if !self.preserve && self.path.exists() {
+        if self.created && !self.preserve && self.path.exists() {
             let _ = fs::remove_dir_all(&self.path);
         }
     }
@@ -176,14 +331,24 @@ pub(super) fn execute_bulk_expression_v1(
     base_directory: &Path,
     request: JobRequest,
 ) -> WorkerResult<String> {
-    execute_workflow_v1(&BULK_EXPRESSION_CONTRACT, base_directory, request)
+    let contract = contract_for(
+        BULK_EXPRESSION_PACK,
+        BULK_EXPRESSION_PACK,
+        WorkflowRuntimeKind::R,
+    )?;
+    execute_workflow_v1(&contract, base_directory, request)
 }
 
 pub(super) fn execute_sequence_convert_v1(
     base_directory: &Path,
     request: JobRequest,
 ) -> WorkerResult<String> {
-    execute_workflow_v1(&SEQUENCE_CONVERT_CONTRACT, base_directory, request)
+    let contract = contract_for(
+        SEQUENCE_CONVERT_PACK,
+        SEQUENCE_CONVERT_PACK,
+        WorkflowRuntimeKind::Python,
+    )?;
+    execute_workflow_v1(&contract, base_directory, request)
 }
 
 fn execute_workflow_v1(
@@ -192,7 +357,9 @@ fn execute_workflow_v1(
     request: JobRequest,
 ) -> WorkerResult<String> {
     ensure_supported_capability(contract, &request.capability)?;
-    validate_v1_multi_input_contract(&request, contract.roles, contract.parameters)?;
+    let roles: Vec<&str> = contract.roles.iter().map(String::as_str).collect();
+    let parameters: Vec<&str> = contract.parameters.iter().map(String::as_str).collect();
+    validate_v1_multi_input_contract(&request, &roles, &parameters)?;
     let (request, verified_inputs) = convert_v1_request(contract, request, base_directory)?;
     let prepared = prepare_v2_request(contract, request, Path::new("."), &verified_inputs)?;
     execute_prepared_request(contract, prepared)
@@ -203,12 +370,12 @@ pub(super) fn execute_bulk_expression_v2(
     request: JobRequestV2,
     verified_inputs: &BTreeMap<String, String>,
 ) -> WorkerResult<String> {
-    execute_workflow_v2(
-        &BULK_EXPRESSION_CONTRACT,
-        base_directory,
-        request,
-        verified_inputs,
-    )
+    let contract = contract_for(
+        BULK_EXPRESSION_PACK,
+        BULK_EXPRESSION_PACK,
+        WorkflowRuntimeKind::R,
+    )?;
+    execute_workflow_v2(&contract, base_directory, request, verified_inputs)
 }
 
 pub(super) fn execute_sequence_convert_v2(
@@ -216,12 +383,12 @@ pub(super) fn execute_sequence_convert_v2(
     request: JobRequestV2,
     verified_inputs: &BTreeMap<String, String>,
 ) -> WorkerResult<String> {
-    execute_workflow_v2(
-        &SEQUENCE_CONVERT_CONTRACT,
-        base_directory,
-        request,
-        verified_inputs,
-    )
+    let contract = contract_for(
+        SEQUENCE_CONVERT_PACK,
+        SEQUENCE_CONVERT_PACK,
+        WorkflowRuntimeKind::Python,
+    )?;
+    execute_workflow_v2(&contract, base_directory, request, verified_inputs)
 }
 
 fn execute_workflow_v2(
@@ -242,10 +409,10 @@ fn convert_v1_request(
 ) -> WorkerResult<(JobRequestV2, BTreeMap<String, String>)> {
     let mut inputs = Vec::with_capacity(contract.roles.len());
     let mut verified_inputs = BTreeMap::new();
-    for role in contract.roles {
+    for role in &contract.roles {
         let configured = request
             .inputs
-            .get(*role)
+            .get(role.as_str())
             .ok_or_else(|| format!("{} requires inputs.{role}", request.capability))?;
         let path = canonical_existing_input(base_directory, configured)?;
         let format = sequence_or_table_format_from_path(&path)?;
@@ -302,7 +469,7 @@ fn prepare_v2_request(
     let mut inputs = Vec::with_capacity(contract.roles.len());
     let mut role_hashes = BTreeMap::new();
     for artifact in &mut request.inputs {
-        if !contract.roles.contains(&artifact.role.as_str()) {
+        if !contract.roles.contains(&artifact.role) {
             return Err(format!(
                 "{} does not accept input role {}",
                 request.capability, artifact.role
@@ -339,8 +506,7 @@ fn prepare_v2_request(
             sha256: actual_sha256,
         });
     }
-    let expected_roles: BTreeSet<String> =
-        contract.roles.iter().map(|role| role.to_string()).collect();
+    let expected_roles: BTreeSet<String> = contract.roles.iter().cloned().collect();
     if roles != expected_roles {
         return Err(format!(
             "{} requires {} inputs",
@@ -383,9 +549,25 @@ fn execute_prepared_request(
             ))?);
         }
     };
+    if let Some(resume) = &pack.resume
+        && let Some(envelope) = try_replay_resume(contract, &prepared, &pack, resume)?
+    {
+        return Ok(envelope);
+    }
+    if prepared.output_directory.exists() {
+        return Err(format!(
+            "refusing to overwrite workflow output directory: {}",
+            prepared.output_directory.display()
+        )
+        .into());
+    }
+    if prepared.request.execution.mode == ExecutionMode::Container {
+        return execute_prepared_request_in_container(contract, prepared, pack);
+    }
+
     let temporary = TemporaryRequestDirectory::create()?;
     let request_path = temporary.write_request(&prepared.request)?;
-    let mut output_directory = WorkflowOutputDirectory::new(prepared.output_directory.clone());
+    let output_directory = WorkflowOutputDirectory::new(prepared.output_directory.clone());
     let result_path = prepared.output_directory.join("result.json");
     let (variable, fallback) = match contract.runtime {
         WorkflowRuntimeKind::R => ("LINXIRA_BIO_WORKFLOW_R", "Rscript"),
@@ -407,7 +589,214 @@ fn execute_prepared_request(
         .current_dir(&pack.root)
         .env("LINXIRA_BIO_CORE_VERSION", env!("CARGO_PKG_VERSION"))
         .output()?;
+    let result = read_result_envelope(&result_path, &process)?;
+    finalize_workflow_result(
+        contract,
+        &prepared,
+        &pack,
+        process.status,
+        output_directory,
+        result,
+    )
+}
 
+const CONTAINER_WORKFLOW_MOUNT: &str = "/linxira-bio/workflow";
+const CONTAINER_REQUEST_MOUNT: &str = "/linxira-bio/request";
+const CONTAINER_OUTPUT_MOUNT: &str = "/linxira-bio/output";
+const CONTAINER_INPUT_MOUNT: &str = "/linxira-bio/input";
+
+/// Resolve the container runtime: `LINXIRA_BIO_CONTAINER_RUNTIME` when set,
+/// otherwise the first of `docker`/`podman` that answers `--version`.
+fn container_runtime() -> WorkerResult<OsString> {
+    if let Some(configured) = env::var_os("LINXIRA_BIO_CONTAINER_RUNTIME")
+        && !configured.is_empty()
+    {
+        return Ok(configured);
+    }
+    for candidate in ["docker", "podman"] {
+        if Command::new(candidate)
+            .arg("--version")
+            .output()
+            .is_ok_and(|output| output.status.success())
+        {
+            return Ok(OsString::from(candidate));
+        }
+    }
+    Err(
+        "container execution requested but no container runtime (docker or podman) is available"
+            .into(),
+    )
+}
+
+fn container_image() -> WorkerResult<OsString> {
+    env::var_os("LINXIRA_BIO_CONTAINER_IMAGE")
+        .filter(|value| !value.is_empty())
+        .ok_or("container execution requires LINXIRA_BIO_CONTAINER_IMAGE".into())
+}
+
+fn container_interpreter(kind: WorkflowRuntimeKind) -> OsString {
+    if let Some(configured) = env::var_os("LINXIRA_BIO_CONTAINER_INTERPRETER")
+        && !configured.is_empty()
+    {
+        return configured;
+    }
+    match kind {
+        WorkflowRuntimeKind::R => OsString::from("Rscript"),
+        _ => OsString::from("python3"),
+    }
+}
+
+/// Run a workflow pack inside a container: the workflow root, request
+/// directory, and every input file parent are mounted read-only; the output
+/// parent is mounted read-write. Input and output paths in the container
+/// request are rewritten to the fixed container mount layout.
+fn execute_prepared_request_in_container(
+    contract: &WorkflowContract,
+    prepared: PreparedWorkflowRequest,
+    pack: VerifiedWorkflowPack,
+) -> WorkerResult<String> {
+    let runtime = container_runtime()?;
+    let image = container_image()?;
+    let interpreter = container_interpreter(contract.runtime);
+    let workflow_root = workflow_root()?;
+    let entrypoint_relative = pack
+        .entrypoint
+        .strip_prefix(&pack.root)
+        .map_err(|_| "container entrypoint must live inside the pack root")?
+        .to_path_buf();
+    let pack_directory = pack
+        .root
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("workflow pack root has no directory name")?
+        .to_owned();
+    let output_name = prepared
+        .output_directory
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("workflow output directory requires a final path component")?
+        .to_owned();
+    let output_parent = prepared
+        .output_directory
+        .parent()
+        .ok_or("workflow output directory has no parent")?
+        .to_path_buf();
+    let container_output_dir = format!("{CONTAINER_OUTPUT_MOUNT}/{output_name}");
+    let result_container_path = format!("{container_output_dir}/result.json");
+
+    let mut request_value = serde_json::to_value(&prepared.request)?;
+    let mut input_mounts = Vec::new();
+    let mut input_index = 0;
+    if let Some(artifacts) = request_value
+        .get_mut("inputs")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        for artifact in artifacts {
+            if let Some(files) = artifact
+                .get_mut("files")
+                .and_then(serde_json::Value::as_array_mut)
+            {
+                for file in files {
+                    let host = file
+                        .get("path")
+                        .and_then(serde_json::Value::as_str)
+                        .ok_or("container request input lacks a path")?;
+                    let host_path = Path::new(host);
+                    let parent = host_path
+                        .parent()
+                        .ok_or("container request input has no parent")?;
+                    let name = host_path
+                        .file_name()
+                        .and_then(|value| value.to_str())
+                        .ok_or("container request input has no file name")?;
+                    let mount_root = format!("{CONTAINER_INPUT_MOUNT}/{input_index}");
+                    input_mounts.push((parent.to_path_buf(), mount_root.clone()));
+                    file["path"] = serde_json::Value::String(format!("{mount_root}/{name}"));
+                    input_index += 1;
+                }
+            }
+        }
+    }
+    request_value["parameters"]["output_directory"] =
+        serde_json::Value::String(container_output_dir.clone());
+
+    let temporary = TemporaryRequestDirectory::create()?;
+    let container_request_path = temporary.path.join("request.json");
+    fs::write(&container_request_path, serde_json::to_vec(&request_value)?)?;
+
+    let mut arguments = vec![
+        OsString::from("run"),
+        OsString::from("--rm"),
+        OsString::from("-v"),
+        OsString::from(format!(
+            "{}:{CONTAINER_WORKFLOW_MOUNT}:ro",
+            workflow_root.display()
+        )),
+        OsString::from("-v"),
+        OsString::from(format!(
+            "{}:{CONTAINER_REQUEST_MOUNT}:ro",
+            temporary.path.display()
+        )),
+        OsString::from("-v"),
+        OsString::from(format!(
+            "{}:{CONTAINER_OUTPUT_MOUNT}:rw",
+            output_parent.display()
+        )),
+    ];
+    for (parent, mount) in &input_mounts {
+        arguments.push(OsString::from("-v"));
+        arguments.push(OsString::from(format!("{}:{mount}:ro", parent.display())));
+    }
+    arguments.push(OsString::from("-e"));
+    arguments.push(OsString::from(format!(
+        "LINXIRA_BIO_CORE_VERSION={}",
+        env!("CARGO_PKG_VERSION")
+    )));
+    arguments.push(image);
+    arguments.push(interpreter);
+    arguments.push(OsString::from(format!(
+        "{CONTAINER_WORKFLOW_MOUNT}/{pack_directory}/{}",
+        entrypoint_relative.display()
+    )));
+    arguments.push(OsString::from("--request"));
+    arguments.push(OsString::from(format!(
+        "{CONTAINER_REQUEST_MOUNT}/request.json"
+    )));
+    arguments.push(OsString::from("--result"));
+    arguments.push(OsString::from(result_container_path));
+
+    let process = Command::new(&runtime)
+        .args(&arguments)
+        .output()
+        .map_err(|error| {
+            format!(
+                "container runtime {} failed to start: {error}",
+                runtime.to_string_lossy()
+            )
+        })?;
+    let result_path = prepared.output_directory.join("result.json");
+    let mut result_value = read_result_value(&result_path, &process)?;
+    remap_container_artifact_paths(
+        &mut result_value,
+        &container_output_dir,
+        &prepared.output_directory,
+    )?;
+    let mut result: AnalysisResultV2<serde_json::Value> = serde_json::from_value(result_value)?;
+    result.provenance.execution_mode = ExecutionMode::Container;
+    finalize_workflow_result(
+        contract,
+        &prepared,
+        &pack,
+        process.status,
+        WorkflowOutputDirectory::new(prepared.output_directory.clone()),
+        result,
+    )
+}
+
+fn read_result_value(
+    result_path: &Path,
+    process: &std::process::Output,
+) -> WorkerResult<serde_json::Value> {
     if !result_path.is_file() {
         return Err(format!(
             "workflow exited with {} without a result envelope: {}",
@@ -416,19 +805,67 @@ fn execute_prepared_request(
         )
         .into());
     }
+    Ok(serde_json::from_slice(&fs::read(result_path)?)?)
+}
+
+fn read_result_envelope(
+    result_path: &Path,
+    process: &std::process::Output,
+) -> WorkerResult<AnalysisResultV2<serde_json::Value>> {
+    let value = read_result_value(result_path, process)?;
+    Ok(serde_json::from_value(value)?)
+}
+
+/// Rewrite container-layout artifact paths back to their host locations so the
+/// recorded envelope validates against the real output directory. Paths that
+/// are already host paths (local container-runtime emulation) pass through;
+/// the subsequent result validation enforces containment either way.
+fn remap_container_artifact_paths(
+    result: &mut serde_json::Value,
+    container_output_dir: &str,
+    host_output_dir: &Path,
+) -> WorkerResult<()> {
+    if let Some(artifacts) = result
+        .get_mut("artifacts")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        for artifact in artifacts {
+            let Some(path) = artifact.get_mut("path") else {
+                continue;
+            };
+            let Some(path_value) = path.as_str() else {
+                continue;
+            };
+            if let Some(relative) = path_value.strip_prefix(container_output_dir) {
+                *path =
+                    serde_json::Value::String(format!("{}{}", host_output_dir.display(), relative));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Validate a produced result envelope, preserve the output directory on
+/// success, record resume state, and serialize the envelope.
+fn finalize_workflow_result(
+    contract: &WorkflowContract,
+    prepared: &PreparedWorkflowRequest,
+    pack: &VerifiedWorkflowPack,
+    process_status: std::process::ExitStatus,
+    mut output_directory: WorkflowOutputDirectory,
+    result: AnalysisResultV2<serde_json::Value>,
+) -> WorkerResult<String> {
     ensure_inputs_unchanged(&prepared.inputs)?;
-    let result: AnalysisResultV2<serde_json::Value> =
-        serde_json::from_slice(&fs::read(&result_path)?)?;
-    validate_workflow_result(contract, &result, &prepared, &pack)?;
+    validate_workflow_result(contract, &result, prepared, pack)?;
     match result.status {
-        JobStatus::Ok if !process.status.success() => {
+        JobStatus::Ok if !process_status.success() => {
             return Err(format!(
                 "workflow returned an ok envelope after process failure {}",
-                process.status
+                process_status
             )
             .into());
         }
-        JobStatus::Error if process.status.success() => {
+        JobStatus::Error if process_status.success() => {
             return Err(
                 "workflow returned an error envelope after a successful process exit".into(),
             );
@@ -436,7 +873,60 @@ fn execute_prepared_request(
         JobStatus::Ok | JobStatus::Error => {}
     }
     output_directory.preserve();
+    if result.status == JobStatus::Ok
+        && let Some(resume) = &pack.resume
+    {
+        let state = WorkflowResumeState {
+            schema_version: "1".to_owned(),
+            job_id: prepared.request.job_id.clone(),
+            capability: prepared.request.capability.clone(),
+            core_version: env!("CARGO_PKG_VERSION").to_owned(),
+            execution_mode: prepared.request.execution.mode.clone(),
+            input_sha256: prepared.role_hashes.clone(),
+            dependency_lock_sha256: pack.dependency_lock_sha256.clone(),
+            result: result.clone(),
+        };
+        let state_path = prepared.output_directory.join(&resume.state_file);
+        fs::write(&state_path, serde_json::to_vec_pretty(&state)?)?;
+    }
     Ok(serde_json::to_string(&result)?)
+}
+
+/// Replay a recorded resume state when it matches the current request, inputs,
+/// core build, and dependency lock, and every recorded artifact still verifies.
+/// Any mismatch (stale state, changed inputs, missing artifacts) falls through
+/// to a fresh pack run.
+fn try_replay_resume(
+    contract: &WorkflowContract,
+    prepared: &PreparedWorkflowRequest,
+    pack: &VerifiedWorkflowPack,
+    resume: &WorkflowResumeConfig,
+) -> WorkerResult<Option<String>> {
+    let state_path = prepared.output_directory.join(&resume.state_file);
+    let bytes = match fs::read(&state_path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    let state: WorkflowResumeState = match serde_json::from_slice(&bytes) {
+        Ok(state) => state,
+        Err(_) => return Ok(None),
+    };
+    if state.schema_version != "1"
+        || state.job_id != prepared.request.job_id
+        || state.capability != prepared.request.capability
+        || state.core_version != env!("CARGO_PKG_VERSION")
+        || state.execution_mode != prepared.request.execution.mode
+        || state.input_sha256 != prepared.role_hashes
+        || state.dependency_lock_sha256 != pack.dependency_lock_sha256
+        || state.result.status != JobStatus::Ok
+    {
+        return Ok(None);
+    }
+    if validate_workflow_result(contract, &state.result, prepared, pack).is_err() {
+        return Ok(None);
+    }
+    Ok(Some(serde_json::to_string(&state.result)?))
 }
 
 fn validate_workflow_result(
@@ -517,6 +1007,7 @@ fn validate_success_result(
                 .is_some_and(|format| contract.artifact_formats.contains(&format))
             || contract
                 .artifact_media_type
+                .as_deref()
                 .is_some_and(|expected| artifact.media_type.as_deref() != Some(expected))
         {
             return Err("workflow produced an unexpected artifact kind or format".into());
@@ -542,7 +1033,8 @@ fn validate_success_result(
             return Err(format!("workflow artifact metadata mismatch: {}", artifact.path).into());
         }
     }
-    let expected_roles: BTreeSet<&str> = contract.artifact_roles.iter().copied().collect();
+    let expected_roles: BTreeSet<&str> =
+        contract.artifact_roles.iter().map(String::as_str).collect();
     if roles != expected_roles {
         return Err(format!(
             "workflow returned unexpected artifact roles: {}",
@@ -568,7 +1060,7 @@ fn ensure_inputs_unchanged(inputs: &[PreparedInput]) -> WorkerResult<()> {
 
 fn load_verified_workflow_pack(contract: &WorkflowContract) -> WorkerResult<VerifiedWorkflowPack> {
     let workflow_root = workflow_root()?;
-    let pack_root = safe_pack_path(&workflow_root, contract.pack_directory)?;
+    let pack_root = safe_pack_path(&workflow_root, &contract.pack_directory)?;
     let manifest_path = safe_pack_path(&pack_root, BULK_EXPRESSION_MANIFEST)?;
     let manifest: WorkflowPackManifest = serde_json::from_slice(&fs::read(&manifest_path)?)?;
     if manifest.schema_version != "2"
@@ -605,6 +1097,7 @@ fn load_verified_workflow_pack(contract: &WorkflowContract) -> WorkerResult<Veri
         root: pack_root,
         entrypoint,
         dependency_lock_sha256,
+        resume: manifest.resume.clone(),
     })
 }
 
@@ -729,13 +1222,6 @@ fn resolve_output_directory(
     } else {
         base_directory.join(configured)
     };
-    if candidate.exists() {
-        return Err(format!(
-            "refusing to overwrite workflow output directory: {}",
-            candidate.display()
-        )
-        .into());
-    }
     let name = candidate
         .file_name()
         .filter(|name| !name.is_empty())
@@ -747,15 +1233,7 @@ fn resolve_output_directory(
     if !parent.is_dir() {
         return Err("workflow output parent is not a directory".into());
     }
-    let output = parent.join(name);
-    if output.exists() {
-        return Err(format!(
-            "refusing to overwrite workflow output directory: {}",
-            output.display()
-        )
-        .into());
-    }
-    Ok(output)
+    Ok(parent.join(name))
 }
 
 fn canonical_existing_input(base_directory: &Path, configured: &str) -> WorkerResult<PathBuf> {
@@ -789,7 +1267,11 @@ fn table_format_from_path(path: &Path) -> WorkerResult<BioDataFormat> {
 }
 
 fn ensure_supported_capability(contract: &WorkflowContract, capability: &str) -> WorkerResult<()> {
-    if contract.capabilities.contains(&capability) {
+    if contract
+        .capabilities
+        .iter()
+        .any(|candidate| candidate == capability)
+    {
         Ok(())
     } else {
         Err(format!("unsupported workflow capability: {capability}").into())
@@ -837,10 +1319,61 @@ fn stderr_summary(stderr: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{TemporaryRequestDirectory, verify_workflow_pack_files};
+    use super::{
+        BULK_EXPRESSION_PACK, SEQUENCE_CONVERT_PACK, TemporaryRequestDirectory,
+        WorkflowRuntimeKind, bulk_expression_fallback_contract, contract_for,
+        sequence_convert_fallback_contract, verify_workflow_pack_files,
+    };
     use linxira_bio_protocol::WorkflowPackManifest;
     use sha2::{Digest, Sha256};
     use std::fs;
+
+    #[test]
+    fn loads_execution_contracts_from_real_pack_manifests() {
+        let bulk = contract_for(
+            BULK_EXPRESSION_PACK,
+            BULK_EXPRESSION_PACK,
+            WorkflowRuntimeKind::R,
+        )
+        .expect("bulk expression contract");
+        let fallback = bulk_expression_fallback_contract();
+        assert_eq!(bulk.roles, fallback.roles);
+        assert_eq!(bulk.parameters, fallback.parameters);
+        assert_eq!(bulk.artifact_count, fallback.artifact_count);
+        assert_eq!(bulk.artifact_roles, fallback.artifact_roles);
+        assert_eq!(bulk.artifact_kind, fallback.artifact_kind);
+        assert_eq!(bulk.artifact_formats, fallback.artifact_formats);
+        assert_eq!(bulk.artifact_media_type, fallback.artifact_media_type);
+        assert!(
+            bulk.capabilities
+                .iter()
+                .any(|capability| capability == "expression.differential.v1")
+        );
+        assert!(
+            bulk.capabilities
+                .iter()
+                .any(|capability| capability == "medical.bulk-rnaseq.v1")
+        );
+
+        let convert = contract_for(
+            SEQUENCE_CONVERT_PACK,
+            SEQUENCE_CONVERT_PACK,
+            WorkflowRuntimeKind::Python,
+        )
+        .expect("sequence convert contract");
+        let fallback = sequence_convert_fallback_contract();
+        assert_eq!(convert.roles, fallback.roles);
+        assert_eq!(convert.parameters, fallback.parameters);
+        assert_eq!(convert.artifact_roles, fallback.artifact_roles);
+        assert_eq!(convert.artifact_kind, fallback.artifact_kind);
+        assert_eq!(convert.artifact_formats, fallback.artifact_formats);
+        assert!(
+            convert
+                .capabilities
+                .iter()
+                .any(|capability| capability == "sequence.convert.biopython.v1")
+        );
+    }
 
     #[test]
     fn rejects_a_tampered_manifest_declared_workflow_file() {
