@@ -48,6 +48,8 @@ use linxira_bio_core::functional::{
 use linxira_bio_core::interval::{
     IntervalMergeOptions, bed_closest_path, bed_intersect_path, bed_merge_path, bed_subtract_path,
 };
+use linxira_bio_core::metabolomics::{metabolomics_path, render_peak_table};
+use linxira_bio_core::microbiome::microbiome_analysis_path;
 use linxira_bio_core::native_tools::{
     HmmerOptions, IqtreeOptions, Kraken2Options, MastOptions, MemeOptions, Minimap2LongReadOptions,
     Minimap2Preset, MuscleOptions, ShortReadAlignmentOptions, SimilaritySearchOptions,
@@ -59,6 +61,7 @@ use linxira_bio_core::native_tools::{
     run_rnafold_path, run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path,
     run_trimal_path, run_wgcna_path,
 };
+use linxira_bio_core::pharmacogenomics::{pharmacogenomics_path, render_pgx_table};
 use linxira_bio_core::phylogeny::{
     DistanceMatrixOptions, TreeTransformOptions, TreeVisualizationOptions, distance_matrix_path,
     render_tree_svg_path, transform_newick_path,
@@ -88,6 +91,9 @@ use linxira_bio_core::set_analysis::{SetAnalysisOptions, upset_analysis_path, ve
 use linxira_bio_core::similarity::{
     ReciprocalBestHitOptions, parse_blast_path, reciprocal_best_hits_path,
 };
+use linxira_bio_core::spatial_transcriptomics::{
+    render_barcode_rank_table, spatial_transcriptomics_path,
+};
 use linxira_bio_core::structure::{PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::table::{
     TableDelimiter, TableFilter, TableManipulateOptions, manipulate_table_path,
@@ -106,7 +112,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
 use std::error::Error;
 use std::fmt::Write as _;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
@@ -162,6 +168,12 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "comparative.dotplot.v1" => run_dotplot(base_directory, request),
         "rna.secondary-structure.v1" => run_rnafold(base_directory, request),
         "metagenomics.classify.v1" => run_metagenomics_classify(base_directory, request),
+        "medical.pharmacogenomics.v1" => run_pharmacogenomics(base_directory, request),
+        "medical.spatial-transcriptomics.v1" => {
+            run_spatial_transcriptomics(base_directory, request)
+        }
+        "medical.microbiome.v1" => run_medical_microbiome(base_directory, request),
+        "medical.metabolomics.v1" => run_metabolomics(base_directory, request),
         "enrichment.overrepresentation.v1" => {
             run_enrichment(base_directory, request, EnrichmentKind::Custom)
         }
@@ -196,6 +208,10 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         }
         "sequence.convert.biopython.v1" => {
             workflow::execute_sequence_convert_v1(base_directory, request)
+        }
+        "medical.survival.v1" => workflow::execute_medical_survival_v1(base_directory, request),
+        "chemistry.descriptors.v1" => {
+            workflow::execute_chemistry_descriptors_v1(base_directory, request)
         }
         "interval.intersect.v1" => run_interval_intersect(base_directory, request),
         "interval.merge.v1" => run_interval_merge(base_directory, request),
@@ -1063,6 +1079,12 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
         "sequence.convert.biopython.v1" => {
             workflow::execute_sequence_convert_v2(base_directory, request, &verified_inputs)
         }
+        "medical.survival.v1" => {
+            workflow::execute_medical_survival_v2(base_directory, request, &verified_inputs)
+        }
+        "chemistry.descriptors.v1" => {
+            workflow::execute_chemistry_descriptors_v2(base_directory, request, &verified_inputs)
+        }
         "metagenomics.classify.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "reads")?;
             let output = resolve_input(
@@ -1079,6 +1101,112 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 result.clone(),
                 &result.warnings,
                 "native-tool-warning",
+                FileArtifactSpec {
+                    artifact_id: "abundance-table",
+                    role: "abundance",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "medical.pharmacogenomics.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "vcf")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = pharmacogenomics_path(&input)?;
+            fs::write(&output, render_pgx_table(&result))?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "pgx-warning",
+                FileArtifactSpec {
+                    artifact_id: "pgx-interpretation",
+                    role: "interpretation",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "medical.spatial-transcriptomics.v1" => {
+            let matrix = resolve_v2_single_input(base_directory, &request, "matrix")?;
+            let features = resolve_v2_single_input(base_directory, &request, "features")?;
+            let barcodes = resolve_v2_single_input(base_directory, &request, "barcodes")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = spatial_transcriptomics_path(&matrix, &features, &barcodes)?;
+            fs::write(&output, render_barcode_rank_table(&result))?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "spatial-warning",
+                FileArtifactSpec {
+                    artifact_id: "barcode-rank-table",
+                    role: "barcode-rank",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "medical.metabolomics.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "mzml")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let result = metabolomics_path(&input)?;
+            fs::write(&output, render_peak_table(&result))?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "metabolomics-warning",
+                FileArtifactSpec {
+                    artifact_id: "peak-table",
+                    role: "peaks",
+                    kind: OutputArtifactKind::Table,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "medical.microbiome.v1" => {
+            let input = resolve_v2_single_input(base_directory, &request, "reads")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_v2_export_output_is_distinct(&request, base_directory, &output)?;
+            let options = kraken2_options(&request.parameters)?;
+            let result = microbiome_analysis_path(input, &output, &options)?;
+            serialize_v2_file_artifact_result_with_warnings(
+                &request,
+                base_directory,
+                &verified_inputs,
+                result.clone(),
+                &result.warnings,
+                "microbiome-warning",
                 FileArtifactSpec {
                     artifact_id: "abundance-table",
                     role: "abundance",
@@ -2236,6 +2364,17 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
             &["sequences"],
             &["output_directory", "output_filename", "output_format"],
         ),
+        "medical.survival.v1" => (
+            &["cohort"],
+            &[
+                "output_directory",
+                "time_column",
+                "event_column",
+                "group_column",
+                "reference_level",
+            ],
+        ),
+        "chemistry.descriptors.v1" => (&["molecules"], &["output_directory", "output_filename"]),
         "metagenomics.classify.v1" => (
             &["reads"],
             &[
@@ -2246,6 +2385,19 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
                 "threads",
             ],
         ),
+        "medical.pharmacogenomics.v1" => (&["vcf"], &["output"]),
+        "medical.spatial-transcriptomics.v1" => (&["matrix", "features", "barcodes"], &["output"]),
+        "medical.microbiome.v1" => (
+            &["reads"],
+            &[
+                "output",
+                "database",
+                "confidence",
+                "minimum_hit_groups",
+                "threads",
+            ],
+        ),
+        "medical.metabolomics.v1" => (&["mzml"], &["output"]),
         "expression.volcano.v1" => (
             &["differential"],
             &["output", "padj", "log2_fold_change", "max_points"],
@@ -2751,6 +2903,7 @@ fn declared_dataset_format(format: BioDataFormat) -> Option<DatasetFormat> {
         BioDataFormat::Zip => DatasetFormat::Zip,
         BioDataFormat::Genbank
         | BioDataFormat::Embl
+        | BioDataFormat::Sdf
         | BioDataFormat::Svg
         | BioDataFormat::Xlsx
         | BioDataFormat::Json
@@ -3567,6 +3720,94 @@ fn kraken2_options(parameters: &serde_json::Value) -> WorkerResult<Kraken2Option
         minimum_hit_groups,
         threads,
     })
+}
+
+fn run_metabolomics(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "mzml", &["output"])?;
+    let input = resolve_required_v1_input(base_directory, &request, "mzml")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let result = metabolomics_path(&input)?;
+    fs::write(&output, render_peak_table(&result))?;
+    let mut analysis = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        result.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    analysis.warnings = result.warnings;
+    Ok(serde_json::to_string(&analysis)?)
+}
+
+fn run_medical_microbiome(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(
+        &request,
+        "reads",
+        &[
+            "output",
+            "database",
+            "confidence",
+            "minimum_hit_groups",
+            "threads",
+        ],
+    )?;
+    let input = resolve_required_v1_input(base_directory, &request, "reads")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let options = kraken2_options(&request.parameters)?;
+    let result = microbiome_analysis_path(input, output, &options)?;
+    let mut analysis = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        result.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    analysis.warnings = result.warnings;
+    Ok(serde_json::to_string(&analysis)?)
+}
+
+fn run_pharmacogenomics(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_named_input_contract(&request, "vcf", &["output"])?;
+    let input = resolve_required_v1_input(base_directory, &request, "vcf")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let result = pharmacogenomics_path(&input)?;
+    fs::write(&output, render_pgx_table(&result))?;
+    let mut analysis = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        result.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    analysis.warnings = result.warnings;
+    Ok(serde_json::to_string(&analysis)?)
+}
+
+fn run_spatial_transcriptomics(base_directory: &Path, request: JobRequest) -> WorkerResult<String> {
+    validate_v1_multi_input_contract(&request, &["matrix", "features", "barcodes"], &["output"])?;
+    let matrix = resolve_required_v1_input(base_directory, &request, "matrix")?;
+    let features = resolve_required_v1_input(base_directory, &request, "features")?;
+    let barcodes = resolve_required_v1_input(base_directory, &request, "barcodes")?;
+    let output = resolve_input(
+        base_directory,
+        required_sequence_output(&request.parameters, &request.capability)?,
+    );
+    let result = spatial_transcriptomics_path(&matrix, &features, &barcodes)?;
+    fs::write(&output, render_barcode_rank_table(&result))?;
+    let mut analysis = AnalysisResult::ok(
+        request.job_id,
+        request.capability,
+        result.clone(),
+        ExecutionMode::LocalCpu,
+    );
+    analysis.warnings = result.warnings;
+    Ok(serde_json::to_string(&analysis)?)
 }
 
 fn dotplot_options(parameters: &serde_json::Value) -> WorkerResult<DotplotOptions> {

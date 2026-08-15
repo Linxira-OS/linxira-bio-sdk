@@ -35,6 +35,21 @@ the agent skills that select and validate them.
 - Read `skills/analyze-metagenomics/SKILL.md` for the implemented local
   Kraken2 taxonomic classification and abundance-table capability
   (`metagenomics.classify.v1`).
+- Read `skills/analyze-pharmacogenomics/SKILL.md` for the implemented local
+  PGx star-allele interpretation capability (`medical.pharmacogenomics.v1`).
+- Read `skills/analyze-spatial-transcriptomics/SKILL.md` for the implemented
+  local 10x count-matrix summary capability
+  (`medical.spatial-transcriptomics.v1`).
+- Read `skills/analyze-microbiome-diversity/SKILL.md` for the implemented
+  local Kraken2 microbiome alpha-diversity capability
+  (`medical.microbiome.v1`).
+- Read `skills/analyze-survival-data/SKILL.md` for the implemented
+  research-use-only Cox survival-analysis workflow (`medical.survival.v1`).
+- Read `skills/analyze-molecular-descriptors/SKILL.md` for the implemented
+  RDKit molecular-descriptor workflow (`chemistry.descriptors.v1`).
+- Read `skills/analyze-metabolomics-peaks/SKILL.md` for the implemented
+  local mzML parsing and centroid peak detection
+  (`medical.metabolomics.v1`).
 - Read `skills/align-biological-sequences/SKILL.md` for implemented MUSCLE 5
   multiple-sequence alignment and trimAl trimming.
 - Read `skills/analyze-sequence-motifs/SKILL.md` for implemented local MEME

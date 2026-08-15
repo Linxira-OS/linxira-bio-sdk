@@ -284,6 +284,54 @@
       "capabilities": [
         "metagenomics.classify.v1"
       ]
+    },
+    {
+      "id": "analyze-pharmacogenomics",
+      "path": "skills/analyze-pharmacogenomics",
+      "kind": "executable",
+      "capabilities": [
+        "medical.pharmacogenomics.v1"
+      ]
+    },
+    {
+      "id": "analyze-spatial-transcriptomics",
+      "path": "skills/analyze-spatial-transcriptomics",
+      "kind": "executable",
+      "capabilities": [
+        "medical.spatial-transcriptomics.v1"
+      ]
+    },
+    {
+      "id": "analyze-microbiome-diversity",
+      "path": "skills/analyze-microbiome-diversity",
+      "kind": "executable",
+      "capabilities": [
+        "medical.microbiome.v1"
+      ]
+    },
+    {
+      "id": "analyze-survival-data",
+      "path": "skills/analyze-survival-data",
+      "kind": "executable",
+      "capabilities": [
+        "medical.survival.v1"
+      ]
+    },
+    {
+      "id": "analyze-molecular-descriptors",
+      "path": "skills/analyze-molecular-descriptors",
+      "kind": "executable",
+      "capabilities": [
+        "chemistry.descriptors.v1"
+      ]
+    },
+    {
+      "id": "analyze-metabolomics-peaks",
+      "path": "skills/analyze-metabolomics-peaks",
+      "kind": "executable",
+      "capabilities": [
+        "medical.metabolomics.v1"
+      ]
     }
   ]
 }

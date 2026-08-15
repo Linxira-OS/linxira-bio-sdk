@@ -1,0 +1,12 @@
+# Exact direct and transitive Python package pins for pack 0.1.0.
+# Runtime: CPython 3.12.x; platforms windows-gnu, debian, arch (x86_64).
+# Hashes cover cp312 wheels pip may select on those platforms (RDKit does not
+# publish PyPI sdists; numpy sdist is intentionally not locked).
+# Installation is gated by environment.apply.v1; signed artifact
+# resolution is not yet implemented, so this lock is not yet consumed.
+rdkit==2026.3.5 \
+    --hash=sha256:b75944ba959d908e97b4d68754e5950216ac08aa81faf67cfd1d7a3cb5b2bad7 \
+    --hash=sha256:b60a2b6e8e2cecd89f775c6a3e691d3dacc5ae05cf521154822e7e5a54602825
+numpy==2.5.2 \
+    --hash=sha256:3cdec01fa790a186d430433fdd4d4ffb70eed6f0eeb4bf05c8dbe2dce0a9bcb8 \
+    --hash=sha256:28ac63476ec7651484215ee7fa15a1f78b57c14621f01e392afe17b9a1390ce4

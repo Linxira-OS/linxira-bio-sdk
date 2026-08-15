@@ -44,6 +44,8 @@ use linxira_bio_core::interval::{
     IntervalIntersectStats, IntervalMergeOptions, bed_closest_path, bed_intersect_path,
     bed_merge_path, bed_subtract_path,
 };
+use linxira_bio_core::metabolomics::{metabolomics_path, render_peak_table};
+use linxira_bio_core::microbiome::microbiome_analysis_path;
 use linxira_bio_core::native_tools::{
     HmmerOptions, IqtreeOptions, Kraken2Options, MastOptions, MemeOptions, Minimap2LongReadOptions,
     MuscleOptions, NativeToolResult, ShortReadAlignmentOptions, SimilaritySearchOptions,
@@ -55,6 +57,7 @@ use linxira_bio_core::native_tools::{
     run_rnafold_path, run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path,
     run_trimal_path, run_wgcna_path,
 };
+use linxira_bio_core::pharmacogenomics::{pharmacogenomics_path, render_pgx_table};
 use linxira_bio_core::phylogeny::{
     DistanceMatrixOptions, DistanceMatrixResult, TreeTransformOptions, TreeTransformResult,
     TreeVisualizationOptions, distance_matrix_path, read_tree_label_map_path, render_tree_svg_path,
@@ -88,6 +91,9 @@ use linxira_bio_core::set_analysis::{
 use linxira_bio_core::similarity::{
     BlastParseResult, ReciprocalBestHitOptions, ReciprocalBestHitResult, parse_blast_path,
     reciprocal_best_hits_path,
+};
+use linxira_bio_core::spatial_transcriptomics::{
+    render_barcode_rank_table, spatial_transcriptomics_path,
 };
 use linxira_bio_core::structure::{PdbStructureSummary, PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::table::{
@@ -424,6 +430,14 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         [sequence, convert, arguments @ ..] if sequence == "sequence" && convert == "convert" => {
             print_sequence_convert(arguments)
         }
+        [chemistry, descriptors, arguments @ ..]
+            if chemistry == "chemistry" && descriptors == "descriptors" =>
+        {
+            print_chemistry_descriptors(arguments)
+        }
+        [medical, survival, arguments @ ..] if medical == "medical" && survival == "survival" => {
+            print_medical_survival(arguments)
+        }
         [primer, epcr, arguments @ ..] if primer == "primer" && epcr == "epcr" => {
             print_primer_epcr(arguments)
         }
@@ -513,6 +527,42 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if medical == "medical" && cohort_qc == "cohort-qc" && json == "--json" =>
         {
             print_cohort_table_qc(path, true)
+        }
+        [medical, pharmacogenomics, input, output]
+            if medical == "medical" && pharmacogenomics == "pharmacogenomics" =>
+        {
+            print_pharmacogenomics(input, output, false)
+        }
+        [medical, pharmacogenomics, input, output, json]
+            if medical == "medical"
+                && pharmacogenomics == "pharmacogenomics"
+                && json == "--json" =>
+        {
+            print_pharmacogenomics(input, output, true)
+        }
+        [
+            medical,
+            spatial_transcriptomics,
+            matrix,
+            features,
+            barcodes,
+            output,
+        ] if medical == "medical" && spatial_transcriptomics == "spatial-transcriptomics" => {
+            print_spatial_transcriptomics(matrix, features, barcodes, output, false)
+        }
+        [
+            medical,
+            spatial_transcriptomics,
+            matrix,
+            features,
+            barcodes,
+            output,
+            json,
+        ] if medical == "medical"
+            && spatial_transcriptomics == "spatial-transcriptomics"
+            && json == "--json" =>
+        {
+            print_spatial_transcriptomics(matrix, features, barcodes, output, true)
         }
         [expression, normalize, arguments @ ..]
             if expression == "expression" && normalize == "normalize" =>
@@ -671,6 +721,21 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if metagenomics == "metagenomics" && classify == "classify" =>
         {
             print_metagenomics_classify(arguments)
+        }
+        [medical, microbiome, arguments @ ..]
+            if medical == "medical" && microbiome == "microbiome" =>
+        {
+            print_medical_microbiome(arguments)
+        }
+        [medical, metabolomics, input, output]
+            if medical == "medical" && metabolomics == "metabolomics" =>
+        {
+            print_metabolomics(input, output, false)
+        }
+        [medical, metabolomics, input, output, json]
+            if medical == "medical" && metabolomics == "metabolomics" && json == "--json" =>
+        {
+            print_metabolomics(input, output, true)
         }
         [similarity, rbh, arguments @ ..] if similarity == "similarity" && rbh == "rbh" => {
             print_reciprocal_best_hits(arguments)
@@ -2176,6 +2241,269 @@ fn print_sequence_convert(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     )
 }
 
+fn print_chemistry_descriptors(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown chemistry descriptors option: {value}").into());
+            }
+            value if input.is_none() => input = Some(value.to_owned()),
+            value if output.is_none() => output = Some(value.to_owned()),
+            value => {
+                return Err(format!("unexpected chemistry descriptors argument: {value}").into());
+            }
+        }
+        index += 1;
+    }
+    let input_path = Path::new(
+        input
+            .as_deref()
+            .ok_or("chemistry descriptors requires <input.sdf> <output.tsv>")?,
+    );
+    let output_path = Path::new(
+        output
+            .as_deref()
+            .ok_or("chemistry descriptors requires <input.sdf> <output.tsv>")?,
+    );
+    if !input_path.is_file() {
+        return Err(format!(
+            "chemistry descriptors input does not exist: {}",
+            input_path.display()
+        )
+        .into());
+    }
+    if output_path.exists() {
+        return Err(format!(
+            "refusing to overwrite chemistry descriptors output: {}",
+            output_path.display()
+        )
+        .into());
+    }
+    let input_path = fs::canonicalize(input_path)?;
+    let output_directory = output_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let containing = output_directory
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(output_directory);
+    if !containing.is_dir() {
+        return Err(format!(
+            "chemistry descriptors output parent directory does not exist: {}",
+            containing.display()
+        )
+        .into());
+    }
+    if output_directory.exists() {
+        return Err(format!(
+            "chemistry descriptors output directory must not already exist: {}",
+            output_directory.display()
+        )
+        .into());
+    }
+    let output_directory = fs::canonicalize(containing)?
+        .join(
+            output_directory
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+        )
+        .to_string_lossy()
+        .into_owned();
+    let output_filename = output_path
+        .file_name()
+        .ok_or("chemistry descriptors output has no file name")?
+        .to_string_lossy()
+        .into_owned();
+    let size_bytes = fs::metadata(&input_path)?.len();
+    let request = serde_json::json!({
+        "schema_version": "2",
+        "job_id": "cli",
+        "capability": "chemistry.descriptors.v1",
+        "inputs": [{
+            "artifact_id": "molecules",
+            "role": "molecules",
+            "cardinality": "single",
+            "files": [{
+                "file_id": "input-molecules-1",
+                "path": input_path.to_string_lossy(),
+                "format": "sdf",
+                "compression": "none",
+                "size_bytes": size_bytes,
+            }],
+        }],
+        "execution": {"mode": "local-cpu"},
+        "parameters": {
+            "output_directory": output_directory,
+            "output_filename": output_filename,
+        },
+    });
+    let _ = json;
+    let temporary = tempfile::Builder::new()
+        .prefix("linxira-bio-descriptors-")
+        .tempdir()?;
+    let request_path = temporary.path().join("request.json");
+    let result_path = Path::new(&output_directory).join("result.json");
+    fs::write(&request_path, serde_json::to_vec(&request)?)?;
+    run_workflow_pack(
+        "org.linxira.chemistry-descriptors-rdkit",
+        &request_path,
+        &result_path,
+    )
+}
+
+fn print_medical_survival(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut time_column = None;
+    let mut event_column = None;
+    let mut group_column = None;
+    let mut reference_level = None;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--time-column" => {
+                index += 1;
+                time_column = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--time-column requires a value")?,
+                );
+            }
+            "--event-column" => {
+                index += 1;
+                event_column = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--event-column requires a value")?,
+                );
+            }
+            "--group-column" => {
+                index += 1;
+                group_column = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--group-column requires a value")?,
+                );
+            }
+            "--reference-level" => {
+                index += 1;
+                reference_level = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--reference-level requires a value")?,
+                );
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown medical survival option: {value}").into());
+            }
+            value if input.is_none() => input = Some(value.to_owned()),
+            value if output.is_none() => output = Some(value.to_owned()),
+            value => return Err(format!("unexpected medical survival argument: {value}").into()),
+        }
+        index += 1;
+    }
+    let input_path = Path::new(
+        input
+            .as_deref()
+            .ok_or("medical survival requires <cohort.csv> <output-directory>")?,
+    );
+    let output_directory = Path::new(
+        output
+            .as_deref()
+            .ok_or("medical survival requires <cohort.csv> <output-directory>")?,
+    );
+    let time_column = time_column
+        .ok_or("medical survival requires --time-column")?
+        .to_owned();
+    let event_column = event_column
+        .ok_or("medical survival requires --event-column")?
+        .to_owned();
+    let group_column = group_column
+        .ok_or("medical survival requires --group-column")?
+        .to_owned();
+    let reference_level = reference_level
+        .ok_or("medical survival requires --reference-level")?
+        .to_owned();
+    if !input_path.is_file() {
+        return Err(format!(
+            "medical survival cohort does not exist: {}",
+            input_path.display()
+        )
+        .into());
+    }
+    let input_path = fs::canonicalize(input_path)?;
+    let containing = output_directory
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    if !containing.is_dir() {
+        return Err(format!(
+            "medical survival output parent directory does not exist: {}",
+            containing.display()
+        )
+        .into());
+    }
+    if output_directory.exists() {
+        return Err(format!(
+            "refusing to overwrite medical survival output directory: {}",
+            output_directory.display()
+        )
+        .into());
+    }
+    let output_directory = fs::canonicalize(containing)?
+        .join(
+            output_directory
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+        )
+        .to_string_lossy()
+        .into_owned();
+    let size_bytes = fs::metadata(&input_path)?.len();
+    let request = serde_json::json!({
+        "schema_version": "2",
+        "job_id": "cli",
+        "capability": "medical.survival.v1",
+        "inputs": [{
+            "artifact_id": "cohort",
+            "role": "cohort",
+            "cardinality": "single",
+            "files": [{
+                "file_id": "input-cohort-1",
+                "path": input_path.to_string_lossy(),
+                "format": "csv",
+                "compression": "none",
+                "size_bytes": size_bytes,
+            }],
+        }],
+        "execution": {"mode": "local-cpu"},
+        "parameters": {
+            "output_directory": output_directory,
+            "time_column": time_column,
+            "event_column": event_column,
+            "group_column": group_column,
+            "reference_level": reference_level,
+        },
+    });
+    let _ = json;
+    let temporary = tempfile::Builder::new()
+        .prefix("linxira-bio-survival-")
+        .tempdir()?;
+    let request_path = temporary.path().join("request.json");
+    let result_path = Path::new(&output_directory).join("result.json");
+    fs::write(&request_path, serde_json::to_vec(&request)?)?;
+    run_workflow_pack("org.linxira.medical-survival", &request_path, &result_path)
+}
+
 fn parse_sequence_format(value: &str) -> Result<String, Box<dyn Error>> {
     match value {
         "fasta" | "fastq" | "genbank" | "embl" => Ok(value.to_owned()),
@@ -2536,6 +2864,80 @@ fn print_medical_variant_cohort(path: &str, json: bool) -> Result<(), Box<dyn Er
         print_variant_stats_text(&stats);
     }
     Ok(())
+}
+
+fn print_pharmacogenomics(input: &str, output: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let result = pharmacogenomics_path(Path::new(input))?;
+    fs::write(Path::new(output), render_pgx_table(&result))?;
+    if json {
+        let warnings = result.warnings.clone();
+        print_analysis_json_with_warnings(
+            "medical-pharmacogenomics",
+            "medical.pharmacogenomics.v1",
+            result,
+            warnings,
+        )
+    } else {
+        println!("reference_build\t{}", result.reference_build);
+        println!("record_count\t{}", result.record_count);
+        println!("matched_variant_count\t{}", result.matched_variant_count);
+        println!("allele_count\t{}", result.allele_count);
+        println!("genes_affected\t{}", result.genes_affected.join(","));
+        println!("output_path\t{output}");
+        for (phenotype, detail) in &result.combined_phenotypes {
+            println!("combined_phenotype\t{phenotype}\t{detail}");
+        }
+        for warning in result.warnings {
+            println!("warning\t{warning}");
+        }
+        Ok(())
+    }
+}
+
+fn print_spatial_transcriptomics(
+    matrix: &str,
+    features: &str,
+    barcodes: &str,
+    output: &str,
+    json: bool,
+) -> Result<(), Box<dyn Error>> {
+    let result =
+        spatial_transcriptomics_path(Path::new(matrix), Path::new(features), Path::new(barcodes))?;
+    fs::write(Path::new(output), render_barcode_rank_table(&result))?;
+    if json {
+        let warnings = result.warnings.clone();
+        print_analysis_json_with_warnings(
+            "medical-spatial-transcriptomics",
+            "medical.spatial-transcriptomics.v1",
+            result,
+            warnings,
+        )
+    } else {
+        println!("format\t{}", result.format);
+        println!("n_barcodes\t{}", result.n_barcodes);
+        println!("n_features\t{}", result.n_features);
+        println!("n_nonzero\t{}", result.n_nonzero);
+        println!("total_counts\t{}", result.total_counts);
+        println!(
+            "mean_counts\t{}",
+            result
+                .mean_counts
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| ".".to_owned())
+        );
+        println!(
+            "median_genes\t{}",
+            result
+                .median_genes
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| ".".to_owned())
+        );
+        println!("output_path\t{output}");
+        for warning in result.warnings {
+            println!("warning\t{warning}");
+        }
+        Ok(())
+    }
 }
 
 fn print_variant_compare(left: &str, right: &str, json: bool) -> Result<(), Box<dyn Error>> {
@@ -5575,6 +5977,128 @@ fn print_metagenomics_classify(arguments: &[String]) -> Result<(), Box<dyn Error
     }
 }
 
+fn print_medical_microbiome(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut database = None;
+    let mut confidence = 0.0_f64;
+    let mut minimum_hit_groups = 2_usize;
+    let mut threads = 1_usize;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--database" => {
+                index += 1;
+                database = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--database requires a directory path")?,
+                );
+            }
+            "--confidence" => {
+                index += 1;
+                confidence = arguments
+                    .get(index)
+                    .ok_or("--confidence requires a value")?
+                    .parse()
+                    .map_err(|_| "confidence must be a number between 0 and 1")?;
+            }
+            "--minimum-hit-groups" => {
+                index += 1;
+                minimum_hit_groups = arguments
+                    .get(index)
+                    .ok_or("--minimum-hit-groups requires a value")?
+                    .parse()
+                    .map_err(|_| "minimum-hit-groups must be an integer")?;
+            }
+            "--threads" => {
+                index += 1;
+                threads = arguments
+                    .get(index)
+                    .ok_or("--threads requires a value")?
+                    .parse()
+                    .map_err(|_| "threads must be an integer")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown medical microbiome option: {value}").into());
+            }
+            value => {
+                if input.is_none() {
+                    input = Some(PathBuf::from(value));
+                } else if output.is_none() {
+                    output = Some(PathBuf::from(value));
+                } else {
+                    return Err("too many positional arguments".into());
+                }
+            }
+        }
+        index += 1;
+    }
+    let input = input.ok_or("medical microbiome requires <reads.fa|fq>")?;
+    let output = output.ok_or("medical microbiome requires <output.tsv>")?;
+    let database = database.ok_or("medical microbiome requires --database <dir>")?;
+    let options = Kraken2Options {
+        database: PathBuf::from(database),
+        confidence,
+        minimum_hit_groups,
+        threads,
+    };
+    let result = microbiome_analysis_path(input, &output, &options)?;
+    if json {
+        let warnings = result.warnings.clone();
+        print_analysis_json_with_warnings(
+            "medical-microbiome",
+            "medical.microbiome.v1",
+            result,
+            warnings,
+        )
+    } else {
+        println!("output_path\t{}", output.display());
+        println!("classified_reads\t{}", result.classified_reads);
+        println!("unclassified_reads\t{}", result.unclassified_reads);
+        println!("classified_fraction\t{}", result.classified_fraction);
+        println!("species_richness\t{}", result.species_richness);
+        println!("shannon_index\t{}", result.shannon_index);
+        println!("evenness\t{}", result.evenness);
+        for species in &result.top_species {
+            println!(
+                "top_species\t{}\t{}\t{:.4}",
+                species.name, species.reads, species.fraction
+            );
+        }
+        for warning in result.warnings {
+            println!("warning\t{warning}");
+        }
+        Ok(())
+    }
+}
+
+fn print_metabolomics(input: &str, output: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let result = metabolomics_path(Path::new(input))?;
+    fs::write(Path::new(output), render_peak_table(&result))?;
+    if json {
+        let warnings = result.warnings.clone();
+        print_analysis_json_with_warnings(
+            "medical-metabolomics",
+            "medical.metabolomics.v1",
+            result,
+            warnings,
+        )
+    } else {
+        println!("spectrum_count\t{}", result.spectrum_count);
+        println!("ms1_count\t{}", result.ms1_count);
+        println!("ms2_count\t{}", result.ms2_count);
+        println!("peak_count\t{}", result.peak_count);
+        println!("output_path\t{output}");
+        for warning in result.warnings {
+            println!("warning\t{warning}");
+        }
+        Ok(())
+    }
+}
+
 fn print_native_tool_result(
     job_id: &str,
     capability: &str,
@@ -5668,6 +6192,8 @@ fn usage() -> &'static str {
         "  linxira-bio sequence consensus <input.alignment.fasta> <output.fasta> [--threshold FLOAT] [--json]\n",
         "  linxira-bio sequence shuffle <input.fasta[.gz]> <output.fasta> [--seed N] [--json]\n",
         "  linxira-bio sequence convert <input> <output> [--input-format fasta|fastq|genbank|embl] [--output-format fasta|fastq|genbank|embl]\n",
+        "  linxira-bio chemistry descriptors <input.sdf> <output.tsv> [--json]\n",
+        "  linxira-bio medical survival <cohort.csv|tsv> <output-directory> --time-column COLUMN --event-column COLUMN --group-column COLUMN --reference-level LEVEL [--json]\n",
         "  linxira-bio primer epcr <reference.fasta[.gz]> <primers.tsv> <output.tsv> [--min-amplicon N] [--max-amplicon N] [--max-hits N] [--json]\n",
         "  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n",
         "  linxira-bio fastq trim <input.fastq[.gz]> <output.fastq> [--min-quality N] [--min-length N] [--quality-encoding phred+33|phred+64] [--json]\n",
@@ -5703,6 +6229,8 @@ fn usage() -> &'static str {
         "  linxira-bio medical single-cell-qc <counts.csv|tsv[.gz]> [--json]\n",
         "  linxira-bio medical pathway <genes.txt|csv|tsv> <associations.csv|tsv> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",
         "  linxira-bio medical variant-cohort <cohort.vcf[.gz]> [--json]\n",
+        "  linxira-bio medical pharmacogenomics <input.vcf[.gz]> <output.tsv> [--json]\n",
+        "  linxira-bio medical spatial-transcriptomics <matrix.mtx[.gz]> <features.tsv[.gz]> <barcodes.tsv[.gz]> <output.tsv> [--json]\n",
         "  linxira-bio expression normalize <matrix.csv|tsv[.gz]> <output.tsv> [--method cpm|log2-cpm|median-ratio] [--pseudocount X] [--json]\n",
         "  linxira-bio expression pca <matrix.csv|tsv[.gz]> [--components N] [--scale] [--json]\n",
         "  linxira-bio expression cluster <matrix.csv|tsv[.gz]> [--sample-clusters N] [--feature-clusters N] [--max-iterations N] [--no-scale] [--json]\n",
@@ -5733,6 +6261,8 @@ fn usage() -> &'static str {
         "  linxira-bio msa muscle <input.fasta> <output.fasta> [--mode align|super5] [--threads N] [--json]\n",
         "  linxira-bio msa trimal <input.alignment> <output.alignment> [--mode automated1|gappyout|strict|strictplus|nogaps] [--json]\n",
         "  linxira-bio metagenomics classify <reads.fa|fq> <output.tsv> --database <kraken2-db> [--confidence FRACTION] [--minimum-hit-groups N] [--threads N] [--json]\n",
+        "  linxira-bio medical microbiome <reads.fa|fq> <output.tsv> --database <kraken2-db> [--confidence FRACTION] [--minimum-hit-groups N] [--threads N] [--json]\n",
+        "  linxira-bio medical metabolomics <input.mzML[.gz]> <output.tsv> [--json]\n",
         "  linxira-bio phylogeny iqtree <alignment> <output.newick> [--threads N] [--model MODEL] [--seed N] [--json]\n",
         "  linxira-bio protein secondary-structure <structure.pdb|cif> <output.dssp> [--json]\n",
         "  linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> [--select-column NAME ...] [--drop-column NAME ...] [--filter-column NAME --filter-op equals|contains|non-empty [--filter-value VALUE]] [--skip-rows N] [--limit N] [--delimiter csv|tsv] [--output-delimiter csv|tsv] [--json]\n",
