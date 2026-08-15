@@ -1267,6 +1267,49 @@ pub fn render_kraken2_abundance_table(rows: &[Kraken2TaxonRow]) -> String {
     table
 }
 
+/// Run Kraken2 and return the parsed report rows plus the classified summary.
+pub fn run_kraken2_classification(
+    input: impl AsRef<Path>,
+    options: &Kraken2Options,
+) -> Result<(Vec<Kraken2TaxonRow>, MetagenomicsClassifyResult), NativeToolError> {
+    let input = input.as_ref();
+    validate_kraken2_options(options)?;
+    let executable = configured_program("LINXIRA_BIO_KRAKEN2", "kraken2");
+    let working = create_temporary_directory(input, "kraken2")?;
+    let report_path = working.join("report.txt");
+    let classified_path = working.join("classified.txt");
+    let result = (|| {
+        let arguments = kraken2_arguments(input, &report_path, &classified_path, options);
+        run_native_command(&executable, &arguments, false)?;
+        let report = fs::read_to_string(&report_path).map_err(NativeToolError::Io)?;
+        let rows = parse_kraken2_report(&report)?;
+        let (total_reads, classified_reads, unclassified_reads) = summarize_kraken2(&rows);
+        let classified_fraction = if total_reads == 0 {
+            0.0
+        } else {
+            classified_reads as f64 / total_reads as f64
+        };
+        Ok((
+            rows,
+            MetagenomicsClassifyResult {
+                tool: "kraken2".to_owned(),
+                output_path: input.to_string_lossy().into_owned(),
+                output_bytes: 0,
+                thread_count: options.threads,
+                command_count: 1,
+                total_reads,
+                classified_reads,
+                unclassified_reads,
+                classified_fraction,
+                taxon_count: 0,
+                warnings: Vec::new(),
+            },
+        ))
+    })();
+    let _ = fs::remove_dir_all(&working);
+    result
+}
+
 /// Run Kraken2 with controlled arguments (no shell) and reduce its `--report`
 /// into the abundance table written to `output`.
 pub fn run_kraken2_path(
@@ -1277,6 +1320,23 @@ pub fn run_kraken2_path(
     let input = input.as_ref();
     let output = output.as_ref();
     validate_paths(&[input], output)?;
+    validate_kraken2_options(options)?;
+    let (rows, mut result) = match run_kraken2_classification(input, options) {
+        Ok(pair) => pair,
+        Err(error) => {
+            remove_incomplete_output(output);
+            return Err(error);
+        }
+    };
+    let table = render_kraken2_abundance_table(&rows);
+    fs::write(output, table.as_bytes())?;
+    result.output_path = output.to_string_lossy().into_owned();
+    result.output_bytes = fs::metadata(output)?.len();
+    result.taxon_count = rows.len();
+    Ok(result)
+}
+
+fn validate_kraken2_options(options: &Kraken2Options) -> Result<(), NativeToolError> {
     if options.database.as_os_str().is_empty() {
         return Err(NativeToolError::InvalidOption(
             "kraken2 classification requires a --database directory".to_owned(),
@@ -1306,48 +1366,7 @@ pub fn run_kraken2_path(
             options.threads
         )));
     }
-    let executable = configured_program("LINXIRA_BIO_KRAKEN2", "kraken2");
-    let working = create_temporary_directory(output, "kraken2")?;
-    let report_path = working.join("report.txt");
-    let classified_path = working.join("classified.txt");
-    let result = (|| {
-        let arguments = kraken2_arguments(input, &report_path, &classified_path, options);
-        run_native_command(&executable, &arguments, false)?;
-        let report = fs::read_to_string(&report_path).map_err(NativeToolError::Io)?;
-        let rows = parse_kraken2_report(&report)?;
-        let table = render_kraken2_abundance_table(&rows);
-        fs::write(output, table.as_bytes())?;
-        let (total_reads, classified_reads, unclassified_reads) = summarize_kraken2(&rows);
-        let classified_fraction = if total_reads == 0 {
-            0.0
-        } else {
-            classified_reads as f64 / total_reads as f64
-        };
-        if !output.is_file() {
-            return Err(NativeToolError::MissingOutput {
-                tool: "kraken2".to_owned(),
-                path: output.to_path_buf(),
-            });
-        }
-        Ok(MetagenomicsClassifyResult {
-            tool: "kraken2".to_owned(),
-            output_path: output.to_string_lossy().into_owned(),
-            output_bytes: fs::metadata(output)?.len(),
-            thread_count: options.threads,
-            command_count: 1,
-            total_reads,
-            classified_reads,
-            unclassified_reads,
-            classified_fraction,
-            taxon_count: rows.len(),
-            warnings: Vec::new(),
-        })
-    })();
-    let _ = fs::remove_dir_all(&working);
-    if result.is_err() {
-        remove_incomplete_output(output);
-    }
-    result
+    Ok(())
 }
 
 /// Derive read totals from the report: the root (`R`) clade count is the

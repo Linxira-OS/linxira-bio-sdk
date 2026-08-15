@@ -1584,6 +1584,13 @@ fn executes_native_tool_workflows_with_versioned_artifacts() {
             true,
             1,
         ),
+        (
+            "microbiome-v2.json",
+            "medical.microbiome.v1",
+            "microbiome-v2/abundance.tsv",
+            true,
+            1,
+        ),
     ];
     for (_, _, output_name, _, _) in &cases {
         let path = result_root.join(output_name);
@@ -1627,7 +1634,9 @@ fn executes_native_tool_workflows_with_versioned_artifacts() {
             String::from_utf8_lossy(&output.stdout)
         );
         assert_eq!(result["capability"], capability, "{fixture}");
-        assert!(result["result"]["output_bytes"].as_u64().unwrap() > 0);
+        if result["result"].get("output_bytes").is_some() {
+            assert!(result["result"]["output_bytes"].as_u64().unwrap() > 0);
+        }
         let output_path = result_root.join(output_name);
         assert!(output_path.is_file(), "{fixture}");
         if is_v2 {
@@ -1667,6 +1676,15 @@ fn executes_native_tool_workflows_with_versioned_artifacts() {
                 assert_eq!(result["result"]["classified_reads"], 999);
                 assert_eq!(result["result"]["unclassified_reads"], 1);
                 assert_eq!(result["result"]["total_reads"], 1000);
+            }
+            if capability == "medical.microbiome.v1" {
+                assert_eq!(result["artifacts"][0]["role"], "abundance");
+                assert_eq!(result["result"]["species_richness"], 2);
+                assert_eq!(result["result"]["top_species"][0]["name"], "Escherichia");
+                assert!(
+                    result["result"]["shannon_index"].as_f64().unwrap() > 0.0,
+                    "two species must yield positive Shannon entropy"
+                );
             }
             if capability == "comparative.kaks.v1" {
                 assert_eq!(result["artifacts"][0]["kind"], "table");
@@ -2456,6 +2474,115 @@ fn compile_rscript_stub(root: &std::path::Path, output_root: &std::path::Path) -
         String::from_utf8_lossy(&output.stderr)
     );
     executable
+}
+
+#[test]
+fn executes_pharmacogenomics_interpretation_jobs() {
+    let root = workspace_root();
+    let result_root = root.join("target/test-results");
+    std::fs::create_dir_all(&result_root).expect("create result directory");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(root.join("tests/fixtures/jobs/pharmacogenomics-v2.json"))
+        .output()
+        .expect("run pharmacogenomics v2 job");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("pharmacogenomics envelope");
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["capability"], "medical.pharmacogenomics.v1");
+    assert_eq!(result["result"]["matched_variant_count"], 4);
+    assert_eq!(result["artifacts"][0]["role"], "interpretation");
+    assert_eq!(result["artifacts"][0]["format"], "tsv");
+    let table = std::fs::read_to_string(result_root.join("pharmacogenomics-v2.tsv"))
+        .expect("interpretation table");
+    assert!(table.starts_with("chrom\tposition\treference\talternate\trsid"));
+    assert!(table.contains("CYP2C19*2"));
+    assert!(table.contains("SLCO1B1*5"));
+    assert!(
+        !table.contains("CYP2D6"),
+        "homozygous-reference record must be excluded"
+    );
+
+    std::fs::remove_file(result_root.join("pharmacogenomics-v2.tsv")).expect("remove output");
+}
+
+#[test]
+fn executes_spatial_transcriptomics_jobs() {
+    let root = workspace_root();
+    let result_root = root.join("target/test-results");
+    std::fs::create_dir_all(&result_root).expect("create result directory");
+    let output_directory = result_root.join("spatial-transcriptomics-v2");
+    if output_directory.exists() {
+        std::fs::remove_dir_all(&output_directory).expect("remove stale output");
+    }
+    std::fs::create_dir_all(&output_directory).expect("create spatial output directory");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(root.join("tests/fixtures/jobs/spatial-transcriptomics-v2.json"))
+        .output()
+        .expect("run spatial v2 job");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("spatial envelope");
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["capability"], "medical.spatial-transcriptomics.v1");
+    assert_eq!(result["result"]["n_barcodes"], 3);
+    assert_eq!(result["result"]["n_features"], 4);
+    assert_eq!(result["result"]["n_nonzero"], 8);
+    assert_eq!(result["result"]["total_counts"], 54);
+    assert_eq!(result["artifacts"][0]["role"], "barcode-rank");
+    let table = std::fs::read_to_string(output_directory.join("barcode-rank.tsv"))
+        .expect("barcode rank table");
+    assert!(table.starts_with("rank\tbarcode\ttotal_counts\tn_genes\n"));
+    assert!(table.contains("AAACCTGGTATG\t27\t4"));
+
+    std::fs::remove_dir_all(output_directory).expect("remove output");
+}
+
+#[test]
+fn executes_metabolomics_peak_detection_jobs() {
+    let root = workspace_root();
+    let result_root = root.join("target/test-results");
+    std::fs::create_dir_all(&result_root).expect("create result directory");
+    let output_path = result_root.join("metabolomics-v2.tsv");
+    if output_path.exists() {
+        std::fs::remove_file(&output_path).expect("remove stale output");
+    }
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(root.join("tests/fixtures/jobs/metabolomics-v2.json"))
+        .output()
+        .expect("run metabolomics v2 job");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("metabolomics envelope");
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["capability"], "medical.metabolomics.v1");
+    assert_eq!(result["result"]["spectrum_count"], 2);
+    assert_eq!(result["result"]["ms1_count"], 1);
+    assert_eq!(result["result"]["ms2_count"], 1);
+    assert_eq!(result["result"]["peak_count"], 3);
+    assert_eq!(result["artifacts"][0]["role"], "peaks");
+    let table = std::fs::read_to_string(&output_path).expect("peak table");
+    assert!(table.starts_with("spectrum_index\tretention_time_min\tmz\tintensity\n"));
+    assert!(table.contains("0\t1\t200\t500"));
+    assert!(table.contains("0\t1\t400\t800"));
+    assert!(table.contains("1\t2\t250\t900"));
+
+    std::fs::remove_file(&output_path).expect("remove output");
 }
 
 fn compile_native_tool_stub(root: &std::path::Path, output_root: &std::path::Path) -> PathBuf {

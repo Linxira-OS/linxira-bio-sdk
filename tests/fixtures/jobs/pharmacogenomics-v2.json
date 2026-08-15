@@ -1,0 +1,27 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-pharmacogenomics-v2",
+  "capability": "medical.pharmacogenomics.v1",
+  "inputs": [
+    {
+      "artifact_id": "input-vcf",
+      "role": "vcf",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-vcf-1",
+          "path": "../pharmacogenomics/pgx-sample.vcf",
+          "format": "vcf",
+          "compression": "none",
+          "size_bytes": 337
+        }
+      ]
+    }
+  ],
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "output": "../../../target/test-results/pharmacogenomics-v2.tsv"
+  }
+}

@@ -133,10 +133,50 @@ class WorkflowManifestTests(unittest.TestCase):
             self.verify_deseq2_r_runtime_policy(pack_root, manifest, catalog_entry)
         elif pack_id == "org.linxira.expression-wgcna":
             self.verify_wgcna_r_runtime_policy(pack_root, manifest, catalog_entry)
+        elif pack_id == "org.linxira.medical-survival":
+            self.verify_survival_r_runtime_policy(pack_root, manifest, catalog_entry)
         else:
             self.fail(f"no R runtime policy defined for pack {pack_id}")
 
-    def verify_resolved_lock(self, pack_root: Path, manifest: dict) -> dict:
+    def verify_survival_r_runtime_policy(
+        self, pack_root: Path, manifest: dict, catalog_entry: dict
+    ) -> None:
+        self.assertEqual(manifest["runtime"]["version"], ">=4.6.1,<4.7.0")
+        self.assertEqual(catalog_entry["status"], "cataloged")
+        self.assertEqual(catalog_entry["capability"], "medical.survival.v1")
+        lock = self.verify_resolved_lock(pack_root, manifest, bioconductor_release=None)
+        requirements = {
+            package["name"]: package["version_requirement"]
+            for package in lock["direct_requirements"]
+        }
+        self.assertEqual(
+            requirements,
+            {
+                "survival": ">=3.8.0,<3.9.0",
+                "jsonlite": ">=1.8.9,<3.0.0",
+                "digest": ">=0.6.37,<0.7.0",
+            },
+        )
+        input_schema = load_json(pack_root / "schemas" / "input.schema.json")
+        output_schema = load_json(pack_root / "schemas" / "output.schema.json")
+        self.assertEqual(
+            input_schema["properties"]["capability"]["const"], "medical.survival.v1"
+        )
+        self.assertEqual(
+            output_schema["properties"]["capability"]["const"], "medical.survival.v1"
+        )
+        script = (pack_root / "src" / "run_survival.R").read_text(encoding="utf-8")
+        self.assertIn("survival::coxph", script)
+        self.assertIn("survival::survfit", script)
+        for requirement in requirements.values():
+            self.assertIn(requirement, script)
+
+    def verify_resolved_lock(
+        self,
+        pack_root: Path,
+        manifest: dict,
+        bioconductor_release: str | None = "3.23",
+    ) -> dict:
         lock = load_json(pack_root / manifest["runtime"]["dependency_lock"]["path"])
         self.assertEqual(lock["schema_version"], "2")
         self.assertEqual(lock["lock_kind"], "compatibility-and-resolution-policy")
@@ -144,7 +184,9 @@ class WorkflowManifestTests(unittest.TestCase):
         self.assertEqual(
             lock["runtime"]["version_requirement"], manifest["runtime"]["version"]
         )
-        self.assertEqual(lock["runtime"]["bioconductor_release"], "3.23")
+        self.assertEqual(
+            lock["runtime"]["bioconductor_release"], bioconductor_release
+        )
         isolation = lock["isolation"]
         self.assertEqual(isolation["scope"], "project")
         self.assertEqual(

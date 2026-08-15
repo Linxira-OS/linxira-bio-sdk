@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Metabolomics Peaks"
+  short_description: "Parse mzML and detect centroid peaks"
+  default_prompt: "Use $analyze-metabolomics-peaks to parse an mzML file and detect centroid peaks for metabolomics profiling."

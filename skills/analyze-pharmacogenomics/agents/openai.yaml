@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Pharmacogenomics"
+  short_description: "Interpret common PGx star alleles in VCF files"
+  default_prompt: "Use $analyze-pharmacogenomics to interpret common pharmacogenomic star alleles in a VCF against the local offline allele table."

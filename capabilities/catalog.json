@@ -1525,6 +1525,93 @@
         "tsv",
         "json"
       ]
+    },
+    {
+      "id": "medical.pharmacogenomics.v1",
+      "status": "available",
+      "category": "research-use-only",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio medical pharmacogenomics <input.vcf[.gz]> <output.tsv> --json",
+      "input_formats": [
+        "vcf"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
+    },
+    {
+      "id": "medical.spatial-transcriptomics.v1",
+      "status": "available",
+      "category": "research-use-only",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio medical spatial-transcriptomics <matrix.mtx[.gz]> <features.tsv[.gz]> <barcodes.tsv[.gz]> <output.tsv> --json",
+      "input_formats": [
+        "mtx",
+        "tsv"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
+    },
+    {
+      "id": "medical.microbiome.v1",
+      "status": "available",
+      "category": "research-use-only",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio medical microbiome <reads.fa|fq> <output.tsv> --database <kraken2-db> [--confidence <fraction>] [--minimum-hit-groups <n>] [--threads <n>] --json",
+      "input_formats": [
+        "fasta",
+        "fastq"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
+    },
+    {
+      "id": "medical.survival.v1",
+      "status": "available",
+      "category": "research-use-only",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio medical survival <cohort.csv|tsv> <output-directory> --time-column COLUMN --event-column COLUMN --group-column COLUMN --reference-level LEVEL --json",
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "csv",
+        "json"
+      ]
+    },
+    {
+      "id": "chemistry.descriptors.v1",
+      "status": "available",
+      "category": "chemistry",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio chemistry descriptors <input.sdf> <output.tsv> --json",
+      "input_formats": [
+        "sdf"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
+    },
+    {
+      "id": "medical.metabolomics.v1",
+      "status": "available",
+      "category": "research-use-only",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio medical metabolomics <input.mzML[.gz]> <output.tsv> --json",
+      "input_formats": [
+        "mzml"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     }
   ]
 }
