@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Metagenomics"
+  short_description: "Classify reads and summarize taxonomy abundance with Kraken2"
+  default_prompt: "Use $analyze-metagenomics to classify metagenomic reads against a local Kraken2 database and interpret the taxonomy abundance table."

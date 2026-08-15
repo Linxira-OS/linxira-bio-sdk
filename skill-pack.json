@@ -31,7 +31,9 @@
       "id": "analyze-sequence-statistics",
       "path": "skills/analyze-sequence-statistics",
       "kind": "executable",
-      "capabilities": ["sequence.stats.v1"]
+      "capabilities": [
+        "sequence.stats.v1"
+      ]
     },
     {
       "id": "manipulate-biological-sequences",
@@ -56,7 +58,9 @@
       "id": "analyze-fastq-quality",
       "path": "skills/analyze-fastq-quality",
       "kind": "executable",
-      "capabilities": ["fastq.qc.v1"]
+      "capabilities": [
+        "fastq.qc.v1"
+      ]
     },
     {
       "id": "process-fastq-reads",
@@ -72,7 +76,9 @@
       "id": "analyze-sam-quality",
       "path": "skills/analyze-sam-quality",
       "kind": "executable",
-      "capabilities": ["alignment.qc.v1"]
+      "capabilities": [
+        "alignment.qc.v1"
+      ]
     },
     {
       "id": "analyze-genome-annotations",
@@ -102,13 +108,18 @@
       "id": "align-biological-sequences",
       "path": "skills/align-biological-sequences",
       "kind": "executable",
-      "capabilities": ["msa.muscle.v1", "msa.trimal.v1"]
+      "capabilities": [
+        "msa.muscle.v1",
+        "msa.trimal.v1"
+      ]
     },
     {
       "id": "analyze-sequence-motifs",
       "path": "skills/analyze-sequence-motifs",
       "kind": "executable",
-      "capabilities": ["motif.meme.v1"]
+      "capabilities": [
+        "motif.meme.v1"
+      ]
     },
     {
       "id": "analyze-functional-enrichment",
@@ -169,31 +180,43 @@
       "id": "analyze-set-overlaps",
       "path": "skills/analyze-set-overlaps",
       "kind": "executable",
-      "capabilities": ["set.venn.v1", "set.upset.v1"]
+      "capabilities": [
+        "set.venn.v1",
+        "set.upset.v1"
+      ]
     },
     {
       "id": "analyze-protein-properties",
       "path": "skills/analyze-protein-properties",
       "kind": "executable",
-      "capabilities": ["protein.properties.v1"]
+      "capabilities": [
+        "protein.properties.v1"
+      ]
     },
     {
       "id": "analyze-protein-domains",
       "path": "skills/analyze-protein-domains",
       "kind": "executable",
-      "capabilities": ["protein.domain.parse.v1"]
+      "capabilities": [
+        "protein.domain.parse.v1"
+      ]
     },
     {
       "id": "transform-phylogenetic-trees",
       "path": "skills/transform-phylogenetic-trees",
       "kind": "executable",
-      "capabilities": ["phylogeny.tree.transform.v1", "phylogeny.iqtree.v1"]
+      "capabilities": [
+        "phylogeny.tree.transform.v1",
+        "phylogeny.iqtree.v1"
+      ]
     },
     {
       "id": "manipulate-bio-tables",
       "path": "skills/manipulate-bio-tables",
       "kind": "executable",
-      "capabilities": ["table.manipulate.v1"]
+      "capabilities": [
+        "table.manipulate.v1"
+      ]
     },
     {
       "id": "analyze-variant-statistics",
@@ -210,7 +233,9 @@
       "id": "analyze-pdb-structure",
       "path": "skills/analyze-pdb-structure",
       "kind": "executable",
-      "capabilities": ["structure.pdb.summary.v1"]
+      "capabilities": [
+        "structure.pdb.summary.v1"
+      ]
     },
     {
       "id": "analyze-coordinate-structures",
@@ -221,15 +246,17 @@
         "structure.sequence.extract.v1",
         "structure.contact-map.v1",
         "structure.geometry.v1",
-        "structure.superpose.v1"
-        ,"protein.secondary-structure.v1"
+        "structure.superpose.v1",
+        "protein.secondary-structure.v1"
       ]
     },
     {
       "id": "inspect-bio-dataset",
       "path": "skills/inspect-bio-dataset",
       "kind": "executable",
-      "capabilities": ["dataset.inspect.v1"]
+      "capabilities": [
+        "dataset.inspect.v1"
+      ]
     },
     {
       "id": "visualize-bio-results",
@@ -246,7 +273,17 @@
       "id": "export-bio-table",
       "path": "skills/export-bio-table",
       "kind": "executable",
-      "capabilities": ["table.export.v1"]
+      "capabilities": [
+        "table.export.v1"
+      ]
+    },
+    {
+      "id": "analyze-metagenomics",
+      "path": "skills/analyze-metagenomics",
+      "kind": "executable",
+      "capabilities": [
+        "metagenomics.classify.v1"
+      ]
     }
   ]
 }

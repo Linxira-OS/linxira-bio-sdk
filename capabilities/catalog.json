@@ -51,8 +51,13 @@
       "category": "sequence-io",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence extract <input.fasta> <output.fasta> --id ID --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "sequence.filter.v1",
@@ -60,8 +65,13 @@
       "category": "sequence-io",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence filter <input.fasta> <output.fasta> --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "sequence.reverse-complement.v1",
@@ -69,8 +79,13 @@
       "category": "sequence-algorithms",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence reverse-complement <input.fasta> <output.fasta> --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "sequence.translate.v1",
@@ -78,8 +93,13 @@
       "category": "sequence-algorithms",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence translate <input.fasta> <output.fasta> --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "sequence.orf.v1",
@@ -87,8 +107,13 @@
       "category": "sequence-algorithms",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence orf <input.fasta> <output.fasta> --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "sequence.id.normalize.v1",
@@ -96,8 +121,13 @@
       "category": "sequence-io",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence normalize-ids <input.fasta> <output.fasta> --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "sequence.merge.v1",
@@ -105,8 +135,13 @@
       "category": "sequence-io",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence merge <output.fasta> <input.fasta>... --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "sequence.split.v1",
@@ -114,8 +149,13 @@
       "category": "sequence-io",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence split <input.fasta> <output-dir> --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "sequence.to-table.v1",
@@ -123,8 +163,14 @@
       "category": "sequence-io",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence to-table <input.fasta> <output.csv|tsv> --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["csv", "tsv", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "csv",
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "sequence.from-table.v1",
@@ -132,8 +178,14 @@
       "category": "sequence-io",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence from-table <input.csv|tsv> <output.fasta> --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "sequence.kmer.count.v1",
@@ -141,8 +193,13 @@
       "category": "sequence-algorithms",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence kmer-count <input.fasta> <output.tsv> --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["tsv", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "sequence.consensus.v1",
@@ -150,8 +207,13 @@
       "category": "sequence-algorithms",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence consensus <input.alignment.fasta> <output.fasta> --threshold 0.5 --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "sequence.shuffle.v1",
@@ -159,8 +221,13 @@
       "category": "sequence-io",
       "default_execution": "local-cpu",
       "command": "linxira-bio sequence shuffle <input.fasta> <output.fasta> --seed 42 --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "primer.epcr.v1",
@@ -168,8 +235,14 @@
       "category": "sequence-algorithms",
       "default_execution": "local-cpu",
       "command": "linxira-bio primer epcr <reference.fasta> <primers.tsv> <output.tsv> --json",
-      "input_formats": ["fasta", "tsv"],
-      "output_formats": ["tsv", "json"]
+      "input_formats": [
+        "fasta",
+        "tsv"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "dataset.inspect.v1",
@@ -178,12 +251,31 @@
       "default_execution": "local-cpu",
       "command": "linxira-bio dataset inspect <input> --json",
       "input_formats": [
-        "fasta", "fastq", "csv", "tsv", "bed", "gff3", "gtf", "vcf", "sam", "pdb"
+        "fasta",
+        "fastq",
+        "csv",
+        "tsv",
+        "bed",
+        "gff3",
+        "gtf",
+        "vcf",
+        "sam",
+        "pdb"
       ],
       "recognized_formats": [
-        "bam", "zip", "bcf", "cram", "h5ad", "loom", "hdf5", "rds", "mmcif"
+        "bam",
+        "zip",
+        "bcf",
+        "cram",
+        "h5ad",
+        "loom",
+        "hdf5",
+        "rds",
+        "mmcif"
       ],
-      "output_formats": ["json"]
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "table.export.v1",
@@ -191,8 +283,16 @@
       "category": "reporting",
       "default_execution": "local-cpu",
       "command": "linxira-bio export table <input.json> <output> --json",
-      "input_formats": ["json"],
-      "output_formats": ["csv", "tsv", "json", "jsonl", "xlsx"]
+      "input_formats": [
+        "json"
+      ],
+      "output_formats": [
+        "csv",
+        "tsv",
+        "json",
+        "jsonl",
+        "xlsx"
+      ]
     },
     {
       "id": "annotation.gxf.stats.v1",
@@ -200,8 +300,13 @@
       "category": "genome-annotation",
       "default_execution": "local-cpu",
       "command": "linxira-bio annotation stats <input.gff3|gtf> --json",
-      "input_formats": ["gff3", "gtf"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "gff3",
+        "gtf"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "annotation.gxf.normalize.v1",
@@ -209,8 +314,14 @@
       "category": "genome-annotation",
       "default_execution": "local-cpu",
       "command": "linxira-bio annotation normalize <input.gff3|gtf> <output.gff3> --json",
-      "input_formats": ["gff3", "gtf"],
-      "output_formats": ["gff3", "json"]
+      "input_formats": [
+        "gff3",
+        "gtf"
+      ],
+      "output_formats": [
+        "gff3",
+        "json"
+      ]
     },
     {
       "id": "annotation.gene-position.v1",
@@ -218,8 +329,14 @@
       "category": "genome-annotation",
       "default_execution": "local-cpu",
       "command": "linxira-bio annotation positions <input.gff3|gtf> <output.tsv> --json",
-      "input_formats": ["gff3", "gtf"],
-      "output_formats": ["tsv", "json"]
+      "input_formats": [
+        "gff3",
+        "gtf"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "annotation.gxf.to-bed.v1",
@@ -227,8 +344,14 @@
       "category": "genome-annotation",
       "default_execution": "local-cpu",
       "command": "linxira-bio annotation to-bed <input.gff3|gtf> <output.bed> --json",
-      "input_formats": ["gff3", "gtf"],
-      "output_formats": ["bed", "json"]
+      "input_formats": [
+        "gff3",
+        "gtf"
+      ],
+      "output_formats": [
+        "bed",
+        "json"
+      ]
     },
     {
       "id": "annotation.sequence.extract.v1",
@@ -236,8 +359,15 @@
       "category": "genome-annotation",
       "default_execution": "local-cpu",
       "command": "linxira-bio annotation extract <input.gff3|gtf> <reference.fasta> <output.fasta> --json",
-      "input_formats": ["gff3", "gtf", "fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "gff3",
+        "gtf",
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "annotation.structure.visualize.v1",
@@ -245,8 +375,14 @@
       "category": "scientific-visualization",
       "default_execution": "local-cpu",
       "command": "linxira-bio annotation plot <input.gff3|gtf> <output.svg> --json",
-      "input_formats": ["gff3", "gtf"],
-      "output_formats": ["svg", "json"]
+      "input_formats": [
+        "gff3",
+        "gtf"
+      ],
+      "output_formats": [
+        "svg",
+        "json"
+      ]
     },
     {
       "id": "genome.gene-density.v1",
@@ -254,8 +390,13 @@
       "category": "genome-annotation",
       "default_execution": "local-cpu",
       "command": "linxira-bio annotation gene-density <input.gff3|gtf> --json",
-      "input_formats": ["gff3", "gtf"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "gff3",
+        "gtf"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "table.manipulate.v1",
@@ -263,8 +404,15 @@
       "category": "data-management",
       "default_execution": "local-cpu",
       "command": "linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["csv", "tsv", "json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "csv",
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "system.worker.v1",
@@ -286,8 +434,12 @@
       "category": "read-qc",
       "default_execution": "local-cpu",
       "command": "linxira-bio fastq qc <input.fastq> --json",
-      "input_formats": ["fastq"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "fastq"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "fastq.trim.v1",
@@ -295,8 +447,13 @@
       "category": "read-processing",
       "default_execution": "local-cpu",
       "command": "linxira-bio fastq trim <input.fastq> <output.fastq> --json",
-      "input_formats": ["fastq"],
-      "output_formats": ["fastq", "json"]
+      "input_formats": [
+        "fastq"
+      ],
+      "output_formats": [
+        "fastq",
+        "json"
+      ]
     },
     {
       "id": "fastq.adapter.v1",
@@ -304,8 +461,13 @@
       "category": "read-processing",
       "default_execution": "local-cpu",
       "command": "linxira-bio fastq adapter-trim <input.fastq> <output.fastq> --json",
-      "input_formats": ["fastq"],
-      "output_formats": ["fastq", "json"]
+      "input_formats": [
+        "fastq"
+      ],
+      "output_formats": [
+        "fastq",
+        "json"
+      ]
     },
     {
       "id": "fastq.deduplicate.v1",
@@ -313,8 +475,13 @@
       "category": "read-processing",
       "default_execution": "local-cpu",
       "command": "linxira-bio fastq deduplicate <input.fastq> <output.fastq> --json",
-      "input_formats": ["fastq"],
-      "output_formats": ["fastq", "json"]
+      "input_formats": [
+        "fastq"
+      ],
+      "output_formats": [
+        "fastq",
+        "json"
+      ]
     },
     {
       "id": "fastq.subsample.v1",
@@ -322,8 +489,13 @@
       "category": "read-processing",
       "default_execution": "local-cpu",
       "command": "linxira-bio fastq subsample <input.fastq> <output.fastq> --target-count 10000 --json",
-      "input_formats": ["fastq"],
-      "output_formats": ["fastq", "json"]
+      "input_formats": [
+        "fastq"
+      ],
+      "output_formats": [
+        "fastq",
+        "json"
+      ]
     },
     {
       "id": "interval.intersect.v1",
@@ -331,8 +503,12 @@
       "category": "genome-intervals",
       "default_execution": "local-cpu",
       "command": "linxira-bio interval intersect <left.bed> <right.bed> --json",
-      "input_formats": ["bed"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "bed"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "interval.merge.v1",
@@ -340,8 +516,13 @@
       "category": "genome-intervals",
       "default_execution": "local-cpu",
       "command": "linxira-bio interval merge <input.bed> <output.bed> --json",
-      "input_formats": ["bed"],
-      "output_formats": ["bed", "json"]
+      "input_formats": [
+        "bed"
+      ],
+      "output_formats": [
+        "bed",
+        "json"
+      ]
     },
     {
       "id": "interval.subtract.v1",
@@ -349,8 +530,13 @@
       "category": "genome-intervals",
       "default_execution": "local-cpu",
       "command": "linxira-bio interval subtract <left.bed> <right.bed> <output.bed> --json",
-      "input_formats": ["bed"],
-      "output_formats": ["bed", "json"]
+      "input_formats": [
+        "bed"
+      ],
+      "output_formats": [
+        "bed",
+        "json"
+      ]
     },
     {
       "id": "interval.closest.v1",
@@ -358,8 +544,13 @@
       "category": "genome-intervals",
       "default_execution": "local-cpu",
       "command": "linxira-bio interval closest <query.bed> <target.bed> <output.tsv> --json",
-      "input_formats": ["bed"],
-      "output_formats": ["tsv", "json"]
+      "input_formats": [
+        "bed"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "alignment.qc.v1",
@@ -367,9 +558,16 @@
       "category": "alignment-files",
       "default_execution": "local-cpu",
       "command": "linxira-bio alignment qc <input.sam> --json",
-      "input_formats": ["sam"],
-      "recognized_formats": ["bam", "cram"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "sam"
+      ],
+      "recognized_formats": [
+        "bam",
+        "cram"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "alignment.bam-cram.qc.v1",
@@ -377,8 +575,14 @@
       "category": "alignment-files",
       "default_execution": "local-cpu",
       "command": "linxira-bio alignment bam-cram-qc <input.bam|cram> <output.tsv> --json",
-      "input_formats": ["bam", "cram"],
-      "output_formats": ["tsv", "json"]
+      "input_formats": [
+        "bam",
+        "cram"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "alignment.coverage.v1",
@@ -386,8 +590,14 @@
       "category": "alignment-files",
       "default_execution": "local-cpu",
       "command": "linxira-bio alignment coverage <input.bam|cram> <output.tsv> --json",
-      "input_formats": ["bam", "cram"],
-      "output_formats": ["tsv", "json"]
+      "input_formats": [
+        "bam",
+        "cram"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "alignment.bam-to-bigwig.v1",
@@ -395,8 +605,14 @@
       "category": "alignment",
       "default_execution": "local-cpu",
       "command": "linxira-bio alignment bam-to-bigwig <input.bam|cram> <output.bw> --json",
-      "input_formats": ["bam", "cram"],
-      "output_formats": ["bigwig", "json"]
+      "input_formats": [
+        "bam",
+        "cram"
+      ],
+      "output_formats": [
+        "bigwig",
+        "json"
+      ]
     },
     {
       "id": "alignment.short-read.v1",
@@ -404,8 +620,14 @@
       "category": "read-alignment",
       "default_execution": "local-cpu",
       "command": "linxira-bio alignment short-read <reference.fasta> <reads.fastq> <output.bam> --threads 1 --json",
-      "input_formats": ["fasta", "fastq"],
-      "output_formats": ["bam", "json"]
+      "input_formats": [
+        "fasta",
+        "fastq"
+      ],
+      "output_formats": [
+        "bam",
+        "json"
+      ]
     },
     {
       "id": "alignment.long-read.v1",
@@ -413,8 +635,14 @@
       "category": "read-alignment",
       "default_execution": "local-cpu",
       "command": "linxira-bio alignment long-read <reference.fasta> <reads.fastq> <output.sam> --preset map-ont --threads 1 --json",
-      "input_formats": ["fasta", "fastq"],
-      "output_formats": ["sam", "json"]
+      "input_formats": [
+        "fasta",
+        "fastq"
+      ],
+      "output_formats": [
+        "sam",
+        "json"
+      ]
     },
     {
       "id": "variant.stats.v1",
@@ -422,8 +650,12 @@
       "category": "variant-calling",
       "default_execution": "local-cpu",
       "command": "linxira-bio variant stats <input.vcf> --json",
-      "input_formats": ["vcf"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "vcf"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "variant.compare.v1",
@@ -431,8 +663,12 @@
       "category": "variant-calling",
       "default_execution": "local-cpu",
       "command": "linxira-bio variant compare <left.vcf> <right.vcf> --json",
-      "input_formats": ["vcf"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "vcf"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "variant.filter.v1",
@@ -440,8 +676,13 @@
       "category": "variant-calling",
       "default_execution": "local-cpu",
       "command": "linxira-bio variant filter <input.vcf> <output.vcf> --json",
-      "input_formats": ["vcf"],
-      "output_formats": ["vcf", "json"]
+      "input_formats": [
+        "vcf"
+      ],
+      "output_formats": [
+        "vcf",
+        "json"
+      ]
     },
     {
       "id": "variant.normalize.v1",
@@ -449,8 +690,14 @@
       "category": "variant-calling",
       "default_execution": "local-cpu",
       "command": "linxira-bio variant normalize <input.vcf> <reference.fasta> <output.vcf> --json",
-      "input_formats": ["vcf", "fasta"],
-      "output_formats": ["vcf", "json"]
+      "input_formats": [
+        "vcf",
+        "fasta"
+      ],
+      "output_formats": [
+        "vcf",
+        "json"
+      ]
     },
     {
       "id": "variant.to-table.v1",
@@ -458,8 +705,13 @@
       "category": "variant-calling",
       "default_execution": "local-cpu",
       "command": "linxira-bio variant to-table <input.vcf> <output.tsv> --json",
-      "input_formats": ["vcf"],
-      "output_formats": ["tsv", "json"]
+      "input_formats": [
+        "vcf"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "variant.annotate.v1",
@@ -467,8 +719,13 @@
       "category": "variant-calling",
       "default_execution": "local-cpu",
       "command": "linxira-bio variant annotate <input.vcf> <output.vcf> --database GRCh38.99 --json",
-      "input_formats": ["vcf"],
-      "output_formats": ["vcf", "json"]
+      "input_formats": [
+        "vcf"
+      ],
+      "output_formats": [
+        "vcf",
+        "json"
+      ]
     },
     {
       "id": "structure.pdb.summary.v1",
@@ -476,18 +733,29 @@
       "category": "structural-biology",
       "default_execution": "local-cpu",
       "command": "linxira-bio structure pdb <input.pdb> --json",
-      "input_formats": ["pdb"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "pdb"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "structure.viewer.v1",
       "status": "available",
       "category": "structural-biology",
       "default_execution": "local-gpu",
-      "fallback_execution": ["local-cpu"],
+      "fallback_execution": [
+        "local-cpu"
+      ],
       "command": "linxira-bio-ui <input.pdb|mmcif>",
-      "input_formats": ["pdb", "mmcif"],
-      "output_formats": ["png"]
+      "input_formats": [
+        "pdb",
+        "mmcif"
+      ],
+      "output_formats": [
+        "png"
+      ]
     },
     {
       "id": "structure.mmcif.summary.v1",
@@ -495,8 +763,12 @@
       "category": "structural-biology",
       "default_execution": "local-cpu",
       "command": "linxira-bio structure mmcif-summary <input.cif|mmcif> --json",
-      "input_formats": ["mmcif"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "mmcif"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "structure.sequence.extract.v1",
@@ -504,8 +776,13 @@
       "category": "structural-biology",
       "default_execution": "local-cpu",
       "command": "linxira-bio structure sequence <input.pdb|cif> --json",
-      "input_formats": ["pdb", "mmcif"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "pdb",
+        "mmcif"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "structure.contact-map.v1",
@@ -513,8 +790,13 @@
       "category": "structural-biology",
       "default_execution": "local-cpu",
       "command": "linxira-bio structure contact-map <input.pdb|cif> --cutoff 8 --atom CA --json",
-      "input_formats": ["pdb", "mmcif"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "pdb",
+        "mmcif"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "structure.geometry.v1",
@@ -522,8 +804,13 @@
       "category": "structural-biology",
       "default_execution": "local-cpu",
       "command": "linxira-bio structure geometry <input.pdb|cif> --atom CHAIN/RESIDUE/ATOM --atom CHAIN/RESIDUE/ATOM --json",
-      "input_formats": ["pdb", "mmcif"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "pdb",
+        "mmcif"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "structure.superpose.v1",
@@ -531,8 +818,13 @@
       "category": "structural-biology",
       "default_execution": "local-cpu",
       "command": "linxira-bio structure superpose <reference.pdb|cif> <mobile.pdb|cif> --atom CA --json",
-      "input_formats": ["pdb", "mmcif"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "pdb",
+        "mmcif"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "sequence.convert.biopython.v1",
@@ -560,8 +852,14 @@
       "category": "expression",
       "default_execution": "local-cpu",
       "command": "linxira-bio workflow run org.linxira.bulk-expression-deseq2 <request.json> <output/result.json>",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["csv", "json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "csv",
+        "json"
+      ]
     },
     {
       "id": "expression.matrix.qc.v1",
@@ -569,8 +867,13 @@
       "category": "expression",
       "default_execution": "local-cpu",
       "command": "linxira-bio expression matrix-qc <matrix.csv|tsv> --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "expression.normalize.v1",
@@ -578,8 +881,14 @@
       "category": "expression",
       "default_execution": "local-cpu",
       "command": "linxira-bio expression normalize <matrix.csv|tsv> <output.tsv> --method cpm --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["json", "tsv"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json",
+        "tsv"
+      ]
     },
     {
       "id": "expression.pca.v1",
@@ -587,8 +896,13 @@
       "category": "expression",
       "default_execution": "local-cpu",
       "command": "linxira-bio expression pca <matrix.csv|tsv> --components 2 --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "expression.cluster.v1",
@@ -596,8 +910,13 @@
       "category": "expression",
       "default_execution": "local-cpu",
       "command": "linxira-bio expression cluster <matrix.csv|tsv> --sample-clusters 2 --feature-clusters 4 --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "expression.heatmap.v1",
@@ -605,8 +924,13 @@
       "category": "visualization",
       "default_execution": "local-cpu",
       "command": "linxira-bio expression heatmap <matrix.csv|tsv> --top-features 50 --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "expression.volcano.v1",
@@ -614,8 +938,13 @@
       "category": "visualization",
       "default_execution": "local-cpu",
       "command": "linxira-bio expression volcano <differential.csv> <output.svg> --json",
-      "input_formats": ["csv"],
-      "output_formats": ["json", "svg"]
+      "input_formats": [
+        "csv"
+      ],
+      "output_formats": [
+        "json",
+        "svg"
+      ]
     },
     {
       "id": "expression.wgcna.v1",
@@ -623,8 +952,14 @@
       "category": "expression",
       "default_execution": "local-cpu",
       "command": "linxira-bio expression wgcna <expression.csv|tsv> <output.json> --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["csv", "json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "csv",
+        "json"
+      ]
     },
     {
       "id": "set.venn.v1",
@@ -632,8 +967,13 @@
       "category": "statistical-analysis",
       "default_execution": "local-cpu",
       "command": "linxira-bio set venn <sets.csv|tsv> --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "set.upset.v1",
@@ -641,8 +981,13 @@
       "category": "statistical-analysis",
       "default_execution": "local-cpu",
       "command": "linxira-bio set upset <sets.csv|tsv> --max-intersections 50 --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "protein.properties.v1",
@@ -650,8 +995,12 @@
       "category": "protein-analysis",
       "default_execution": "local-cpu",
       "command": "linxira-bio protein properties <proteins.fasta> --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "similarity.blast.parse.v1",
@@ -659,8 +1008,14 @@
       "category": "sequence-similarity",
       "default_execution": "local-cpu",
       "command": "linxira-bio similarity blast-parse <blast.tsv|xml> --json",
-      "input_formats": ["blast-outfmt6", "blast-outfmt7", "blast-xml1"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "blast-outfmt6",
+        "blast-outfmt7",
+        "blast-xml1"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "similarity.blast.local.v1",
@@ -668,8 +1023,14 @@
       "category": "sequence-similarity",
       "default_execution": "local-cpu",
       "command": "linxira-bio similarity blast <query.fasta> <reference.fasta> <output.tsv> --program blastn --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["blast-outfmt6", "blast-outfmt7", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "blast-outfmt6",
+        "blast-outfmt7",
+        "json"
+      ]
     },
     {
       "id": "similarity.diamond.v1",
@@ -677,8 +1038,14 @@
       "category": "sequence-similarity",
       "default_execution": "local-cpu",
       "command": "linxira-bio similarity diamond <query.fasta> <reference.fasta> <output.tsv> --mode blastp --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["blast-outfmt6", "blast-outfmt7", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "blast-outfmt6",
+        "blast-outfmt7",
+        "json"
+      ]
     },
     {
       "id": "similarity.hmmer.v1",
@@ -686,8 +1053,14 @@
       "category": "sequence-similarity",
       "default_execution": "local-cpu",
       "command": "linxira-bio similarity hmmer <profile.hmm> <sequences.fasta> <output.domtblout> --mode hmmsearch --json",
-      "input_formats": ["hmmer-profile", "fasta"],
-      "output_formats": ["hmmer-domtblout", "json"]
+      "input_formats": [
+        "hmmer-profile",
+        "fasta"
+      ],
+      "output_formats": [
+        "hmmer-domtblout",
+        "json"
+      ]
     },
     {
       "id": "similarity.reciprocal.v1",
@@ -695,8 +1068,14 @@
       "category": "comparative-genomics",
       "default_execution": "local-cpu",
       "command": "linxira-bio similarity rbh <forward.tsv|xml> <reverse.tsv|xml> --json",
-      "input_formats": ["blast-outfmt6", "blast-outfmt7", "blast-xml1"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "blast-outfmt6",
+        "blast-outfmt7",
+        "blast-xml1"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "protein.domain.parse.v1",
@@ -704,8 +1083,13 @@
       "category": "protein-analysis",
       "default_execution": "local-cpu",
       "command": "linxira-bio protein domains <interproscan.tsv|hmmer.domtblout> --json",
-      "input_formats": ["interproscan-tsv", "hmmer-domtblout"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "interproscan-tsv",
+        "hmmer-domtblout"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "protein.domain.visualize.v1",
@@ -713,8 +1097,14 @@
       "category": "scientific-visualization",
       "default_execution": "local-cpu",
       "command": "linxira-bio protein domain-plot <interproscan.tsv|hmmer.domtblout> <output.svg> --json",
-      "input_formats": ["interproscan-tsv", "hmmer-domtblout"],
-      "output_formats": ["svg", "json"]
+      "input_formats": [
+        "interproscan-tsv",
+        "hmmer-domtblout"
+      ],
+      "output_formats": [
+        "svg",
+        "json"
+      ]
     },
     {
       "id": "phylogeny.tree.transform.v1",
@@ -722,8 +1112,13 @@
       "category": "phylogenetics",
       "default_execution": "local-cpu",
       "command": "linxira-bio phylogeny tree <input.nwk> <output.nwk> --json",
-      "input_formats": ["newick"],
-      "output_formats": ["newick", "json"]
+      "input_formats": [
+        "newick"
+      ],
+      "output_formats": [
+        "newick",
+        "json"
+      ]
     },
     {
       "id": "phylogeny.distance.v1",
@@ -731,8 +1126,13 @@
       "category": "phylogenetics",
       "default_execution": "local-cpu",
       "command": "linxira-bio phylogeny distance <input.alignment.fasta> <output.tsv> --model p-distance --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["tsv", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "phylogeny.iqtree.v1",
@@ -740,8 +1140,13 @@
       "category": "phylogenetics",
       "default_execution": "local-cpu",
       "command": "linxira-bio phylogeny iqtree <alignment> <output.newick> --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["newick", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "newick",
+        "json"
+      ]
     },
     {
       "id": "phylogeny.tree.visualize.v1",
@@ -749,8 +1154,13 @@
       "category": "phylogenetics",
       "default_execution": "local-cpu",
       "command": "linxira-bio phylogeny tree-plot <input.nwk> <output.svg> --json",
-      "input_formats": ["newick"],
-      "output_formats": ["svg", "json"]
+      "input_formats": [
+        "newick"
+      ],
+      "output_formats": [
+        "svg",
+        "json"
+      ]
     },
     {
       "id": "msa.muscle.v1",
@@ -758,8 +1168,13 @@
       "category": "multiple-sequence-alignment",
       "default_execution": "local-cpu",
       "command": "linxira-bio msa muscle <input.fasta> <output.fasta> --mode align --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "msa.trimal.v1",
@@ -767,8 +1182,13 @@
       "category": "multiple-sequence-alignment",
       "default_execution": "local-cpu",
       "command": "linxira-bio msa trimal <input.alignment> <output.alignment> --mode automated1 --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["fasta", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
     },
     {
       "id": "motif.meme.v1",
@@ -776,8 +1196,13 @@
       "category": "motif-analysis",
       "default_execution": "local-cpu",
       "command": "linxira-bio motif meme <input.fasta> <output.meme> --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["meme-text", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "meme-text",
+        "json"
+      ]
     },
     {
       "id": "motif.visualize.v1",
@@ -785,8 +1210,13 @@
       "category": "scientific-visualization",
       "default_execution": "local-cpu",
       "command": "linxira-bio motif logo <input.meme> <output.svg> --json",
-      "input_formats": ["meme-text"],
-      "output_formats": ["svg", "json"]
+      "input_formats": [
+        "meme-text"
+      ],
+      "output_formats": [
+        "svg",
+        "json"
+      ]
     },
     {
       "id": "motif.mast.v1",
@@ -794,8 +1224,14 @@
       "category": "motif-analysis",
       "default_execution": "local-cpu",
       "command": "linxira-bio motif mast <motif.meme> <sequences.fasta> <output.txt> --json",
-      "input_formats": ["meme-text", "fasta"],
-      "output_formats": ["mast-text", "json"]
+      "input_formats": [
+        "meme-text",
+        "fasta"
+      ],
+      "output_formats": [
+        "mast-text",
+        "json"
+      ]
     },
     {
       "id": "protein.secondary-structure.v1",
@@ -803,8 +1239,14 @@
       "category": "protein-structure",
       "default_execution": "local-cpu",
       "command": "linxira-bio protein secondary-structure <structure.pdb|cif> <output.dssp> --json",
-      "input_formats": ["pdb", "mmcif"],
-      "output_formats": ["dssp", "json"]
+      "input_formats": [
+        "pdb",
+        "mmcif"
+      ],
+      "output_formats": [
+        "dssp",
+        "json"
+      ]
     },
     {
       "id": "annotation.go.normalize.v1",
@@ -812,8 +1254,14 @@
       "category": "functional-annotation",
       "default_execution": "local-cpu",
       "command": "linxira-bio annotation go <input.csv|tsv> <output.tsv> --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["tsv", "json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "annotation.eggnog.normalize.v1",
@@ -821,8 +1269,13 @@
       "category": "functional-annotation",
       "default_execution": "local-cpu",
       "command": "linxira-bio annotation eggnog <input.tsv> <output.tsv> --json",
-      "input_formats": ["eggnog-annotations"],
-      "output_formats": ["tsv", "json"]
+      "input_formats": [
+        "eggnog-annotations"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "enrichment.overrepresentation.v1",
@@ -830,8 +1283,14 @@
       "category": "functional-enrichment",
       "default_execution": "local-cpu",
       "command": "linxira-bio enrichment custom <genes.txt|tsv> <associations.tsv> --json",
-      "input_formats": ["identifier-list", "csv", "tsv"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "identifier-list",
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "enrichment.go.v1",
@@ -839,8 +1298,14 @@
       "category": "functional-enrichment",
       "default_execution": "local-cpu",
       "command": "linxira-bio enrichment go <genes.txt|tsv> <associations.tsv> --json",
-      "input_formats": ["identifier-list", "csv", "tsv"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "identifier-list",
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "enrichment.kegg.v1",
@@ -848,8 +1313,14 @@
       "category": "functional-enrichment",
       "default_execution": "local-cpu",
       "command": "linxira-bio enrichment kegg <genes.txt|tsv> <associations.tsv> --json",
-      "input_formats": ["identifier-list", "csv", "tsv"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "identifier-list",
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "enrichment.gsea.v1",
@@ -857,8 +1328,13 @@
       "category": "functional-enrichment",
       "default_execution": "local-cpu",
       "command": "linxira-bio enrichment gsea <ranked.tsv> <gene-sets.tsv> --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "enrichment.visualize.v1",
@@ -866,15 +1342,25 @@
       "category": "scientific-visualization",
       "default_execution": "local-cpu",
       "command": "linxira-bio enrichment visualize <genes.txt|tsv> <associations.tsv> <output.svg> --kind go --style bar --json",
-      "input_formats": ["identifier-list", "csv", "tsv"],
-      "output_formats": ["svg", "json"]
+      "input_formats": [
+        "identifier-list",
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "svg",
+        "json"
+      ]
     },
     {
       "id": "protein.af2.predict.v1",
       "status": "planned",
       "category": "structural-biology",
       "default_execution": "local-gpu",
-      "fallback_execution": ["hpc", "cloud"]
+      "fallback_execution": [
+        "hpc",
+        "cloud"
+      ]
     },
     {
       "id": "protein.af3.server.v1",
@@ -889,8 +1375,13 @@
       "category": "research-use-only",
       "default_execution": "local-cpu",
       "command": "linxira-bio medical cohort-qc <cohort.csv|tsv> --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "medical.bulk-rnaseq.v1",
@@ -898,8 +1389,14 @@
       "category": "research-use-only",
       "default_execution": "local-cpu",
       "command": "linxira-bio workflow run org.linxira.bulk-expression-deseq2 <request.json> <output/result.json>",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["csv", "json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "csv",
+        "json"
+      ]
     },
     {
       "id": "medical.pathway-ruo.v1",
@@ -907,8 +1404,14 @@
       "category": "research-use-only",
       "default_execution": "local-cpu",
       "command": "linxira-bio medical pathway <genes.txt|csv|tsv> <associations.csv|tsv> --json",
-      "input_formats": ["csv", "tsv", "identifier-list"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "csv",
+        "tsv",
+        "identifier-list"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "medical.variant-cohort.v1",
@@ -916,8 +1419,12 @@
       "category": "research-use-only",
       "default_execution": "local-cpu",
       "command": "linxira-bio medical variant-cohort <cohort.vcf> --json",
-      "input_formats": ["vcf"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "vcf"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "medical.single-cell-qc.v1",
@@ -925,8 +1432,13 @@
       "category": "research-use-only",
       "default_execution": "local-cpu",
       "command": "linxira-bio medical single-cell-qc <counts.csv|tsv> --json",
-      "input_formats": ["csv", "tsv"],
-      "output_formats": ["json"]
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     },
     {
       "id": "comparative.mcscanx.v1",
@@ -934,8 +1446,14 @@
       "category": "comparative-genomics",
       "default_execution": "local-cpu",
       "command": "linxira-bio comparative mcscanx <genes.tsv> <hits.blast> <output.collinearity> --json",
-      "input_formats": ["tsv", "blast-tabular"],
-      "output_formats": ["mcscanx-collinearity", "json"]
+      "input_formats": [
+        "tsv",
+        "blast-tabular"
+      ],
+      "output_formats": [
+        "mcscanx-collinearity",
+        "json"
+      ]
     },
     {
       "id": "comparative.kaks.v1",
@@ -943,8 +1461,13 @@
       "category": "comparative-genomics",
       "default_execution": "local-cpu",
       "command": "linxira-bio comparative kaks <codon-alignment.axt> <output.tsv> <NG|LWL|LPB|YN> --json",
-      "input_formats": ["axt"],
-      "output_formats": ["tsv", "json"]
+      "input_formats": [
+        "axt"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     },
     {
       "id": "comparative.synteny.visualize.v1",
@@ -952,8 +1475,13 @@
       "category": "comparative-genomics",
       "default_execution": "local-cpu",
       "command": "linxira-bio comparative synteny-plot <anchors.tsv> <output.svg> [--style dual|multiple|micro|circular] --json",
-      "input_formats": ["tsv"],
-      "output_formats": ["svg", "json"]
+      "input_formats": [
+        "tsv"
+      ],
+      "output_formats": [
+        "svg",
+        "json"
+      ]
     },
     {
       "id": "comparative.dotplot.v1",
@@ -961,8 +1489,13 @@
       "category": "comparative-genomics",
       "default_execution": "local-cpu",
       "command": "linxira-bio comparative dotplot <query.fa> <reference.fa> <output.svg> [--width <px>] [--height <px>] [--kmer <size>] --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["svg", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "svg",
+        "json"
+      ]
     },
     {
       "id": "rna.secondary-structure.v1",
@@ -970,8 +1503,28 @@
       "category": "rna-analysis",
       "default_execution": "local-cpu",
       "command": "linxira-bio rna secondary-structure <input.fa> <output.txt> [--temp <celsius>] --json",
-      "input_formats": ["fasta"],
-      "output_formats": ["txt", "json"]
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "txt",
+        "json"
+      ]
+    },
+    {
+      "id": "metagenomics.classify.v1",
+      "status": "available",
+      "category": "metagenomics",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio metagenomics classify <reads.fa|fq> <output.tsv> --database <kraken2-db> [--confidence <fraction>] [--minimum-hit-groups <n>] [--threads <n>] --json",
+      "input_formats": [
+        "fasta",
+        "fastq"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     }
   ]
 }
