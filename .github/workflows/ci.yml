@@ -271,14 +271,13 @@ jobs:
           print("survival E2E ok:", result["result"]["n_observations"], "observations")
           PY
       - name: Install Python 3.12 for RDKit descriptors pack
-        uses: actions/setup-python@v5
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
       - name: Create isolated descriptors environment from hashed lock
         run: |
-          python3 --version
-          test "$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.12"
-          python3 -m venv "$GITHUB_WORKSPACE/.venv-descriptors"
+          uv python install 3.12
+          uv venv --python 3.12 "$GITHUB_WORKSPACE/.venv-descriptors"
           "$GITHUB_WORKSPACE/.venv-descriptors/bin/python" -m pip install --disable-pip-version-check --require-hashes -r workflows/org.linxira.chemistry-descriptors-rdkit/requirements.lock
       - name: Run chemistry descriptors pack tests under locked Python
         run: |
