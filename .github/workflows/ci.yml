@@ -305,7 +305,7 @@ jobs:
                 "path": "tests/fixtures/chemistry/aspirin.sdf",
                 "format": "sdf",
                 "compression": "none",
-                "size_bytes": 1077,
+                "size_bytes": 1188,
               }],
             }],
             "execution": {"mode": "local-cpu"},
