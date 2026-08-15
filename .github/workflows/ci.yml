@@ -278,10 +278,12 @@ jobs:
         run: |
           uv python install 3.12
           uv venv --python 3.12 "$GITHUB_WORKSPACE/.venv-descriptors"
-          "$GITHUB_WORKSPACE/.venv-descriptors/bin/python" -m pip install --disable-pip-version-check --require-hashes -r workflows/org.linxira.chemistry-descriptors-rdkit/requirements.lock
+          uv pip install --python "$GITHUB_WORKSPACE/.venv-descriptors/bin/python" \
+            --disable-pip-version-check --require-hashes \
+            -r workflows/org.linxira.chemistry-descriptors-rdkit/requirements.lock
       - name: Run chemistry descriptors pack tests under locked Python
         run: |
-          "$GITHUB_WORKSPACE/.venv-descriptors/bin/python" -m pip install --disable-pip-version-check jsonschema
+          uv pip install --python "$GITHUB_WORKSPACE/.venv-descriptors/bin/python" --disable-pip-version-check jsonschema
           "$GITHUB_WORKSPACE/.venv-descriptors/bin/python" -m unittest discover -s workflows/org.linxira.chemistry-descriptors-rdkit/tests -p "test_*.py"
       - name: Run chemistry descriptors E2E
         shell: bash
