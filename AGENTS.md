@@ -32,6 +32,9 @@ the agent skills that select and validate them.
 - Read `skills/analyze-sequence-similarity/SKILL.md` for implemented local
   BLAST+, DIAMOND, HMMER, BLAST result parsing, and reciprocal best-hit
   analysis.
+- Read `skills/analyze-metagenomics/SKILL.md` for the implemented local
+  Kraken2 taxonomic classification and abundance-table capability
+  (`metagenomics.classify.v1`).
 - Read `skills/align-biological-sequences/SKILL.md` for implemented MUSCLE 5
   multiple-sequence alignment and trimAl trimming.
 - Read `skills/analyze-sequence-motifs/SKILL.md` for implemented local MEME

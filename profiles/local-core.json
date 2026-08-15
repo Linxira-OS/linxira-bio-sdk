@@ -13,6 +13,7 @@
     "analyze-sam-quality",
     "analyze-genome-annotations",
     "analyze-sequence-similarity",
+    "analyze-metagenomics",
     "align-biological-sequences",
     "analyze-sequence-motifs",
     "analyze-functional-enrichment",

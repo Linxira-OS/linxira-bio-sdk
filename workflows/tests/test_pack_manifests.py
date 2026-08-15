@@ -90,6 +90,25 @@ class WorkflowManifestTests(unittest.TestCase):
             r"(\s*,\s*(>=|<=|>|<|=|~|\^)?\s*\d+\.\d+(\.\d+)?)*$",
             "core_compatibility must be a comma-separated semver range",
         )
+        contract = manifest.get("contract")
+        self.assertIsInstance(contract, dict, "cataloged pack must declare an execution contract")
+        self.assertTrue(contract["inputs"])
+        self.assertTrue(contract["outputs"]["roles"])
+        self.assertTrue(contract["outputs"]["formats"])
+        self.assertTrue(contract["parameters"])
+        declared_roles = {entry["role"] for entry in contract["inputs"]}
+        input_schema = load_json(pack_root / manifest["input_schema"]["$ref"])
+        schema_roles = {
+            entry.get("properties", {}).get("role", {}).get("const")
+            for entry in input_schema["properties"]["inputs"].get("allOf", [])
+        }
+        schema_roles.discard(None)
+        if schema_roles:
+            self.assertEqual(
+                declared_roles,
+                schema_roles,
+                "manifest contract input roles must match the input schema",
+            )
         self.assertIn(entrypoint, declared)
         self.assertIn(lock["path"], declared)
         self.assertEqual(lock["sha256"].lower(), declared[lock["path"]])

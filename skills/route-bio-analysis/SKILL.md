@@ -71,6 +71,10 @@ a replacement script silently.
 - Local FASTA similarity search with BLAST+ or DIAMOND, HMMER3 profile search,
   completed BLAST outfmt 6/outfmt 7/XML1 parsing, and reciprocal best-hit
   analysis: use `analyze-sequence-similarity`.
+- Shotgun or amplicon read taxonomic classification against a local Kraken2
+  database with clade/taxon abundance tables: use `analyze-metagenomics`.
+  Read-level classification does not assemble genomes or estimate strain
+  abundance.
 - Completed InterProScan TSV or HMMER domtblout files: use
   `analyze-protein-domains`. Domain search execution and database downloads
   remain external native workflows.

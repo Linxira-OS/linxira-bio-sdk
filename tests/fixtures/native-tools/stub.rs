@@ -5,6 +5,19 @@ use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let arguments = env::args_os().skip(1).collect::<Vec<_>>();
+    if let Some(report) = value_after(&arguments, "--report") {
+        let report = PathBuf::from(report);
+        if let Some(classified) = value_after(&arguments, "--output") {
+            let _ = write_output(&PathBuf::from(classified), "C\t1\t1\t1:1\n");
+        }
+        return write_output(
+            &report,
+            "99.90\t999\t999\tR\t1\troot\n\
+             10.00\t100\t50\tS\t561\tEscherichia\n\
+             10.00\t100\t50\tS\t1392\tStaphylococcus\n\
+             0.10\t1\t1\tU\t0\tunclassified\n",
+        );
+    }
     if matches!(arguments.first().and_then(|value| value.to_str()), Some("stats" | "coverage")) {
         println!("# linxira native-tool test report\nSN\traw total sequences:\t2");
         return ExitCode::SUCCESS;

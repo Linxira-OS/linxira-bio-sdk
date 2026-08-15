@@ -24,6 +24,7 @@ pub enum ExecutionMode {
     Hpc,
     Cloud,
     AuthenticatedBrowser,
+    Container,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -430,6 +431,38 @@ pub struct DependencyLock {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkflowInputContract {
+    pub role: String,
+    pub formats: Vec<BioDataFormat>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkflowOutputContract {
+    pub roles: Vec<String>,
+    pub kind: OutputArtifactKind,
+    pub formats: Vec<BioDataFormat>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media_type: Option<String>,
+}
+
+/// Explicit, machine-readable execution contract for a workflow pack. When a
+/// manifest declares this, executors must derive the pack's input roles,
+/// formats, parameters, and artifact contract from it instead of hardcoded
+/// tables.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkflowContractDecl {
+    pub inputs: Vec<WorkflowInputContract>,
+    pub outputs: WorkflowOutputContract,
+    pub parameters: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkflowResumeConfig {
+    pub enabled: bool,
+    pub state_file: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkflowRuntime {
     pub kind: WorkflowRuntimeKind,
     pub version: String,
@@ -505,6 +538,10 @@ pub struct WorkflowPackManifest {
     pub homepage: Option<String>,
     pub entrypoint: WorkflowEntrypoint,
     pub runtime: WorkflowRuntime,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume: Option<WorkflowResumeConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contract: Option<WorkflowContractDecl>,
     pub input_schema: serde_json::Value,
     pub output_schema: serde_json::Value,
     pub platforms: Vec<SupportedPlatform>,
