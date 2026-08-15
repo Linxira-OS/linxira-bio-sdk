@@ -105,7 +105,7 @@
     },
     {
       "path": "src/run_survival.R",
-      "sha256": "aca9edc4f741b107a9bb08d8aa5d9e3041f0c7b02e17e6ee8b64dfc113dfb45f"
+      "sha256": "378b4185358790d8bad9d9d9811f61318070b6d0daced23f34e29aa58571c528"
     },
     {
       "path": "tests/test_validation.R",
