@@ -75,6 +75,24 @@ a replacement script silently.
   database with clade/taxon abundance tables: use `analyze-metagenomics`.
   Read-level classification does not assemble genomes or estimate strain
   abundance.
+- Research-only PGx star-allele interpretation from VCF files against the
+  local offline allele table: use `analyze-pharmacogenomics`. Report observed
+  alleles and phenotypes, never prescribing recommendations.
+- 10x Genomics sparse count matrices with feature/barcode annotations:
+  use `analyze-spatial-transcriptomics` for per-barcode counts, detected
+  genes, and barcode-rank QC summaries. Clustering, normalization, and cell
+  typing remain external or planned.
+- Shotgun read microbiome profiling with alpha diversity (richness, Shannon,
+  evenness) and dominant species: use `analyze-microbiome-diversity`, which
+  shares the Kraken2 backend with `analyze-metagenomics`.
+- Research-only survival analysis on cohort tables with time/event/group
+  columns: use `analyze-survival-data` for Cox PH hazard ratios and
+  Kaplan-Meier summaries. Clinical decision support is out of scope.
+- SDF molecule records needing physicochemical descriptors (MW, CLogP, TPSA,
+  HBD/HBA, rings, formula): use `analyze-molecular-descriptors`.
+- mzML mass-spectrometry files needing local centroid peak detection:
+  use `analyze-metabolomics-peaks`. Feature alignment, deconvolution, and
+  quantification remain external or planned.
 - Completed InterProScan TSV or HMMER domtblout files: use
   `analyze-protein-domains`. Domain search execution and database downloads
   remain external native workflows.

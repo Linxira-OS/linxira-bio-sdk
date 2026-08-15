@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Microbiome Diversity"
+  short_description: "Classify reads and summarize microbiome alpha diversity"
+  default_prompt: "Use $analyze-microbiome-diversity to classify metagenomic reads with Kraken2 and summarize species richness, Shannon diversity, and evenness."

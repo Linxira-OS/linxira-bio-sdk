@@ -21,6 +21,86 @@ use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use structure_viewer::StructureViewer;
 
+/// Central visual theme for the desktop UI. Every color, spacing, radius, and
+/// type size used in this file is drawn from these tokens so the interface
+/// stays coherent as it grows. Keep values here instead of scattering them
+/// across the code.
+mod theme {
+    use eframe::egui;
+
+    // --- Accent palette (light theme) ---
+    /// Brand green: sidebar masthead and primary emphasis.
+    pub const ACCENT: egui::Color32 = egui::Color32::from_rgb(23, 81, 72);
+    /// Success/primary green: ready states, section rules, drop-zone hover.
+    pub const ACCENT_STRONG: egui::Color32 = egui::Color32::from_rgb(32, 116, 86);
+    /// Interactive accent: selections and hovered controls.
+    pub const ACCENT_SOFT: egui::Color32 = egui::Color32::from_rgb(42, 123, 105);
+    /// Pale green tint for hovered/dragged surfaces (drop zone).
+    pub const ACCENT_TINT: egui::Color32 = egui::Color32::from_rgb(226, 241, 237);
+    /// Neutral muted text: captions, secondary labels, empty states.
+    pub const TEXT_MUTED: egui::Color32 = egui::Color32::from_rgb(73, 88, 83);
+    /// Informational blue: inspecting/running states.
+    pub const INFO: egui::Color32 = egui::Color32::from_rgb(49, 103, 158);
+    /// Warning amber: pending/warning states.
+    pub const WARNING: egui::Color32 = egui::Color32::from_rgb(176, 104, 24);
+    /// Strong amber for environment warnings.
+    pub const WARNING_AMBER: egui::Color32 = egui::Color32::from_rgb(160, 90, 0);
+    /// Error red: invalid/failed states.
+    pub const DANGER: egui::Color32 = egui::Color32::from_rgb(174, 57, 57);
+    /// Deep red for blockers and missing documents.
+    pub const DANGER_DEEP: egui::Color32 = egui::Color32::from_rgb(160, 70, 40);
+    /// Hyperlink blue.
+    pub const LINK: egui::Color32 = egui::Color32::from_rgb(32, 101, 145);
+
+    // --- Surfaces ---
+    /// Main window background.
+    pub const WINDOW_BG: egui::Color32 = egui::Color32::from_rgb(252, 253, 252);
+    /// Panel/sidebar background.
+    pub const PANEL_BG: egui::Color32 = egui::Color32::from_rgb(249, 250, 249);
+    /// Faint background: stripes, table tints, subtle fills.
+    pub const FAINT_BG: egui::Color32 = egui::Color32::from_rgb(238, 242, 240);
+    /// Elevated surfaces: cards and result panels.
+    pub const ELEVATED_BG: egui::Color32 = egui::Color32::WHITE;
+    /// Code and monospace backgrounds.
+    pub const CODE_BG: egui::Color32 = egui::Color32::from_rgb(235, 239, 237);
+    /// Widget resting background.
+    pub const WIDGET_BG: egui::Color32 = egui::Color32::from_rgb(239, 243, 241);
+    /// Widget hovered background.
+    pub const WIDGET_BG_HOVER: egui::Color32 = egui::Color32::from_rgb(224, 236, 232);
+    /// Drop-zone resting fill.
+    pub const DROP_BG: egui::Color32 = egui::Color32::from_rgb(246, 248, 247);
+    /// Hairline border color.
+    pub const BORDER: egui::Color32 = egui::Color32::from_rgb(190, 199, 196);
+
+    // --- Spacing and layout ---
+    /// Fixed sidebar width (navigation + dataset list).
+    pub const SIDEBAR_WIDTH: f32 = 200.0;
+    /// Right-hand context panel width in the workspace.
+    pub const CONTEXT_WIDTH: f32 = 280.0;
+    /// Gap between workspace content and the context panel.
+    pub const CONTEXT_GAP: f32 = 18.0;
+    /// Height reserved for the bottom status bar.
+    pub const STATUS_BAR_HEIGHT: f32 = 28.0;
+    /// Height of a sidebar navigation button.
+    pub const NAV_BUTTON_HEIGHT: f32 = 36.0;
+    /// Height of a workspace tab button.
+    pub const TAB_BUTTON_HEIGHT: f32 = 34.0;
+    /// Uniform inner padding for panels and cards.
+    pub const PANEL_MARGIN: egui::Margin = egui::Margin::symmetric(14, 12);
+    /// Uniform corner rounding for frames and widgets.
+    pub const CORNER_RADIUS: egui::CornerRadius = egui::CornerRadius::same(6);
+
+    // --- Typography ---
+    /// Page/section titles.
+    pub const TITLE_SIZE: f32 = 18.0;
+    /// Panel and card headers.
+    pub const SUBTITLE_SIZE: f32 = 14.0;
+    /// Body emphasis (dataset list labels).
+    pub const BODY_SIZE: f32 = 13.0;
+    /// Small labels and captions.
+    pub const SMALL_SIZE: f32 = 12.0;
+}
+
 fn main() -> eframe::Result {
     let startup_paths = std::env::args_os().skip(1).map(PathBuf::from).collect();
     let options = eframe::NativeOptions {
@@ -102,10 +182,10 @@ impl DatasetState {
 
     fn color(self) -> egui::Color32 {
         match self {
-            Self::Inspecting => egui::Color32::from_rgb(49, 103, 158),
-            Self::Ready => egui::Color32::from_rgb(32, 116, 86),
-            Self::Warning => egui::Color32::from_rgb(176, 104, 24),
-            Self::Invalid => egui::Color32::from_rgb(174, 57, 57),
+            Self::Inspecting => theme::INFO,
+            Self::Ready => theme::ACCENT_STRONG,
+            Self::Warning => theme::WARNING,
+            Self::Invalid => theme::DANGER,
         }
     }
 }
@@ -1486,9 +1566,13 @@ impl BioApp {
             egui::RichText::new("LINXIRA BIO")
                 .strong()
                 .size(18.0)
-                .color(egui::Color32::from_rgb(23, 81, 72)),
+                .color(theme::ACCENT),
         );
-        ui.small(self.text("本地分析工作台", "Local analysis workbench"));
+        ui.label(
+            egui::RichText::new(self.text("本地分析工作台", "Local analysis workbench"))
+                .size(theme::SMALL_SIZE)
+                .color(theme::TEXT_MUTED),
+        );
         ui.add_space(14.0);
 
         nav_button(
@@ -1526,7 +1610,25 @@ impl BioApp {
         ui.weak(self.text("项目数据", "PROJECT DATA"));
         ui.add_space(4.0);
         if self.datasets.is_empty() {
-            ui.small(self.text("尚未导入数据", "No datasets imported"));
+            egui::Frame::NONE
+                .fill(theme::FAINT_BG)
+                .corner_radius(theme::CORNER_RADIUS)
+                .inner_margin(egui::Margin::symmetric(8, 10))
+                .show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(self.text("尚未导入数据", "No datasets imported"))
+                            .size(theme::SMALL_SIZE)
+                            .color(theme::TEXT_MUTED),
+                    );
+                    ui.label(
+                        egui::RichText::new(self.text(
+                            "拖放文件到主区域，或点击下方导入。",
+                            "Drop files in the main area, or use Import below.",
+                        ))
+                        .size(theme::SMALL_SIZE)
+                        .color(theme::TEXT_MUTED),
+                    );
+                });
         } else {
             egui::ScrollArea::vertical()
                 .id_salt("navigation-datasets")
@@ -1535,7 +1637,7 @@ impl BioApp {
                     for index in 0..self.datasets.len() {
                         let dataset = &self.datasets[index];
                         let selected = self.selected_dataset == Some(index);
-                        let label = egui::RichText::new(&dataset.name).size(13.0);
+                        let label = egui::RichText::new(&dataset.name).size(theme::BODY_SIZE);
                         let response = ui.add_sized(
                             [ui.available_width(), 30.0],
                             egui::Button::new(label).selected(selected),
@@ -1590,11 +1692,11 @@ impl BioApp {
             }
             ui.separator();
             let environment_color = if self.environment_running {
-                egui::Color32::from_rgb(49, 103, 158)
+                theme::INFO
             } else if self.environment_result.is_some() {
-                egui::Color32::from_rgb(32, 116, 86)
+                theme::ACCENT_STRONG
             } else {
-                egui::Color32::from_rgb(176, 104, 24)
+                theme::WARNING
             };
             ui.colored_label(
                 environment_color,
@@ -1626,6 +1728,90 @@ impl BioApp {
         if !self.project_status.is_empty() {
             ui.small(&self.project_status);
         }
+    }
+
+    /// Bottom status bar: dataset/job counts on the left, environment state
+    /// and build version on the right. One coherent strip below every page.
+    fn show_status_bar(&self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new(self.text("状态", "Status")).size(theme::SMALL_SIZE));
+            ui.separator();
+            ui.label(
+                egui::RichText::new(format!(
+                    "{}: {}",
+                    self.text("数据集", "Datasets"),
+                    self.datasets.len()
+                ))
+                .size(theme::SMALL_SIZE),
+            );
+            let running = self
+                .job_history
+                .iter()
+                .filter(|job| job.state == JobState::Running)
+                .count();
+            let completed = self
+                .job_history
+                .iter()
+                .filter(|job| job.state == JobState::Completed)
+                .count();
+            let failed = self
+                .job_history
+                .iter()
+                .filter(|job| job.state == JobState::Failed)
+                .count();
+            if running > 0 {
+                ui.separator();
+                ui.colored_label(
+                    theme::INFO,
+                    egui::RichText::new(format!("{} {}", running, self.text("运行中", "running")))
+                        .size(theme::SMALL_SIZE),
+                );
+            }
+            if completed > 0 {
+                ui.separator();
+                ui.colored_label(
+                    theme::ACCENT_STRONG,
+                    egui::RichText::new(format!("{} {}", completed, self.text("已完成", "done")))
+                        .size(theme::SMALL_SIZE),
+                );
+            }
+            if failed > 0 {
+                ui.separator();
+                ui.colored_label(
+                    theme::DANGER,
+                    egui::RichText::new(format!("{} {}", failed, self.text("失败", "failed")))
+                        .size(theme::SMALL_SIZE),
+                );
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(
+                    egui::RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                        .weak()
+                        .size(theme::SMALL_SIZE),
+                );
+                ui.separator();
+                let (environment_color, environment_text) = if self.environment_running {
+                    (
+                        theme::INFO,
+                        self.text("环境检查中…", "Checking environment…"),
+                    )
+                } else if self.environment_result.is_some() {
+                    (
+                        theme::ACCENT_STRONG,
+                        self.text("环境已检查", "Environment checked"),
+                    )
+                } else {
+                    (
+                        theme::WARNING,
+                        self.text("环境待检查", "Environment pending"),
+                    )
+                };
+                ui.colored_label(
+                    environment_color,
+                    egui::RichText::new(environment_text).size(theme::SMALL_SIZE),
+                );
+            });
+        });
     }
 
     fn show_workspace(&mut self, ui: &mut egui::Ui) {
@@ -1661,8 +1847,9 @@ impl BioApp {
         let show_context = ui.available_width() >= 900.0;
         if show_context {
             ui.horizontal_top(|ui| {
-                let context_width = 270.0;
-                let content_width = (ui.available_width() - context_width - 18.0).max(420.0);
+                let context_width = theme::CONTEXT_WIDTH;
+                let content_width =
+                    (ui.available_width() - context_width - theme::CONTEXT_GAP).max(420.0);
                 ui.allocate_ui_with_layout(
                     egui::vec2(content_width, ui.available_height()),
                     egui::Layout::top_down(egui::Align::LEFT),
@@ -1672,7 +1859,22 @@ impl BioApp {
                 ui.allocate_ui_with_layout(
                     egui::vec2(context_width, ui.available_height()),
                     egui::Layout::top_down(egui::Align::LEFT),
-                    |ui| self.show_workspace_context(ui),
+                    |ui| {
+                        let rect = ui.max_rect();
+                        let painter = ui.painter();
+                        painter.rect_filled(rect, theme::CORNER_RADIUS, theme::PANEL_BG);
+                        painter.rect_stroke(
+                            rect,
+                            theme::CORNER_RADIUS,
+                            egui::Stroke::new(1.0, theme::BORDER),
+                            egui::StrokeKind::Inside,
+                        );
+                        ui.add_space(10.0);
+                        ui.horizontal(|ui| {
+                            ui.add_space(12.0);
+                            ui.vertical(|ui| self.show_workspace_context(ui));
+                        });
+                    },
                 );
             });
         } else {
@@ -1698,21 +1900,21 @@ impl BioApp {
 
         let hovered = ui.ctx().input(|input| !input.raw.hovered_files.is_empty());
         let drop_fill = if hovered {
-            egui::Color32::from_rgb(226, 241, 237)
+            theme::ACCENT_TINT
         } else {
-            egui::Color32::from_rgb(246, 248, 247)
+            theme::DROP_BG
         };
         egui::Frame::NONE
             .fill(drop_fill)
             .stroke(egui::Stroke::new(
                 1.0,
                 if hovered {
-                    egui::Color32::from_rgb(40, 126, 108)
+                    theme::ACCENT_STRONG
                 } else {
-                    egui::Color32::from_rgb(190, 199, 196)
+                    theme::BORDER
                 },
             ))
-            .corner_radius(egui::CornerRadius::same(6))
+            .corner_radius(theme::CORNER_RADIUS)
             .inner_margin(egui::Margin::symmetric(16, 18))
             .show(ui, |ui| {
                 ui.vertical_centered(|ui| {
@@ -1797,7 +1999,7 @@ impl BioApp {
                 self.import_path.clear();
             }
         }
-        ui.colored_label(egui::Color32::from_rgb(73, 88, 83), &self.import_status);
+        ui.colored_label(theme::TEXT_MUTED, &self.import_status);
 
         ui.add_space(18.0);
         section_title(ui, self.text("格式边界", "Format boundaries"));
@@ -2928,46 +3130,73 @@ impl BioApp {
             return;
         };
         let payload = result.get("result").unwrap_or(&result);
+        let language = self.language;
+
         ui.add_space(12.0);
-        section_title(ui, self.text("统计摘要", "Statistics summary"));
-        render_metrics(ui, payload, self.language);
-
-        ui.add_space(14.0);
-        section_title(ui, self.text("图表预览", "Chart preview"));
-        let capability = result.get("capability").and_then(Value::as_str);
-        if !visualization::show_analysis_charts(
+        result_panel(
             ui,
-            payload,
-            capability,
-            self.language == Language::ZhCn,
-        ) {
-            ui.small(self.text(
-                "当前结果没有可绘制的数值序列。",
-                "This result has no plottable numeric series.",
-            ));
-        }
+            self.text("统计摘要", "Statistics summary"),
+            Some(self.text(
+                "关键数值与文件级摘要，来自本次分析输出。",
+                "Key numeric and file-level summaries from this analysis output.",
+            )),
+            |ui| render_metrics(ui, payload, language),
+        );
 
         ui.add_space(14.0);
-        section_title(ui, self.text("导出", "Export"));
-        ui.horizontal_wrapped(|ui| {
-            if ui.button("CSV").clicked() {
-                self.export_analysis(&result, ExportFormat::Csv);
-            }
-            if ui.button("TSV").clicked() {
-                self.export_analysis(&result, ExportFormat::Tsv);
-            }
-            if ui.button("JSON").clicked() {
-                self.export_analysis(&result, ExportFormat::Json);
-            }
-            if ui.button("XLSX").clicked() {
-                self.export_analysis(&result, ExportFormat::Xlsx);
-            }
-            ui.add_enabled(false, egui::Button::new("Parquet"))
-                .on_hover_text(self.text("计划能力", "Planned capability"));
-        });
-        if !self.export_status.is_empty() {
-            ui.small(&self.export_status);
-        }
+        result_panel(
+            ui,
+            self.text("图表预览", "Chart preview"),
+            Some(self.text(
+                "火山图、热图、共线性、点图、模体与进化树等图形结果统一在此容器中展示。",
+                "Volcano, heatmap, synteny, dotplot, motif, and tree figures all share this container.",
+            )),
+            |ui| {
+                let capability = result.get("capability").and_then(Value::as_str);
+                if !visualization::show_analysis_charts(
+                    ui,
+                    payload,
+                    capability,
+                    language == Language::ZhCn,
+                ) {
+                    ui.small(self.text(
+                        "当前结果没有可绘制的数值序列。",
+                        "This result has no plottable numeric series.",
+                    ));
+                }
+            },
+        );
+
+        ui.add_space(14.0);
+        result_panel(
+            ui,
+            self.text("导出", "Export"),
+            Some(self.text(
+                "导出当前分析结果；格式与扩展名一一对应。",
+                "Export the current analysis result; each format matches its extension.",
+            )),
+            |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    if ui.button("CSV").clicked() {
+                        self.export_analysis(&result, ExportFormat::Csv);
+                    }
+                    if ui.button("TSV").clicked() {
+                        self.export_analysis(&result, ExportFormat::Tsv);
+                    }
+                    if ui.button("JSON").clicked() {
+                        self.export_analysis(&result, ExportFormat::Json);
+                    }
+                    if ui.button("XLSX").clicked() {
+                        self.export_analysis(&result, ExportFormat::Xlsx);
+                    }
+                    ui.add_enabled(false, egui::Button::new("Parquet"))
+                        .on_hover_text(self.text("计划能力", "Planned capability"));
+                });
+                if !self.export_status.is_empty() {
+                    ui.small(&self.export_status);
+                }
+            },
+        );
 
         if self.user_mode == UserMode::Expert {
             ui.add_space(12.0);
@@ -3300,7 +3529,7 @@ impl BioApp {
             render_markdown_document(ui, &document);
         } else {
             ui.colored_label(
-                egui::Color32::from_rgb(170, 70, 40),
+                theme::DANGER_DEEP,
                 self.text("文档未找到。", "Documentation was not found."),
             );
         }
@@ -3358,7 +3587,7 @@ impl BioApp {
                 }
                 Err(error) => {
                     ui.colored_label(
-                        egui::Color32::from_rgb(176, 104, 24),
+                        theme::WARNING,
                         self.text(
                             "开发构建旁未找到平台依赖 NOTICE；正式发行包会在 staging 时生成。",
                             "No platform dependency NOTICE was found beside this development build; release staging generates it.",
@@ -3404,13 +3633,17 @@ impl eframe::App for BioApp {
             self.show_top_bar(ui);
             ui.add_space(6.0);
             ui.separator();
+            ui.add_space(4.0);
             ui.allocate_ui_with_layout(
-                ui.available_size(),
+                egui::vec2(
+                    ui.available_width(),
+                    (ui.available_height() - theme::STATUS_BAR_HEIGHT).max(160.0),
+                ),
                 egui::Layout::left_to_right(egui::Align::TOP),
                 |ui| {
                     let height = ui.available_height();
                     ui.allocate_ui_with_layout(
-                        egui::vec2(190.0, height),
+                        egui::vec2(theme::SIDEBAR_WIDTH, height),
                         egui::Layout::top_down(egui::Align::LEFT),
                         |ui| self.show_navigation(ui),
                     );
@@ -3444,6 +3677,11 @@ impl eframe::App for BioApp {
                     );
                 },
             );
+            ui.add_space(6.0);
+            ui.separator();
+            ui.add_space(2.0);
+            self.show_status_bar(ui);
+            ui.add_space(4.0);
         });
     }
 }
@@ -3990,22 +4228,29 @@ fn configure_style(context: &egui::Context) {
     style.spacing.interact_size = egui::vec2(38.0, 30.0);
     style.spacing.combo_width = 180.0;
 
+    // Quiet scrollbars: they appear on hover, use a neutral handle color,
+    // and keep a consistent width across every scroll area.
+    style.spacing.scroll.bar_width = 8.0;
+    style.spacing.scroll.floating_allocated_width = 4.0;
+    style.spacing.scroll.handle_min_length = 24.0;
+    style.spacing.scroll.foreground_color = false;
+
     let visuals = &mut style.visuals;
-    visuals.panel_fill = egui::Color32::from_rgb(249, 250, 249);
-    visuals.window_fill = egui::Color32::from_rgb(252, 253, 252);
-    visuals.faint_bg_color = egui::Color32::from_rgb(238, 242, 240);
-    visuals.extreme_bg_color = egui::Color32::WHITE;
-    visuals.code_bg_color = egui::Color32::from_rgb(235, 239, 237);
-    visuals.selection.bg_fill = egui::Color32::from_rgb(42, 123, 105);
-    visuals.hyperlink_color = egui::Color32::from_rgb(32, 101, 145);
-    visuals.warn_fg_color = egui::Color32::from_rgb(176, 104, 24);
-    visuals.error_fg_color = egui::Color32::from_rgb(174, 57, 57);
-    visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(4);
-    visuals.widgets.hovered.corner_radius = egui::CornerRadius::same(4);
-    visuals.widgets.active.corner_radius = egui::CornerRadius::same(4);
-    visuals.widgets.open.corner_radius = egui::CornerRadius::same(4);
-    visuals.widgets.inactive.weak_bg_fill = egui::Color32::from_rgb(239, 243, 241);
-    visuals.widgets.hovered.weak_bg_fill = egui::Color32::from_rgb(224, 236, 232);
+    visuals.panel_fill = theme::PANEL_BG;
+    visuals.window_fill = theme::WINDOW_BG;
+    visuals.faint_bg_color = theme::FAINT_BG;
+    visuals.extreme_bg_color = theme::ELEVATED_BG;
+    visuals.code_bg_color = theme::CODE_BG;
+    visuals.selection.bg_fill = theme::ACCENT_SOFT;
+    visuals.hyperlink_color = theme::LINK;
+    visuals.warn_fg_color = theme::WARNING;
+    visuals.error_fg_color = theme::DANGER;
+    visuals.widgets.inactive.corner_radius = theme::CORNER_RADIUS;
+    visuals.widgets.hovered.corner_radius = theme::CORNER_RADIUS;
+    visuals.widgets.active.corner_radius = theme::CORNER_RADIUS;
+    visuals.widgets.open.corner_radius = theme::CORNER_RADIUS;
+    visuals.widgets.inactive.weak_bg_fill = theme::WIDGET_BG;
+    visuals.widgets.hovered.weak_bg_fill = theme::WIDGET_BG_HOVER;
     context.set_style_of(egui::Theme::Light, style);
 }
 
@@ -4013,7 +4258,7 @@ fn nav_button(ui: &mut egui::Ui, page: &mut Page, target: Page, label: &str) {
     let selected = *page == target;
     if ui
         .add_sized(
-            [ui.available_width(), 36.0],
+            [ui.available_width(), theme::NAV_BUTTON_HEIGHT],
             egui::Button::new(label).selected(selected),
         )
         .clicked()
@@ -4030,7 +4275,7 @@ fn workspace_tab_button(
 ) {
     if ui
         .add_sized(
-            [ui.available_width(), 34.0],
+            [ui.available_width(), theme::TAB_BUTTON_HEIGHT],
             egui::Button::new(label).selected(*tab == target),
         )
         .clicked()
@@ -4040,7 +4285,49 @@ fn workspace_tab_button(
 }
 
 fn section_title(ui: &mut egui::Ui, title: &str) {
-    ui.label(egui::RichText::new(title).strong().size(18.0));
+    ui.horizontal(|ui| {
+        let bar = ui
+            .allocate_exact_size(egui::vec2(3.0, 16.0), egui::Sense::hover())
+            .0;
+        ui.painter()
+            .rect_filled(bar, egui::CornerRadius::same(2), theme::ACCENT_STRONG);
+        ui.label(egui::RichText::new(title).strong().size(theme::TITLE_SIZE));
+    });
+}
+
+/// A titled, uniformly padded result container. Every result section
+/// (statistics, chart preview, export) shares this panel so figures and
+/// summaries look coherent regardless of the capability that produced them.
+fn result_panel(
+    ui: &mut egui::Ui,
+    title: &str,
+    caption: Option<&str>,
+    content: impl FnOnce(&mut egui::Ui),
+) {
+    egui::Frame::NONE
+        .fill(theme::ELEVATED_BG)
+        .stroke(egui::Stroke::new(1.0, theme::BORDER))
+        .corner_radius(theme::CORNER_RADIUS)
+        .inner_margin(theme::PANEL_MARGIN)
+        .show(ui, |ui| {
+            ui.label(
+                egui::RichText::new(title)
+                    .strong()
+                    .size(theme::SUBTITLE_SIZE),
+            );
+            ui.add_space(2.0);
+            ui.separator();
+            ui.add_space(6.0);
+            content(ui);
+            if let Some(caption) = caption {
+                ui.add_space(8.0);
+                ui.label(
+                    egui::RichText::new(caption)
+                        .size(theme::SMALL_SIZE)
+                        .color(theme::TEXT_MUTED),
+                );
+            }
+        });
 }
 
 fn empty_state(
@@ -4050,14 +4337,26 @@ fn empty_state(
     tab: &mut WorkspaceTab,
     target: WorkspaceTab,
 ) {
-    ui.add_space(36.0);
-    ui.vertical_centered(|ui| {
-        ui.label(egui::RichText::new(title).strong().size(18.0));
-        ui.add_space(8.0);
-        if ui.button(action).clicked() {
-            *tab = target;
-        }
-    });
+    ui.add_space(24.0);
+    egui::Frame::NONE
+        .fill(theme::PANEL_BG)
+        .stroke(egui::Stroke::new(1.0, theme::BORDER))
+        .corner_radius(theme::CORNER_RADIUS)
+        .inner_margin(egui::Margin::symmetric(24, 28))
+        .show(ui, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.label(
+                    egui::RichText::new(title)
+                        .strong()
+                        .size(theme::SUBTITLE_SIZE)
+                        .color(theme::TEXT_MUTED),
+                );
+                ui.add_space(10.0);
+                if ui.button(action).clicked() {
+                    *tab = target;
+                }
+            });
+        });
 }
 
 fn inspection_payload(result: &Value) -> &Value {
@@ -4722,7 +5021,7 @@ fn show_environment_audit(ui: &mut egui::Ui, audit: &Value, language: Language) 
         });
         if !native_supported {
             ui.colored_label(
-                egui::Color32::from_rgb(160, 90, 0),
+                theme::WARNING_AMBER,
                 language.text(
                     "Bioconda 不提供原生 Windows 包；请通过 WSL Arch 或 WSL Debian 运行。",
                     "Bioconda does not publish native Windows packages; use WSL Arch or WSL Debian.",
@@ -4769,7 +5068,7 @@ fn show_environment_audit(ui: &mut egui::Ui, audit: &Value, language: Language) 
 
     if let Some(warnings) = audit.get("warnings").and_then(Value::as_array) {
         for warning in warnings.iter().filter_map(Value::as_str) {
-            ui.colored_label(egui::Color32::from_rgb(160, 90, 0), warning);
+            ui.colored_label(theme::WARNING_AMBER, warning);
         }
     }
 }
@@ -4924,14 +5223,14 @@ fn show_environment_plan(ui: &mut egui::Ui, plan: &Value, language: Language) {
         }
         if let Some(blockers) = transaction.get("blockers").and_then(Value::as_array) {
             for blocker in blockers.iter().filter_map(Value::as_str) {
-                ui.colored_label(egui::Color32::from_rgb(160, 70, 40), blocker);
+                ui.colored_label(theme::DANGER_DEEP, blocker);
             }
         }
     }
 
     if let Some(warnings) = plan.get("warnings").and_then(Value::as_array) {
         for warning in warnings.iter().filter_map(Value::as_str) {
-            ui.colored_label(egui::Color32::from_rgb(160, 90, 0), warning);
+            ui.colored_label(theme::WARNING_AMBER, warning);
         }
     }
 }

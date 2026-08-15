@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mzML xmlns="http://psi.hupo.org/ms/mzml" version="1.1.0">
+  <run id="fixture">
+    <spectrumList count="2">
+      <spectrum id="scan=1" index="0" defaultArrayLength="5">
+        <cvParam accession="MS:1000511" name="ms level" value="1"/>
+        <cvParam accession="MS:1000016" name="scan start time" value="1.0" unitAccession="MS:1000038" unitName="minute"/>
+        <binaryDataArrayList count="2">
+          <binaryDataArray encodedLength="20">
+            <cvParam accession="MS:1000523" name="32-bit float" value=""/>
+            <cvParam accession="MS:1000514" name="m/z array" value=""/>
+            <binary>AADIQgAASEMAAJZDAADIQwAA+kM=</binary>
+          </binaryDataArray>
+          <binaryDataArray encodedLength="20">
+            <cvParam accession="MS:1000523" name="32-bit float" value=""/>
+            <cvParam accession="MS:1000515" name="intensity array" value=""/>
+            <binary>AAAgQQAA+kMAAKBBAABIRAAAoEA=</binary>
+          </binaryDataArray>
+        </binaryDataArrayList>
+      </spectrum>
+      <spectrum id="scan=2" index="1" defaultArrayLength="3">
+        <cvParam accession="MS:1000511" name="ms level" value="2"/>
+        <cvParam accession="MS:1000016" name="scan start time" value="2.0" unitAccession="MS:1000038" unitName="minute"/>
+        <binaryDataArrayList count="2">
+          <binaryDataArray encodedLength="12">
+            <cvParam accession="MS:1000523" name="32-bit float" value=""/>
+            <cvParam accession="MS:1000514" name="m/z array" value=""/>
+            <binary>AAAWQwAAekMAAK9D</binary>
+          </binaryDataArray>
+          <binaryDataArray encodedLength="12">
+            <cvParam accession="MS:1000523" name="32-bit float" value=""/>
+            <cvParam accession="MS:1000515" name="intensity array" value=""/>
+            <binary>AADwQQAAYUQAACBC</binary>
+          </binaryDataArray>
+        </binaryDataArrayList>
+      </spectrum>
+    </spectrumList>
+  </run>
+</mzML>
