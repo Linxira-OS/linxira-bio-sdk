@@ -632,15 +632,23 @@ fn execute_prepared_request(
     let executable = env::var_os(variable)
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| OsString::from(fallback));
-    let process = Command::new(executable)
+    let mut command = Command::new(executable);
+    command
         .arg(&pack.entrypoint)
         .arg("--request")
         .arg(&request_path)
         .arg("--result")
         .arg(&result_path)
         .current_dir(&pack.root)
-        .env("LINXIRA_BIO_CORE_VERSION", env!("CARGO_PKG_VERSION"))
-        .output()?;
+        .env("LINXIRA_BIO_CORE_VERSION", env!("CARGO_PKG_VERSION"));
+    // R packs require a bootstrapped package library; resolve it the same way
+    // the CLI does (env override, then walk up for `.linxira-bio/ci/r/*`).
+    if contract.runtime == WorkflowRuntimeKind::R
+        && let Some(library) = worker_r_library(&pack.root)?
+    {
+        command.env("LINXIRA_BIO_WORKFLOW_R_LIBRARY", &library);
+    }
+    let process = command.output()?;
     let result = read_result_envelope(&result_path, &process)?;
     finalize_workflow_result(
         contract,
@@ -656,6 +664,77 @@ const CONTAINER_WORKFLOW_MOUNT: &str = "/linxira-bio/workflow";
 const CONTAINER_REQUEST_MOUNT: &str = "/linxira-bio/request";
 const CONTAINER_OUTPUT_MOUNT: &str = "/linxira-bio/output";
 const CONTAINER_INPUT_MOUNT: &str = "/linxira-bio/input";
+
+/// Resolve the project-isolated R package library for a workflow pack:
+/// `LINXIRA_BIO_WORKFLOW_R_LIBRARY` when set and valid, otherwise the newest
+/// `.linxira-bio/ci/r/<version>/library` found walking up from the pack root.
+/// Returns None when no usable library exists; the pack script then reports
+/// its own actionable error.
+fn worker_r_library(pack_root: &Path) -> WorkerResult<Option<PathBuf>> {
+    if let Some(configured) = env::var_os("LINXIRA_BIO_WORKFLOW_R_LIBRARY")
+        && !configured.is_empty()
+    {
+        let path = PathBuf::from(&configured);
+        return if path.is_dir() {
+            Ok(Some(path))
+        } else {
+            Err(format!(
+                "LINXIRA_BIO_WORKFLOW_R_LIBRARY names a missing directory: {}",
+                path.display()
+            )
+            .into())
+        };
+    }
+    let mut directory = pack_root.to_path_buf();
+    loop {
+        let candidates = directory.join(".linxira-bio").join("ci").join("r");
+        if let Some(found) = newest_r_library(&candidates)? {
+            return Ok(Some(found));
+        }
+        match directory.parent() {
+            Some(parent) if parent != directory => directory = parent.to_path_buf(),
+            _ => return Ok(None),
+        }
+    }
+}
+
+/// Return the highest-versioned `.linxira-bio/ci/r/<version>/library` under
+/// the given root, or None when no bootstrapped library exists.
+fn newest_r_library(root: &Path) -> WorkerResult<Option<PathBuf>> {
+    let mut best: Option<(u64, u64, PathBuf)> = None;
+    let entries = match std::fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    for entry in entries {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let mut parts = name.split('.');
+        let (Some(major), Some(minor)) = (parts.next(), parts.next()) else {
+            continue;
+        };
+        let (Ok(major), Ok(minor)) = (major.parse::<u64>(), minor.parse::<u64>()) else {
+            continue;
+        };
+        let library = entry.path().join("library");
+        if !library.is_dir() {
+            continue;
+        }
+        let replace = match &best {
+            Some((best_major, best_minor, _)) => (major, minor) > (*best_major, *best_minor),
+            None => true,
+        };
+        if replace {
+            best = Some((major, minor, library));
+        }
+    }
+    Ok(best.map(|(_, _, path)| path))
+}
 
 /// Resolve the container runtime: `LINXIRA_BIO_CONTAINER_RUNTIME` when set,
 /// otherwise the first of `docker`/`podman` that answers `--version`.
