@@ -438,6 +438,13 @@ struct BioApp {
     datasets: Vec<DatasetEntry>,
     selected_dataset: Option<usize>,
     secondary_dataset: Option<usize>,
+    tertiary_dataset: Option<usize>,
+    survival_time_column: String,
+    survival_event_column: String,
+    survival_group_column: String,
+    survival_reference_level: String,
+    microbiome_database: String,
+    microbiome_confidence: f64,
     project_generation: u64,
     inspection_sender: Sender<InspectionMessage>,
     inspection_receiver: Receiver<InspectionMessage>,
@@ -556,6 +563,13 @@ impl BioApp {
             datasets: Vec::new(),
             selected_dataset: None,
             secondary_dataset: None,
+            tertiary_dataset: None,
+            survival_time_column: "time".to_owned(),
+            survival_event_column: "event".to_owned(),
+            survival_group_column: "group".to_owned(),
+            survival_reference_level: "control".to_owned(),
+            microbiome_database: String::new(),
+            microbiome_confidence: 0.5,
             project_generation: 0,
             inspection_sender,
             inspection_receiver,
@@ -910,6 +924,7 @@ impl BioApp {
                 self.datasets.clear();
                 self.selected_dataset = None;
                 self.secondary_dataset = None;
+                self.tertiary_dataset = None;
                 self.analysis_job_id = None;
                 self.analysis_receiver = None;
                 self.analysis_running = false;
@@ -1003,6 +1018,25 @@ impl BioApp {
                 .inputs
                 .insert(role.to_owned(), secondary.path.clone());
             dataset_name = format!("{dataset_name} + {}", secondary.name);
+        }
+        if let Some(tertiary_role) = tertiary_input_role(route.capability) {
+            let Some(tertiary_index) = self.tertiary_dataset else {
+                return;
+            };
+            let Some(tertiary) = self.datasets.get(tertiary_index) else {
+                return;
+            };
+            let tertiary_runnable =
+                tertiary_input_format(route.capability).is_some_and(|required| {
+                    dataset_detected_format(tertiary).eq_ignore_ascii_case(required)
+                });
+            if !tertiary_runnable || tertiary.path == dataset_path {
+                return;
+            }
+            request
+                .inputs
+                .insert(tertiary_role.to_owned(), tertiary.path.clone());
+            dataset_name = format!("{dataset_name} + {}", tertiary.name);
         }
         if let Some(extension) = capability_output_extension(route.capability) {
             let output = derived_analysis_output_path(&dataset_path, route.capability, extension);
@@ -1250,6 +1284,23 @@ impl BioApp {
                 "contrast_level": self.differential_contrast_level.trim(),
                 "alpha": self.differential_alpha,
                 "min_total_count": self.differential_min_total_count,
+            });
+        }
+        if route.capability == "medical.survival.v1" {
+            request.parameters = serde_json::json!({
+                "time_column": self.survival_time_column.trim(),
+                "event_column": self.survival_event_column.trim(),
+                "group_column": self.survival_group_column.trim(),
+                "reference_level": self.survival_reference_level.trim(),
+            });
+        }
+        if route.capability == "medical.microbiome.v1"
+            || route.capability == "metagenomics.classify.v1"
+        {
+            request.parameters = serde_json::json!({
+                "database": self.microbiome_database.trim(),
+                "confidence": self.microbiome_confidence,
+                "threads": self.native_threads,
             });
         }
         if route.capability == "enrichment.gsea.v1" {
@@ -1966,6 +2017,9 @@ impl BioApp {
                                     "newick",
                                     "tree",
                                     "tre",
+                                    "mtx",
+                                    "mzml",
+                                    "sdf",
                                     "gz",
                                 ],
                             )
@@ -2287,6 +2341,12 @@ impl BioApp {
                     "structure.geometry.v1",
                     "structure.superpose.v1",
                     "protein.secondary-structure.v1",
+                    "medical.pharmacogenomics.v1",
+                    "medical.spatial-transcriptomics.v1",
+                    "medical.metabolomics.v1",
+                    "medical.microbiome.v1",
+                    "medical.survival.v1",
+                    "chemistry.descriptors.v1",
                 ] {
                     ui.selectable_value(
                         &mut self.selected_capability,
@@ -2419,6 +2479,122 @@ impl BioApp {
                             ui.selectable_value(&mut self.secondary_dataset, Some(*index), name);
                         }
                     });
+            });
+        }
+        let requires_tertiary = tertiary_input_format(&self.selected_capability).is_some();
+        if requires_tertiary {
+            let tertiary_format = tertiary_input_format(&self.selected_capability);
+            let tertiary_candidates = self
+                .datasets
+                .iter()
+                .enumerate()
+                .filter(|(index, dataset)| {
+                    Some(*index) != primary_index
+                        && Some(*index) != self.secondary_dataset
+                        && tertiary_format.is_some_and(|required| {
+                            dataset_detected_format(dataset).eq_ignore_ascii_case(required)
+                        })
+                        && dataset
+                            .inspection
+                            .as_ref()
+                            .is_some_and(inspection_is_runnable)
+                        && !matches!(
+                            dataset.state,
+                            DatasetState::Inspecting | DatasetState::Invalid
+                        )
+                })
+                .map(|(index, dataset)| (index, dataset.name.clone()))
+                .collect::<Vec<_>>();
+            if !self.tertiary_dataset.is_some_and(|selected| {
+                tertiary_candidates
+                    .iter()
+                    .any(|(index, _)| *index == selected)
+            }) {
+                self.tertiary_dataset = tertiary_candidates.first().map(|(index, _)| *index);
+            }
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                let (label, missing) = match self.selected_capability.as_str() {
+                    "medical.spatial-transcriptomics.v1" => (
+                        self.text("条形码 TSV", "Barcode TSV"),
+                        self.text("没有可用条形码 TSV", "No barcode TSV available"),
+                    ),
+                    _ => (
+                        self.text("第三输入", "Third input"),
+                        self.text("没有可用输入", "No input available"),
+                    ),
+                };
+                ui.label(label);
+                egui::ComboBox::from_id_salt("tertiary-analysis-dataset")
+                    .selected_text(
+                        self.tertiary_dataset
+                            .and_then(|selected| {
+                                tertiary_candidates
+                                    .iter()
+                                    .find(|(index, _)| *index == selected)
+                                    .map(|(_, name)| name.as_str())
+                            })
+                            .unwrap_or(missing),
+                    )
+                    .width(300.0)
+                    .show_ui(ui, |ui| {
+                        for (index, name) in &tertiary_candidates {
+                            ui.selectable_value(&mut self.tertiary_dataset, Some(*index), name);
+                        }
+                    });
+            });
+        }
+        if self.selected_capability == "medical.survival.v1" {
+            ui.add_space(8.0);
+            ui.label(
+                self.language
+                    .text("生存分析列", "Survival analysis columns"),
+            );
+            egui::Grid::new("survival-columns")
+                .num_columns(2)
+                .spacing([8.0, 4.0])
+                .show(ui, |ui| {
+                    ui.label(self.language.text("时间列", "Time column"));
+                    ui.text_edit_singleline(&mut self.survival_time_column);
+                    ui.end_row();
+                    ui.label(self.language.text("事件列 (0/1)", "Event column (0/1)"));
+                    ui.text_edit_singleline(&mut self.survival_event_column);
+                    ui.end_row();
+                    ui.label(self.language.text("分组列", "Group column"));
+                    ui.text_edit_singleline(&mut self.survival_group_column);
+                    ui.end_row();
+                    ui.label(self.language.text("参考水平", "Reference level"));
+                    ui.text_edit_singleline(&mut self.survival_reference_level);
+                    ui.end_row();
+                });
+        }
+        if self.selected_capability == "medical.microbiome.v1"
+            || self.selected_capability == "metagenomics.classify.v1"
+        {
+            ui.add_space(8.0);
+            ui.label(
+                self.language
+                    .text("Kraken2 数据库目录", "Kraken2 database directory"),
+            );
+            ui.horizontal(|ui| {
+                ui.text_edit_singleline(&mut self.microbiome_database);
+                if ui.button(self.language.text("浏览…", "Browse…")).clicked()
+                    && let Some(path) = rfd::FileDialog::new()
+                        .set_title(
+                            self.language
+                                .text("选择 Kraken2 数据库", "Select Kraken2 database"),
+                        )
+                        .pick_folder()
+                {
+                    self.microbiome_database = path.to_string_lossy().into_owned();
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label(self.language.text("置信度", "Confidence"));
+                ui.add(egui::Slider::new(
+                    &mut self.microbiome_confidence,
+                    0.0..=1.0,
+                ));
             });
         }
         if self.selected_capability == "annotation.gxf.normalize.v1" {
@@ -3744,6 +3920,14 @@ fn analysis_route_for_format(format: &str) -> Option<AnalysisRoute> {
             capability: "comparative.kaks.v1",
             input_role: "codon-alignment",
         }),
+        "mzml" => Some(AnalysisRoute {
+            capability: "medical.metabolomics.v1",
+            input_role: "mzml",
+        }),
+        "sdf" => Some(AnalysisRoute {
+            capability: "chemistry.descriptors.v1",
+            input_role: "molecules",
+        }),
         _ => None,
     }
 }
@@ -4015,6 +4199,36 @@ fn analysis_route_for_capability(capability: &str, format: &str) -> Option<Analy
             capability: "protein.secondary-structure.v1",
             input_role: "structure",
         }),
+        ("medical.pharmacogenomics.v1", "vcf") => Some(AnalysisRoute {
+            capability: "medical.pharmacogenomics.v1",
+            input_role: "vcf",
+        }),
+        ("medical.metabolomics.v1", "mzml") => Some(AnalysisRoute {
+            capability: "medical.metabolomics.v1",
+            input_role: "mzml",
+        }),
+        ("medical.spatial-transcriptomics.v1", "mtx") => Some(AnalysisRoute {
+            capability: "medical.spatial-transcriptomics.v1",
+            input_role: "matrix",
+        }),
+        ("medical.microbiome.v1" | "metagenomics.classify.v1", "fasta" | "fastq") => {
+            Some(AnalysisRoute {
+                capability: if capability == "medical.microbiome.v1" {
+                    "medical.microbiome.v1"
+                } else {
+                    "metagenomics.classify.v1"
+                },
+                input_role: "reads",
+            })
+        }
+        ("medical.survival.v1", "csv" | "tsv") => Some(AnalysisRoute {
+            capability: "medical.survival.v1",
+            input_role: "cohort",
+        }),
+        ("chemistry.descriptors.v1", "sdf") => Some(AnalysisRoute {
+            capability: "chemistry.descriptors.v1",
+            input_role: "molecules",
+        }),
         _ => None,
     }
 }
@@ -4042,6 +4256,7 @@ fn secondary_input_format(capability: &str) -> Option<&'static str> {
         | "enrichment.gsea.v1"
         | "medical.pathway-ruo.v1"
         | "enrichment.visualize.v1" => Some("table"),
+        "medical.spatial-transcriptomics.v1" => Some("tsv"),
         _ => None,
     }
 }
@@ -4078,6 +4293,21 @@ fn secondary_input_role(capability: &str) -> Option<&'static str> {
         | "medical.pathway-ruo.v1"
         | "enrichment.visualize.v1" => Some("associations"),
         "enrichment.gsea.v1" => Some("gene-sets"),
+        "medical.spatial-transcriptomics.v1" => Some("features"),
+        _ => None,
+    }
+}
+
+fn tertiary_input_format(capability: &str) -> Option<&'static str> {
+    match capability {
+        "medical.spatial-transcriptomics.v1" => Some("tsv"),
+        _ => None,
+    }
+}
+
+fn tertiary_input_role(capability: &str) -> Option<&'static str> {
+    match capability {
+        "medical.spatial-transcriptomics.v1" => Some("barcodes"),
         _ => None,
     }
 }
@@ -4112,6 +4342,13 @@ fn capability_output_extension(capability: &str) -> Option<&'static str> {
         | "protein.domain.visualize.v1"
         | "expression.volcano.v1"
         | "motif.visualize.v1" => Some("svg"),
+        "medical.pharmacogenomics.v1"
+        | "medical.spatial-transcriptomics.v1"
+        | "medical.metabolomics.v1"
+        | "medical.microbiome.v1"
+        | "medical.survival.v1"
+        | "metagenomics.classify.v1"
+        | "chemistry.descriptors.v1" => Some("tsv"),
         _ => None,
     }
 }
@@ -4896,6 +5133,18 @@ fn capability_title(capability: &str, language: Language) -> &'static str {
         "protein.secondary-structure.v1" => {
             language.text("DSSP 二级结构", "DSSP secondary structure")
         }
+        "medical.pharmacogenomics.v1" => language.text(
+            "药物基因组等位基因解读",
+            "Pharmacogenomic allele interpretation",
+        ),
+        "medical.spatial-transcriptomics.v1" => {
+            language.text("空间转录组矩阵汇总", "Spatial transcriptomics summary")
+        }
+        "medical.microbiome.v1" => language.text("微生物组 α 多样性", "Microbiome alpha diversity"),
+        "metagenomics.classify.v1" => language.text("宏基因组分类", "Metagenomic classification"),
+        "medical.metabolomics.v1" => language.text("代谢组峰值检测", "Metabolomics peak detection"),
+        "medical.survival.v1" => language.text("生存分析 (Cox)", "Survival analysis (Cox)"),
+        "chemistry.descriptors.v1" => language.text("分子理化描述符", "Molecular descriptors"),
         _ => language.text("未知能力", "Unknown capability"),
     }
 }
@@ -6110,6 +6359,7 @@ mod tests {
         inspection_is_runnable, inspection_state, load_dependency_notices_from,
         looks_like_drive_relative_path, new_job_id, notice_platform_target_pair_is_valid,
         render_dependency_notice_report, secondary_input_matches, secondary_input_role,
+        tertiary_input_format, tertiary_input_role,
     };
     use linxira_bio_protocol::ExecutionMode;
     use serde_json::json;
@@ -6692,6 +6942,74 @@ mod tests {
         assert!(secondary_input_matches("structure.superpose.v1", "pdb"));
         assert!(secondary_input_matches("structure.superpose.v1", "mmcif"));
         assert!(!secondary_input_matches("structure.superpose.v1", "fasta"));
+    }
+
+    #[test]
+    fn v1_planned_medical_and_chemistry_capabilities_route_and_export_tsv() {
+        for (capability, format, role) in [
+            ("medical.pharmacogenomics.v1", "vcf", "vcf"),
+            ("medical.metabolomics.v1", "mzml", "mzml"),
+            ("medical.microbiome.v1", "fasta", "reads"),
+            ("medical.survival.v1", "csv", "cohort"),
+            ("chemistry.descriptors.v1", "sdf", "molecules"),
+        ] {
+            let route = analysis_route_for_capability(capability, format)
+                .unwrap_or_else(|| panic!("{capability} should route {format}"));
+            assert_eq!(route.capability, capability);
+            assert_eq!(route.input_role, role);
+            assert_eq!(capability_output_extension(capability), Some("tsv"));
+            assert!(!capability_requires_secondary(capability));
+        }
+        // spatial-transcriptomics needs three inputs: matrix + features + barcodes
+        let route = analysis_route_for_capability("medical.spatial-transcriptomics.v1", "mtx")
+            .expect("spatial matrix route");
+        assert_eq!(route.input_role, "matrix");
+        assert_eq!(
+            capability_output_extension("medical.spatial-transcriptomics.v1"),
+            Some("tsv")
+        );
+        assert!(capability_requires_secondary(
+            "medical.spatial-transcriptomics.v1"
+        ));
+        assert!(secondary_input_matches(
+            "medical.spatial-transcriptomics.v1",
+            "tsv"
+        ));
+        assert_eq!(
+            secondary_input_role("medical.spatial-transcriptomics.v1"),
+            Some("features")
+        );
+        assert_eq!(
+            tertiary_input_role("medical.spatial-transcriptomics.v1"),
+            Some("barcodes")
+        );
+        assert_eq!(
+            tertiary_input_format("medical.spatial-transcriptomics.v1"),
+            Some("tsv")
+        );
+        // negative checks
+        assert!(analysis_route_for_capability("medical.survival.v1", "fasta").is_none());
+        assert!(analysis_route_for_capability("chemistry.descriptors.v1", "csv").is_none());
+        assert!(analysis_route_for_capability("medical.pharmacogenomics.v1", "vcf").is_some());
+        assert!(
+            analysis_route_for_capability("medical.spatial-transcriptomics.v1", "csv").is_none()
+        );
+    }
+
+    #[test]
+    fn format_based_routes_default_to_new_medical_and_chemistry_capabilities() {
+        assert_eq!(
+            analysis_route_for_format("mzml").map(|route| route.capability),
+            Some("medical.metabolomics.v1")
+        );
+        assert_eq!(
+            analysis_route_for_format("sdf").map(|route| route.capability),
+            Some("chemistry.descriptors.v1")
+        );
+        assert_eq!(
+            analysis_route_for_format("fasta").map(|route| route.capability),
+            Some("sequence.stats.v1")
+        );
     }
 
     #[test]

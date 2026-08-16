@@ -59,6 +59,9 @@ pub enum DatasetFormat {
     MemeText,
     McscanxCollinearity,
     Newick,
+    Mtx,
+    Mzml,
+    Sdf,
     Unknown,
 }
 
@@ -93,6 +96,9 @@ impl DatasetFormat {
             Self::MemeText => "meme-text",
             Self::McscanxCollinearity => "mcscanx-collinearity",
             Self::Newick => "newick",
+            Self::Mtx => "mtx",
+            Self::Mzml => "mzml",
+            Self::Sdf => "sdf",
             Self::Unknown => "unknown",
         }
     }
@@ -498,6 +504,9 @@ fn detect_from_extension(path: &Path) -> Option<Detection> {
         "meme" => DatasetFormat::MemeText,
         "collinearity" => DatasetFormat::McscanxCollinearity,
         "nwk" | "newick" | "tree" | "tre" => DatasetFormat::Newick,
+        "mtx" => DatasetFormat::Mtx,
+        "mzml" => DatasetFormat::Mzml,
+        "sdf" => DatasetFormat::Sdf,
         _ => return None,
     };
     Some(Detection {
@@ -899,7 +908,10 @@ fn support_for(format: DatasetFormat) -> DatasetSupport {
         | DatasetFormat::HmmProfile
         | DatasetFormat::MemeText
         | DatasetFormat::McscanxCollinearity
-        | DatasetFormat::Newick => DatasetSupport::Supported,
+        | DatasetFormat::Newick
+        | DatasetFormat::Mtx
+        | DatasetFormat::Mzml
+        | DatasetFormat::Sdf => DatasetSupport::Supported,
         DatasetFormat::Bam
         | DatasetFormat::Zip
         | DatasetFormat::Bcf
@@ -951,6 +963,9 @@ fn build_preview(
         | DatasetFormat::MemeText
         | DatasetFormat::McscanxCollinearity
         | DatasetFormat::Newick
+        | DatasetFormat::Mtx
+        | DatasetFormat::Mzml
+        | DatasetFormat::Sdf
         | DatasetFormat::Unknown => preview_text(path, compression, options),
     }
 }
