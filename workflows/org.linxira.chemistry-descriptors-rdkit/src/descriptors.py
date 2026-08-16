@@ -74,10 +74,15 @@ def output_path_from(request: dict[str, Any]) -> Path:
     parameters = request.get("parameters")
     if not isinstance(parameters, dict):
         raise RequestError("request parameters must be an object")
-    output = parameters.get("output")
-    if not isinstance(output, str) or not output:
-        raise RequestError("parameters.output is required")
-    return Path(output)
+    # The worker contract resolves parameters.output_directory (and optional
+    # output_filename) into the request before invoking the pack.
+    output_directory = parameters.get("output_directory")
+    if not isinstance(output_directory, str) or not output_directory:
+        raise RequestError("parameters.output_directory is required")
+    output_filename = parameters.get("output_filename")
+    if not isinstance(output_filename, str) or not output_filename:
+        output_filename = "descriptors.tsv"
+    return Path(output_directory) / output_filename
 
 
 def sha256_file(path: Path) -> str:
@@ -89,12 +94,18 @@ def sha256_file(path: Path) -> str:
 
 
 def parse_sdf(mol_text: str) -> list[dict[str, Any]]:
-    """Parse minimal SDF records ($$$$ separated) into molecule texts."""
-    return [
-        record.strip()
-        for record in mol_text.split("$$$$")
-        if record.strip()
-    ]
+    """Parse minimal SDF records ($$$$ separated) into molecule texts.
+
+    Records keep their leading blank line (the V2000 title row) and program
+    header; only the separator newlines are removed from the end so RDKit can
+    locate the counts line.
+    """
+    records = []
+    for record in mol_text.split("$$$$"):
+        record = record.rstrip("\r\n")
+        if record.strip():
+            records.append(record)
+    return records
 
 
 def compute_descriptors(molecule_text: str) -> dict[str, Any]:

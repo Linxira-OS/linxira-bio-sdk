@@ -6264,6 +6264,7 @@ fn usage() -> &'static str {
         "  linxira-bio medical microbiome <reads.fa|fq> <output.tsv> --database <kraken2-db> [--confidence FRACTION] [--minimum-hit-groups N] [--threads N] [--json]\n",
         "  linxira-bio medical metabolomics <input.mzML[.gz]> <output.tsv> [--json]\n",
         "  linxira-bio phylogeny iqtree <alignment> <output.newick> [--threads N] [--model MODEL] [--seed N] [--json]\n",
+        "  linxira-bio rna secondary-structure <input.fa> <output.txt> [--temp C] [--json]\n",
         "  linxira-bio protein secondary-structure <structure.pdb|cif> <output.dssp> [--json]\n",
         "  linxira-bio table manipulate <input.csv|tsv[.gz]> <output.csv|tsv> [--select-column NAME ...] [--drop-column NAME ...] [--filter-column NAME --filter-op equals|contains|non-empty [--filter-value VALUE]] [--skip-rows N] [--limit N] [--delimiter csv|tsv] [--output-delimiter csv|tsv] [--json]\n",
         "  linxira-bio structure pdb <input.pdb[.gz]> [--alphafold-plddt] [--json]\n",
