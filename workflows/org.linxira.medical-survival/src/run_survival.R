@@ -20,6 +20,19 @@ request_error <- function(message) {
   stop(structure(list(message = message, call = NULL), class = c("request_error", "error", "condition")))
 }
 
+# Windows canonicalized paths (fs::canonicalize / R normalizePath) carry a
+# "\\\\?\\" extended-length prefix; file.path() then mixes "/" separators into
+# it and Windows rejects the result. Strip the prefix so the pack can open its
+# own output files. Harmless on POSIX where the prefix never appears.
+strip_long_path_prefix <- function(path) {
+  prefix <- "\\\\?\\"
+  if (startsWith(path, prefix)) {
+    substr(path, nchar(prefix) + 1L, nchar(path))
+  } else {
+    path
+  }
+}
+
 require_object <- function(value, context) {
   if (!is.list(value) || is.null(names(value))) {
     request_error(sprintf("%s must be an object", context))
@@ -110,6 +123,7 @@ validate_request <- function(document, result_path) {
   group_column <- require_string(parameters$group_column, "parameters.group_column")
   reference_level <- require_string(parameters$reference_level, "parameters.reference_level")
   output_directory <- require_string(parameters$output_directory, "parameters.output_directory")
+  output_directory <- strip_long_path_prefix(output_directory)
   if (file.exists(output_directory) || dir.exists(output_directory)) {
     request_error(sprintf("refusing to overwrite workflow output directory: %s", output_directory))
   }
@@ -282,6 +296,7 @@ minimal_error_json <- function(job_id, message, started_at) {
 }
 
 write_error_json_atomic <- function(result_path, payload) {
+  result_path <- strip_long_path_prefix(result_path)
   target <- normalizePath(result_path, winslash = "/", mustWork = FALSE)
   parent <- dirname(target)
   if (!dir.exists(parent)) {
@@ -309,7 +324,7 @@ main <- function() {
   result_path <- NULL
   status <- tryCatch({
     options <- parse_arguments(commandArgs(trailingOnly = TRUE))
-    result_path <- options$result
+    result_path <- strip_long_path_prefix(options$result)
     project_library <- configure_project_library()
     if (!file.exists(options$request) || dir.exists(options$request)) {
       request_error(sprintf("request file does not exist: %s", options$request))

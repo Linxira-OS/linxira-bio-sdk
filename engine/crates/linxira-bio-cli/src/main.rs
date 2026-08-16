@@ -115,6 +115,7 @@ use std::collections::BTreeSet;
 use std::env;
 use std::error::Error;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
@@ -973,16 +974,21 @@ fn run_workflow_pack(
         .into());
     }
     let entrypoint = safe_pack_path(pack_root, &manifest.entrypoint.path)?;
+    let runtime_environment = workflow_runtime_environment(manifest.runtime.kind, pack_root)?;
     let executable = workflow_executable(manifest.runtime.kind)?;
-    let status = Command::new(&executable)
+    let mut command = Command::new(&executable);
+    command
         .arg(&entrypoint)
         .arg("--request")
         .arg(request_path)
         .arg("--result")
         .arg(result_path)
         .current_dir(pack_root)
-        .env("LINXIRA_BIO_CORE_VERSION", env!("CARGO_PKG_VERSION"))
-        .status()?;
+        .env("LINXIRA_BIO_CORE_VERSION", env!("CARGO_PKG_VERSION"));
+    for (key, value) in runtime_environment {
+        command.env(key, value);
+    }
+    let status = command.status()?;
 
     if !result_path.is_file() {
         return Err(format!(
@@ -1168,6 +1174,110 @@ fn workflow_executable(kind: WorkflowRuntimeKind) -> Result<String, Box<dyn Erro
         }
     };
     Ok(env::var(variable).unwrap_or_else(|_| fallback.to_owned()))
+}
+
+/// Resolve project-isolated runtime environments before launching a workflow
+/// pack. R packs require a bootstrapped package library; Python packs run in
+/// whatever interpreter is named by `LINXIRA_BIO_WORKFLOW_PYTHON` (or the
+/// system interpreter). Missing requirements produce actionable guidance
+/// instead of an opaque interpreter error.
+fn workflow_runtime_environment(
+    kind: WorkflowRuntimeKind,
+    pack_root: &Path,
+) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+    match kind {
+        WorkflowRuntimeKind::R => {
+            if let Some(configured) = env::var_os("LINXIRA_BIO_WORKFLOW_R_LIBRARY") {
+                let path = PathBuf::from(&configured);
+                if path.is_dir() {
+                    return Ok(vec![(
+                        "LINXIRA_BIO_WORKFLOW_R_LIBRARY".to_owned(),
+                        path.to_string_lossy().into_owned(),
+                    )]);
+                }
+                return Err(format!(
+                    "LINXIRA_BIO_WORKFLOW_R_LIBRARY names a missing directory: {}",
+                    path.display()
+                )
+                .into());
+            }
+            // Discover a project-isolated R library: walk up from the pack
+            // root looking for `.linxira-bio/ci/r/<version>/library`.
+            let mut directory = pack_root.to_path_buf();
+            loop {
+                let library = directory.join(".linxira-bio").join("ci").join("r");
+                if let Some(found) = newest_r_library(&library)? {
+                    return Ok(vec![(
+                        "LINXIRA_BIO_WORKFLOW_R_LIBRARY".to_owned(),
+                        found.to_string_lossy().into_owned(),
+                    )]);
+                }
+                match directory.parent() {
+                    Some(parent) if parent != directory => directory = parent.to_path_buf(),
+                    _ => break,
+                }
+            }
+            Err(
+                "this workflow pack requires a project-isolated R package library.\n\
+                 Bootstrap one and set LINXIRA_BIO_WORKFLOW_R_LIBRARY, for example:\n\
+                   Rscript scripts/bootstrap-survival-lib.R .linxira-bio/ci/r/4.6.1/library\n\
+                   export LINXIRA_BIO_WORKFLOW_R_LIBRARY=$PWD/.linxira-bio/ci/r/4.6.1/library"
+                    .into(),
+            )
+        }
+        WorkflowRuntimeKind::Python => {
+            if env::var_os("LINXIRA_BIO_WORKFLOW_PYTHON").is_some_and(|value| !value.is_empty()) {
+                return Ok(vec![]);
+            }
+            Err(
+                "this workflow pack runs in a Python interpreter with locked dependencies.\n\
+                 Create an isolated environment and point LINXIRA_BIO_WORKFLOW_PYTHON at it, for example:\n\
+                   python -m venv .venv-workflow\n\
+                   .venv-workflow/bin/pip install --require-hashes -r workflows/<pack>/requirements.lock\n\
+                   export LINXIRA_BIO_WORKFLOW_PYTHON=$PWD/.venv-workflow/bin/python"
+                    .into(),
+            )
+        }
+        WorkflowRuntimeKind::Java | WorkflowRuntimeKind::Native => Ok(vec![]),
+    }
+}
+
+/// Return the highest-versioned `.linxira-bio/ci/r/<version>/library` under
+/// the given root, or None when no bootstrapped library exists.
+fn newest_r_library(root: &Path) -> Result<Option<PathBuf>, Box<dyn Error>> {
+    let mut best: Option<(u64, u64, PathBuf)> = None;
+    let entries = match fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    for entry in entries {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let mut parts = name.split('.');
+        let (Some(major), Some(minor)) = (parts.next(), parts.next()) else {
+            continue;
+        };
+        let (Ok(major), Ok(minor)) = (major.parse::<u64>(), minor.parse::<u64>()) else {
+            continue;
+        };
+        let library = entry.path().join("library");
+        if !library.is_dir() {
+            continue;
+        }
+        let replace = match &best {
+            Some((best_major, best_minor, _)) => (major, minor) > (*best_major, *best_minor),
+            None => true,
+        };
+        if replace {
+            best = Some((major, minor, library));
+        }
+    }
+    Ok(best.map(|(_, _, path)| path))
 }
 
 fn sha256_file(path: &Path) -> Result<String, Box<dyn Error>> {
