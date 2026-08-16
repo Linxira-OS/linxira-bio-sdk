@@ -1287,17 +1287,30 @@ impl BioApp {
             });
         }
         if route.capability == "medical.survival.v1" {
+            let output_directory =
+                derived_analysis_output_path(&dataset_path, route.capability, "results");
             request.parameters = serde_json::json!({
+                "output_directory": output_directory.to_string_lossy(),
                 "time_column": self.survival_time_column.trim(),
                 "event_column": self.survival_event_column.trim(),
                 "group_column": self.survival_group_column.trim(),
                 "reference_level": self.survival_reference_level.trim(),
             });
         }
+        if route.capability == "chemistry.descriptors.v1" {
+            let output_directory =
+                derived_analysis_output_path(&dataset_path, route.capability, "results");
+            request.parameters = serde_json::json!({
+                "output_directory": output_directory.to_string_lossy(),
+                "output_filename": "descriptors.tsv",
+            });
+        }
         if route.capability == "medical.microbiome.v1"
             || route.capability == "metagenomics.classify.v1"
         {
+            let output = derived_analysis_output_path(&dataset_path, route.capability, "tsv");
             request.parameters = serde_json::json!({
+                "output": output.to_string_lossy(),
                 "database": self.microbiome_database.trim(),
                 "confidence": self.microbiome_confidence,
                 "threads": self.native_threads,
@@ -4346,9 +4359,7 @@ fn capability_output_extension(capability: &str) -> Option<&'static str> {
         | "medical.spatial-transcriptomics.v1"
         | "medical.metabolomics.v1"
         | "medical.microbiome.v1"
-        | "medical.survival.v1"
-        | "metagenomics.classify.v1"
-        | "chemistry.descriptors.v1" => Some("tsv"),
+        | "metagenomics.classify.v1" => Some("tsv"),
         _ => None,
     }
 }
@@ -6950,6 +6961,16 @@ mod tests {
             ("medical.pharmacogenomics.v1", "vcf", "vcf"),
             ("medical.metabolomics.v1", "mzml", "mzml"),
             ("medical.microbiome.v1", "fasta", "reads"),
+        ] {
+            let route = analysis_route_for_capability(capability, format)
+                .unwrap_or_else(|| panic!("{capability} should route {format}"));
+            assert_eq!(route.capability, capability);
+            assert_eq!(route.input_role, role);
+            assert_eq!(capability_output_extension(capability), Some("tsv"));
+            assert!(!capability_requires_secondary(capability));
+        }
+        // survival and descriptors emit output directories (worker output_directory contract)
+        for (capability, format, role) in [
             ("medical.survival.v1", "csv", "cohort"),
             ("chemistry.descriptors.v1", "sdf", "molecules"),
         ] {
@@ -6957,7 +6978,7 @@ mod tests {
                 .unwrap_or_else(|| panic!("{capability} should route {format}"));
             assert_eq!(route.capability, capability);
             assert_eq!(route.input_role, role);
-            assert_eq!(capability_output_extension(capability), Some("tsv"));
+            assert_eq!(capability_output_extension(capability), None);
             assert!(!capability_requires_secondary(capability));
         }
         // spatial-transcriptomics needs three inputs: matrix + features + barcodes
