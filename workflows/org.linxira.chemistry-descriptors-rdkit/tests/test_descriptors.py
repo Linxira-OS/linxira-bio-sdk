@@ -8,18 +8,18 @@ from pathlib import Path
 PACK_ROOT = Path(__file__).resolve().parents[1]
 
 SDF = """molecule1
-  RDKit          2D
+     RDKit          2D
 
   5  4  0  0  0  0  0  0  0  0999 V2000
-    0.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
-    1.2000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
-    2.4000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
-    1.2000    1.2000    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
-    1.2000   -1.2000    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+   -1.8187   -0.7500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -0.5196    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -0.5196    1.5000    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+    0.7794   -0.7500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    2.0785   -0.0000    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
   1  2  1  0
-  2  3  1  0
+  2  3  2  0
   2  4  1  0
-  2  5  2  0
+  4  5  1  0
 M  END
 $$$$
 """
@@ -45,9 +45,12 @@ class DescriptorPackTests(unittest.TestCase):
                 text=True,
                 check=False,
             )
-            self.assertEqual(process.returncode, 0, process.stderr)
-            self.assertTrue(result_path.is_file())
+            self.assertTrue(result_path.is_file(), process.stderr)
             envelope = json.loads(result_path.read_text(encoding="utf-8"))
+            # Worker contract: an error envelope is reported with a nonzero
+            # process exit; only an ok envelope must exit 0.
+            if envelope.get("status") == "ok":
+                self.assertEqual(process.returncode, 0, process.stderr)
             return envelope, result_path
 
     def test_computes_descriptors_for_sdf_input(self):

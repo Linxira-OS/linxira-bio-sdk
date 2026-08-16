@@ -23,7 +23,7 @@
     "core_compatibility": ">=0.1.0,<1.0.0",
     "dependency_lock": {
       "path": "requirements.lock",
-      "sha256": "ca193793b6047f21c4f7241c8455f91ef8f49fc942bde6f5e70ff2cb23bceda1"
+      "sha256": "07445ad9d7b2b304bc96d4be805b0e2bc84b1ecba8ac13d78a41c9c92b4c7478"
     }
   },
   "resume": {
@@ -88,7 +88,7 @@
     },
     {
       "path": "requirements.lock",
-      "sha256": "ca193793b6047f21c4f7241c8455f91ef8f49fc942bde6f5e70ff2cb23bceda1"
+      "sha256": "07445ad9d7b2b304bc96d4be805b0e2bc84b1ecba8ac13d78a41c9c92b4c7478"
     },
     {
       "path": "schemas/input.schema.json",
@@ -100,11 +100,11 @@
     },
     {
       "path": "src/descriptors.py",
-      "sha256": "b886bf3adb6cbead64c40defab8d840c44e1bee5d5b7a37471ab93103a5816f9"
+      "sha256": "94a7036d3b75954c4747f47167659b41ed3bcf6648df64dad90990307611c68d"
     },
     {
       "path": "tests/test_descriptors.py",
-      "sha256": "5cbb4645198f74a8ccd66ac7bafeb115b1825471e38a29a1828f40d24ea13d09"
+      "sha256": "9d6e805fd8b0fe833f47bf65d64bc0023e37a1150a6883ce0ea7ce643a11582e"
     }
   ]
 }
