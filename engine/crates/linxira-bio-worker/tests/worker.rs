@@ -388,6 +388,61 @@ fn malformed_json_remains_a_process_error_without_an_envelope() {
 }
 
 #[test]
+fn gui_shape_requests_accept_injected_parameters() {
+    // The desktop app injects capability-specific parameter keys. Every key the
+    // GUI sends must be accepted by the worker v1 contract validator; a typo
+    // here (e.g. "exponent" vs "score_exponent") fails at runtime in the GUI.
+    // This test pins the GUI-side key spellings against real execution.
+    let root = workspace_root();
+    let request = temporary_request_path("gui-shape-gsea");
+    std::fs::write(
+        &request,
+        format!(
+            r#"{{
+                "schema_version": "1",
+                "job_id": "gui-shape-gsea",
+                "capability": "enrichment.gsea.v1",
+                "inputs": {{
+                    "ranked": "{}",
+                    "gene-sets": "{}"
+                }},
+                "execution": {{"mode": "local-cpu"}},
+                "parameters": {{
+                    "score_exponent": 1.0,
+                    "min_set_size": 2,
+                    "max_set_size": 4,
+                    "permutations": 50,
+                    "seed": 42
+                }}
+            }}"#,
+            root.join("tests/fixtures/functional/ranked.tsv")
+                .to_string_lossy()
+                .replace('\\', "/"),
+            root.join("tests/fixtures/functional/gene-sets.tsv")
+                .to_string_lossy()
+                .replace('\\', "/"),
+        ),
+    )
+    .expect("write GUI-shape gsea request");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(&request)
+        .output()
+        .expect("run GUI-shape gsea request");
+    std::fs::remove_file(request).expect("remove GUI-shape fixture");
+
+    assert!(
+        output.status.success(),
+        "worker rejected GUI-injected gsea parameters: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid gsea result envelope");
+    assert_eq!(result["status"], "ok", "{result}");
+    assert_eq!(result["capability"], "enrichment.gsea.v1");
+}
+
+#[test]
 fn exports_a_table_through_the_worker() {
     let root = workspace_root();
     let output_path = root.join("target/test-results/metrics.csv");
