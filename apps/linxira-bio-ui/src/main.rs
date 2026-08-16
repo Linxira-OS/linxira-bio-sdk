@@ -1318,7 +1318,7 @@ impl BioApp {
         }
         if route.capability == "enrichment.gsea.v1" {
             request.parameters = serde_json::json!({
-                "exponent": self.gsea_score_exponent,
+                "score_exponent": self.gsea_score_exponent,
                 "min_set_size": self.gsea_min_set_size,
                 "max_set_size": self.gsea_max_set_size,
                 "permutations": self.gsea_permutations,
