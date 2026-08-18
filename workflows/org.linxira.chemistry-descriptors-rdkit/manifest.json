@@ -20,7 +20,7 @@
   "runtime": {
     "kind": "python",
     "version": "3.12.x",
-    "core_compatibility": ">=0.1.0,<1.0.0",
+    "core_compatibility": ">=0.1.0,<2.0.0",
     "dependency_lock": {
       "path": "requirements.lock",
       "sha256": "07445ad9d7b2b304bc96d4be805b0e2bc84b1ecba8ac13d78a41c9c92b4c7478"
