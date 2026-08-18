@@ -11,6 +11,6 @@ name = "linxira-bio-mcp"
 path = "src/main.rs"
 
 [dependencies]
-linxira-bio-protocol = { version = "0.1.0", path = "../linxira-bio-protocol" }
+linxira-bio-protocol = { version = "1.0.1", path = "../linxira-bio-protocol" }
 serde = { workspace = true }
 serde_json = { workspace = true }
