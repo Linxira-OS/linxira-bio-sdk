@@ -20,7 +20,7 @@
   "runtime": {
     "kind": "r",
     "version": ">=4.6.1,<4.7.0",
-    "core_compatibility": ">=0.1.0,<1.0.0",
+    "core_compatibility": ">=0.1.0,<2.0.0",
     "dependency_lock": {
       "path": "dependencies.lock.json",
       "sha256": "9ae2540676e63f6bddcc08507423b3d1f0c00fac2150a3e08430b783b57eb3c4"

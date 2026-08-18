@@ -103,12 +103,27 @@ mod theme {
 
 fn main() -> eframe::Result {
     let startup_paths = std::env::args_os().skip(1).map(PathBuf::from).collect();
+    let icon = {
+        let bytes = include_bytes!("bio_icon.png");
+        let mut reader = png::Decoder::new(std::io::Cursor::new(bytes))
+            .read_info()
+            .expect("read bio_icon.png");
+        let mut buf = vec![0u8; reader.output_buffer_size().expect("output buffer size")];
+        reader.next_frame(&mut buf).expect("decode bio_icon.png");
+        let info = reader.info();
+        egui::IconData {
+            rgba: buf,
+            width: info.width,
+            height: info.height,
+        }
+    };
     let options = eframe::NativeOptions {
         renderer: preferred_renderer(),
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1_100.0, 700.0])
             .with_min_inner_size([760.0, 500.0])
-            .with_maximized(true),
+            .with_maximized(true)
+            .with_icon(icon),
         ..Default::default()
     };
     eframe::run_native(
