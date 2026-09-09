@@ -105,6 +105,10 @@ use linxira_bio_core::variant_transform::{
     normalize_vcf_path, vcf_to_table_path,
 };
 use linxira_bio_export::export_json_file;
+use linxira_bio_output::{
+    BioDataWriter, ProbeCompression, ProbeResult, WriteOptions, find_native_7z, probe_format,
+    probe_sra_tools, resolve_input_path,
+};
 use linxira_bio_protocol::{
     AnalysisResult, ExecutionMode, WorkflowPackManifest, WorkflowRuntimeKind,
     semver_range::core_compatibility_matches,
@@ -206,11 +210,50 @@ fn main() -> ExitCode {
     match run(env::args().skip(1).collect()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
+            // §10.1 contract: usage errors exit 2; new contract-aware
+            // commands carry their own classification (3 execution failure,
+            // 4 environment missing) via CliError.
+            let code = error
+                .downcast_ref::<CliError>()
+                .map(|contract| contract.code)
+                .unwrap_or(2);
             eprintln!("error: {error}");
-            ExitCode::from(2)
+            ExitCode::from(code)
         }
     }
 }
+
+/// A contract-classified error for the agent-facing commands (§10.1):
+/// 2 usage error, 3 capability execution failure, 4 environment missing.
+#[derive(Debug)]
+struct CliError {
+    code: u8,
+    message: String,
+}
+
+impl CliError {
+    fn usage(message: impl Into<String>) -> Box<dyn Error> {
+        Box::new(Self {
+            code: 2,
+            message: message.into(),
+        })
+    }
+
+    fn execution(message: impl Into<String>) -> Box<dyn Error> {
+        Box::new(Self {
+            code: 3,
+            message: message.into(),
+        })
+    }
+}
+
+impl std::fmt::Display for CliError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
+impl Error for CliError {}
 
 fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
     match arguments.as_slice() {
@@ -366,6 +409,22 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if export == "export" && table == "table" && json == "--json" =>
         {
             print_table_export(input, output, true)
+        }
+        [export, bio, input, output] if export == "export" && bio == "bio" => {
+            print_bio_export(input, output, false)
+        }
+        [export, bio, input, output, json]
+            if export == "export" && bio == "bio" && json == "--json" =>
+        {
+            print_bio_export(input, output, true)
+        }
+        [import, probe, path] if import == "import" && probe == "probe" => {
+            print_import_probe(path, false)
+        }
+        [import, probe, path, json]
+            if import == "import" && probe == "probe" && json == "--json" =>
+        {
+            print_import_probe(path, true)
         }
         [sequence, stats, path] if sequence == "sequence" && stats == "stats" => {
             print_sequence_stats(path, false)
@@ -5402,6 +5461,109 @@ fn print_table_export(input: &str, output: &str, json: bool) -> Result<(), Box<d
     Ok(())
 }
 
+/// `export bio`: renders the authoritative JSON result into a traditional
+/// bioinformatics format through the unified output framework (M0-T12).
+/// Errors follow the §10.1 contract: bad output extension exits 2, data and
+/// I/O failures exit 3.
+fn print_bio_export(input: &str, output: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let output_path = Path::new(output);
+    if linxira_bio_output::format_from_path(output_path).is_err() {
+        return Err(CliError::usage(format!(
+            "unsupported bio output extension: {output}; expected one of \
+             fa/fastq/bed/gff3/gtf/vcf/sam/csv/tsv/json/jsonl/xlsx"
+        )));
+    }
+    let value: serde_json::Value =
+        serde_json::from_reader(std::io::BufReader::new(fs::File::open(Path::new(input))?))
+            .map_err(|error| {
+                CliError::execution(format!("invalid input JSON {input:?}: {error}"))
+            })?;
+    let receipt = BioDataWriter::write_to_path(&value, output_path, &WriteOptions::default())
+        .map_err(|error| CliError::execution(error.to_string()))?;
+    if json {
+        let result = serde_json::json!({
+            "role": receipt.role,
+            "format": receipt.format,
+            "output_path": receipt.output_path.display().to_string(),
+            "size_bytes": receipt.size_bytes,
+        });
+        print_analysis_json("bio-export", "output.export.v1", result)?;
+    } else {
+        println!("{}", receipt.output_path.display());
+    }
+    Ok(())
+}
+
+/// `import probe`: reports the format/compression of an input (magic bytes
+/// first) plus the sra-tools inventory for SRA archives (M0-T12).
+fn print_import_probe(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
+    let resolved = resolve_input_path(path).map_err(|error| CliError::usage(error.to_string()))?;
+    if !resolved.exists() {
+        return Err(CliError::execution(format!(
+            "input {:?} does not exist",
+            resolved.display()
+        )));
+    }
+    let result = probe_format(&resolved).map_err(|error| CliError::execution(error.to_string()))?;
+    let sra_tools = probe_sra_tools();
+    if json {
+        let mut payload = serde_json::json!({
+            "resolved_path": resolved.display().to_string(),
+            "format": result.format,
+            "compression": result.compression.as_str(),
+            "confidence": result.confidence.as_str(),
+            "sra": result.sra,
+        });
+        if result.sra {
+            payload["sra_tools"] = serde_json::json!({
+                "fasterq_dump": sra_tools.fasterq_dump,
+                "fastq_dump": sra_tools.fastq_dump,
+                "prefetch": sra_tools.prefetch,
+                "vdb_config": sra_tools.vdb_config,
+                "can_unpack": sra_tools.can_unpack(),
+            });
+        }
+        print_analysis_json("import-probe", "import.probe.v1", payload)?;
+    } else {
+        println!("path\t{}", resolved.display());
+        println!("format\t{}", probe_format_label(&result));
+        println!("compression\t{}", result.compression.as_str());
+        println!("confidence\t{}", result.confidence.as_str());
+        if result.sra {
+            println!(
+                "sra-tools\tfasterq-dump={} fastq-dump={} prefetch={} vdb-config={}",
+                sra_tools.fasterq_dump,
+                sra_tools.fastq_dump,
+                sra_tools.prefetch,
+                sra_tools.vdb_config
+            );
+            if !sra_tools.can_unpack() {
+                println!("hint\tinstall sra-tools to unpack this archive");
+            }
+        }
+        if matches!(
+            result.compression,
+            ProbeCompression::Zip
+                | ProbeCompression::SevenZip
+                | ProbeCompression::Bzip2
+                | ProbeCompression::Xz
+                | ProbeCompression::Zstd
+        ) && find_native_7z().is_none()
+        {
+            println!("hint\tinstall p7zip/7-Zip to enable native multi-thread decompression");
+        }
+    }
+    Ok(())
+}
+
+fn probe_format_label(result: &ProbeResult) -> String {
+    if result.sra {
+        "sra-archive".to_owned()
+    } else {
+        format!("{:?}", result.format)
+    }
+}
+
 fn print_table_manipulate(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     let mut input = None;
     let mut output = None;
@@ -6383,7 +6545,9 @@ fn usage() -> &'static str {
         "  linxira-bio structure contact-map <input.pdb|cif[.gz]> [--cutoff ANGSTROM] [--atom NAME] [--intra-chain-only] [--json]\n",
         "  linxira-bio structure geometry <input.pdb|cif[.gz]> --atom CHAIN/RESIDUE/ATOM --atom ... [--json]\n",
         "  linxira-bio structure superpose <reference.pdb|cif[.gz]> <mobile.pdb|cif[.gz]> [--atom NAME] [--json]\n",
-        "  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]"
+        "  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]\n",
+        "  linxira-bio export bio <input.json> <output.fa|fastq|bed|gff3|gtf|vcf|sam|csv|tsv|json|jsonl|xlsx> [--json]\n",
+        "  linxira-bio import probe <input> [--json]"
     )
 }
 

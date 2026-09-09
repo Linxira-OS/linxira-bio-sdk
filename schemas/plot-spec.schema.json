@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/plot-spec.schema.json",
+  "title": "Linxira Bio plot specification",
+  "description": "Unified rendering parameters consumed by every plot backend (matplotlib, ggplot2, and the zero-dependency Rust SVG fallback). One spec must produce visually equivalent figures across backends. The data payload is required and read-only for backends.",
+  "type": "object",
+  "required": [
+    "data"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "title": {
+      "type": "string",
+      "default": ""
+    },
+    "subtitle": {
+      "type": "string",
+      "default": ""
+    },
+    "x_label": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Defaults to a label derived from the input file name when unset."
+    },
+    "y_label": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Defaults to a label derived from the input file name when unset."
+    },
+    "x_range": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "default": null
+    },
+    "y_range": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "default": null
+    },
+    "x_log": {
+      "type": "boolean",
+      "default": false
+    },
+    "y_log": {
+      "type": "boolean",
+      "default": false
+    },
+    "grid": {
+      "type": "boolean",
+      "default": true
+    },
+    "theme": {
+      "enum": [
+        "dark",
+        "light",
+        "publication"
+      ],
+      "default": "light"
+    },
+    "palette": {
+      "type": "string",
+      "default": "set2",
+      "description": "Palette name; each backend maps it to its native color system."
+    },
+    "legend": {
+      "type": "boolean",
+      "default": true
+    },
+    "figure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "type": "integer",
+          "default": 800
+        },
+        "height": {
+          "type": "integer",
+          "default": 600
+        },
+        "dpi": {
+          "type": "integer",
+          "default": 150
+        }
+      }
+    },
+    "font": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "Empty or null selects the platform default font."
+        },
+        "size": {
+          "type": "integer",
+          "default": 12
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "enum": [
+            "svg",
+            "png",
+            "pdf"
+          ],
+          "default": "svg",
+          "description": "png and pdf prefer the matplotlib backend; svg may use any backend."
+        },
+        "interactive": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "data": {
+      "type": "object",
+      "description": "The plot payload (point series, matrices, ...) assembled by the capability; backends treat it as read-only."
+    }
+  }
+}
