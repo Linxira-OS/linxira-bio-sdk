@@ -6,6 +6,7 @@ members = [
     "engine/crates/linxira-bio-export",
     "engine/crates/linxira-bio-protocol",
     "engine/crates/linxira-bio-mcp",
+    "engine/crates/linxira-bio-output",
     "engine/crates/linxira-bio-worker",
 ]
 resolver = "3"

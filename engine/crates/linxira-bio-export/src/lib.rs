@@ -241,6 +241,40 @@ pub fn write_atomic_bytes(output: &Path, bytes: &[u8]) -> ExportResult<u64> {
     Ok(persisted.metadata()?.len())
 }
 
+/// Exports a caller-built table to a delimited or XLSX destination.
+///
+/// The unified output framework uses this when an artifact explicitly pins
+/// column names, since [`Table::from_json`] derives its own sorted column
+/// order. JSON and JSONL exports keep consuming the raw value via
+/// [`export_value`] instead of a prebuilt table.
+pub fn export_table(table: &Table, output: &Path) -> ExportResult<ExportReceipt> {
+    let format = ExportFormat::from_path(output)?;
+    let output_directory = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let mut temporary = NamedTempFile::new_in(output_directory)?;
+    match format {
+        ExportFormat::Csv => write_delimited(table, temporary.as_file_mut(), b',')?,
+        ExportFormat::Tsv => write_delimited(table, temporary.as_file_mut(), b'\t')?,
+        ExportFormat::Xlsx => write_xlsx(table, temporary.as_file_mut())?,
+        other => {
+            return Err(ExportError::InvalidTable(format!(
+                "prebuilt tables export to csv, tsv, or xlsx only; {other:?} exports the raw value instead"
+            )));
+        }
+    }
+    let persisted = temporary
+        .persist(output)
+        .map_err(|error| ExportError::Io(error.error))?;
+    Ok(ExportReceipt {
+        schema_version: "1".to_owned(),
+        format,
+        output_path: output.display().to_string(),
+        size_bytes: persisted.metadata()?.len(),
+    })
+}
+
 fn write_jsonl<W: Write>(value: &Value, output: W) -> ExportResult<()> {
     let value = value.get("result").unwrap_or(value);
     let objects = match value {

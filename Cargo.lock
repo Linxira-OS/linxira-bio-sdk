@@ -1888,6 +1888,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "linxira-bio-output"
+version = "1.0.1"
+dependencies = [
+ "linxira-bio-export",
+ "linxira-bio-protocol",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "linxira-bio-protocol"
 version = "1.0.1"
 dependencies = [
