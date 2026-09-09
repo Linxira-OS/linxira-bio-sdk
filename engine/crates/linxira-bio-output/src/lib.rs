@@ -34,13 +34,19 @@
 //! and read back as plain strings, so canonical round-trips use scalar
 //! values for those fields.
 
+mod format_probe;
 mod path_resolver;
 mod plot;
 mod readers;
 mod writers;
 
+pub use format_probe::{
+    ProbeCompression, ProbeConfidence, ProbeResult, SraTools, ensure_decompressed, find_native_7z,
+    probe_format, probe_sra_tools, unpack_sra,
+};
 pub use path_resolver::{
-    classify_output_dir, resolve_input_path, timestamp_suffix, workspace_root,
+    classify_output_dir, format_rfc3339_unix, resolve_input_path, rfc3339_now,
+    timestamp_directory_suffix, timestamp_suffix, workspace_root,
 };
 pub use plot::{PlotFigure, PlotFont, PlotOutput, PlotOutputFormat, PlotSpec, PlotTheme};
 pub use readers::BioDataReader;

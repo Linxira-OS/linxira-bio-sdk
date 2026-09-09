@@ -1,0 +1,27 @@
+{
+  "schema_version": "1",
+  "capability": "sequence.extract.v1",
+  "artifacts": [
+    {
+      "role": "sequences",
+      "format": "fasta",
+      "path": "analysis/sequence/sequence.extract.v1/sequences.fa"
+    },
+    {
+      "role": "summary-table",
+      "format": "tsv",
+      "path": "analysis/sequence/sequence.extract.v1/summary.tsv",
+      "columns": ["identifier", "length", "gc_percent"]
+    },
+    {
+      "role": "variants",
+      "format": "vcf",
+      "path": "analysis/sequence/sequence.extract.v1/variants.vcf",
+      "header": [
+        "##contig=<ID=chr1,length=1000000>",
+        "##INFO=<ID=dp,Number=1,Type=Integer,Description=\"Read depth\">"
+      ],
+      "coords": "vcf"
+    }
+  ]
+}

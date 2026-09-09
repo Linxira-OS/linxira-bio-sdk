@@ -1848,6 +1848,7 @@ version = "1.0.1"
 dependencies = [
  "linxira-bio-core",
  "linxira-bio-export",
+ "linxira-bio-output",
  "linxira-bio-protocol",
  "serde",
  "serde_json",
@@ -1891,6 +1892,7 @@ dependencies = [
 name = "linxira-bio-output"
 version = "1.0.1"
 dependencies = [
+ "flate2",
  "linxira-bio-export",
  "linxira-bio-protocol",
  "serde",
@@ -1926,6 +1928,7 @@ version = "1.0.1"
 dependencies = [
  "linxira-bio-core",
  "linxira-bio-export",
+ "linxira-bio-output",
  "linxira-bio-protocol",
  "serde",
  "serde_json",

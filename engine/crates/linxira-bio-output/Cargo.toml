@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+flate2 = "1.1"
 linxira-bio-export = { version = "1.0.1", path = "../linxira-bio-export" }
 linxira-bio-protocol = { version = "1.0.1", path = "../linxira-bio-protocol" }
 serde.workspace = true

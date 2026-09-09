@@ -149,10 +149,6 @@ pub fn classify_output_dir(capability: &str) -> OutputResult<PathBuf> {
 /// `_3`, ... when the suffixed path is already taken, so repeated runs in the
 /// same second never overwrite each other.
 pub fn timestamp_suffix(existing: &Path) -> OutputResult<PathBuf> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|error| OutputError::Io(std::io::Error::other(error.to_string())))?;
-    let stamp = format_timestamp_unix(now.as_secs());
     let stem = existing
         .file_stem()
         .and_then(|stem| stem.to_str())
@@ -162,9 +158,24 @@ pub fn timestamp_suffix(existing: &Path) -> OutputResult<PathBuf> {
         .and_then(|extension| extension.to_str())
         .map(|extension| format!(".{extension}"))
         .unwrap_or_default();
-    let parent = existing
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty());
+    timestamped_path(existing.parent(), stem, &extension)
+}
+
+/// [`timestamp_suffix`] for directories: the whole final component is treated
+/// as a name (`cap.v1` stays intact instead of losing a `.v1` "extension").
+pub fn timestamp_directory_suffix(directory: &Path) -> OutputResult<PathBuf> {
+    let stem = directory
+        .file_name()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("output");
+    timestamped_path(directory.parent(), stem, "")
+}
+
+fn timestamped_path(parent: Option<&Path>, stem: &str, extension: &str) -> OutputResult<PathBuf> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| OutputError::Io(std::io::Error::other(error.to_string())))?;
+    let stamp = format_timestamp_unix(now.as_secs());
     let mut counter: u32 = 0;
     loop {
         let suffix = if counter == 0 {
@@ -183,6 +194,28 @@ pub fn timestamp_suffix(existing: &Path) -> OutputResult<PathBuf> {
             OutputError::InvalidSpec("timestamp suffix counter overflow".to_owned())
         })?;
     }
+}
+
+/// Current UTC time in RFC3339 form (`2026-09-09T12:34:56Z`), as recorded in
+/// `ProvenanceV2.started_at`/`finished_at`.
+pub fn rfc3339_now() -> OutputResult<String> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| OutputError::Io(std::io::Error::other(error.to_string())))?;
+    Ok(format_rfc3339_unix(now.as_secs()))
+}
+
+/// Renders an RFC3339 UTC timestamp from a Unix timestamp.
+pub fn format_rfc3339_unix(unix_seconds: u64) -> String {
+    let days = unix_seconds / 86_400;
+    let seconds_of_day = unix_seconds % 86_400;
+    let (year, month, day) = civil_from_days(days as i64);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z",
+        hour = seconds_of_day / 3_600,
+        minute = (seconds_of_day % 3_600) / 60,
+        second = seconds_of_day % 60,
+    )
 }
 
 /// Renders `YYYYMMDD-HHMMSS` in UTC from a Unix timestamp.
@@ -224,8 +257,8 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::{
-        classify_output_dir, format_timestamp_unix, resolve_input_path_with_home, timestamp_suffix,
-        workspace_root,
+        classify_output_dir, format_rfc3339_unix, format_timestamp_unix,
+        resolve_input_path_with_home, timestamp_directory_suffix, timestamp_suffix, workspace_root,
     };
     use std::path::{Path, PathBuf};
 
@@ -379,10 +412,38 @@ mod tests {
     }
 
     #[test]
+    fn directory_timestamps_keep_dotted_capability_names_intact() {
+        let root = std::env::temp_dir().join(format!(
+            "linxira-bio-output-timestamp-dir-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).expect("create temporary root");
+        let desired = root.join("analysis").join("sequence").join("cap.v1");
+        let first = timestamp_directory_suffix(&desired).expect("directory suffix");
+        let name = first
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("utf-8 name")
+            .to_owned();
+        assert!(
+            name.starts_with("cap.v1_"),
+            "the capability id must survive: {name}"
+        );
+        assert!(!name.ends_with(".v1"), "no phantom extension: {name}");
+        std::fs::create_dir_all(&first).expect("occupy the first candidate");
+        let second = timestamp_directory_suffix(&desired).expect("second suffix");
+        assert_ne!(first, second);
+        std::fs::remove_dir_all(root).expect("clean up");
+    }
+
+    #[test]
     fn formats_known_unix_timestamps() {
         assert_eq!(format_timestamp_unix(0), "19700101-000000");
         assert_eq!(format_timestamp_unix(86_399), "19700101-235959");
         assert_eq!(format_timestamp_unix(86_400), "19700102-000000");
         assert_eq!(format_timestamp_unix(1_788_912_000), "20260909-000000");
+        assert_eq!(format_rfc3339_unix(0), "1970-01-01T00:00:00Z");
+        assert_eq!(format_rfc3339_unix(86_399), "1970-01-01T23:59:59Z");
+        assert_eq!(format_rfc3339_unix(1_788_912_000), "2026-09-09T00:00:00Z");
     }
 }
