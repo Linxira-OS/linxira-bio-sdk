@@ -62,7 +62,9 @@ SCHEMA_FILES = (
     "schemas/job-request-v2.schema.json",
     "schemas/job-request.schema.json",
     "schemas/native-tool-result.schema.json",
+    "schemas/output-spec.schema.json",
     "schemas/phylogeny-tree-transform.schema.json",
+    "schemas/plot-spec.schema.json",
     "schemas/protein-domain-parse.schema.json",
     "schemas/protein-properties.schema.json",
     "schemas/reciprocal-best-hits.schema.json",
@@ -94,6 +96,14 @@ CATALOG_AND_MANIFEST_CONTRACTS = (
 )
 
 CAPABILITY_RESULT_CONTRACTS = (
+    (
+        "tests/fixtures/output/output-spec.example.json",
+        "schemas/output-spec.schema.json",
+    ),
+    (
+        "tests/fixtures/output/plot-spec.example.json",
+        "schemas/plot-spec.schema.json",
+    ),
     (
         "tests/fixtures/capability-results/annotation-structure-visualize.json",
         "schemas/svg-visualization.schema.json",

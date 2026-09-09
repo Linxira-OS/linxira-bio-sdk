@@ -1,0 +1,42 @@
+{
+  "title": "Expression PCA",
+  "subtitle": "PC1 vs PC2, normalized counts",
+  "x_label": "PC1 (42% variance)",
+  "y_label": "PC2 (18% variance)",
+  "grid": true,
+  "legend": true,
+  "theme": "publication",
+  "palette": "set2",
+  "figure": {
+    "width": 800,
+    "height": 600,
+    "dpi": 150
+  },
+  "font": {
+    "family": null,
+    "size": 12
+  },
+  "output": {
+    "format": "svg",
+    "interactive": false
+  },
+  "data": {
+    "series": [
+      {
+        "name": "treated",
+        "points": [
+          {"x": -12.4, "y": 3.1},
+          {"x": -11.9, "y": 2.7},
+          {"x": -12.8, "y": 3.6}
+        ]
+      },
+      {
+        "name": "control",
+        "points": [
+          {"x": 9.2, "y": -4.4},
+          {"x": 10.1, "y": -3.9}
+        ]
+      }
+    ]
+  }
+}

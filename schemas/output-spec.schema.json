@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/output-spec.schema.json",
+  "title": "Linxira Bio output specification",
+  "description": "Declares the artifact set an analysis projects from its authoritative JSON result. The JSON envelope stays the single source of truth; every artifact is a reversible projection rendered by the unified output writers. schema_version must be the integer version \"1\" (never \"1.0\").",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "capability",
+    "artifacts"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1"
+    },
+    "capability": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The capability id producing these artifacts, e.g. expression.differential.v1."
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "role",
+          "format",
+          "path"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Artifact role, e.g. sequences, variants, table, figure."
+          },
+          "format": {
+            "enum": [
+              "fasta",
+              "fastq",
+              "bed",
+              "gff3",
+              "gtf",
+              "vcf",
+              "sam",
+              "csv",
+              "tsv",
+              "json",
+              "jsonl",
+              "xlsx"
+            ],
+            "description": "On-disk format; only formats with unified writers are eligible here."
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!.*[\\\\]).*$",
+            "description": "Workspace-relative POSIX path; absolute paths and backslash separators are rejected."
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "description": "Column-name override for tabular artifacts; defaults derive from the records."
+          },
+          "header": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Extra header lines (VCF meta lines, SAM @SQ lines) emitted after the built-in header."
+          },
+          "coords": {
+            "enum": [
+              "bed",
+              "gff",
+              "vcf"
+            ],
+            "description": "On-disk coordinate convention override; JSON interval coordinates are always 1-based closed and each format defaults to its native convention (bed = 0-based half-open)."
+          }
+        }
+      }
+    }
+  }
+}

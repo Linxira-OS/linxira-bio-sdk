@@ -1,4 +1,5 @@
 use super::{WorkerResult, sha256_file, validate_v1_multi_input_contract};
+use linxira_bio_output::{classify_output_dir, rfc3339_now, timestamp_directory_suffix};
 use linxira_bio_protocol::{
     AnalysisResultV2, ArtifactFile, BioDataFormat, CompressionFormat, DiagnosticSeverity,
     ExecutionMode, InputArtifact, InputCardinality, JobRequest, JobRequestV2, JobStatus,
@@ -255,6 +256,8 @@ struct PreparedInput {
 struct PreparedWorkflowRequest {
     request: JobRequestV2,
     output_directory: PathBuf,
+    /// RFC3339 UTC capture time threaded into `provenance.started_at`.
+    started_at: String,
     inputs: Vec<PreparedInput>,
     role_hashes: BTreeMap<String, String>,
 }
@@ -508,6 +511,7 @@ fn prepare_v2_request(
     base_directory: &Path,
     verified_inputs: &BTreeMap<String, String>,
 ) -> WorkerResult<PreparedWorkflowRequest> {
+    let started_at = rfc3339_now()?;
     if request.inputs.len() != contract.roles.len() {
         return Err(format!(
             "{} requires exactly {} input artifacts",
@@ -568,7 +572,8 @@ fn prepare_v2_request(
         .into());
     }
 
-    let output_directory = resolve_output_directory(base_directory, &request.parameters)?;
+    let output_directory =
+        resolve_output_directory(base_directory, &request.parameters, &request.capability)?;
     for input in &inputs {
         if paths_equal(&input.path, &output_directory) {
             return Err("workflow output directory must differ from every input".into());
@@ -580,6 +585,7 @@ fn prepare_v2_request(
     Ok(PreparedWorkflowRequest {
         request,
         output_directory,
+        started_at,
         inputs,
         role_hashes,
     })
@@ -988,6 +994,13 @@ fn finalize_workflow_result(
 ) -> WorkerResult<String> {
     ensure_inputs_unchanged(&prepared.inputs)?;
     validate_workflow_result(contract, &result, prepared, pack)?;
+    // M0-T14: provenance timing. Packs may fill their own timestamps; the
+    // worker guarantees both fields end up populated with RFC3339 UTC values.
+    let mut result = result;
+    if result.provenance.started_at.is_none() {
+        result.provenance.started_at = Some(prepared.started_at.clone());
+    }
+    result.provenance.finished_at = Some(rfc3339_now()?);
     match result.status {
         JobStatus::Ok if !process_status.success() => {
             return Err(format!(
@@ -1339,32 +1352,50 @@ fn safe_pack_path(root: &Path, relative: &str) -> WorkerResult<PathBuf> {
 fn resolve_output_directory(
     base_directory: &Path,
     parameters: &serde_json::Value,
+    capability: &str,
 ) -> WorkerResult<PathBuf> {
     let configured = parameters
         .get("output_directory")
-        .and_then(serde_json::Value::as_str)
-        .ok_or("bulk expression workflow requires string parameters.output_directory")?;
-    if configured.trim().is_empty() {
-        return Err("parameters.output_directory must not be empty".into());
+        .and_then(serde_json::Value::as_str);
+    match configured {
+        Some(configured) if !configured.trim().is_empty() => {
+            let configured = PathBuf::from(configured);
+            let candidate = if configured.is_absolute() {
+                configured
+            } else {
+                base_directory.join(configured)
+            };
+            let name = candidate
+                .file_name()
+                .filter(|name| !name.is_empty())
+                .ok_or("workflow output directory requires a final path component")?;
+            let parent = candidate
+                .parent()
+                .ok_or("workflow output directory has no parent")?;
+            let parent = fs::canonicalize(parent)?;
+            if !parent.is_dir() {
+                return Err("workflow output parent is not a directory".into());
+            }
+            Ok(parent.join(name))
+        }
+        // Default layout (M0-T13): classify by capability domain under the
+        // workspace and timestamp the directory so repeated runs never
+        // overwrite each other.
+        _ => {
+            let relative = classify_output_dir(capability)
+                .map_err(|error| format!("cannot classify workflow output: {error}"))?;
+            let desired = base_directory.join(&relative);
+            if let Some(parent) = desired.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let candidate = timestamp_directory_suffix(&desired)
+                .map_err(|error| format!("cannot timestamp workflow output: {error}"))?;
+            // The classified parent is created eagerly so the pack entrypoint
+            // can rely on it existing before it writes anything.
+            fs::create_dir_all(&candidate)?;
+            Ok(candidate)
+        }
     }
-    let configured = PathBuf::from(configured);
-    let candidate = if configured.is_absolute() {
-        configured
-    } else {
-        base_directory.join(configured)
-    };
-    let name = candidate
-        .file_name()
-        .filter(|name| !name.is_empty())
-        .ok_or("workflow output directory requires a final path component")?;
-    let parent = candidate
-        .parent()
-        .ok_or("workflow output directory has no parent")?;
-    let parent = fs::canonicalize(parent)?;
-    if !parent.is_dir() {
-        return Err("workflow output parent is not a directory".into());
-    }
-    Ok(parent.join(name))
 }
 
 fn canonical_existing_input(base_directory: &Path, configured: &str) -> WorkerResult<PathBuf> {
@@ -1454,11 +1485,61 @@ mod tests {
     use super::{
         BULK_EXPRESSION_PACK, SEQUENCE_CONVERT_PACK, TemporaryRequestDirectory,
         WorkflowRuntimeKind, bulk_expression_fallback_contract, contract_for,
-        sequence_convert_fallback_contract, verify_workflow_pack_files,
+        resolve_output_directory, sequence_convert_fallback_contract, verify_workflow_pack_files,
     };
     use linxira_bio_protocol::WorkflowPackManifest;
     use sha2::{Digest, Sha256};
     use std::fs;
+
+    #[test]
+    fn resolves_a_default_classified_timestamped_output_directory() {
+        let root = std::env::temp_dir().join(format!(
+            "linxira-bio-worker-default-output-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).expect("create workspace root");
+        let parameters = serde_json::json!({});
+        let directory = resolve_output_directory(&root, &parameters, "expression.differential.v1")
+            .expect("default output directory");
+        let relative = directory
+            .strip_prefix(&root)
+            .expect("directory stays inside the workspace");
+        let rendered = relative.to_string_lossy().replace('\\', "/");
+        assert_eq!(
+            rendered.split('/').take(2).collect::<Vec<_>>(),
+            ["analysis", "expression"],
+            "default output classifies by capability domain: {rendered}"
+        );
+        assert!(
+            rendered.contains("expression.differential.v1_"),
+            "the capability id stays intact with a timestamp suffix: {rendered}"
+        );
+        assert!(
+            directory.is_dir(),
+            "the default directory is created eagerly"
+        );
+        fs::remove_dir_all(root).expect("clean up");
+    }
+
+    #[test]
+    fn explicit_output_directories_keep_precedence_over_the_default_layout() {
+        let root = std::env::temp_dir().join(format!(
+            "linxira-bio-worker-explicit-output-{}",
+            std::process::id()
+        ));
+        let explicit = root.join("custom").join("outdir");
+        fs::create_dir_all(&explicit).expect("create explicit output");
+        let parameters = serde_json::json!({ "output_directory": explicit.display().to_string() });
+        let directory = resolve_output_directory(&root, &parameters, "expression.differential.v1")
+            .expect("explicit output directory");
+        // The explicit branch canonicalizes the parent, which on Windows adds
+        // the \\?\ long-path prefix; compare canonical forms instead.
+        assert_eq!(
+            fs::canonicalize(&directory).expect("canonicalize resolved directory"),
+            fs::canonicalize(&explicit).expect("canonicalize explicit directory")
+        );
+        let _ = fs::remove_dir_all(root);
+    }
 
     #[test]
     fn loads_execution_contracts_from_real_pack_manifests() {
