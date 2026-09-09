@@ -1,0 +1,13 @@
+[package]
+name = "linxira-bio-output"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+linxira-bio-export = { version = "1.0.1", path = "../linxira-bio-export" }
+linxira-bio-protocol = { version = "1.0.1", path = "../linxira-bio-protocol" }
+serde.workspace = true
+serde_json.workspace = true
