@@ -6,6 +6,7 @@ build/
 target/
 .agents/
 .codex/
+.mimosa/
 .linxira/
 .linxira-bio/
 .venv-ci/
