@@ -1,0 +1,4 @@
+@HD	VN:1.6	SO:unsorted
+@SQ	SN:chr1	LN:108
+read_1	99	chr1	101	60	8M	=	151	58	ACGTTGCA	IIIIIIII	NM:i:0
+read_2	77	*	0	0	*	*	0	0	GGTT	*

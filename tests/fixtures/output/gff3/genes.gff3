@@ -1,0 +1,4 @@
+##gff-version 3
+I	engine	gene	1	1000	.	+	.	ID=gene:1;Name=brca1
+###
+II	engine	CDS	500	700	.	.	.	Parent=gene:1

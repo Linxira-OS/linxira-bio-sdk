@@ -246,6 +246,11 @@ fn read_bed<R: BufRead>(reader: R) -> OutputResult<Vec<Map<String, Value>>> {
             if field.is_empty() {
                 continue;
             }
+            // Skip the canonical fill values the writer pads rows with, so a
+            // padded file reads back to the same canonical records.
+            if *field == bed_default_token(column) {
+                continue;
+            }
             let value = match *column {
                 "score" | "thickStart" | "thickEnd" | "blockCount" => json_number_or_string(field),
                 _ => Value::String((*field).to_owned()),
@@ -597,6 +602,15 @@ fn read_sam<R: BufRead>(reader: R) -> OutputResult<Vec<Map<String, Value>>> {
         records.push(record);
     }
     Ok(records)
+}
+
+/// The fill value the writer pads this BED column with; such tokens are
+/// omitted on read so padded files stay reversible.
+fn bed_default_token(column: &str) -> &'static str {
+    match column {
+        "name" | "strand" => ".",
+        _ => "0",
+    }
 }
 
 fn insert_optional_text(record: &mut Map<String, Value>, key: &str, field: &str) {

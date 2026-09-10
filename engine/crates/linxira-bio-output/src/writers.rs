@@ -251,8 +251,14 @@ fn fastq_bytes(records: &[Map<String, Value>]) -> OutputResult<Vec<u8>> {
     Ok(out.into_bytes())
 }
 
+/// Canonical fill values for optional BED columns. Reference tools such as
+/// bedtools require a uniform column count across the whole file, so every
+/// row is padded to the widest row using these defaults.
+const BED_DEFAULTS: [&str; 9] = [".", "0", ".", "0", "0", "0", "0", "0", "0"];
+
 fn bed_bytes(records: &[Map<String, Value>], target: CoordinateSystem) -> OutputResult<Vec<u8>> {
-    let mut out = String::new();
+    let mut rows: Vec<Vec<Option<String>>> = Vec::with_capacity(records.len());
+    let mut widest = 3usize;
     for (index, record) in records.iter().enumerate() {
         let chrom = required_str(record, "chrom", index)?;
         let start = required_u64(record, "start", index)?;
@@ -262,28 +268,32 @@ fn bed_bytes(records: &[Map<String, Value>], target: CoordinateSystem) -> Output
                 "record {index}: BED end {end} precedes start {start}"
             )));
         }
-        let mut fields = vec![
-            chrom,
-            target.output_start(start)?.to_string(),
-            end.to_string(),
-        ];
-        let optional = &BED_COLUMNS[3..];
-        let last_present = optional
-            .iter()
-            .rposition(|column| !record.get(*column).unwrap_or(&Value::Null).is_null());
-        if let Some(last_present) = last_present {
-            for column in &optional[..=last_present] {
-                let value = record.get(*column).unwrap_or(&Value::Null);
-                if value.is_null() {
-                    return Err(OutputError::InvalidRecord(format!(
-                        "record {index}: BED column {:?} is missing but later columns are \
-                         present; BED fields must be filled left to right",
-                        column
-                    )));
-                }
-                fields.push(bed_cell(value));
+        let mut cells: Vec<Option<String>> = vec![None; BED_COLUMNS.len()];
+        cells[0] = Some(chrom);
+        cells[1] = Some(target.output_start(start)?.to_string());
+        cells[2] = Some(end.to_string());
+        for (offset, column) in BED_COLUMNS[3..].iter().enumerate() {
+            let value = record.get(*column).unwrap_or(&Value::Null);
+            if !value.is_null() {
+                cells[3 + offset] = Some(bed_cell(value));
             }
         }
+        let last_present = cells
+            .iter()
+            .rposition(Option::is_some)
+            .expect("the three core BED columns are always present");
+        widest = widest.max(last_present + 1);
+        rows.push(cells);
+    }
+    let mut out = String::new();
+    for mut cells in rows {
+        cells.truncate(widest);
+        for column in 3..widest {
+            if cells[column].is_none() {
+                cells[column] = Some(BED_DEFAULTS[column - 3].to_owned());
+            }
+        }
+        let fields: Vec<String> = cells.into_iter().flatten().collect();
         out.push_str(&fields.join("\t"));
         out.push('\n');
     }
@@ -465,7 +475,11 @@ fn vcf_bytes(
     let mut info_columns: Vec<(String, &'static str)> = Vec::new();
     let mut filter_ids: Vec<String> = Vec::new();
     let mut format_ids: Vec<String> = Vec::new();
+    let mut contigs: Vec<String> = Vec::new();
     for record in records {
+        if let Some(Value::String(chrom)) = record.get("chrom") {
+            ensure_ordered(&mut contigs, chrom.clone());
+        }
         if let Some(Value::Object(info)) = record.get("info") {
             for (key, value) in info {
                 let kind = info_value_kind(value);
@@ -529,6 +543,27 @@ fn vcf_bytes(
     for line in options.header.iter().flatten() {
         out.push_str(line);
         out.push('\n');
+    }
+    // bcftools warns about contigs referenced without a ##contig header line;
+    // synthesize one per referenced chrom unless the caller declared it.
+    let user_contigs: Vec<String> = options
+        .header
+        .iter()
+        .flatten()
+        .filter_map(|line| {
+            let rest = line.strip_prefix("##contig=")?;
+            rest.split(',').find_map(|part| {
+                let part = part.trim().trim_start_matches('<');
+                part.trim()
+                    .strip_prefix("ID=")
+                    .map(|id| id.trim_end_matches('>').trim().to_owned())
+            })
+        })
+        .collect();
+    for chrom in &contigs {
+        if !user_contigs.iter().any(|defined| defined == chrom) {
+            out.push_str(&format!("##contig=<ID={chrom}>\n"));
+        }
     }
     for (id, kind) in &info_columns {
         out.push_str(&format!(
@@ -736,8 +771,41 @@ fn vcf_info(record: &Map<String, Value>, index: usize) -> OutputResult<String> {
 }
 
 fn sam_bytes(records: &[Map<String, Value>], options: &WriteOptions) -> OutputResult<Vec<u8>> {
-    let mut out = String::new();
     let header_lines: Vec<String> = options.header.iter().flatten().cloned().collect();
+
+    // samtools rejects @SQ lines without LN, so synthesize @SQ entries with a
+    // reference span derived from the data (the furthest aligned position is
+    // a valid lower bound for the reference length).
+    let mut spans: Vec<(String, u64)> = Vec::new();
+    for record in records {
+        let Some(rname) = record.get("rname").and_then(Value::as_str) else {
+            continue;
+        };
+        if rname == "*" {
+            continue;
+        }
+        let pos = record.get("pos").and_then(Value::as_u64).unwrap_or(0);
+        if pos == 0 {
+            continue;
+        }
+        let cigar = record.get("cigar").and_then(Value::as_str).unwrap_or("*");
+        let end = pos.saturating_add(cigar_reference_span(cigar).saturating_sub(1));
+        if let Some(entry) = spans.iter_mut().find(|(name, _)| name == rname) {
+            entry.1 = entry.1.max(end);
+        } else {
+            spans.push((rname.to_owned(), end));
+        }
+    }
+    let declared: Vec<String> = header_lines
+        .iter()
+        .filter_map(|line| {
+            let rest = line.strip_prefix("@SQ")?;
+            rest.split('\t')
+                .find_map(|field| field.strip_prefix("SN:").map(ToOwned::to_owned))
+        })
+        .collect();
+
+    let mut out = String::new();
     let declares_hd = header_lines
         .first()
         .is_some_and(|line| line.starts_with("@HD"));
@@ -747,6 +815,11 @@ fn sam_bytes(records: &[Map<String, Value>], options: &WriteOptions) -> OutputRe
     for line in &header_lines {
         out.push_str(line);
         out.push('\n');
+    }
+    for (name, end) in &spans {
+        if !declared.iter().any(|sn| sn == name) {
+            out.push_str(&format!("@SQ\tSN:{name}\tLN:{end}\n"));
+        }
     }
     for (index, record) in records.iter().enumerate() {
         let qname = required_str(record, "qname", index)?;
@@ -801,6 +874,26 @@ fn sam_bytes(records: &[Map<String, Value>], options: &WriteOptions) -> OutputRe
         out.push('\n');
     }
     Ok(out.into_bytes())
+}
+
+/// Reference bases consumed by a CIGAR string (M/D/N/=/X); 0 when absent.
+fn cigar_reference_span(cigar: &str) -> u64 {
+    let mut total = 0u64;
+    let mut number = 0u64;
+    let mut seen_digits = false;
+    for character in cigar.chars() {
+        if let Some(digit) = character.to_digit(10) {
+            number = number * 10 + u64::from(digit);
+            seen_digits = true;
+        } else {
+            if seen_digits && matches!(character, 'M' | 'D' | 'N' | '=' | 'X') {
+                total += number;
+            }
+            number = 0;
+            seen_digits = false;
+        }
+    }
+    total
 }
 
 fn required_str(record: &Map<String, Value>, field: &str, index: usize) -> OutputResult<String> {
@@ -982,7 +1075,7 @@ mod tests {
         BioDataWriter::write_to_path(&value, &output, &WriteOptions::default()).expect("BED write");
         assert_eq!(
             std::fs::read_to_string(&output).expect("read BED"),
-            "chr1\t0\t5\nchr1\t9\t20\tsite\t500\t+\n"
+            "chr1\t0\t5\t.\t0\t.\nchr1\t9\t20\tsite\t500\t+\n"
         );
 
         // A GFF-convention override keeps the 1-based start as-is.
@@ -993,7 +1086,7 @@ mod tests {
         BioDataWriter::write_to_path(&value, &output, &options).expect("BED write (1-based)");
         assert_eq!(
             std::fs::read_to_string(&output).expect("read BED"),
-            "chr1\t1\t5\nchr1\t10\t20\tsite\t500\t+\n"
+            "chr1\t1\t5\t.\t0\t.\nchr1\t10\t20\tsite\t500\t+\n"
         );
 
         let zero_based = json!([{"chrom": "chr1", "start": 0, "end": 5}]);
@@ -1004,13 +1097,16 @@ mod tests {
     }
 
     #[test]
-    fn bed_rejects_gapped_optional_columns() {
+    fn bed_pads_gapped_optional_columns_to_the_file_wide_width() {
         let value = json!([{"chrom": "chr1", "start": 1, "end": 5, "strand": "+"}]);
         let root = temp_root("bed-gap");
         let output = root.join("intervals.bed");
-        let error = BioDataWriter::write_to_path(&value, &output, &WriteOptions::default())
-            .expect_err("strand without name must fail");
-        assert!(error.to_string().contains("left to right"));
+        BioDataWriter::write_to_path(&value, &output, &WriteOptions::default())
+            .expect("gapped optional columns are padded, not rejected");
+        assert_eq!(
+            std::fs::read_to_string(&output).expect("read BED"),
+            "chr1\t0\t5\t.\t0\t+\n"
+        );
         std::fs::remove_dir_all(root).expect("clean up");
     }
 
@@ -1070,6 +1166,7 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(&output).expect("read VCF"),
             "##fileformat=VCFv4.2\n\
+             ##contig=<ID=chr1>\n\
              ##INFO=<ID=dp,Number=.,Type=Integer,Description=\"Synthesized by Linxira Bio export\">\n\
              ##INFO=<ID=somatic,Number=.,Type=Flag,Description=\"Synthesized by Linxira Bio export\">\n\
              ##INFO=<ID=af,Number=.,Type=Float,Description=\"Synthesized by Linxira Bio export\">\n\
@@ -1109,6 +1206,7 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(&output).expect("read SAM"),
             "@HD\tVN:1.6\tSO:unsorted\n\
+             @SQ\tSN:chr1\tLN:4\n\
              read1\t0\tchr1\t1\t60\t4M\t*\t0\t0\tACGT\tIIII\tNM:i:0\tMD:Z:4\n\
              read2\t4\t*\t0\t0\t*\t*\t0\t0\tGG\t*\n"
         );

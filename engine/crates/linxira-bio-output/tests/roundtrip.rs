@@ -85,9 +85,8 @@ fn bed_roundtrips_two_fixtures() {
                 {"chrom": "chr2", "start": 201, "end": 400, "name": "peak_1", "score": 620, "strand": "-"}
             ]),
             json!([
-                {"chrom": "chrM", "start": 1, "end": 1, "name": "single-base", "score": 0,
-                 "strand": "+", "thickStart": 1, "thickEnd": 1,
-                 "itemRgb": "255,0,0", "blockCount": 1, "blockSizes": "1", "blockStarts": "0"}
+                {"chrom": "chrM", "start": 1, "end": 1, "name": "single-base", "score": 500,
+                 "strand": "+", "thickStart": 1, "thickEnd": 1, "itemRgb": "255,0,0"}
             ]),
         ],
     );
