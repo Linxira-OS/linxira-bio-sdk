@@ -1,0 +1,72 @@
+{
+  "schema_version": "1",
+  "capability": "sequence.stats.v1",
+  "dataset_class": "sequence",
+  "backends": [
+    {
+      "backend": "rust",
+      "repeats": 3,
+      "median_wall_ms": 12.5,
+      "min_wall_ms": 11.2,
+      "max_wall_ms": 14.1,
+      "iqr_wall_ms": 1.45,
+      "median_peak_rss_mb": 4.2,
+      "median_cpu_ms": 11.0,
+      "runs": [
+        {
+          "backend": "rust",
+          "run_index": 1,
+          "wall_ms": 12.5,
+          "cpu_ms": 11.0,
+          "peak_rss_mb": 4.2,
+          "disk_read_bytes": 524288,
+          "disk_write_bytes": 4096,
+          "output_bytes": 2048,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "rust",
+          "run_index": 2,
+          "wall_ms": 11.2,
+          "cpu_ms": 10.1,
+          "peak_rss_mb": 4.2,
+          "disk_read_bytes": 524288,
+          "disk_write_bytes": 4096,
+          "output_bytes": 2048,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "rust",
+          "run_index": 3,
+          "wall_ms": 14.1,
+          "cpu_ms": 12.7,
+          "peak_rss_mb": 4.3,
+          "disk_read_bytes": 524288,
+          "disk_write_bytes": 4096,
+          "output_bytes": 2048,
+          "ok": true,
+          "error_summary": null
+        }
+      ]
+    }
+  ],
+  "speedup": null,
+  "memory_saving": null,
+  "consistency": "consistent",
+  "findings": [],
+  "environment": {
+    "os": "linux",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2",
+    "cpu_model": "Example CPU",
+    "total_memory_mb": 16384,
+    "engine_version": "1.0.1",
+    "python_version": "Python 3.12.6",
+    "r_version": "R version 4.6.1 (2026-10-31)",
+    "in_container": false,
+    "page_cache": "warm",
+    "precision": "high"
+  },
+  "sampled_at": "2026-09-10T00:00:00Z"
+}

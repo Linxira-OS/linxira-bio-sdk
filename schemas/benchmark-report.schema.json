@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/benchmark-report.schema.json",
+  "title": "Linxira Bio benchmark report",
+  "description": "Result of benchmarking one capability across execution backends on one machine: per-backend wall-time statistics (median/min/max/IQR over timed repeats following a warmup run), peak RSS, consistency verdict from the structural diff engine, and the full environment disclosure required by the benchmark methodology.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "capability",
+    "dataset_class",
+    "backends",
+    "consistency",
+    "environment",
+    "sampled_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1"
+    },
+    "capability": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_class": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Data class label (srr, annotation, matrix, structure, sequence, sample-table, other)."
+    },
+    "backends": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "backend",
+          "repeats",
+          "median_wall_ms",
+          "min_wall_ms",
+          "max_wall_ms",
+          "iqr_wall_ms",
+          "runs"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "backend": {
+            "type": "string",
+            "minLength": 1
+          },
+          "repeats": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "median_wall_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "min_wall_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "max_wall_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "iqr_wall_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "median_peak_rss_mb": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "median_cpu_ms": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "backend",
+                "run_index",
+                "wall_ms",
+                "output_bytes",
+                "ok"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "backend": {
+                  "type": "string"
+                },
+                "run_index": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "wall_ms": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "cpu_ms": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "peak_rss_mb": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "disk_read_bytes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "disk_write_bytes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "output_bytes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "error_summary": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "speedup": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "median_wall(native) / median_wall(rust); null until a native backend benchmark exists."
+    },
+    "memory_saving": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "1 - peak_rss(rust)/peak_rss(native); null without a native backend."
+    },
+    "consistency": {
+      "enum": [
+        "consistent",
+        "inconsistent",
+        "failed"
+      ]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "field",
+          "detail"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "required": [
+        "os",
+        "engine_version",
+        "in_container",
+        "page_cache",
+        "precision"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "os": {
+          "type": "string"
+        },
+        "kernel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cpu_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "total_memory_mb": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "engine_version": {
+          "type": "string"
+        },
+        "python_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "r_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "in_container": {
+          "type": "boolean"
+        },
+        "page_cache": {
+          "type": "string",
+          "description": "warm when repeats follow a warmup run on the same machine."
+        },
+        "precision": {
+          "type": "string",
+          "description": "high with /usr/bin/time -v, degraded with Instant only."
+        }
+      }
+    },
+    "sampled_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

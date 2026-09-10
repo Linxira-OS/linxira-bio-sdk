@@ -1850,6 +1850,7 @@ dependencies = [
  "linxira-bio-export",
  "linxira-bio-output",
  "linxira-bio-protocol",
+ "linxira-bio-worker",
  "serde",
  "serde_json",
  "sha2",
@@ -1862,6 +1863,7 @@ version = "1.0.1"
 dependencies = [
  "csv",
  "flate2",
+ "linxira-bio-protocol",
  "rand 0.8.7",
  "serde",
  "serde_json",

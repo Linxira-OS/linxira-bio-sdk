@@ -44,6 +44,7 @@ SCHEMA_FILES = (
     "schemas/analysis-result-v2.schema.json",
     "schemas/analysis-result.schema.json",
     "schemas/artifact.schema.json",
+    "schemas/benchmark-report.schema.json",
     "schemas/bundle-manifest.schema.json",
     "schemas/capability.schema.json",
     "schemas/dataset-manifest.schema.json",
@@ -96,6 +97,10 @@ CATALOG_AND_MANIFEST_CONTRACTS = (
 )
 
 CAPABILITY_RESULT_CONTRACTS = (
+    (
+        "tests/fixtures/output/benchmark-report.example.json",
+        "schemas/benchmark-report.schema.json",
+    ),
     (
         "tests/fixtures/output/output-spec.example.json",
         "schemas/output-spec.schema.json",

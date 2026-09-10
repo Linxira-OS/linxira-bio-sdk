@@ -409,6 +409,109 @@ fn provenance_v2(execution_mode: ExecutionMode) -> ProvenanceV2 {
     }
 }
 
+/// Schema version of the benchmark report document.
+pub const BENCHMARK_REPORT_SCHEMA_VERSION: &str = "1";
+
+/// One timed execution of a capability under one backend (M2-T1).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BenchmarkRun {
+    pub backend: String,
+    /// 1-based index within the backend's timed repeats (the warmup is
+    /// never recorded).
+    pub run_index: u32,
+    pub wall_ms: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpu_ms: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub peak_rss_mb: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disk_read_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disk_write_bytes: Option<u64>,
+    /// Size of the result envelope produced by the run.
+    pub output_bytes: u64,
+    pub ok: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_summary: Option<String>,
+}
+
+/// Aggregated statistics for one backend: median wall-time and peak RSS with
+/// min/max/±IQR, per the benchmark methodology.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BenchmarkBackendSummary {
+    pub backend: String,
+    pub repeats: u32,
+    pub median_wall_ms: f64,
+    pub min_wall_ms: f64,
+    pub max_wall_ms: f64,
+    pub iqr_wall_ms: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub median_peak_rss_mb: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub median_cpu_ms: Option<f64>,
+    pub runs: Vec<BenchmarkRun>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum BenchmarkVerdict {
+    Consistent,
+    Inconsistent,
+    Failed,
+}
+
+/// One field-level difference found by the consistency diff engine.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BenchmarkFinding {
+    pub field: String,
+    pub detail: String,
+}
+
+/// Machine-readable environment disclosure (methodology §7.1): every report
+/// records what ran, where, and at what timing precision.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BenchmarkEnvironment {
+    pub os: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kernel: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpu_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_memory_mb: Option<u64>,
+    pub engine_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub python_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r_version: Option<String>,
+    pub in_container: bool,
+    /// `warm` when repeats follow a warmup run on the same machine.
+    pub page_cache: String,
+    /// `high` with an external `/usr/bin/time -v` wrapper, `degraded` with
+    /// in-process `Instant` only (Windows).
+    pub precision: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BenchmarkReport {
+    pub schema_version: String,
+    pub capability: String,
+    pub dataset_class: String,
+    pub backends: Vec<BenchmarkBackendSummary>,
+    /// median_wall(native) / median_wall(rust); None until a native backend
+    /// benchmark lands (M2-T3 packs).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speedup: Option<f64>,
+    /// 1 - peak_rss(rust)/peak_rss(native); None without a native backend.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_saving: Option<f64>,
+    pub consistency: BenchmarkVerdict,
+    #[serde(default)]
+    pub findings: Vec<BenchmarkFinding>,
+    pub environment: BenchmarkEnvironment,
+    /// RFC3339 UTC sample time.
+    pub sampled_at: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkflowPublisher {
     pub name: String,
@@ -554,10 +657,12 @@ pub struct WorkflowPackManifest {
 #[cfg(test)]
 mod tests {
     use super::{
-        AnalysisResult, AnalysisResultV2, BioDataFormat, CompressionFormat, DatasetManifest,
-        DatasetRelationshipKind, DiagnosticSeverity, ExecutionMode, InputCardinality, JobRequest,
-        JobRequestV2, JobStatus, NetworkAccess, SCHEMA_VERSION, SCHEMA_VERSION_V2, ValidationState,
-        WorkflowPackManifest, WorkflowRuntimeKind,
+        AnalysisResult, AnalysisResultV2, BENCHMARK_REPORT_SCHEMA_VERSION, BenchmarkBackendSummary,
+        BenchmarkEnvironment, BenchmarkReport, BenchmarkRun, BenchmarkVerdict, BioDataFormat,
+        CompressionFormat, DatasetManifest, DatasetRelationshipKind, DiagnosticSeverity,
+        ExecutionMode, InputCardinality, JobRequest, JobRequestV2, JobStatus, NetworkAccess,
+        SCHEMA_VERSION, SCHEMA_VERSION_V2, ValidationState, WorkflowPackManifest,
+        WorkflowRuntimeKind,
     };
 
     #[test]
@@ -778,6 +883,58 @@ mod tests {
         )
         .expect("legacy envelope parses");
         assert_eq!(legacy.provenance.core_version, None);
+    }
+
+    #[test]
+    fn benchmark_report_round_trips_without_shape_changes() {
+        let report = BenchmarkReport {
+            schema_version: BENCHMARK_REPORT_SCHEMA_VERSION.to_owned(),
+            capability: "sequence.stats.v1".to_owned(),
+            dataset_class: "sequence".to_owned(),
+            backends: vec![BenchmarkBackendSummary {
+                backend: "rust".to_owned(),
+                repeats: 3,
+                median_wall_ms: 12.0,
+                min_wall_ms: 11.0,
+                max_wall_ms: 14.0,
+                iqr_wall_ms: 1.5,
+                median_peak_rss_mb: Some(4.2),
+                median_cpu_ms: Some(11.5),
+                runs: vec![BenchmarkRun {
+                    backend: "rust".to_owned(),
+                    run_index: 1,
+                    wall_ms: 12.0,
+                    cpu_ms: Some(11.5),
+                    peak_rss_mb: Some(4.2),
+                    disk_read_bytes: Some(1024),
+                    disk_write_bytes: None,
+                    output_bytes: 2048,
+                    ok: true,
+                    error_summary: None,
+                }],
+            }],
+            speedup: None,
+            memory_saving: None,
+            consistency: BenchmarkVerdict::Consistent,
+            findings: Vec::new(),
+            environment: BenchmarkEnvironment {
+                os: "linux".to_owned(),
+                kernel: Some("6.18.33".to_owned()),
+                cpu_model: Some("test cpu".to_owned()),
+                total_memory_mb: Some(16_000),
+                engine_version: "1.0.1".to_owned(),
+                python_version: None,
+                r_version: None,
+                in_container: false,
+                page_cache: "warm".to_owned(),
+                precision: "high".to_owned(),
+            },
+            sampled_at: "2026-09-10T00:00:00Z".to_owned(),
+        };
+        let json = serde_json::to_string(&report).expect("serialize benchmark report");
+        let parsed: BenchmarkReport = serde_json::from_str(&json).expect("parse benchmark report");
+        assert_eq!(parsed, report);
+        assert_eq!(parsed.backends[0].runs[0].backend, "rust");
     }
 
     #[test]
