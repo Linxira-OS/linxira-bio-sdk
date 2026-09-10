@@ -94,6 +94,8 @@ the agent skills that select and validate them.
 - Read `skills/configure-bio-environment/SKILL.md` to audit managed Python, R,
   Java, Conda/Bioconda, BLAST, DIAMOND, native command-line tools, WSL Debian,
   WSL Arch, Docker, Podman, or GPU prerequisites.
+- Read `skills/run-bio-benchmark/SKILL.md` for the implemented
+  `benchmark.run.v1` capability.
 - Do not use a capability marked `planned` as though it were available.
 
 ## Repository Rules

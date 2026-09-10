@@ -429,6 +429,13 @@
       "command": "linxira-bio-ui"
     },
     {
+      "id": "benchmark.run.v1",
+      "status": "available",
+      "category": "benchmark",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio benchmark run <capability> [role=path]... --backends rust --repeat N --output DIR --dataset-class CLASS --json"
+    },
+    {
       "id": "fastq.qc.v1",
       "status": "available",
       "category": "read-qc",

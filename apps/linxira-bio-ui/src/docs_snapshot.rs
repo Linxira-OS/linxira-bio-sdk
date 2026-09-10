@@ -31,6 +31,8 @@ pub fn embedded_document(capability: &str, locale: &str) -> Option<&'static str>
         ("annotation.sequence.extract.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/annotation.sequence.extract.v1/zh-CN.md")),
         ("annotation.structure.visualize.v1", "en-US") => Some(include_str!("../../../docs/capabilities/annotation.structure.visualize.v1/en-US.md")),
         ("annotation.structure.visualize.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/annotation.structure.visualize.v1/zh-CN.md")),
+        ("benchmark.run.v1", "en-US") => Some(include_str!("../../../docs/capabilities/benchmark.run.v1/en-US.md")),
+        ("benchmark.run.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/benchmark.run.v1/zh-CN.md")),
         ("chemistry.descriptors.v1", "en-US") => Some(include_str!("../../../docs/capabilities/chemistry.descriptors.v1/en-US.md")),
         ("chemistry.descriptors.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/chemistry.descriptors.v1/zh-CN.md")),
         ("comparative.dotplot.v1", "en-US") => Some(include_str!("../../../docs/capabilities/comparative.dotplot.v1/en-US.md")),
