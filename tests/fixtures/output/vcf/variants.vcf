@@ -1,0 +1,7 @@
+##fileformat=VCFv4.2
+##contig=<ID=chr7>
+##INFO=<ID=af,Number=.,Type=Float,Description="Synthesized by Linxira Bio export">
+##INFO=<ID=dp,Number=.,Type=Integer,Description="Synthesized by Linxira Bio export">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr7	117199644	rs699	A	G	118.5	PASS	af=0.42;dp=61
+chr7	117199700	.	C	T	30	.	.

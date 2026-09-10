@@ -1,0 +1,4 @@
+{"records":[
+  {"chrom":"chr7","pos":117199644,"id":"rs699","ref":"A","alt":"G","qual":118.5,"filter":"PASS","info":{"dp":61,"af":0.42}},
+  {"chrom":"chr7","pos":117199700,"ref":"C","alt":"T","qual":30}
+]}

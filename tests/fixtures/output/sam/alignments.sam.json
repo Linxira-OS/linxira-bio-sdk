@@ -1,0 +1,4 @@
+{"records":[
+  {"qname":"read_1","flag":99,"rname":"chr1","pos":101,"mapq":60,"cigar":"8M","rnext":"=","pnext":151,"tlen":58,"seq":"ACGTTGCA","qual":"IIIIIIII","tags":["NM:i:0"]},
+  {"qname":"read_2","flag":77,"pos":0,"mapq":0,"pnext":0,"tlen":0,"seq":"GGTT","qual":"*"}
+]}
