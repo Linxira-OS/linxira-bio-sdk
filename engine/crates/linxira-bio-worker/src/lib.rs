@@ -2297,9 +2297,13 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
     }
 }
 
-fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
-    let (required_roles, allowed_parameters): (&[&str], &[&str]) = match request.capability.as_str()
-    {
+/// The per-capability input-role and parameter contract, shared by request
+/// validation and benchmark/agent tooling that binds positional inputs to
+/// named roles.
+pub fn v2_contract(
+    capability: &str,
+) -> WorkerResult<(&'static [&'static str], &'static [&'static str])> {
+    let contract: (&'static [&'static str], &'static [&'static str]) = match capability {
         "alignment.qc.v1" => (&["sam"], &[]),
         "alignment.bam-cram.qc.v1" | "alignment.coverage.v1" => (&["alignment"], &["output"]),
         "alignment.bam-to-bigwig.v1" => (&["alignment"], &["output", "threads"]),
@@ -2604,6 +2608,11 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         "variant.to-table.v1" => (&["vcf"], &["output"]),
         capability => return Err(format!("unsupported capability: {capability}").into()),
     };
+    Ok(contract)
+}
+
+fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
+    let (required_roles, allowed_parameters) = v2_contract(&request.capability)?;
 
     let mut artifact_ids = HashSet::new();
     let mut roles = HashSet::new();
