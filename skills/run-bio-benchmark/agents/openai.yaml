@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run Bio Benchmark"
+  short_description: "Measure capability speed, memory, and cross-backend consistency"
+  default_prompt: "Use $run-bio-benchmark to benchmark this capability on the current input and report the medians."
