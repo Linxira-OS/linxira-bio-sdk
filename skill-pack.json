@@ -332,6 +332,14 @@
       "capabilities": [
         "medical.metabolomics.v1"
       ]
+    },
+    {
+      "id": "run-bio-benchmark",
+      "path": "skills/run-bio-benchmark",
+      "kind": "executable",
+      "capabilities": [
+        "benchmark.run.v1"
+      ]
     }
   ]
 }
