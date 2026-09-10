@@ -1,0 +1,5 @@
+{"records":[
+  {"chrom":"chr1","start":1,"end":100},
+  {"chrom":"chr2","start":201,"end":400,"name":"peak_1","score":620,"strand":"-"},
+  {"chrom":"chrM","start":1,"end":1,"name":"single-base","score":0,"strand":"+"}
+]}

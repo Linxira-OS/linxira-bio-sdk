@@ -1,0 +1,4 @@
+{"records":[
+  {"seqid":"I","source":"engine","type":"gene","start":1,"end":1000,"strand":"+","attributes":{"ID":"gene:1","Name":"brca1"}},
+  {"seqid":"II","source":"engine","type":"CDS","start":500,"end":700,"attributes":{"Parent":"gene:1"}}
+]}
