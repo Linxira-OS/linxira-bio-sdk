@@ -7,6 +7,9 @@ use linxira_bio_core::annotation::{
     extract_annotation_sequences_path, gene_density_path, gxf_to_bed_path,
     normalize_annotation_path,
 };
+use linxira_bio_core::benchmark::{
+    diff_envelopes, environment_snapshot, iqr, median, parse_time_verbose,
+};
 use linxira_bio_core::cohort::{CohortTableQc, cohort_table_qc_path};
 use linxira_bio_core::coordinate::{
     ContactMapOptions, MmcifStructureSummary, StructureContactMapResult, StructureGeometryResult,
@@ -107,14 +110,17 @@ use linxira_bio_core::variant_transform::{
 use linxira_bio_export::export_json_file;
 use linxira_bio_output::{
     BioDataWriter, ProbeCompression, ProbeResult, WriteOptions, find_native_7z, probe_format,
-    probe_sra_tools, resolve_input_path,
+    probe_sra_tools, resolve_input_path, rfc3339_now,
 };
 use linxira_bio_protocol::{
-    AnalysisResult, ExecutionMode, WorkflowPackManifest, WorkflowRuntimeKind,
+    AnalysisResult, BENCHMARK_REPORT_SCHEMA_VERSION, BenchmarkBackendSummary, BenchmarkReport,
+    BenchmarkRun, BenchmarkVerdict, ExecutionMode, WorkflowPackManifest, WorkflowRuntimeKind,
     semver_range::core_compatibility_matches,
 };
+use linxira_bio_worker::v2_contract;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::env;
 use std::error::Error;
@@ -122,6 +128,7 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+use std::time::Instant;
 
 const CAPABILITY_CATALOG: &str = include_str!("../../../../capabilities/catalog.json");
 const WORKFLOW_CATALOG: &str = include_str!("../../../../workflows/catalog.json");
@@ -242,6 +249,13 @@ impl CliError {
     fn execution(message: impl Into<String>) -> Box<dyn Error> {
         Box::new(Self {
             code: 3,
+            message: message.into(),
+        })
+    }
+
+    fn environment(message: impl Into<String>) -> Box<dyn Error> {
+        Box::new(Self {
+            code: 4,
             message: message.into(),
         })
     }
@@ -425,6 +439,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if import == "import" && probe == "probe" && json == "--json" =>
         {
             print_import_probe(path, true)
+        }
+        [benchmark, run, arguments @ ..] if benchmark == "benchmark" && run == "run" => {
+            run_benchmark_command(arguments)
         }
         [sequence, stats, path] if sequence == "sequence" && stats == "stats" => {
             print_sequence_stats(path, false)
@@ -5564,6 +5581,563 @@ fn probe_format_label(result: &ProbeResult) -> String {
     }
 }
 
+/// `benchmark run` (M2-T4): executes one capability repeatedly through the
+/// worker subprocess (warmup + timed repeats), aggregates median wall-time
+/// and peak RSS per backend, cross-checks result envelopes with the
+/// consistency diff engine, and writes the disclosed report.
+fn run_benchmark_command(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut positional: Vec<String> = Vec::new();
+    let mut backends: Vec<String> = vec!["rust".to_owned()];
+    let mut repeat: u32 = 3;
+    let mut output_dir = std::path::PathBuf::from("benchmark-results");
+    let mut dataset_class = "other".to_owned();
+    let mut parameters: Option<serde_json::Value> = None;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        let argument = &arguments[index];
+        let (flag, inline_value) = split_cli_flag(argument);
+        match flag.as_str() {
+            "--backends" => {
+                let value = cli_flag_value(inline_value, arguments, &mut index, "--backends")?;
+                backends = value
+                    .split(',')
+                    .map(|backend| backend.trim().to_owned())
+                    .filter(|backend| !backend.is_empty())
+                    .collect();
+                if backends.is_empty() {
+                    return Err(CliError::usage("--backends requires at least one backend"));
+                }
+            }
+            "--repeat" => {
+                let value = cli_flag_value(inline_value, arguments, &mut index, "--repeat")?;
+                repeat = value.parse().map_err(|_| {
+                    CliError::usage(format!(
+                        "--repeat expects a positive integer, got {value:?}"
+                    ))
+                })?;
+                if repeat == 0 {
+                    return Err(CliError::usage("--repeat must be at least 1"));
+                }
+            }
+            "--output" => {
+                let value = cli_flag_value(inline_value, arguments, &mut index, "--output")?;
+                output_dir = std::path::PathBuf::from(value);
+            }
+            "--dataset-class" => {
+                dataset_class =
+                    cli_flag_value(inline_value, arguments, &mut index, "--dataset-class")?;
+            }
+            "--parameters" => {
+                let value = cli_flag_value(inline_value, arguments, &mut index, "--parameters")?;
+                parameters = Some(serde_json::from_str(&value).map_err(|error| {
+                    CliError::usage(format!("--parameters must be a JSON object: {error}"))
+                })?);
+            }
+            "--json" => json = true,
+            other => {
+                if other.starts_with('-') {
+                    return Err(CliError::usage(format!("unknown benchmark flag: {other}")));
+                }
+                positional.push(argument.clone());
+            }
+        }
+        index += 1;
+    }
+
+    let Some(capability) = positional.first().cloned() else {
+        return Err(CliError::usage(
+            "benchmark run requires a capability id, e.g. benchmark run sequence.stats.v1 \
+             fasta=input.fa",
+        ));
+    };
+    let (required_roles, _) =
+        v2_contract(&capability).map_err(|error| CliError::usage(error.to_string()))?;
+    let inputs = bind_benchmark_inputs(required_roles, &positional[1..])?;
+    let mut resolved_inputs = BTreeMap::new();
+    for (role, raw_path) in inputs {
+        let resolved =
+            resolve_input_path(&raw_path).map_err(|error| CliError::usage(error.to_string()))?;
+        if !resolved.is_file() {
+            return Err(CliError::execution(format!(
+                "benchmark input {raw_path:?} does not exist"
+            )));
+        }
+        // The request file lives in a temporary directory and the worker
+        // resolves relative paths against it, so anchor to an absolute path.
+        let absolute = if resolved.is_absolute() {
+            resolved
+        } else {
+            std::env::current_dir()?.join(resolved)
+        };
+        resolved_inputs.insert(role, absolute.display().to_string());
+    }
+
+    let worker = benchmark_worker_binary()?;
+    let request_path = write_benchmark_request(
+        &capability,
+        &resolved_inputs,
+        parameters.unwrap_or_else(|| serde_json::json!({})),
+    )?;
+
+    let mut backend_summaries = Vec::new();
+    let mut backend_envelopes: Vec<(String, Option<serde_json::Value>)> = Vec::new();
+    let mut high_precision = true;
+    for backend in &backends {
+        if backend != "rust" {
+            // M2-T3 registers the native python/r benchmark packs; until then
+            // those backends are skipped rather than silently timed.
+            eprintln!("skipping backend {backend:?}: no benchmark pack is registered yet (M2-T3)");
+            continue;
+        }
+        let warmup = execute_benchmark_run(&worker, &request_path);
+        if !warmup.ok {
+            eprintln!("warning: warmup run failed: {}", warmup.error_summary());
+        }
+        let mut runs = Vec::new();
+        let mut last_envelope = None;
+        for run_index in 1..=repeat {
+            let mut run = execute_benchmark_run(&worker, &request_path);
+            run.backend = backend.clone();
+            run.run_index = run_index;
+            if !run.timed_with_time_v {
+                high_precision = false;
+            }
+            if run.ok {
+                last_envelope = run.envelope.clone();
+            }
+            runs.push(run.into_record());
+        }
+        let successful: Vec<&BenchmarkRun> = runs.iter().filter(|run| run.ok).collect();
+        if successful.is_empty() {
+            eprintln!("warning: backend {backend:?} produced no successful runs");
+        }
+        let mut wall_times: Vec<f64> = successful.iter().map(|run| run.wall_ms).collect();
+        let median_wall_ms = median(&mut wall_times).unwrap_or_default();
+        let mut sorted_wall = wall_times.clone();
+        sorted_wall.sort_by(|left, right| left.partial_cmp(right).expect("finite wall times"));
+        let min_wall_ms = sorted_wall.first().copied().unwrap_or_default();
+        let max_wall_ms = sorted_wall.last().copied().unwrap_or_default();
+        let mut rss_values: Vec<f64> = successful
+            .iter()
+            .filter_map(|run| run.peak_rss_mb)
+            .collect();
+        let mut cpu_values: Vec<f64> = successful.iter().filter_map(|run| run.cpu_ms).collect();
+        backend_summaries.push(BenchmarkBackendSummary {
+            backend: backend.clone(),
+            repeats: repeat,
+            median_wall_ms,
+            min_wall_ms,
+            max_wall_ms,
+            iqr_wall_ms: iqr(&mut sorted_wall).unwrap_or_default(),
+            median_peak_rss_mb: median(&mut rss_values),
+            median_cpu_ms: median(&mut cpu_values),
+            runs,
+        });
+        backend_envelopes.push((backend.clone(), last_envelope));
+    }
+
+    let mut findings = Vec::new();
+    let mut consistency = if backend_summaries.is_empty() {
+        BenchmarkVerdict::Failed
+    } else {
+        BenchmarkVerdict::Consistent
+    };
+    if let Some((_, Some(reference))) = backend_envelopes.first() {
+        for (_, envelope) in backend_envelopes.iter().skip(1) {
+            let Some(envelope) = envelope else { continue };
+            let backend_findings = diff_envelopes(reference, envelope);
+            if !backend_findings.is_empty() {
+                consistency = BenchmarkVerdict::Inconsistent;
+                findings.extend(backend_findings);
+            }
+        }
+    } else if backend_summaries
+        .iter()
+        .all(|summary| summary.runs.iter().all(|run| !run.ok))
+        && !backend_summaries.is_empty()
+    {
+        consistency = BenchmarkVerdict::Failed;
+    }
+
+    let rust_median = backend_summaries
+        .iter()
+        .find(|summary| summary.backend == "rust")
+        .map(|summary| summary.median_wall_ms);
+    let speedup = match (
+        rust_median,
+        backend_summaries
+            .iter()
+            .find(|summary| summary.backend != "rust"),
+    ) {
+        (Some(rust), native) if rust > 0.0 => native.map(|summary| summary.median_wall_ms / rust),
+        _ => None,
+    };
+
+    let mut environment = environment_snapshot(env!("CARGO_PKG_VERSION"));
+    environment.precision = if high_precision {
+        "high".to_owned()
+    } else {
+        "degraded".to_owned()
+    };
+    let report = BenchmarkReport {
+        schema_version: BENCHMARK_REPORT_SCHEMA_VERSION.to_owned(),
+        capability: capability.clone(),
+        dataset_class,
+        backends: backend_summaries,
+        speedup,
+        memory_saving: None,
+        consistency,
+        findings,
+        environment,
+        sampled_at: rfc3339_now()?,
+    };
+
+    std::fs::create_dir_all(&output_dir)?;
+    let report_path = output_dir.join(format!("{capability}.benchmark.json"));
+    std::fs::write(&report_path, serde_json::to_vec_pretty(&report)?)?;
+    let summary_path = output_dir.join(format!("{capability}.benchmark.md"));
+    std::fs::write(&summary_path, benchmark_summary_markdown(&report))?;
+
+    if json {
+        print_analysis_json("benchmark-run", "benchmark.run.v1", &report)?;
+    } else {
+        println!("report\t{}", report_path.display());
+        println!("summary\t{}", summary_path.display());
+        println!("capability\t{}", report.capability);
+        println!("consistency\t{:?}", report.consistency);
+        for backend in &report.backends {
+            println!(
+                "backend\t{}\tmedian_wall_ms\t{:.1}\tmedian_peak_rss_mb\t{}",
+                backend.backend,
+                backend.median_wall_ms,
+                backend
+                    .median_peak_rss_mb
+                    .map(|value| format!("{value:.1}"))
+                    .unwrap_or_else(|| "n/a".to_owned())
+            );
+        }
+        if !report.findings.is_empty() {
+            for finding in &report.findings {
+                println!("finding\t{}\t{}", finding.field, finding.detail);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Splits `--flag=value` into its parts; `--flag value` is resolved by the
+/// caller through [`cli_flag_value`].
+fn split_cli_flag(argument: &str) -> (String, Option<String>) {
+    if argument.starts_with('-')
+        && let Some((flag, value)) = argument.split_once('=')
+    {
+        return (flag.to_owned(), Some(value.to_owned()));
+    }
+    (argument.to_owned(), None)
+}
+
+fn cli_flag_value(
+    inline: Option<String>,
+    arguments: &[String],
+    index: &mut usize,
+    flag: &str,
+) -> Result<String, Box<dyn Error>> {
+    if let Some(value) = inline {
+        return Ok(value);
+    }
+    *index += 1;
+    arguments
+        .get(*index)
+        .cloned()
+        .ok_or_else(|| CliError::usage(format!("{flag} requires a value")))
+}
+
+/// Binds positional inputs to the capability's required roles: explicit
+/// `role=path` pairs bind by name, bare paths fill the roles in order.
+fn bind_benchmark_inputs(
+    required_roles: &[&str],
+    arguments: &[String],
+) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+    let mut bound = Vec::new();
+    let mut bare = Vec::new();
+    for argument in arguments {
+        let is_role_pair = argument.split_once('=').is_some_and(|(role, _)| {
+            !role.is_empty()
+                && role.chars().all(|character| {
+                    character.is_ascii_lowercase() || character.is_ascii_digit() || character == '-'
+                })
+        });
+        if is_role_pair {
+            let (role, path) = argument.split_once('=').expect("checked above");
+            bound.push((role.to_owned(), path.to_owned()));
+        } else {
+            bare.push(argument.clone());
+        }
+    }
+    if !bare.is_empty() {
+        if bare.len() != required_roles.len() {
+            return Err(CliError::usage(format!(
+                "{} requires inputs bound to the roles [{}]; pass role=path pairs or exactly {} \
+                 bare paths",
+                "capability",
+                required_roles.join(", "),
+                required_roles.len()
+            )));
+        }
+        for (role, path) in required_roles.iter().zip(bare) {
+            bound.push(((*role).to_owned(), path));
+        }
+    }
+    if bound.is_empty() {
+        return Err(CliError::usage(
+            "benchmark run requires at least one input (role=path or a bare path)",
+        ));
+    }
+    Ok(bound)
+}
+
+/// Locates the worker binary: `LINXIRA_BIO_WORKER`, a sibling of this
+/// executable, then PATH.
+fn benchmark_worker_binary() -> Result<std::path::PathBuf, Box<dyn Error>> {
+    let executable = if cfg!(windows) {
+        "linxira-bio-worker.exe"
+    } else {
+        "linxira-bio-worker"
+    };
+    if let Some(path) = std::env::var_os("LINXIRA_BIO_WORKER") {
+        let path = std::path::PathBuf::from(path);
+        if path.is_file() {
+            return Ok(path);
+        }
+        return Err(CliError::environment(format!(
+            "LINXIRA_BIO_WORKER names a missing file: {}",
+            path.display()
+        )));
+    }
+    if let Ok(current) = std::env::current_exe()
+        && let Some(sibling) = current.parent().map(|parent| parent.join(executable))
+        && sibling.is_file()
+    {
+        return Ok(sibling);
+    }
+    if let Some(paths) = std::env::var_os("PATH")
+        && let Some(found) = std::env::split_paths(&paths)
+            .map(|directory| directory.join(executable))
+            .find(|candidate| candidate.is_file())
+    {
+        return Ok(found);
+    }
+    Err(CliError::environment(format!(
+        "the worker binary {executable} was not found; set LINXIRA_BIO_WORKER or install the SDK"
+    )))
+}
+
+fn write_benchmark_request(
+    capability: &str,
+    inputs: &BTreeMap<String, String>,
+    parameters: serde_json::Value,
+) -> Result<std::path::PathBuf, Box<dyn Error>> {
+    let job_id: String = capability
+        .replace('.', "-")
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '-' {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let request = serde_json::json!({
+        "schema_version": "1",
+        "job_id": format!("benchmark-{job_id}"),
+        "capability": capability,
+        "inputs": inputs,
+        "execution": {"mode": "local-cpu"},
+        "parameters": parameters,
+    });
+    let path = std::env::temp_dir().join(format!(
+        "linxira-bio-benchmark-request-{}-{job_id}.json",
+        std::process::id()
+    ));
+    std::fs::write(&path, serde_json::to_vec_pretty(&request)?)?;
+    Ok(path)
+}
+
+/// One timed benchmark execution through the worker subprocess.
+struct ExecutedRun {
+    backend: String,
+    run_index: u32,
+    wall_ms: f64,
+    cpu_ms: Option<f64>,
+    peak_rss_mb: Option<f64>,
+    disk_read_bytes: Option<u64>,
+    disk_write_bytes: Option<u64>,
+    output_bytes: u64,
+    ok: bool,
+    error_summary: Option<String>,
+    envelope: Option<serde_json::Value>,
+    timed_with_time_v: bool,
+}
+
+impl ExecutedRun {
+    fn error_summary(&self) -> &str {
+        self.error_summary.as_deref().unwrap_or("unknown error")
+    }
+
+    fn into_record(self) -> BenchmarkRun {
+        BenchmarkRun {
+            backend: self.backend,
+            run_index: self.run_index,
+            wall_ms: self.wall_ms,
+            cpu_ms: self.cpu_ms,
+            peak_rss_mb: self.peak_rss_mb,
+            disk_read_bytes: self.disk_read_bytes,
+            disk_write_bytes: self.disk_write_bytes,
+            output_bytes: self.output_bytes,
+            ok: self.ok,
+            error_summary: self.error_summary,
+        }
+    }
+}
+
+fn execute_benchmark_run(worker: &std::path::Path, request_path: &std::path::Path) -> ExecutedRun {
+    let started = Instant::now();
+    // Fixed argument vectors only; the worker path comes from the discovery
+    // rules, never from a shell string.
+    let output = if cfg!(target_os = "linux") && std::path::Path::new("/usr/bin/time").is_file() {
+        std::process::Command::new("/usr/bin/time")
+            .arg("-v")
+            .arg(worker)
+            .arg(request_path)
+            .output()
+    } else {
+        std::process::Command::new(worker)
+            .arg(request_path)
+            .output()
+    };
+    let instant_wall_ms = started.elapsed().as_secs_f64() * 1000.0;
+    match output {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+            let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+            let timed = parse_time_verbose(&stderr);
+            let envelope: Option<serde_json::Value> = serde_json::from_str(stdout.trim()).ok();
+            let ok = output.status.success() && envelope.is_some();
+            let error_summary = if ok {
+                None
+            } else {
+                Some(truncate_error_summary(&stderr))
+            };
+            ExecutedRun {
+                backend: String::new(),
+                run_index: 0,
+                wall_ms: timed.as_ref().map(|m| m.wall_ms).unwrap_or(instant_wall_ms),
+                cpu_ms: timed.as_ref().map(|m| m.user_ms + m.system_ms),
+                peak_rss_mb: timed
+                    .as_ref()
+                    .and_then(|m| m.peak_rss_kb)
+                    .map(|kb| kb as f64 / 1024.0),
+                disk_read_bytes: timed.as_ref().and_then(|m| m.disk_read_bytes),
+                disk_write_bytes: timed.as_ref().and_then(|m| m.disk_write_bytes),
+                output_bytes: stdout.len() as u64,
+                ok,
+                error_summary,
+                envelope,
+                timed_with_time_v: timed.is_some(),
+            }
+        }
+        Err(error) => ExecutedRun {
+            backend: String::new(),
+            run_index: 0,
+            wall_ms: instant_wall_ms,
+            cpu_ms: None,
+            peak_rss_mb: None,
+            disk_read_bytes: None,
+            disk_write_bytes: None,
+            output_bytes: 0,
+            ok: false,
+            error_summary: Some(truncate_error_summary(&error.to_string())),
+            envelope: None,
+            timed_with_time_v: false,
+        },
+    }
+}
+
+/// Failure isolation (methodology §7.1): stderr summaries are truncated to
+/// 4 KiB in the report.
+fn truncate_error_summary(text: &str) -> String {
+    const LIMIT: usize = 4096;
+    let trimmed = text.trim();
+    if trimmed.len() <= LIMIT {
+        trimmed.to_owned()
+    } else {
+        let mut boundary = LIMIT;
+        while !trimmed.is_char_boundary(boundary) {
+            boundary -= 1;
+        }
+        format!("{}…", &trimmed[..boundary])
+    }
+}
+
+fn benchmark_summary_markdown(report: &BenchmarkReport) -> String {
+    let mut markdown = String::new();
+    markdown.push_str(&format!(
+        "# Benchmark: {}\n\n- dataset_class: {}\n- consistency: {:?}\n- sampled_at: {}\n- precision: {} (page_cache: {})\n\n",
+        report.capability,
+        report.dataset_class,
+        report.consistency,
+        report.sampled_at,
+        report.environment.precision,
+        report.environment.page_cache
+    ));
+    markdown
+        .push_str("| backend | repeats | median wall (ms) | min | max | IQR | median RSS (MB) |\n");
+    markdown.push_str("|---|---|---|---|---|---|---|\n");
+    for backend in &report.backends {
+        markdown.push_str(&format!(
+            "| {} | {} | {:.1} | {:.1} | {:.1} | {:.1} | {} |\n",
+            backend.backend,
+            backend.repeats,
+            backend.median_wall_ms,
+            backend.min_wall_ms,
+            backend.max_wall_ms,
+            backend.iqr_wall_ms,
+            backend
+                .median_peak_rss_mb
+                .map(|value| format!("{value:.1}"))
+                .unwrap_or_else(|| "n/a".to_owned())
+        ));
+    }
+    if let Some(speedup) = report.speedup {
+        markdown.push_str(&format!("\nspeedup (native/rust): {speedup:.2}x\n"));
+    }
+    if !report.findings.is_empty() {
+        markdown.push_str("\n## Consistency findings\n\n");
+        for finding in &report.findings {
+            markdown.push_str(&format!("- `{}`: {}\n", finding.field, finding.detail));
+        }
+    }
+    markdown.push_str(&format!(
+        "\n## Environment\n\n- os: {} {}\n- engine: {}\n- python: {}\n- R: {}\n",
+        report.environment.os,
+        report
+            .environment
+            .kernel
+            .as_deref()
+            .unwrap_or("(unknown kernel)"),
+        report.environment.engine_version,
+        report
+            .environment
+            .python_version
+            .as_deref()
+            .unwrap_or("n/a"),
+        report.environment.r_version.as_deref().unwrap_or("n/a")
+    ));
+    markdown
+}
+
 fn print_table_manipulate(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     let mut input = None;
     let mut output = None;
@@ -6547,7 +7121,8 @@ fn usage() -> &'static str {
         "  linxira-bio structure superpose <reference.pdb|cif[.gz]> <mobile.pdb|cif[.gz]> [--atom NAME] [--json]\n",
         "  linxira-bio export table <input.json> <output.csv|tsv|json|jsonl|xlsx> [--json]\n",
         "  linxira-bio export bio <input.json> <output.fa|fastq|bed|gff3|gtf|vcf|sam|csv|tsv|json|jsonl|xlsx> [--json]\n",
-        "  linxira-bio import probe <input> [--json]"
+        "  linxira-bio import probe <input> [--json]\n",
+        "  linxira-bio benchmark run <capability> [role=path]... [--backends rust,python,r] [--repeat N] [--output DIR] [--dataset-class CLASS] [--parameters JSON] [--json]"
     )
 }
 
