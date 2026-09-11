@@ -1,0 +1,63 @@
+{
+  "schema_version": "2",
+  "lock_kind": "compatibility-and-resolution-policy",
+  "runtime": {
+    "name": "R",
+    "preferred_version": "4.6.1",
+    "version_requirement": ">=4.4.0,<5.0.0",
+    "release_policy": "benchmark-host-installed-runtime-recorded-in-provenance",
+    "bioconductor_release": "3.23"
+  },
+  "isolation": {
+    "scope": "benchmark-host",
+    "interpreter_environment_variable": "LINXIRA_BIO_WORKFLOW_R",
+    "library_environment_variable": "LINXIRA_BIO_WORKFLOW_R_LIBRARY",
+    "declared_packages_must_resolve_from_project_library": false,
+    "all_loaded_non_base_packages_must_resolve_from_project_library": false,
+    "base_and_recommended_packages_may_resolve_from_runtime": true,
+    "global_library_mutation": false,
+    "global_path_mutation": false,
+    "side_by_side_runtime_versions": true,
+    "policy_note": "This pack measures the R stack as installed on the benchmark host. A project library is honoured when LINXIRA_BIO_WORKFLOW_R_LIBRARY is set; otherwise the interpreter's library paths are used and every loaded version is written to provenance.software."
+  },
+  "repositories": [
+    {
+      "id": "bioconductor-bioc",
+      "url": "https://bioconductor.org/packages/3.23/bioc"
+    },
+    {
+      "id": "cran",
+      "url": "https://cloud.r-project.org"
+    }
+  ],
+  "direct_requirements": [
+    {
+      "name": "Biostrings",
+      "version_requirement": ">=2.70.0,<3.0.0",
+      "repository": "bioconductor-bioc",
+      "license": "Artistic-2.0",
+      "used_by": ["sequence.stats.v1"]
+    },
+    {
+      "name": "jsonlite",
+      "version_requirement": ">=1.8.9,<3.0.0",
+      "repository": "cran",
+      "license": "MIT"
+    },
+    {
+      "name": "digest",
+      "version_requirement": ">=0.6.37,<0.7.0",
+      "repository": "cran",
+      "license": "GPL-2.0-or-later"
+    }
+  ],
+  "resolved_environment_lock": {
+    "required_before_activation": false,
+    "scope": "benchmark-host-installed-packages",
+    "completeness": "direct-requirements-only",
+    "entries": []
+  },
+  "pack_lock_completeness": "runtime-and-direct-requirements",
+  "execution_policy": "require-compatible-runtime-and-record-installed-dependency-versions",
+  "installable": false
+}

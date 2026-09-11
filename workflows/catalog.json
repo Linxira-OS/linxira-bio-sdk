@@ -62,6 +62,22 @@
       "trust": "official",
       "runtime": "python",
       "manifest": "workflows/org.linxira.chemistry-descriptors-rdkit/manifest.json"
+    },
+    {
+      "id": "org.linxira.benchmark-python",
+      "capability": "sequence.stats.v1",
+      "status": "cataloged",
+      "trust": "official",
+      "runtime": "python",
+      "manifest": "workflows/org.linxira.benchmark-python/manifest.json"
+    },
+    {
+      "id": "org.linxira.benchmark-r",
+      "capability": "sequence.stats.v1",
+      "status": "cataloged",
+      "trust": "official",
+      "runtime": "r",
+      "manifest": "workflows/org.linxira.benchmark-r/manifest.json"
     }
   ]
 }

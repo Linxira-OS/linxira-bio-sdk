@@ -105,7 +105,7 @@ use linxira_bio_core::variant_transform::{
 use linxira_bio_export::{ExportFormat, ensure_distinct_input_output, export_json_file};
 use linxira_bio_protocol::{
     AnalysisResult, AnalysisResultV2, ArtifactFile, BioDataFormat, CompressionFormat, Diagnostic,
-    DiagnosticSeverity, ExecutionMode, JobRequest, JobRequestV2, OutputArtifact,
+    DiagnosticSeverity, ExecutionBackend, ExecutionMode, JobRequest, JobRequestV2, OutputArtifact,
     OutputArtifactKind, SCHEMA_VERSION, SCHEMA_VERSION_V2,
 };
 use sha2::{Digest, Sha256};
@@ -147,6 +147,17 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         ExecutionMode::LocalCpu | ExecutionMode::Container
     ) {
         return Err("the current worker supports local-cpu and container execution only".into());
+    }
+
+    // M2-T3: an explicit non-Rust backend routes the whole request to the
+    // matching benchmark pack, which must honour the same input roles and
+    // result shape as the native implementation below.
+    if let Some(backend) = request
+        .execution
+        .backend
+        .filter(|backend| *backend != ExecutionBackend::Rust)
+    {
+        return workflow::execute_benchmark_backend_v1(base_directory, request, backend);
     }
 
     match request.capability.as_str() {
@@ -324,6 +335,19 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
         }
     }
     let verified_inputs = validate_v2_inputs(&request, base_directory)?;
+
+    if let Some(backend) = request
+        .execution
+        .backend
+        .filter(|backend| *backend != ExecutionBackend::Rust)
+    {
+        return workflow::execute_benchmark_backend_v2(
+            base_directory,
+            request,
+            &verified_inputs,
+            backend,
+        );
+    }
 
     match request.capability.as_str() {
         "alignment.qc.v1" => {
@@ -2643,7 +2667,17 @@ fn validate_v2_contract(request: &JobRequestV2) -> WorkerResult<()> {
         serde_json::Value::Object(parameters) => parameters,
         _ => return Err("v2 parameters must be an object".into()),
     };
+    // Benchmark packs write into a directory the request names, so the
+    // pack-side `output_directory` is accepted for non-Rust backends even
+    // when the native contract has no parameters at all.
+    let pack_backend = request
+        .execution
+        .backend
+        .is_some_and(|backend| backend != ExecutionBackend::Rust);
     for parameter in parameters.keys() {
+        if pack_backend && parameter == "output_directory" {
+            continue;
+        }
         if !allowed_parameters.contains(&parameter.as_str()) {
             return Err(format!(
                 "{} does not accept parameter {parameter}",
@@ -6840,8 +6874,8 @@ mod tests {
     use super::{execute_request, execute_request_v2, validate_v2_inputs};
     use linxira_bio_protocol::{
         AnalysisResultV2, ArtifactFile, BioDataFormat, CompressionFormat, DiagnosticSeverity,
-        ExecutionMode, ExecutionRequest, InputArtifact, InputCardinality, JobRequest, JobRequestV2,
-        JobStatus, SCHEMA_VERSION, SCHEMA_VERSION_V2,
+        ExecutionRequest, InputArtifact, InputCardinality, JobRequest, JobRequestV2, JobStatus,
+        SCHEMA_VERSION, SCHEMA_VERSION_V2,
     };
     use std::collections::BTreeMap;
     use std::fs;
@@ -7653,9 +7687,7 @@ mod tests {
             job_id: "environment-plan-test".to_owned(),
             capability: "environment.plan.v1".to_owned(),
             inputs: BTreeMap::new(),
-            execution: ExecutionRequest {
-                mode: ExecutionMode::LocalCpu,
-            },
+            execution: ExecutionRequest::local_cpu(),
             parameters,
         }
     }
@@ -7670,9 +7702,7 @@ mod tests {
             job_id: "sequence-transform-v1-test".to_owned(),
             capability: capability.to_owned(),
             inputs: BTreeMap::from([("fasta".to_owned(), path.to_string_lossy().into_owned())]),
-            execution: ExecutionRequest {
-                mode: ExecutionMode::LocalCpu,
-            },
+            execution: ExecutionRequest::local_cpu(),
             parameters,
         }
     }
@@ -7704,9 +7734,7 @@ mod tests {
                 }],
                 dataset_id: None,
             }],
-            execution: ExecutionRequest {
-                mode: ExecutionMode::LocalCpu,
-            },
+            execution: ExecutionRequest::local_cpu(),
             parameters: serde_json::json!({}),
         }
     }

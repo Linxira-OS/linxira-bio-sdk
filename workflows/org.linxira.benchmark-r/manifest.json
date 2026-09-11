@@ -1,0 +1,109 @@
+{
+  "schema_version": "2",
+  "id": "org.linxira.benchmark-r",
+  "version": "0.1.0",
+  "publisher": {
+    "name": "Linxira OS",
+    "url": "https://github.com/Linxira-OS"
+  },
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
+  "entrypoint": {
+    "path": "src/benchmark_harness.R",
+    "arguments": [
+      "--request",
+      "{request}",
+      "--result",
+      "{result}"
+    ]
+  },
+  "runtime": {
+    "kind": "r",
+    "version": ">=4.4.0,<5.0.0",
+    "core_compatibility": ">=0.1.0,<2.0.0",
+    "dependency_lock": {
+      "path": "dependencies.lock.json",
+      "sha256": "d62137fe1613f91c40d378133f8a4a052ca9b165bf5775e0a259252c8e7d8a8c"
+    }
+  },
+  "input_schema": {
+    "type": "object",
+    "$ref": "schemas/input.schema.json"
+  },
+  "output_schema": {
+    "type": "object",
+    "$ref": "schemas/output.schema.json"
+  },
+  "platforms": [
+    "windows-gnu",
+    "debian",
+    "arch"
+  ],
+  "network": {
+    "access": "none",
+    "allowed_hosts": []
+  },
+  "resources": {
+    "minimum_memory_mb": 512,
+    "minimum_disk_mb": 200,
+    "recommended_threads": 1,
+    "gpu": "none"
+  },
+  "files": [
+    {
+      "path": "dependencies.lock.json",
+      "sha256": "d62137fe1613f91c40d378133f8a4a052ca9b165bf5775e0a259252c8e7d8a8c"
+    },
+    {
+      "path": "NOTICE.md",
+      "sha256": "3fe201b7aa8235815eaf1b728cb3a2a18e195ec9b877ac98e8d083a2b3ef3490"
+    },
+    {
+      "path": "README.md",
+      "sha256": "d61692e1e3b2b1672ebf6053d72a42c672df84e8968017db39d32866cf74b135"
+    },
+    {
+      "path": "schemas/input.schema.json",
+      "sha256": "1ecabcb054dd23686b6a20182526d955bbc1f01bdc32c3a6d6cfa1bc440da49c"
+    },
+    {
+      "path": "schemas/output.schema.json",
+      "sha256": "1cd4d146c5c1659953bb293985ff0475787c3047076d973353c0f7b4407cf85a"
+    },
+    {
+      "path": "src/benchmark_harness.R",
+      "sha256": "478f25a8145310307fae95d505e59b86b8f2522b9eed4c08ce96fea56ae04727"
+    },
+    {
+      "path": "src/implementations/sequence_stats_v1.R",
+      "sha256": "d258083c782591ac2bc82f2d6a708586b6d599fa8b762c2bd9f73a4e743b43b7"
+    },
+    {
+      "path": "tests/test_benchmark_harness.R",
+      "sha256": "6155700d3d294c662e56b439b70b06dc2c798195260c27625377d408c093917e"
+    }
+  ],
+  "contract": {
+    "inputs": [
+      {
+        "role": "fasta",
+        "formats": [
+          "fasta"
+        ]
+      }
+    ],
+    "outputs": {
+      "roles": [
+        "benchmark-result"
+      ],
+      "kind": "report",
+      "formats": [
+        "json"
+      ],
+      "media_type": "application/json"
+    },
+    "parameters": [
+      "output_directory"
+    ]
+  }
+}

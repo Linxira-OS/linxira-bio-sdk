@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use linxira_bio_protocol::{ExecutionMode, ExecutionRequest, JobRequest};
+use linxira_bio_protocol::{ExecutionRequest, JobRequest};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::env;
@@ -474,9 +474,7 @@ fn handle_tools_call(
         job_id: job_id.clone(),
         capability: capability_id.clone(),
         inputs,
-        execution: ExecutionRequest {
-            mode: ExecutionMode::LocalCpu,
-        },
+        execution: ExecutionRequest::local_cpu(),
         parameters,
     };
 
