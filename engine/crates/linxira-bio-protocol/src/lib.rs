@@ -41,6 +41,52 @@ pub struct JobRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionRequest {
     pub mode: ExecutionMode,
+    /// Implementation backend for capabilities that ship more than one
+    /// independent implementation (M2/M3). `None` and `Rust` both select the
+    /// native engine; `Python`/`R` route to the benchmark packs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backend: Option<ExecutionBackend>,
+}
+
+impl ExecutionRequest {
+    pub fn local_cpu() -> Self {
+        Self {
+            mode: ExecutionMode::LocalCpu,
+            backend: None,
+        }
+    }
+}
+
+/// Independent implementation backends of one capability. The wire form is
+/// lowercase (`"rust"`, `"python"`, `"r"`) to match `--backend` on the CLI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ExecutionBackend {
+    #[default]
+    Rust,
+    Python,
+    R,
+}
+
+impl ExecutionBackend {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Rust => "rust",
+            Self::Python => "python",
+            Self::R => "r",
+        }
+    }
+
+    /// Parses the CLI/GUI spelling; `auto` is not a backend and must be
+    /// resolved by the caller (runtime preferences, M2-T7) before this point.
+    pub fn parse(text: &str) -> Option<Self> {
+        match text.trim().to_ascii_lowercase().as_str() {
+            "rust" => Some(Self::Rust),
+            "python" => Some(Self::Python),
+            "r" => Some(Self::R),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -433,6 +479,15 @@ pub struct BenchmarkRun {
     pub ok: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_summary: Option<String>,
+    /// Wall time the backend measured around the analysis itself, so the
+    /// interpreter start-up share of `wall_ms` is visible; `None` for the
+    /// native engine.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub self_reported_wall_ms: Option<f64>,
+    /// Peak RSS the backend observed for its own process (Python `resource`,
+    /// R `/proc/self/status` VmHWM); `None` when not reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub self_reported_peak_rss_mb: Option<f64>,
 }
 
 /// Aggregated statistics for one backend: median wall-time and peak RSS with
@@ -911,6 +966,8 @@ mod tests {
                     output_bytes: 2048,
                     ok: true,
                     error_summary: None,
+                    self_reported_wall_ms: None,
+                    self_reported_peak_rss_mb: None,
                 }],
             }],
             speedup: None,

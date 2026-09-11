@@ -140,6 +140,22 @@
                     "string",
                     "null"
                   ]
+                },
+                "self_reported_wall_ms": {
+                  "description": "Wall time measured inside the backend around the analysis only (excludes interpreter start-up); absent for the native Rust engine.",
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "self_reported_peak_rss_mb": {
+                  "description": "Peak resident set size the backend observed for itself (Python `resource`, R `/proc/self/status` VmHWM); null when the platform cannot report it.",
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0
                 }
               }
             }

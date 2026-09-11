@@ -2,8 +2,8 @@ use super::{WorkerResult, sha256_file, validate_v1_multi_input_contract};
 use linxira_bio_output::{classify_output_dir, rfc3339_now, timestamp_directory_suffix};
 use linxira_bio_protocol::{
     AnalysisResultV2, ArtifactFile, BioDataFormat, CompressionFormat, DiagnosticSeverity,
-    ExecutionMode, InputArtifact, InputCardinality, JobRequest, JobRequestV2, JobStatus,
-    NetworkAccess, OutputArtifactKind, WorkflowPackManifest, WorkflowResumeConfig,
+    ExecutionBackend, ExecutionMode, InputArtifact, InputCardinality, JobRequest, JobRequestV2,
+    JobStatus, NetworkAccess, OutputArtifactKind, WorkflowPackManifest, WorkflowResumeConfig,
     WorkflowRuntimeKind, semver_range::core_compatibility_matches,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -23,6 +23,10 @@ const BULK_EXPRESSION_PACK: &str = "org.linxira.bulk-expression-deseq2";
 const SEQUENCE_CONVERT_PACK: &str = "org.linxira.sequence-conversion-biopython";
 const MEDICAL_SURVIVAL_PACK: &str = "org.linxira.medical-survival";
 const CHEMISTRY_DESCRIPTORS_PACK: &str = "org.linxira.chemistry-descriptors-rdkit";
+/// M2-T3 benchmark packs: one harness per language that hosts the independent
+/// Python/R implementations of native capabilities and self-reports timing.
+const BENCHMARK_PYTHON_PACK: &str = "org.linxira.benchmark-python";
+const BENCHMARK_R_PACK: &str = "org.linxira.benchmark-r";
 
 #[derive(Debug, Clone, PartialEq)]
 struct WorkflowContract {
@@ -443,6 +447,70 @@ pub(super) fn execute_chemistry_descriptors_v2(
         CHEMISTRY_DESCRIPTORS_PACK,
         WorkflowRuntimeKind::Python,
     )?;
+    execute_workflow_v2(&contract, base_directory, request, verified_inputs)
+}
+
+/// Route a request to the Python or R benchmark pack (M2-T3). The pack is a
+/// multi-capability harness, so its manifest contract declares the union of
+/// input roles it can serve; the contract is narrowed here to exactly the
+/// roles the native implementation requires (`v2_contract`), which keeps the
+/// three backends interchangeable at the request level.
+fn benchmark_contract_for(
+    backend: ExecutionBackend,
+    capability: &str,
+) -> WorkerResult<WorkflowContract> {
+    let (pack_id, runtime) = match backend {
+        ExecutionBackend::Python => (BENCHMARK_PYTHON_PACK, WorkflowRuntimeKind::Python),
+        ExecutionBackend::R => (BENCHMARK_R_PACK, WorkflowRuntimeKind::R),
+        ExecutionBackend::Rust => {
+            return Err("the rust backend is served natively, not by a benchmark pack".into());
+        }
+    };
+    let mut contract = contract_for(pack_id, pack_id, runtime)?;
+    if !contract
+        .capabilities
+        .iter()
+        .any(|served| served == capability)
+    {
+        return Err(format!(
+            "benchmark pack {pack_id} has no {} implementation of {capability}",
+            backend.as_str()
+        )
+        .into());
+    }
+    let (required_roles, _) = super::v2_contract(capability)?;
+    for role in required_roles {
+        if !contract.roles.iter().any(|declared| declared == role) {
+            return Err(format!(
+                "benchmark pack {pack_id} does not declare input role {role} required by \
+                 {capability}"
+            )
+            .into());
+        }
+    }
+    contract.roles = required_roles
+        .iter()
+        .map(|role| (*role).to_owned())
+        .collect();
+    Ok(contract)
+}
+
+pub(super) fn execute_benchmark_backend_v1(
+    base_directory: &Path,
+    request: JobRequest,
+    backend: ExecutionBackend,
+) -> WorkerResult<String> {
+    let contract = benchmark_contract_for(backend, &request.capability)?;
+    execute_workflow_v1(&contract, base_directory, request)
+}
+
+pub(super) fn execute_benchmark_backend_v2(
+    base_directory: &Path,
+    request: JobRequestV2,
+    verified_inputs: &BTreeMap<String, String>,
+    backend: ExecutionBackend,
+) -> WorkerResult<String> {
+    let contract = benchmark_contract_for(backend, &request.capability)?;
     execute_workflow_v2(&contract, base_directory, request, verified_inputs)
 }
 
@@ -1388,12 +1456,11 @@ fn resolve_output_directory(
             if let Some(parent) = desired.parent() {
                 fs::create_dir_all(parent)?;
             }
-            let candidate = timestamp_directory_suffix(&desired)
-                .map_err(|error| format!("cannot timestamp workflow output: {error}"))?;
-            // The classified parent is created eagerly so the pack entrypoint
-            // can rely on it existing before it writes anything.
-            fs::create_dir_all(&candidate)?;
-            Ok(candidate)
+            // Only the classified parent exists at this point: the pack
+            // creates the run directory itself, and `execute_prepared_request`
+            // refuses a directory that already exists.
+            timestamp_directory_suffix(&desired)
+                .map_err(|error| format!("cannot timestamp workflow output: {error}").into())
         }
     }
 }
@@ -1515,8 +1582,12 @@ mod tests {
             "the capability id stays intact with a timestamp suffix: {rendered}"
         );
         assert!(
-            directory.is_dir(),
-            "the default directory is created eagerly"
+            !directory.exists(),
+            "the run directory is left for the pack to create so the overwrite guard holds"
+        );
+        assert!(
+            directory.parent().is_some_and(std::path::Path::is_dir),
+            "the classified parent directory is created eagerly"
         );
         fs::remove_dir_all(root).expect("clean up");
     }

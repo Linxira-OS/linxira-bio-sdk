@@ -21,6 +21,10 @@
       "properties": {
         "mode": {
           "enum": ["local-cpu", "local-gpu", "hpc", "cloud", "authenticated-browser"]
+        },
+        "backend": {
+          "description": "Independent implementation of the capability; omitted means the native Rust engine.",
+          "enum": ["rust", "python", "r"]
         }
       },
       "additionalProperties": false

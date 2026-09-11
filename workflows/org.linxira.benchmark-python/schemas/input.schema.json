@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/workflows/benchmark-python/input.v1.json",
+  "title": "Request accepted by the Python benchmark harness",
+  "description": "A worker V2 request whose execution.backend selects the Python implementation. Input roles and parameters are those of the native capability; the worker injects parameters.output_directory.",
+  "type": "object",
+  "required": ["schema_version", "job_id", "capability", "inputs", "execution", "parameters"],
+  "properties": {
+    "schema_version": { "const": "2" },
+    "job_id": { "type": "string", "minLength": 1 },
+    "capability": { "enum": ["sequence.stats.v1"] },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["artifact_id", "role", "cardinality", "files"],
+        "properties": {
+          "artifact_id": { "type": "string", "minLength": 1 },
+          "role": { "enum": ["fasta"] },
+          "cardinality": { "const": "single" },
+          "files": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["file_id", "path", "format", "compression", "size_bytes"],
+              "properties": {
+                "file_id": { "type": "string", "minLength": 1 },
+                "path": { "type": "string", "minLength": 1 },
+                "role": { "type": ["string", "null"] },
+                "format": { "enum": ["fasta"] },
+                "compression": { "const": "none" },
+                "size_bytes": { "type": "integer", "minimum": 0 },
+                "modified_at": { "type": ["string", "null"] },
+                "sha256": { "type": ["string", "null"], "pattern": "^[A-Fa-f0-9]{64}$" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "dataset_id": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": { "const": "local-cpu" },
+        "backend": { "const": "python" }
+      },
+      "additionalProperties": false
+    },
+    "parameters": {
+      "type": "object",
+      "required": ["output_directory"],
+      "properties": {
+        "output_directory": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

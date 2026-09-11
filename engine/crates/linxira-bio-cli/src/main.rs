@@ -8,7 +8,7 @@ use linxira_bio_core::annotation::{
     normalize_annotation_path,
 };
 use linxira_bio_core::benchmark::{
-    diff_envelopes, environment_snapshot, iqr, median, parse_time_verbose,
+    diff_result_envelopes, environment_snapshot, iqr, median, parse_time_verbose,
 };
 use linxira_bio_core::cohort::{CohortTableQc, cohort_table_qc_path};
 use linxira_bio_core::coordinate::{
@@ -113,8 +113,9 @@ use linxira_bio_output::{
     probe_sra_tools, resolve_input_path, rfc3339_now,
 };
 use linxira_bio_protocol::{
-    AnalysisResult, BENCHMARK_REPORT_SCHEMA_VERSION, BenchmarkBackendSummary, BenchmarkReport,
-    BenchmarkRun, BenchmarkVerdict, ExecutionMode, WorkflowPackManifest, WorkflowRuntimeKind,
+    AnalysisResult, BENCHMARK_REPORT_SCHEMA_VERSION, BenchmarkBackendSummary, BenchmarkFinding,
+    BenchmarkReport, BenchmarkRun, BenchmarkVerdict, CompressionFormat, ExecutionBackend,
+    ExecutionMode, WorkflowPackManifest, WorkflowRuntimeKind,
     semver_range::core_compatibility_matches,
 };
 use linxira_bio_worker::v2_contract;
@@ -1104,7 +1105,11 @@ fn validate_workflow_catalog(catalog: &WorkflowCatalog) -> Result<(), Box<dyn Er
         return Err("workflow catalog is invalid".into());
     }
     let mut pack_ids = BTreeSet::new();
-    let mut capabilities = BTreeSet::new();
+    // One capability may be served by one pack per runtime (the benchmark
+    // packs exist exactly to host the python/r implementations alongside the
+    // native engine); the same capability twice on the same runtime is a
+    // catalog mistake.
+    let mut capability_runtimes = BTreeSet::new();
     for pack in &catalog.packs {
         if !pack_ids.insert(pack.id.as_str()) {
             return Err(format!("workflow catalog repeats pack id: {}", pack.id).into());
@@ -1116,15 +1121,25 @@ fn validate_workflow_catalog(catalog: &WorkflowCatalog) -> Result<(), Box<dyn Er
                     format!("workflow pack {} repeats capability: {capability}", pack.id).into(),
                 );
             }
-            if !capabilities.insert(capability) {
+            if !capability_runtimes.insert((capability, runtime_name(pack.runtime))) {
                 return Err(format!(
-                    "workflow catalog assigns capability more than once: {capability}"
+                    "workflow catalog assigns capability {capability} to more than one {} pack",
+                    runtime_name(pack.runtime)
                 )
                 .into());
             }
         }
     }
     Ok(())
+}
+
+fn runtime_name(runtime: WorkflowRuntimeKind) -> &'static str {
+    match runtime {
+        WorkflowRuntimeKind::R => "R",
+        WorkflowRuntimeKind::Python => "Python",
+        WorkflowRuntimeKind::Java => "Java",
+        WorkflowRuntimeKind::Native => "native",
+    }
 }
 
 fn workflow_root() -> Result<PathBuf, Box<dyn Error>> {
@@ -5651,6 +5666,27 @@ fn run_benchmark_command(arguments: &[String]) -> Result<(), Box<dyn Error>> {
              fasta=input.fa",
         ));
     };
+    let mut selected_backends: Vec<ExecutionBackend> = Vec::with_capacity(backends.len());
+    for backend in &backends {
+        match ExecutionBackend::parse(backend) {
+            Some(parsed) => {
+                if !selected_backends.contains(&parsed) {
+                    selected_backends.push(parsed);
+                }
+            }
+            None if backend.eq_ignore_ascii_case("auto") => {
+                return Err(CliError::usage(
+                    "--backends auto is resolved from runtime preferences, which a benchmark \
+                     must not consult; name the backends explicitly (rust,python,r)",
+                ));
+            }
+            None => {
+                return Err(CliError::usage(format!(
+                    "unknown backend {backend:?}; expected rust, python, or r"
+                )));
+            }
+        }
+    }
     let (required_roles, _) =
         v2_contract(&capability).map_err(|error| CliError::usage(error.to_string()))?;
     let inputs = bind_benchmark_inputs(required_roles, &positional[1..])?;
@@ -5674,31 +5710,39 @@ fn run_benchmark_command(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     }
 
     let worker = benchmark_worker_binary()?;
-    let request_path = write_benchmark_request(
-        &capability,
-        &resolved_inputs,
-        parameters.unwrap_or_else(|| serde_json::json!({})),
-    )?;
+    let parameters = parameters.unwrap_or_else(|| serde_json::json!({}));
 
     let mut backend_summaries = Vec::new();
     let mut backend_envelopes: Vec<(String, Option<serde_json::Value>)> = Vec::new();
     let mut high_precision = true;
-    for backend in &backends {
-        if backend != "rust" {
-            // M2-T3 registers the native python/r benchmark packs; until then
-            // those backends are skipped rather than silently timed.
-            eprintln!("skipping backend {backend:?}: no benchmark pack is registered yet (M2-T3)");
-            continue;
-        }
-        let warmup = execute_benchmark_run(&worker, &request_path);
+    for backend in &selected_backends {
+        let backend_name = backend.as_str().to_owned();
+        let warmup = BenchmarkRequest::write(
+            &capability,
+            &resolved_inputs,
+            &parameters,
+            *backend,
+            "warmup",
+        )?
+        .execute(&worker);
         if !warmup.ok {
-            eprintln!("warning: warmup run failed: {}", warmup.error_summary());
+            eprintln!(
+                "warning: {backend_name} warmup run failed: {}",
+                warmup.error_summary()
+            );
         }
         let mut runs = Vec::new();
         let mut last_envelope = None;
         for run_index in 1..=repeat {
-            let mut run = execute_benchmark_run(&worker, &request_path);
-            run.backend = backend.clone();
+            let mut run = BenchmarkRequest::write(
+                &capability,
+                &resolved_inputs,
+                &parameters,
+                *backend,
+                &format!("run{run_index}"),
+            )?
+            .execute(&worker);
+            run.backend = backend_name.clone();
             run.run_index = run_index;
             if !run.timed_with_time_v {
                 high_precision = false;
@@ -5710,7 +5754,7 @@ fn run_benchmark_command(arguments: &[String]) -> Result<(), Box<dyn Error>> {
         }
         let successful: Vec<&BenchmarkRun> = runs.iter().filter(|run| run.ok).collect();
         if successful.is_empty() {
-            eprintln!("warning: backend {backend:?} produced no successful runs");
+            eprintln!("warning: backend {backend_name:?} produced no successful runs");
         }
         let mut wall_times: Vec<f64> = successful.iter().map(|run| run.wall_ms).collect();
         let median_wall_ms = median(&mut wall_times).unwrap_or_default();
@@ -5724,7 +5768,7 @@ fn run_benchmark_command(arguments: &[String]) -> Result<(), Box<dyn Error>> {
             .collect();
         let mut cpu_values: Vec<f64> = successful.iter().filter_map(|run| run.cpu_ms).collect();
         backend_summaries.push(BenchmarkBackendSummary {
-            backend: backend.clone(),
+            backend: backend_name.clone(),
             repeats: repeat,
             median_wall_ms,
             min_wall_ms,
@@ -5734,43 +5778,76 @@ fn run_benchmark_command(arguments: &[String]) -> Result<(), Box<dyn Error>> {
             median_cpu_ms: median(&mut cpu_values),
             runs,
         });
-        backend_envelopes.push((backend.clone(), last_envelope));
+        backend_envelopes.push((backend_name, last_envelope));
     }
 
+    // Verdict (methodology §7.1): a backend that never produced an envelope
+    // makes the whole report `failed`; otherwise the first successful backend
+    // is the reference and every other backend's *result* is diffed against
+    // it. Provenance and timing are excluded from the comparison.
     let mut findings = Vec::new();
     let mut consistency = if backend_summaries.is_empty() {
         BenchmarkVerdict::Failed
     } else {
         BenchmarkVerdict::Consistent
     };
-    if let Some((_, Some(reference))) = backend_envelopes.first() {
-        for (_, envelope) in backend_envelopes.iter().skip(1) {
-            let Some(envelope) = envelope else { continue };
-            let backend_findings = diff_envelopes(reference, envelope);
-            if !backend_findings.is_empty() {
-                consistency = BenchmarkVerdict::Inconsistent;
-                findings.extend(backend_findings);
-            }
+    for summary in &backend_summaries {
+        if summary.runs.iter().all(|run| !run.ok) {
+            consistency = BenchmarkVerdict::Failed;
+            findings.push(BenchmarkFinding {
+                field: ".status".to_owned(),
+                detail: format!("backend {} produced no successful run", summary.backend),
+            });
         }
-    } else if backend_summaries
+    }
+    let successful_envelopes: Vec<(&str, &serde_json::Value)> = backend_envelopes
         .iter()
-        .all(|summary| summary.runs.iter().all(|run| !run.ok))
-        && !backend_summaries.is_empty()
-    {
-        consistency = BenchmarkVerdict::Failed;
+        .filter_map(|(backend, envelope)| {
+            envelope
+                .as_ref()
+                .map(|envelope| (backend.as_str(), envelope))
+        })
+        .collect();
+    if let Some((reference_backend, reference)) = successful_envelopes.first() {
+        for (backend, envelope) in successful_envelopes.iter().skip(1) {
+            let backend_findings = diff_result_envelopes(reference, envelope);
+            if backend_findings.is_empty() {
+                continue;
+            }
+            if consistency == BenchmarkVerdict::Consistent {
+                consistency = BenchmarkVerdict::Inconsistent;
+            }
+            findings.extend(
+                backend_findings
+                    .into_iter()
+                    .map(|finding| BenchmarkFinding {
+                        field: finding.field,
+                        detail: format!("{reference_backend} vs {backend}: {}", finding.detail),
+                    }),
+            );
+        }
     }
 
-    let rust_median = backend_summaries
+    // speedup = median_wall(native) / median_wall(rust);
+    // memory_saving = 1 - peak_rss(rust) / peak_rss(native). Both need at
+    // least one successful run on each side, otherwise they stay null.
+    let rust_summary = backend_summaries
         .iter()
-        .find(|summary| summary.backend == "rust")
-        .map(|summary| summary.median_wall_ms);
-    let speedup = match (
-        rust_median,
-        backend_summaries
-            .iter()
-            .find(|summary| summary.backend != "rust"),
+        .find(|summary| summary.backend == "rust" && summary.runs.iter().any(|run| run.ok));
+    let native_summary = backend_summaries
+        .iter()
+        .find(|summary| summary.backend != "rust" && summary.runs.iter().any(|run| run.ok));
+    let speedup = match (rust_summary, native_summary) {
+        (Some(rust), Some(native)) if rust.median_wall_ms > 0.0 => {
+            Some(native.median_wall_ms / rust.median_wall_ms)
+        }
+        _ => None,
+    };
+    let memory_saving = match (
+        rust_summary.and_then(|summary| summary.median_peak_rss_mb),
+        native_summary.and_then(|summary| summary.median_peak_rss_mb),
     ) {
-        (Some(rust), native) if rust > 0.0 => native.map(|summary| summary.median_wall_ms / rust),
+        (Some(rust), Some(native)) if native > 0.0 => Some(1.0 - rust / native),
         _ => None,
     };
 
@@ -5786,7 +5863,7 @@ fn run_benchmark_command(arguments: &[String]) -> Result<(), Box<dyn Error>> {
         dataset_class,
         backends: backend_summaries,
         speedup,
-        memory_saving: None,
+        memory_saving,
         consistency,
         findings,
         environment,
@@ -5806,16 +5883,25 @@ fn run_benchmark_command(arguments: &[String]) -> Result<(), Box<dyn Error>> {
         println!("summary\t{}", summary_path.display());
         println!("capability\t{}", report.capability);
         println!("consistency\t{:?}", report.consistency);
+        println!("precision\t{}", report.environment.precision);
         for backend in &report.backends {
             println!(
-                "backend\t{}\tmedian_wall_ms\t{:.1}\tmedian_peak_rss_mb\t{}",
+                "backend\t{}\tmedian_wall_ms\t{:.1}\tmedian_peak_rss_mb\t{}\tok_runs\t{}/{}",
                 backend.backend,
                 backend.median_wall_ms,
                 backend
                     .median_peak_rss_mb
                     .map(|value| format!("{value:.1}"))
-                    .unwrap_or_else(|| "n/a".to_owned())
+                    .unwrap_or_else(|| "n/a".to_owned()),
+                backend.runs.iter().filter(|run| run.ok).count(),
+                backend.runs.len()
             );
+        }
+        if let Some(speedup) = report.speedup {
+            println!("speedup\t{speedup:.2}");
+        }
+        if let Some(memory_saving) = report.memory_saving {
+            println!("memory_saving\t{memory_saving:.3}");
         }
         if !report.findings.is_empty() {
             for finding in &report.findings {
@@ -5933,36 +6019,115 @@ fn benchmark_worker_binary() -> Result<std::path::PathBuf, Box<dyn Error>> {
     )))
 }
 
-fn write_benchmark_request(
-    capability: &str,
-    inputs: &BTreeMap<String, String>,
-    parameters: serde_json::Value,
-) -> Result<std::path::PathBuf, Box<dyn Error>> {
-    let job_id: String = capability
-        .replace('.', "-")
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() || character == '-' {
-                character
-            } else {
-                '-'
+/// One request file per timed execution. Non-Rust backends run through a
+/// workflow pack that writes into an output directory, so every execution
+/// gets a fresh temporary directory (the worker refuses to reuse one) which
+/// is removed together with the request file once the run has been read.
+struct BenchmarkRequest {
+    path: std::path::PathBuf,
+    output_directory: Option<std::path::PathBuf>,
+}
+
+impl BenchmarkRequest {
+    fn write(
+        capability: &str,
+        inputs: &BTreeMap<String, String>,
+        parameters: &serde_json::Value,
+        backend: ExecutionBackend,
+        tag: &str,
+    ) -> Result<Self, Box<dyn Error>> {
+        let job_id: String = capability
+            .replace('.', "-")
+            .chars()
+            .map(|character| {
+                if character.is_ascii_alphanumeric() || character == '-' {
+                    character
+                } else {
+                    '-'
+                }
+            })
+            .collect();
+        let unique = format!(
+            "linxira-bio-benchmark-{}-{job_id}-{}-{tag}-{}",
+            std::process::id(),
+            backend.as_str(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|elapsed| elapsed.as_nanos())
+                .unwrap_or_default()
+        );
+        let mut parameters = parameters.clone();
+        let output_directory = match backend {
+            ExecutionBackend::Rust => None,
+            ExecutionBackend::Python | ExecutionBackend::R => {
+                let directory = std::env::temp_dir().join(format!("{unique}-output"));
+                if let Some(object) = parameters.as_object_mut() {
+                    object.insert(
+                        "output_directory".to_owned(),
+                        serde_json::Value::String(directory.display().to_string()),
+                    );
+                }
+                Some(directory)
             }
+        };
+        // Benchmarks compare V2 envelopes (the authoritative result form), so
+        // the request is V2 as well: one single-file artifact per role whose
+        // format/compression come from the content probe. The worker hashes
+        // the file itself; no SHA-256 is declared here to keep request
+        // preparation cheap for very large inputs.
+        let mut artifacts = Vec::with_capacity(inputs.len());
+        for (role, path) in inputs {
+            let probe = probe_format(std::path::Path::new(path))
+                .map_err(|error| CliError::execution(error.to_string()))?;
+            let compression = match probe.compression {
+                ProbeCompression::None => CompressionFormat::None,
+                ProbeCompression::Gzip => CompressionFormat::Gzip,
+                ProbeCompression::Bgzip => CompressionFormat::Bgzip,
+                ProbeCompression::Bzip2 => CompressionFormat::Bzip2,
+                ProbeCompression::Xz => CompressionFormat::Xz,
+                ProbeCompression::Zstd => CompressionFormat::Zstd,
+                ProbeCompression::Zip => CompressionFormat::Zip,
+                ProbeCompression::SevenZip | ProbeCompression::Unknown => {
+                    CompressionFormat::Unknown
+                }
+            };
+            artifacts.push(serde_json::json!({
+                "artifact_id": format!("input-{role}"),
+                "role": role,
+                "cardinality": "single",
+                "files": [{
+                    "file_id": format!("input-{role}-1"),
+                    "path": path,
+                    "format": probe.format,
+                    "compression": compression,
+                    "size_bytes": std::fs::metadata(path)?.len(),
+                }],
+            }));
+        }
+        let request = serde_json::json!({
+            "schema_version": "2",
+            "job_id": format!("benchmark-{job_id}"),
+            "capability": capability,
+            "inputs": artifacts,
+            "execution": {"mode": "local-cpu", "backend": backend.as_str()},
+            "parameters": parameters,
+        });
+        let path = std::env::temp_dir().join(format!("{unique}.json"));
+        std::fs::write(&path, serde_json::to_vec_pretty(&request)?)?;
+        Ok(Self {
+            path,
+            output_directory,
         })
-        .collect();
-    let request = serde_json::json!({
-        "schema_version": "1",
-        "job_id": format!("benchmark-{job_id}"),
-        "capability": capability,
-        "inputs": inputs,
-        "execution": {"mode": "local-cpu"},
-        "parameters": parameters,
-    });
-    let path = std::env::temp_dir().join(format!(
-        "linxira-bio-benchmark-request-{}-{job_id}.json",
-        std::process::id()
-    ));
-    std::fs::write(&path, serde_json::to_vec_pretty(&request)?)?;
-    Ok(path)
+    }
+
+    fn execute(self, worker: &std::path::Path) -> ExecutedRun {
+        let run = execute_benchmark_run(worker, &self.path);
+        let _ = std::fs::remove_file(&self.path);
+        if let Some(directory) = &self.output_directory {
+            let _ = std::fs::remove_dir_all(directory);
+        }
+        run
+    }
 }
 
 /// One timed benchmark execution through the worker subprocess.
@@ -5979,6 +6144,8 @@ struct ExecutedRun {
     error_summary: Option<String>,
     envelope: Option<serde_json::Value>,
     timed_with_time_v: bool,
+    self_reported_wall_ms: Option<f64>,
+    self_reported_peak_rss_mb: Option<f64>,
 }
 
 impl ExecutedRun {
@@ -5998,8 +6165,42 @@ impl ExecutedRun {
             output_bytes: self.output_bytes,
             ok: self.ok,
             error_summary: self.error_summary,
+            self_reported_wall_ms: self.self_reported_wall_ms,
+            self_reported_peak_rss_mb: self.self_reported_peak_rss_mb,
         }
     }
+}
+
+/// Benchmark packs report their in-process timing as an `info` diagnostic
+/// whose message is a JSON object (`{"wall_ms": ..., "peak_rss_mb": ...}`);
+/// the native engine emits none, so both values stay `None` for Rust.
+fn self_reported_metrics(envelope: &serde_json::Value) -> (Option<f64>, Option<f64>) {
+    let Some(diagnostics) = envelope
+        .get("diagnostics")
+        .and_then(|value| value.as_array())
+    else {
+        return (None, None);
+    };
+    for diagnostic in diagnostics {
+        if diagnostic.get("code").and_then(|code| code.as_str()) != Some("benchmark.self_reported")
+        {
+            continue;
+        }
+        let Some(message) = diagnostic
+            .get("message")
+            .and_then(|message| message.as_str())
+        else {
+            continue;
+        };
+        let Ok(metrics) = serde_json::from_str::<serde_json::Value>(message) else {
+            continue;
+        };
+        return (
+            metrics.get("wall_ms").and_then(|value| value.as_f64()),
+            metrics.get("peak_rss_mb").and_then(|value| value.as_f64()),
+        );
+    }
+    (None, None)
 }
 
 fn execute_benchmark_run(worker: &std::path::Path, request_path: &std::path::Path) -> ExecutedRun {
@@ -6024,12 +6225,29 @@ fn execute_benchmark_run(worker: &std::path::Path, request_path: &std::path::Pat
             let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
             let timed = parse_time_verbose(&stderr);
             let envelope: Option<serde_json::Value> = serde_json::from_str(stdout.trim()).ok();
-            let ok = output.status.success() && envelope.is_some();
+            // The worker reports pack failures as an `error` envelope with a
+            // zero exit code, so the envelope status decides success.
+            let envelope_ok = envelope
+                .as_ref()
+                .and_then(|envelope| envelope.get("status"))
+                .and_then(|status| status.as_str())
+                == Some("ok");
+            let ok = output.status.success() && envelope_ok;
             let error_summary = if ok {
                 None
             } else {
-                Some(truncate_error_summary(&stderr))
+                let from_envelope = envelope.as_ref().and_then(envelope_error_summary);
+                let worker_stderr = strip_time_verbose_report(&stderr);
+                Some(truncate_error_summary(&match from_envelope {
+                    Some(summary) if worker_stderr.trim().is_empty() => summary,
+                    Some(summary) => format!("{summary}\n{worker_stderr}"),
+                    None => worker_stderr,
+                }))
             };
+            let (self_reported_wall_ms, self_reported_peak_rss_mb) = envelope
+                .as_ref()
+                .map(self_reported_metrics)
+                .unwrap_or((None, None));
             ExecutedRun {
                 backend: String::new(),
                 run_index: 0,
@@ -6046,6 +6264,8 @@ fn execute_benchmark_run(worker: &std::path::Path, request_path: &std::path::Pat
                 error_summary,
                 envelope,
                 timed_with_time_v: timed.is_some(),
+                self_reported_wall_ms,
+                self_reported_peak_rss_mb,
             }
         }
         Err(error) => ExecutedRun {
@@ -6061,8 +6281,53 @@ fn execute_benchmark_run(worker: &std::path::Path, request_path: &std::path::Pat
             error_summary: Some(truncate_error_summary(&error.to_string())),
             envelope: None,
             timed_with_time_v: false,
+            self_reported_wall_ms: None,
+            self_reported_peak_rss_mb: None,
         },
     }
+}
+
+/// Joins the error-severity diagnostics of an `error` envelope into one
+/// summary line so pack failures surface in the report even when the worker
+/// process exited cleanly.
+fn envelope_error_summary(envelope: &serde_json::Value) -> Option<String> {
+    let diagnostics = envelope.get("diagnostics")?.as_array()?;
+    let messages: Vec<&str> = diagnostics
+        .iter()
+        .filter(|diagnostic| {
+            diagnostic
+                .get("severity")
+                .and_then(|severity| severity.as_str())
+                == Some("error")
+        })
+        .filter_map(|diagnostic| {
+            diagnostic
+                .get("message")
+                .and_then(|message| message.as_str())
+        })
+        .collect();
+    if messages.is_empty() {
+        Some(format!(
+            "worker returned status {}",
+            envelope
+                .get("status")
+                .and_then(|status| status.as_str())
+                .unwrap_or("unknown")
+        ))
+    } else {
+        Some(messages.join("; "))
+    }
+}
+
+/// GNU `time -v` appends its report to the worker's stderr as tab-indented
+/// lines; those belong to the measurement, not to the failure, so they are
+/// dropped from error summaries. Worker diagnostics never start with a tab.
+fn strip_time_verbose_report(stderr: &str) -> String {
+    stderr
+        .lines()
+        .filter(|line| !line.starts_with('\t'))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Failure isolation (methodology §7.1): stderr summaries are truncated to
@@ -6110,8 +6375,64 @@ fn benchmark_summary_markdown(report: &BenchmarkReport) -> String {
                 .unwrap_or_else(|| "n/a".to_owned())
         ));
     }
+    // `speedup`/`memory_saving` are computed against the first non-Rust
+    // backend that produced results; name it so the number is unambiguous
+    // when several native backends were measured.
+    let compared_backend = report
+        .backends
+        .iter()
+        .find(|backend| backend.backend != "rust" && backend.runs.iter().any(|run| run.ok))
+        .map(|backend| backend.backend.as_str())
+        .unwrap_or("native");
     if let Some(speedup) = report.speedup {
-        markdown.push_str(&format!("\nspeedup (native/rust): {speedup:.2}x\n"));
+        markdown.push_str(&format!(
+            "\nspeedup ({compared_backend}/rust median wall): {speedup:.2}x\n"
+        ));
+    }
+    if let Some(memory_saving) = report.memory_saving {
+        markdown.push_str(&format!(
+            "memory saving (1 - rust/{compared_backend} median peak RSS): {:.1}%\n",
+            memory_saving * 100.0
+        ));
+    }
+    // Self-reported numbers come from inside the interpreter and exclude its
+    // start-up; the gap to the outer wall time is disclosed rather than hidden.
+    let self_reported: Vec<String> = report
+        .backends
+        .iter()
+        .filter_map(|backend| {
+            let mut walls: Vec<f64> = backend
+                .runs
+                .iter()
+                .filter(|run| run.ok)
+                .filter_map(|run| run.self_reported_wall_ms)
+                .collect();
+            let mut peaks: Vec<f64> = backend
+                .runs
+                .iter()
+                .filter(|run| run.ok)
+                .filter_map(|run| run.self_reported_peak_rss_mb)
+                .collect();
+            let wall = median(&mut walls)?;
+            Some(format!(
+                "| {} | {:.1} | {:.1} | {} |\n",
+                backend.backend,
+                wall,
+                (backend.median_wall_ms - wall).max(0.0),
+                median(&mut peaks)
+                    .map(|value| format!("{value:.1}"))
+                    .unwrap_or_else(|| "n/a".to_owned())
+            ))
+        })
+        .collect();
+    if !self_reported.is_empty() {
+        markdown.push_str(
+            "\n## Self-reported (in-process) timing\n\n| backend | median analysis wall (ms) | \
+             start-up overhead (ms) | median self peak RSS (MB) |\n|---|---|---|---|\n",
+        );
+        for row in self_reported {
+            markdown.push_str(&row);
+        }
     }
     if !report.findings.is_empty() {
         markdown.push_str("\n## Consistency findings\n\n");
