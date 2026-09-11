@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import re
 from pathlib import Path
@@ -26,6 +27,19 @@ except ImportError as error:
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_pack_manifest_tool():
+    """`update-pack-manifest.py` has a hyphenated name, so import it by path."""
+    path = Path(__file__).resolve().with_name("update-pack-manifest.py")
+    spec = importlib.util.spec_from_file_location("update_pack_manifest", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+PACK_MANIFEST_TOOL = _load_pack_manifest_tool()
 
 try:
     SCHEMA_FORMAT_CHECKER = FormatChecker(
@@ -457,6 +471,10 @@ def _iter_repo_text_files(relative_root: str) -> list[tuple[Path, str]]:
     for path in sorted(root.rglob("*")):
         if not path.is_file():
             continue
+        # Dot-directories hold tool state (build caches, scanner session
+        # files), not repository source; gate checks read source only.
+        if any(part.startswith(".") for part in path.relative_to(root).parts[:-1]):
+            continue
         try:
             content = path.read_bytes()
         except OSError:
@@ -705,6 +723,20 @@ def validate_schema_contracts() -> tuple[int, int, int]:
             raise ValueError(f"workflow manifest is missing: {display_path(manifest_path)}")
         schema_path = "schemas/workflow-pack-manifest.schema.json"
         validate_json_instance(manifest_path, schema_path, schemas[schema_path])
+        validated_instances += 1
+
+    # The worker refuses a pack whose files do not match the manifest hashes,
+    # so a stale manifest is a broken pack: every cataloged pack must pass
+    # the same semantic check `scripts/update-pack-manifest.py --check` runs.
+    for manifest_path in sorted(referenced_manifests):
+        pack_root = manifest_path.parent
+        current = json.loads(manifest_path.read_text(encoding="utf-8"))
+        desired = PACK_MANIFEST_TOOL.refreshed_manifest(pack_root)
+        if PACK_MANIFEST_TOOL.is_stale(current, desired):
+            raise ValueError(
+                f"workflow pack manifest hashes are stale: {display_path(manifest_path)} "
+                f"(run python scripts/update-pack-manifest.py {display_path(pack_root)})"
+            )
         validated_instances += 1
 
     validated_instances += validate_versioned_fixtures(

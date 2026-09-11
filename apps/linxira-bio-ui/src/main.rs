@@ -5,7 +5,7 @@ mod visualization;
 
 use eframe::egui;
 use linxira_bio_export::export_value;
-use linxira_bio_protocol::{ExecutionMode, ExecutionRequest, JobRequest, SCHEMA_VERSION};
+use linxira_bio_protocol::{ExecutionRequest, JobRequest, SCHEMA_VERSION};
 use linxira_bio_worker::execute_request;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -1486,9 +1486,7 @@ impl BioApp {
                 job_id: new_job_id(),
                 capability: capability.to_owned(),
                 inputs: BTreeMap::new(),
-                execution: ExecutionRequest {
-                    mode: ExecutionMode::LocalCpu,
-                },
+                execution: ExecutionRequest::local_cpu(),
                 parameters,
             };
             let result =
@@ -4406,9 +4404,7 @@ fn build_analysis_request(job_id: &str, route: AnalysisRoute, input_path: &str) 
         job_id: job_id.to_owned(),
         capability: route.capability.to_owned(),
         inputs,
-        execution: ExecutionRequest {
-            mode: ExecutionMode::LocalCpu,
-        },
+        execution: ExecutionRequest::local_cpu(),
         parameters: serde_json::json!({}),
     }
 }
@@ -4421,9 +4417,7 @@ fn run_inspection_task(task: InspectionTask) -> InspectionMessage {
         job_id: new_job_id(),
         capability: "dataset.inspect.v1".to_owned(),
         inputs,
-        execution: ExecutionRequest {
-            mode: ExecutionMode::LocalCpu,
-        },
+        execution: ExecutionRequest::local_cpu(),
         parameters: serde_json::json!({
             "dataset_id": task.dataset_id,
             "max_preview_records": 200,

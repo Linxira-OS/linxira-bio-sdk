@@ -18,6 +18,32 @@ pub fn diff_envelopes(reference: &Value, candidate: &Value) -> Vec<BenchmarkFind
     findings
 }
 
+/// Cross-backend consistency (methodology §7.1) compares what the analysis
+/// *produced*, not how it ran: the envelope identity (`schema_version`,
+/// `capability`, `status`) and the full `result` object are diffed; the
+/// per-run `provenance` (timestamps, engine/software versions, command line),
+/// `diagnostics`, `artifacts` (paths and hashes differ per output directory),
+/// and `job_id` are excluded so an independent Python or R implementation is
+/// judged on its numbers alone.
+pub fn diff_result_envelopes(reference: &Value, candidate: &Value) -> Vec<BenchmarkFinding> {
+    let mut findings = Vec::new();
+    for key in ["schema_version", "capability", "status"] {
+        diff_value(
+            &format!(".{key}"),
+            reference.get(key).unwrap_or(&Value::Null),
+            candidate.get(key).unwrap_or(&Value::Null),
+            &mut findings,
+        );
+    }
+    diff_value(
+        ".result",
+        reference.get("result").unwrap_or(&Value::Null),
+        candidate.get("result").unwrap_or(&Value::Null),
+        &mut findings,
+    );
+    findings
+}
+
 fn diff_value(
     path: &str,
     reference: &Value,
@@ -304,9 +330,47 @@ fn read_total_memory_mb() -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::{
-        TimeVerboseMetrics, diff_envelopes, environment_snapshot, iqr, median, parse_time_verbose,
+        TimeVerboseMetrics, diff_envelopes, diff_result_envelopes, environment_snapshot, iqr,
+        median, parse_time_verbose,
     };
     use serde_json::json;
+
+    #[test]
+    fn result_diff_ignores_provenance_and_run_identity_but_not_results() {
+        let rust = json!({
+            "schema_version": "2", "job_id": "benchmark-a", "capability": "sequence.stats.v1",
+            "status": "ok", "result": {"sequence_count": 3, "gc_percent": 60.0},
+            "artifacts": [],
+            "provenance": {"engine_version": "1.0.1", "started_at": "2026-09-11T00:00:00Z"},
+            "diagnostics": []
+        });
+        let python = json!({
+            "schema_version": "2", "job_id": "benchmark-a", "capability": "sequence.stats.v1",
+            "status": "ok", "result": {"sequence_count": 3, "gc_percent": 60.00000001},
+            "artifacts": [{"artifact_id": "envelope", "path": "/tmp/x/result.json"}],
+            "provenance": {"engine_version": "0.1.0", "started_at": "2026-09-11T00:00:07Z",
+                           "software": [{"name": "Biopython"}]},
+            "diagnostics": [{"code": "benchmark.self_reported", "severity": "info", "message": "{}"}]
+        });
+        assert!(diff_result_envelopes(&rust, &python).is_empty());
+        assert!(
+            !diff_envelopes(&rust, &python).is_empty(),
+            "the full diff still sees provenance"
+        );
+
+        let drift = json!({
+            "schema_version": "2", "capability": "sequence.stats.v1", "status": "ok",
+            "result": {"sequence_count": 3, "gc_percent": 61.0}
+        });
+        let findings = diff_result_envelopes(&rust, &drift);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].field, ".result.gc_percent");
+
+        let failed = json!({"schema_version": "2", "capability": "sequence.stats.v1",
+                            "status": "error", "result": {}});
+        let findings = diff_result_envelopes(&rust, &failed);
+        assert!(findings.iter().any(|finding| finding.field == ".status"));
+    }
 
     #[test]
     fn diffs_numbers_within_tolerance_and_flags_outliers() {
