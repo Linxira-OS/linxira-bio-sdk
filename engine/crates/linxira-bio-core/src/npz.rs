@@ -731,8 +731,12 @@ fn decode_label_array(array: &str, npy: &NpyArray) -> Result<Vec<String>, NpzImp
             String::from_utf8_lossy(trim_trailing_nuls(unit)).into_owned()
         } else {
             let text: String = unit
-                .chunks_exact(4)
-                .map(|code| char::from_u32(le_u32(code, 0)).unwrap_or(char::REPLACEMENT_CHARACTER))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|code| {
+                    char::from_u32(u32::from_le_bytes(*code)).unwrap_or(char::REPLACEMENT_CHARACTER)
+                })
                 .collect();
             text.trim_end_matches('\0').to_owned()
         };
