@@ -4,8 +4,11 @@ mod structure_viewer;
 mod visualization;
 
 use eframe::egui;
+use linxira_bio_core::benchmark::{diff_envelopes, median};
 use linxira_bio_export::export_value;
-use linxira_bio_protocol::{ExecutionRequest, JobRequest, SCHEMA_VERSION};
+use linxira_bio_protocol::{
+    ExecutionBackend, ExecutionMode, ExecutionRequest, JobRequest, SCHEMA_VERSION,
+};
 use linxira_bio_worker::execute_request;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -287,6 +290,28 @@ fn capability_has_backend_packs(capability: &str) -> bool {
     matches!(capability, "sequence.stats.v1")
 }
 
+/// One backend's aggregated result of a GUI benchmark comparison (M2-T5).
+#[derive(Debug, Clone)]
+struct BenchmarkBackendRow {
+    backend: String,
+    median_wall_ms: Option<f64>,
+    ok_runs: u32,
+    repeats: u32,
+    error: Option<String>,
+}
+
+/// The full comparison outcome rendered under the Benchmark button.
+#[derive(Debug, Clone)]
+struct BenchmarkOutcome {
+    rows: Vec<BenchmarkBackendRow>,
+    consistency: String,
+    findings: usize,
+    speedup: Option<f64>,
+    compared_backend: Option<String>,
+}
+
+type BenchmarkMessage = Result<BenchmarkOutcome, String>;
+
 struct JobRecord {
     id: String,
     capability: String,
@@ -495,6 +520,10 @@ struct BioApp {
     active_inspections: usize,
     selected_capability: String,
     analysis_backend: AnalysisBackend,
+    benchmark_receiver: Option<Receiver<BenchmarkMessage>>,
+    benchmark_running: bool,
+    benchmark_status: String,
+    benchmark_outcome: Option<BenchmarkOutcome>,
     annotation_feature_type: String,
     annotation_sort: bool,
     annotation_visual_feature_id: String,
@@ -621,6 +650,10 @@ impl BioApp {
             active_inspections: 0,
             selected_capability: "sequence.stats.v1".to_owned(),
             analysis_backend: AnalysisBackend::Auto,
+            benchmark_receiver: None,
+            benchmark_running: false,
+            benchmark_status: String::new(),
+            benchmark_outcome: None,
             annotation_feature_type: "gene".to_owned(),
             annotation_sort: false,
             annotation_visual_feature_id: String::new(),
@@ -1616,6 +1649,62 @@ impl BioApp {
         }
     }
 
+    fn start_benchmark_comparison(
+        &mut self,
+        capability: String,
+        input_role: String,
+        input_path: String,
+    ) {
+        if self.benchmark_running {
+            return;
+        }
+        let (sender, receiver) = mpsc::channel();
+        self.benchmark_receiver = Some(receiver);
+        self.benchmark_running = true;
+        self.benchmark_outcome = None;
+        self.benchmark_status = match self.language {
+            Language::ZhCn => format!("正在对比 {capability} 的 rust 与原生后端……"),
+            Language::EnUs => {
+                format!("Comparing rust against the native backends of {capability}...")
+            }
+        };
+        thread::spawn(move || {
+            let _ = sender.send(run_benchmark_task(capability, input_role, input_path));
+        });
+    }
+
+    fn poll_benchmark_job(&mut self) {
+        let message = match self.benchmark_receiver.as_ref().map(Receiver::try_recv) {
+            Some(Ok(message)) => message,
+            Some(Err(TryRecvError::Empty)) | None => return,
+            Some(Err(TryRecvError::Disconnected)) => {
+                self.benchmark_receiver = None;
+                self.benchmark_running = false;
+                self.benchmark_status = self
+                    .text(
+                        "Benchmark 后台通道意外关闭。",
+                        "The benchmark background channel closed unexpectedly.",
+                    )
+                    .to_owned();
+                return;
+            }
+        };
+
+        self.benchmark_receiver = None;
+        self.benchmark_running = false;
+        match message {
+            Ok(outcome) => {
+                self.benchmark_status = self
+                    .text("Benchmark 已完成。", "Benchmark completed.")
+                    .to_owned();
+                self.benchmark_outcome = Some(outcome);
+            }
+            Err(error) => {
+                self.benchmark_status = error;
+            }
+        }
+    }
+
     fn poll_environment_job(&mut self) {
         let message = match self.environment_receiver.as_ref().map(Receiver::try_recv) {
             Some(Ok(message)) => message,
@@ -2453,6 +2542,89 @@ impl BioApp {
                         );
                     });
             });
+            ui.add_space(6.0);
+            ui.horizontal_wrapped(|ui| {
+                let dataset_path = self
+                    .selected_dataset
+                    .and_then(|index| self.datasets.get(index))
+                    .map(|dataset| dataset.path.clone());
+                let button = egui::Button::new(self.text(
+                    "Benchmark 对比（rust vs 原生包）",
+                    "Benchmark comparison (rust vs native packs)",
+                ));
+                let clicked = ui
+                    .add_enabled(dataset_path.is_some() && !self.benchmark_running, button)
+                    .clicked();
+                if clicked
+                    && let Some(path) = dataset_path
+                    && let Some(route) =
+                        analysis_route_for_capability(&self.selected_capability, &format)
+                {
+                    self.start_benchmark_comparison(
+                        self.selected_capability.clone(),
+                        route.input_role.to_owned(),
+                        path,
+                    );
+                }
+                if self.benchmark_running {
+                    ui.spinner();
+                    ui.label(&self.benchmark_status);
+                }
+            });
+            if let Some(outcome) = &self.benchmark_outcome {
+                ui.add_space(8.0);
+                egui::Grid::new("benchmark-comparison-grid")
+                    .striped(true)
+                    .show(ui, |ui| {
+                        ui.strong(self.text("后端", "Backend"));
+                        ui.strong(self.text("中位耗时 (ms)", "Median wall (ms)"));
+                        ui.strong(self.text("成功 / 重复", "ok / repeats"));
+                        ui.end_row();
+                        for row in &outcome.rows {
+                            ui.label(&row.backend);
+                            match row.median_wall_ms {
+                                Some(value) => ui.label(format!("{value:.1}")),
+                                None => ui.label("n/a"),
+                            };
+                            ui.label(format!("{}/{}", row.ok_runs, row.repeats));
+                            ui.end_row();
+                        }
+                    });
+                for row in &outcome.rows {
+                    if let Some(error) = &row.error {
+                        ui.label(format!(
+                            "{} {}: {error}",
+                            self.text("失败", "Failed"),
+                            row.backend
+                        ));
+                    }
+                }
+                if let (Some(backend), Some(speedup)) = (&outcome.compared_backend, outcome.speedup)
+                {
+                    ui.label(match self.language {
+                        Language::ZhCn => {
+                            format!("加速比（{backend}/rust 中位耗时）：{speedup:.2}x")
+                        }
+                        Language::EnUs => {
+                            format!("Speedup ({backend}/rust median wall): {speedup:.2}x")
+                        }
+                    });
+                }
+                ui.label(match self.language {
+                    Language::ZhCn => format!(
+                        "一致性：{}（{} 项差异）",
+                        outcome.consistency, outcome.findings
+                    ),
+                    Language::EnUs => format!(
+                        "Consistency: {} ({} differing fields)",
+                        outcome.consistency, outcome.findings
+                    ),
+                });
+                ui.label(self.text(
+                    "注意：GUI 内使用 Instant 计时（精度 degraded，无 RSS）；正式数字请用 benchmark run。",
+                    "Note: the GUI times with Instant (precision degraded, no RSS); use benchmark run for official numbers.",
+                ));
+            }
         }
 
         let requires_secondary = capability_requires_secondary(&self.selected_capability);
@@ -3889,8 +4061,10 @@ impl eframe::App for BioApp {
         self.poll_inspection_jobs();
         self.poll_analysis_job();
         self.poll_environment_job();
+        self.poll_benchmark_job();
         if self.analysis_running
             || self.environment_running
+            || self.benchmark_running
             || self.active_inspections > 0
             || !self.inspection_queue.is_empty()
             || self
@@ -4502,6 +4676,155 @@ fn run_inspection_task(task: InspectionTask) -> InspectionMessage {
         dataset_id: task.dataset_id,
         result: run_worker_request(request),
     }
+}
+
+/// GUI benchmark comparison (M2-T5): warmup plus timed repeats of the
+/// native engine and every benchmark-pack backend, then a consistency diff
+/// of the result objects. Timing wraps the in-process worker call with
+/// `Instant` (precision degraded, no RSS) — `benchmark run` in the CLI is
+/// the high-precision tool and its numbers are the ones worth publishing.
+fn run_benchmark_task(
+    capability: String,
+    input_role: String,
+    input_path: String,
+) -> BenchmarkMessage {
+    const REPEATS: u32 = 3;
+    let run_backend =
+        |backend: ExecutionBackend| -> Result<(BenchmarkBackendRow, Option<Value>), String> {
+            let mut walls: Vec<f64> = Vec::new();
+            let mut last_result = None;
+            for attempt in 0..=REPEATS {
+                let unique = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|elapsed| elapsed.as_nanos())
+                    .unwrap_or_default();
+                let output_directory = std::env::temp_dir().join(format!(
+                    "linxira-bio-gui-benchmark-{}-{unique}",
+                    std::process::id()
+                ));
+                let mut parameters = serde_json::json!({});
+                if backend != ExecutionBackend::Rust {
+                    parameters["output_directory"] =
+                        Value::String(output_directory.display().to_string());
+                }
+                let mut inputs = BTreeMap::new();
+                inputs.insert(input_role.clone(), input_path.clone());
+                let request = JobRequest {
+                    schema_version: SCHEMA_VERSION.to_owned(),
+                    job_id: format!(
+                        "gui-benchmark-{}-{}-{attempt}",
+                        capability,
+                        backend.as_str()
+                    ),
+                    capability: capability.clone(),
+                    inputs,
+                    execution: ExecutionRequest {
+                        mode: ExecutionMode::LocalCpu,
+                        backend: Some(backend),
+                    },
+                    parameters,
+                };
+                let started = std::time::Instant::now();
+                let outcome = execute_request(request, Path::new("."));
+                let wall_ms = started.elapsed().as_secs_f64() * 1000.0;
+                let _ = fs::remove_dir_all(&output_directory);
+                let body = outcome.map_err(|error| error.to_string())?;
+                let envelope: Value = serde_json::from_str(body.trim())
+                    .map_err(|error| format!("worker returned invalid JSON: {error}"))?;
+                if envelope.get("status").and_then(Value::as_str) == Some("ok") {
+                    last_result = envelope.get("result").cloned();
+                    if attempt > 0 {
+                        walls.push(wall_ms);
+                    }
+                } else {
+                    let message = envelope
+                        .get("diagnostics")
+                        .and_then(Value::as_array)
+                        .map(|diagnostics| {
+                            diagnostics
+                                .iter()
+                                .filter_map(|diagnostic| {
+                                    diagnostic.get("message").and_then(Value::as_str)
+                                })
+                                .collect::<Vec<_>>()
+                                .join("; ")
+                        })
+                        .unwrap_or_else(|| "worker returned an error envelope".to_owned());
+                    return Ok((
+                        BenchmarkBackendRow {
+                            backend: backend.as_str().to_owned(),
+                            median_wall_ms: None,
+                            ok_runs: 0,
+                            repeats: REPEATS,
+                            error: Some(message),
+                        },
+                        None,
+                    ));
+                }
+            }
+            let median_wall_ms = median(&mut walls);
+            Ok((
+                BenchmarkBackendRow {
+                    backend: backend.as_str().to_owned(),
+                    median_wall_ms,
+                    ok_runs: REPEATS,
+                    repeats: REPEATS,
+                    error: None,
+                },
+                last_result,
+            ))
+        };
+
+    let pack_backends: Vec<ExecutionBackend> = match capability.as_str() {
+        "sequence.stats.v1" => vec![ExecutionBackend::Python, ExecutionBackend::R],
+        _ => Vec::new(),
+    };
+    let mut rows = Vec::new();
+    let mut results: Vec<(String, Value)> = Vec::new();
+    for backend in std::iter::once(ExecutionBackend::Rust).chain(pack_backends) {
+        let (row, result) = run_backend(backend)?;
+        if let Some(result) = result {
+            results.push((backend.as_str().to_owned(), result));
+        }
+        rows.push(row);
+    }
+
+    let mut consistency = if !rows.is_empty() && rows.iter().all(|row| row.error.is_some()) {
+        "failed"
+    } else {
+        "consistent"
+    };
+    let mut findings = 0usize;
+    if let Some((_, reference)) = results.first() {
+        for (_, result) in results.iter().skip(1) {
+            let backend_findings = diff_envelopes(reference, result);
+            findings += backend_findings.len();
+            if !backend_findings.is_empty() && consistency == "consistent" {
+                consistency = "inconsistent";
+            }
+        }
+    }
+    let rust_row = rows
+        .iter()
+        .find(|row| row.backend == "rust" && row.error.is_none());
+    let native_row = rows
+        .iter()
+        .find(|row| row.backend != "rust" && row.error.is_none());
+    let speedup = match (
+        rust_row.and_then(|row| row.median_wall_ms),
+        native_row.and_then(|row| row.median_wall_ms),
+    ) {
+        (Some(rust), Some(native)) if rust > 0.0 => Some(native / rust),
+        _ => None,
+    };
+    let compared_backend = native_row.map(|row| row.backend.clone());
+    Ok(BenchmarkOutcome {
+        rows,
+        consistency: consistency.to_owned(),
+        findings,
+        speedup,
+        compared_backend,
+    })
 }
 
 fn run_worker_request(request: JobRequest) -> UiJobResult {
