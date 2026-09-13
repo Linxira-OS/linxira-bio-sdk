@@ -64,7 +64,7 @@
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "62c66e698139ae9c7838cc1640dc5e85bcf06ad1ac1571b2009c9556aa1066bc"
+      "sha256": "4273c390c5f891068aa117844b01fa30a8c9c82c825bd9071a495eef8f04abf9"
     },
     {
       "path": "schemas/output.schema.json",
@@ -76,7 +76,7 @@
     },
     {
       "path": "src/implementations/__init__.py",
-      "sha256": "eae4aa1d27b97843f7fd3805bafa76f32b41f647d3e3d0e2103dfb08cb0fcc92"
+      "sha256": "a1d4f68a87144f4470bb512631797e4f9daed740d50022ff7bcc6945c7bc20ec"
     },
     {
       "path": "src/implementations/sequence_stats_v1.py",
@@ -84,7 +84,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.py",
-      "sha256": "88aa1703290dbf0927abe62b9f521a1206e25a7701a004dc4f764abecb6cc4be"
+      "sha256": "ccaf20241b0be9f8ef95596fc8166743feb7c9cd1b4d73d5519c68c62ee9b396"
     },
     {
       "path": "src/implementations/expression_pca_v1.py",
@@ -125,6 +125,18 @@
     {
       "path": "tests/reference/structure.pdb.summary.v1.reference-plddt.json",
       "sha256": "6134b76427b14032b800a44e5e2422fcddec865d0c82175b1e6d9ef55cfe2fbf"
+    },
+    {
+      "path": "src/implementations/enrichment_overrepresentation_v1.py",
+      "sha256": "fb03cedef349e7f44156da22e52fa44dc75b857f85a3506db42cb8eba087aa54"
+    },
+    {
+      "path": "tests/reference/enrichment.overrepresentation.v1.default.json",
+      "sha256": "eebec29cc6cb801c3f9011f399dfe157f8181eca2af143738ffe940bc4dbbaf1"
+    },
+    {
+      "path": "tests/reference/enrichment.overrepresentation.v1.genes.json",
+      "sha256": "610d9407d7c3891afa20c1e7637ae5c4aa61ba0c25af9c69155773b17910489c"
     }
   ],
   "contract": {
@@ -154,6 +166,22 @@
         "formats": [
           "pdb"
         ]
+      },
+      {
+        "role": "genes",
+        "formats": [
+          "txt",
+          "tsv",
+          "csv"
+        ]
+      },
+      {
+        "role": "associations",
+        "formats": [
+          "txt",
+          "tsv",
+          "csv"
+        ]
       }
     ],
     "outputs": {
@@ -172,7 +200,10 @@
       "scale_features",
       "include_items",
       "max_intersections",
-      "interpret_b_factors_as_plddt"
+      "interpret_b_factors_as_plddt",
+      "min_overlap",
+      "max_terms",
+      "include_genes"
     ]
   }
 }

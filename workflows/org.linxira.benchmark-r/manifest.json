@@ -64,7 +64,7 @@
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "dd33ef0a251851f65ee74f989da400ca7155f736a4b21a14b2f13aeb887b3cbc"
+      "sha256": "f22d6ae322d570d7c0583e52fb3ed16d8d8b4e4652dfda5160eaa5051bfbf243"
     },
     {
       "path": "schemas/output.schema.json",
@@ -80,7 +80,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.R",
-      "sha256": "3c7518d43156fcaa75b97dc6e6222bda19bf31a86a9761ecabfd1c871d037411"
+      "sha256": "5f49e392255d6e157d692d172d0d06296a1f111fb843fbc1622d921836be4e86"
     },
     {
       "path": "src/implementations/expression_pca_v1.R",
@@ -121,6 +121,18 @@
     {
       "path": "tests/reference/structure.pdb.summary.v1.reference-plddt.json",
       "sha256": "6134b76427b14032b800a44e5e2422fcddec865d0c82175b1e6d9ef55cfe2fbf"
+    },
+    {
+      "path": "src/implementations/enrichment_overrepresentation_v1.R",
+      "sha256": "0a9f9590af7d7ff3780cdc96cdb473f1805daae9b1d09d367189c0df11398624"
+    },
+    {
+      "path": "tests/reference/enrichment.overrepresentation.v1.default.json",
+      "sha256": "eebec29cc6cb801c3f9011f399dfe157f8181eca2af143738ffe940bc4dbbaf1"
+    },
+    {
+      "path": "tests/reference/enrichment.overrepresentation.v1.genes.json",
+      "sha256": "610d9407d7c3891afa20c1e7637ae5c4aa61ba0c25af9c69155773b17910489c"
     }
   ],
   "contract": {
@@ -150,6 +162,22 @@
         "formats": [
           "pdb"
         ]
+      },
+      {
+        "role": "genes",
+        "formats": [
+          "txt",
+          "tsv",
+          "csv"
+        ]
+      },
+      {
+        "role": "associations",
+        "formats": [
+          "txt",
+          "tsv",
+          "csv"
+        ]
       }
     ],
     "outputs": {
@@ -168,7 +196,10 @@
       "scale_features",
       "include_items",
       "max_intersections",
-      "interpret_b_factors_as_plddt"
+      "interpret_b_factors_as_plddt",
+      "min_overlap",
+      "max_terms",
+      "include_genes"
     ]
   }
 }

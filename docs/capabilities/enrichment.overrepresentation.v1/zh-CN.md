@@ -41,3 +41,10 @@ linxira-bio enrichment custom genes.txt associations.tsv --include-genes --json
 ## 故障排除
 
 确保两个文件使用相同标识体系，并在解读前检查 `query_unmapped_count`。
+
+## 后端选择
+
+- `--backend auto|rust|python|r` 分别路由到引擎、benchmark-python pack 或
+  benchmark-r pack。pack 实现是对引擎自身数学（log 阶乘超几何上尾 +
+  引擎同款平局规则的 Benjamini-Hochberg）的标准库/base R 移植；刻意不用
+  scipy/gseapy 与 clusterProfiler，以保证三端结果可逐位对比。
