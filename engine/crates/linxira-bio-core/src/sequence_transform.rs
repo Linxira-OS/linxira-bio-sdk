@@ -1537,7 +1537,7 @@ fn complement(base: u8, rna: bool) -> u8 {
 
 fn translate_dna(sequence: &[u8], trim_terminal_stop: bool, stop_at_first: bool) -> Vec<u8> {
     let mut protein = Vec::with_capacity(sequence.len() / 3);
-    for codon in sequence.chunks_exact(3) {
+    for codon in sequence.as_chunks::<3>().0 {
         let amino_acid = standard_amino_acid(codon);
         if stop_at_first && amino_acid == b'*' {
             break;

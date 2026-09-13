@@ -222,12 +222,12 @@ fn decode_binary_array(array: &str) -> Result<Vec<f64>, MetabolomicsError> {
     };
     let mut values = Vec::with_capacity(bytes.len() / if is_64_bit { 8 } else { 4 });
     if is_64_bit {
-        for chunk in bytes.chunks_exact(8) {
-            values.push(f64::from_le_bytes(chunk.try_into().expect("8 bytes")));
+        for chunk in bytes.as_chunks::<8>().0 {
+            values.push(f64::from_le_bytes(*chunk));
         }
     } else {
-        for chunk in bytes.chunks_exact(4) {
-            values.push(f32::from_le_bytes(chunk.try_into().expect("4 bytes")) as f64);
+        for chunk in bytes.as_chunks::<4>().0 {
+            values.push(f32::from_le_bytes(*chunk) as f64);
         }
     }
     Ok(values)
