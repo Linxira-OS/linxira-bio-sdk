@@ -1549,6 +1549,89 @@ fn is_missing(value: &str) -> bool {
         || value.eq_ignore_ascii_case("nan")
 }
 
+/// Transcript-level quantification summary from one `salmon quant` run
+/// (`expression.quantify.v1`). The full quant table is written as the
+/// `quant` artifact; this struct is the machine-readable summary.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ExpressionQuantifyResult {
+    pub tool: &'static str,
+    pub lib_type: String,
+    pub thread_count: u32,
+    pub transcript_count: usize,
+    pub total_tpm: f64,
+    pub total_num_reads: f64,
+    /// Transcripts with NumReads > 0.
+    pub expressed_transcript_count: usize,
+    /// Top transcripts by TPM (at most 5) with NumReads fractions.
+    pub top_transcripts: Vec<TranscriptAbundance>,
+    /// Bytes of the emitted quant.sf artifact.
+    pub output_bytes: u64,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TranscriptAbundance {
+    pub name: String,
+    pub tpm: f64,
+    pub num_reads: f64,
+    pub fraction: f64,
+}
+
+/// Quantify `reads` against a pre-built salmon index and summarize the
+/// resulting quant.sf. The table itself is copied to `output`.
+pub fn expression_quantify_path(
+    reads: &[std::path::PathBuf],
+    output: impl AsRef<Path>,
+    options: &crate::native_tools::SalmonQuantOptions,
+) -> Result<ExpressionQuantifyResult, crate::native_tools::NativeToolError> {
+    let (records, output_bytes) = crate::native_tools::run_salmon_quant(reads, output, options)?;
+    let total_tpm: f64 = records.iter().map(|record| record.tpm).sum();
+    let total_num_reads: f64 = records.iter().map(|record| record.num_reads).sum();
+    let expressed = records
+        .iter()
+        .filter(|record| record.num_reads > 0.0)
+        .count();
+    let mut ranked: Vec<&crate::native_tools::SalmonQuantRecord> =
+        records.iter().filter(|record| record.tpm > 0.0).collect();
+    ranked.sort_by(|left, right| {
+        right
+            .tpm
+            .partial_cmp(&left.tpm)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| left.name.cmp(&right.name))
+    });
+    let top_transcripts = ranked
+        .iter()
+        .take(5)
+        .map(|record| TranscriptAbundance {
+            name: record.name.clone(),
+            tpm: record.tpm,
+            num_reads: record.num_reads,
+            fraction: if total_num_reads > 0.0 {
+                record.num_reads / total_num_reads
+            } else {
+                0.0
+            },
+        })
+        .collect();
+    let mut warnings = Vec::new();
+    if expressed == 0 {
+        warnings.push("no transcript received any reads".to_owned());
+    }
+    Ok(ExpressionQuantifyResult {
+        tool: "salmon",
+        lib_type: options.lib_type.clone(),
+        thread_count: options.threads,
+        transcript_count: records.len(),
+        total_tpm,
+        total_num_reads,
+        expressed_transcript_count: expressed,
+        top_transcripts,
+        output_bytes,
+        warnings,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -1725,5 +1808,83 @@ mod tests {
             ExpressionNormalizationMethod::MedianRatio
         );
         assert!(parse_expression_normalization_method("quantile").is_err());
+    }
+
+    fn quant_sf_fixture() -> &'static str {
+        "Name\tLength\tEffectiveLength\tTPM\tNumReads\n\
+         transcriptA\t500\t450\t1000.0\t500.5\n\
+         transcriptB\t300\t250\t0.0\t0.0\n\
+         transcriptC\t900\t850\t40.5\t12.25\n"
+    }
+
+    #[test]
+    fn parses_salmon_quant_sf_tables() {
+        let records = crate::native_tools::parse_salmon_quant_sf(quant_sf_fixture()).expect("rows");
+        assert_eq!(records.len(), 3);
+        assert_eq!(records[0].name, "transcriptA");
+        assert_eq!(records[0].effective_length, 450);
+        assert!((records[2].num_reads - 12.25).abs() < 1e-12);
+        assert!(crate::native_tools::parse_salmon_quant_sf("Name\tWrong\n").is_err());
+        assert!(
+            crate::native_tools::parse_salmon_quant_sf(
+                "Name\tLength\tEffectiveLength\tTPM\tNumReads\n"
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn salmon_quant_arguments_are_controlled_and_shell_free() {
+        use crate::native_tools::{SalmonQuantOptions, salmon_quant_arguments};
+        let options = SalmonQuantOptions {
+            index: std::path::PathBuf::from("/idx"),
+            lib_type: "A".to_owned(),
+            threads: 8,
+            validate_mappings: true,
+        };
+        let single = salmon_quant_arguments(
+            &[std::path::PathBuf::from("reads.fq")],
+            std::path::Path::new("/out"),
+            &options,
+        );
+        let rendered: Vec<String> = single
+            .iter()
+            .map(|value| value.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(
+            rendered,
+            vec![
+                "quant",
+                "-i",
+                "/idx",
+                "-l",
+                "A",
+                "-p",
+                "8",
+                "-o",
+                "/out",
+                "-r",
+                "reads.fq",
+                "--validateMappings"
+            ]
+        );
+        let paired = salmon_quant_arguments(
+            &[
+                std::path::PathBuf::from("r1.fq"),
+                std::path::PathBuf::from("r2.fq"),
+            ],
+            std::path::Path::new("/out"),
+            &options,
+        );
+        assert!(
+            paired
+                .windows(2)
+                .any(|pair| pair[0] == "-1" && pair[1] == "r1.fq")
+        );
+        assert!(
+            paired
+                .windows(2)
+                .any(|pair| pair[0] == "-2" && pair[1] == "r2.fq")
+        );
     }
 }

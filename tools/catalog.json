@@ -1046,6 +1046,39 @@
           "requires_admin": true
         }
       }
+    },
+    {
+      "id": "salmon",
+      "display_name": "Kraken2",
+      "category": "taxonomic-classification",
+      "probes": [
+        {
+          "program": "salmon",
+          "args": [
+            "--version"
+          ]
+        }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "conda",
+          "package": "salmon",
+          "source_url": "https://anaconda.org/bioconda/kraken2",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "conda",
+          "package": "salmon",
+          "source_url": "https://anaconda.org/bioconda/kraken2",
+          "requires_admin": false
+        },
+        "arch": {
+          "strategy": "pacman",
+          "package": "salmon",
+          "source_url": "https://archlinux.org/packages/extra/x86_64/kraken2/",
+          "requires_admin": true
+        }
+      }
     }
   ]
 }
