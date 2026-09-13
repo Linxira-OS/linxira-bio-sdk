@@ -4,7 +4,7 @@ The benchmark harness, the independent capability implementations, schemas,
 tests, and documentation in this directory are Copyright Linxira OS
 contributors and licensed `AGPL-3.0-or-later`.
 
-Runtime dependencies are resolved from the benchmark host's R installation (or
+Runtime dependencies are installed separately and are not vendored: they are resolved from the benchmark host's R installation (or
 a project library named by `LINXIRA_BIO_WORKFLOW_R_LIBRARY`) and are not
 vendored in this pack:
 

@@ -19,7 +19,7 @@
   },
   "runtime": {
     "kind": "r",
-    "version": "4.6.1",
+    "version": ">=4.4.0,<5.0.0",
     "core_compatibility": ">=0.1.0,<2.0.0",
     "dependency_lock": {
       "path": "dependencies.lock.json",
@@ -95,7 +95,7 @@
   "files": [
     {
       "path": "NOTICE.md",
-      "sha256": "6084c957c58790f9061c10ad692d595e2356bd1b7e84f9146e238785cd5ca29d"
+      "sha256": "1646bdb913d698d64e59d51780e07004661628f73f7c93e0cffde3839f278f6c"
     },
     {
       "path": "dependencies.lock.json",
