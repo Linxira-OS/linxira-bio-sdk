@@ -134,7 +134,11 @@ def main(argv: list[str] | None = None) -> int:
     schema = load_json(SCHEMA_PATH)
     validator = Draft202012Validator(schema) if Draft202012Validator else None
 
-    table = load_json(options.file)
+    if options.file.is_file():
+        table = load_json(options.file)
+    else:
+        print(f"{options.file} does not exist yet; starting an empty table")
+        table = {"schema_version": 1, "preferences": []}
     written = 0
     for report_path in options.reports:
         entry, message = entry_from_report(load_json(report_path))

@@ -9,6 +9,7 @@ target/
 .mimosa/
 .linxira/
 .linxira-bio/
+benchmark-datasets.json
 .venv-ci/
 __pycache__/
 *.py[cod]
