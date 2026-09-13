@@ -2974,6 +2974,11 @@ fn format_declaration_conflicts(
 }
 
 fn declared_dataset_format(format: BioDataFormat) -> Option<DatasetFormat> {
+    // A plain-text identifier list has no tabular dataset semantics; it is
+    // carried as a raw artifact instead of a declared dataset.
+    if matches!(format, BioDataFormat::Txt) {
+        return None;
+    }
     Some(match format {
         BioDataFormat::Fasta => DatasetFormat::Fasta,
         BioDataFormat::Fastq => DatasetFormat::Fastq,
@@ -3010,10 +3015,10 @@ fn declared_dataset_format(format: BioDataFormat) -> Option<DatasetFormat> {
         | BioDataFormat::Json
         | BioDataFormat::Jsonl
         | BioDataFormat::Parquet
+        | BioDataFormat::Txt
         | BioDataFormat::Unknown => return None,
     })
 }
-
 fn dataset_formats_are_compatible(declared: DatasetFormat, actual: DatasetFormat) -> bool {
     declared == actual
         || matches!(

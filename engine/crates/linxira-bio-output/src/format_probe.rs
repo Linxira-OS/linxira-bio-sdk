@@ -280,6 +280,7 @@ fn lookup_format_extension(extension: &str) -> Option<BioDataFormat> {
         "nwk" | "newick" | "tree" => Some(BioDataFormat::Newick),
         "csv" => Some(BioDataFormat::Csv),
         "tsv" => Some(BioDataFormat::Tsv),
+        "txt" => Some(BioDataFormat::Txt),
         "json" => Some(BioDataFormat::Json),
         "jsonl" => Some(BioDataFormat::Jsonl),
         "xlsx" => Some(BioDataFormat::Xlsx),
