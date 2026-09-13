@@ -29,8 +29,8 @@ use linxira_bio_core::expression::{
     ExpressionClusterOptions, ExpressionClusterResult, ExpressionHeatmapOptions,
     ExpressionHeatmapResult, ExpressionMatrixQc, ExpressionNormalizeOptions, ExpressionPcaOptions,
     ExpressionPcaResult, expression_cluster_path, expression_heatmap_path,
-    expression_matrix_qc_path, expression_pca_path, normalize_expression_matrix_path,
-    parse_expression_normalization_method,
+    expression_matrix_qc_path, expression_pca_path, expression_quantify_path,
+    normalize_expression_matrix_path, parse_expression_normalization_method,
 };
 use linxira_bio_core::fastq::{FastqQcMetrics, FastqQcOptions, QualityEncodingMode, fastq_qc_path};
 use linxira_bio_core::fastq_transform::{
@@ -51,11 +51,11 @@ use linxira_bio_core::metabolomics::{metabolomics_path, render_peak_table};
 use linxira_bio_core::microbiome::microbiome_analysis_path;
 use linxira_bio_core::native_tools::{
     HmmerOptions, IqtreeOptions, Kraken2Options, MastOptions, MemeOptions, Minimap2LongReadOptions,
-    MuscleOptions, NativeToolResult, ShortReadAlignmentOptions, SimilaritySearchOptions,
-    SnpEffOptions, WgcnaOptions, parse_blast_program, parse_diamond_mode, parse_hmmer_mode,
-    parse_meme_alphabet, parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode,
-    run_bam_to_bigwig_path, run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path,
-    run_hmmer_path, run_iqtree_path, run_kaks_path, run_kraken2_path, run_mast_path,
+    MuscleOptions, NativeToolResult, SalmonQuantOptions, ShortReadAlignmentOptions,
+    SimilaritySearchOptions, SnpEffOptions, WgcnaOptions, parse_blast_program, parse_diamond_mode,
+    parse_hmmer_mode, parse_meme_alphabet, parse_minimap2_preset, parse_muscle_mode,
+    parse_trimal_mode, run_bam_to_bigwig_path, run_blast_fasta_path, run_diamond_fasta_path,
+    run_dssp_path, run_hmmer_path, run_iqtree_path, run_kaks_path, run_kraken2_path, run_mast_path,
     run_mcscanx_path, run_meme_path, run_minimap2_long_read_path, run_muscle_path,
     run_rnafold_path, run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path,
     run_trimal_path, run_wgcna_path,
@@ -789,6 +789,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if rna == "rna" && secondary_structure == "secondary-structure" =>
         {
             print_rnafold(arguments)
+        }
+        [expression, quantify, arguments @ ..]
+            if expression == "expression" && quantify == "quantify" =>
+        {
+            print_expression_quantify(arguments)
         }
         [metagenomics, classify, arguments @ ..]
             if metagenomics == "metagenomics" && classify == "classify" =>
@@ -7258,6 +7263,90 @@ fn print_rnafold(arguments: &[String]) -> Result<(), Box<dyn Error>> {
         result,
         json,
     )
+}
+
+fn print_expression_quantify(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut reads: Vec<PathBuf> = Vec::new();
+    let mut output = None;
+    let mut index_dir = None;
+    let mut lib_type = "A".to_owned();
+    let mut threads = 1_u32;
+    let mut validate_mappings = true;
+    let mut json = false;
+    let mut position = 0;
+    while position < arguments.len() {
+        match arguments[position].as_str() {
+            "--index" => {
+                position += 1;
+                index_dir = Some(PathBuf::from(
+                    arguments
+                        .get(position)
+                        .ok_or("--index requires a salmon index directory")?,
+                ));
+            }
+            "--lib-type" => {
+                position += 1;
+                lib_type = arguments
+                    .get(position)
+                    .ok_or("--lib-type requires a value")?
+                    .to_owned();
+            }
+            "--threads" => {
+                position += 1;
+                threads = arguments
+                    .get(position)
+                    .ok_or("--threads requires a value")?
+                    .parse()
+                    .map_err(|_| "threads must be a positive integer")?;
+            }
+            "--no-validate-mappings" => validate_mappings = false,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown expression quantify option: {value}").into());
+            }
+            value => reads.push(PathBuf::from(value)),
+        }
+        position += 1;
+    }
+    if !matches!(reads.len(), 1 | 2) {
+        return Err(
+            "expression quantify requires one single-end read file or two paired-end files".into(),
+        );
+    }
+    let output = output.take().unwrap_or_else(|| PathBuf::from("quant.sf"));
+    let index_dir = index_dir.ok_or("expression quantify requires --index <dir>")?;
+    let options = SalmonQuantOptions {
+        index: index_dir,
+        lib_type,
+        threads,
+        validate_mappings,
+    };
+    let result = expression_quantify_path(&reads, &output, &options)?;
+    if json {
+        print_analysis_json("expression-quantify", "expression.quantify.v1", result)?
+    } else {
+        println!("tool	{}", result.tool);
+        println!("output	{}", output.display());
+        println!("output_bytes	{}", result.output_bytes);
+        println!("thread_count	{}", result.thread_count);
+        println!("transcript_count	{}", result.transcript_count);
+        println!(
+            "expressed_transcript_count	{}",
+            result.expressed_transcript_count
+        );
+        println!("total_tpm	{}", result.total_tpm);
+        println!("total_num_reads	{}", result.total_num_reads);
+        for transcript in &result.top_transcripts {
+            println!(
+                "top	{}	tpm	{}	num_reads	{}",
+                transcript.name, transcript.tpm, transcript.num_reads
+            );
+        }
+        for warning in &result.warnings {
+            eprintln!("warning: {warning}");
+        }
+    }
+    Ok(())
 }
 
 fn print_metagenomics_classify(arguments: &[String]) -> Result<(), Box<dyn Error>> {

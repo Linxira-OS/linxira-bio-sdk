@@ -1634,6 +1634,21 @@
         "png",
         "pdf"
       ]
+    },
+    {
+      "id": "expression.quantify.v1",
+      "status": "available",
+      "category": "expression",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio expression quantify r1.fq r2.fq --index salmon_idx --output quant.sf --json",
+      "input_formats": [
+        "fasta",
+        "fastq"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     }
   ]
 }
