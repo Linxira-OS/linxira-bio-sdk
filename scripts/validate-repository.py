@@ -62,6 +62,8 @@ SCHEMA_FILES = (
     "schemas/benchmark-summary.schema.json",
     "schemas/runtime-preferences.schema.json",
     "schemas/bundle-manifest.schema.json",
+    "schemas/curve-fit.schema.json",
+    "schemas/npz-import.schema.json",
     "schemas/capability.schema.json",
     "schemas/dataset-manifest.schema.json",
     "schemas/environment-plan.schema.json",

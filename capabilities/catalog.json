@@ -1649,6 +1649,35 @@
         "tsv",
         "json"
       ]
+    },
+    {
+      "id": "matrix.from-npz.v1",
+      "status": "available",
+      "category": "data-management",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio matrix from-npz counts.npz counts.tsv --json",
+      "input_formats": [
+        "npz"
+      ],
+      "output_formats": [
+        "csv",
+        "tsv",
+        "json"
+      ]
+    },
+    {
+      "id": "curve.fit.v1",
+      "status": "available",
+      "category": "statistical-analysis",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio curve fit curve.csv --model 4pl --json",
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json"
+      ]
     }
   ]
 }
