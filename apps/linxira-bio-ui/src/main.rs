@@ -259,6 +259,34 @@ struct AnalysisRoute {
     input_role: &'static str,
 }
 
+/// Implementation backend of the selected analysis (M2-T7). `Auto` leaves
+/// the request backend unset so the worker consults
+/// `runtime-preferences.json`; the other choices pin one backend.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AnalysisBackend {
+    Auto,
+    Rust,
+    Python,
+    R,
+}
+
+impl AnalysisBackend {
+    fn protocol_backend(self) -> Option<linxira_bio_protocol::ExecutionBackend> {
+        match self {
+            Self::Auto => None,
+            Self::Rust => Some(linxira_bio_protocol::ExecutionBackend::Rust),
+            Self::Python => Some(linxira_bio_protocol::ExecutionBackend::Python),
+            Self::R => Some(linxira_bio_protocol::ExecutionBackend::R),
+        }
+    }
+}
+
+/// Capabilities with a registered benchmark-pack implementation; extend as
+/// the packs gain capabilities (M3).
+fn capability_has_backend_packs(capability: &str) -> bool {
+    matches!(capability, "sequence.stats.v1")
+}
+
 struct JobRecord {
     id: String,
     capability: String,
@@ -466,6 +494,7 @@ struct BioApp {
     inspection_queue: VecDeque<InspectionTask>,
     active_inspections: usize,
     selected_capability: String,
+    analysis_backend: AnalysisBackend,
     annotation_feature_type: String,
     annotation_sort: bool,
     annotation_visual_feature_id: String,
@@ -591,6 +620,7 @@ impl BioApp {
             inspection_queue: VecDeque::new(),
             active_inspections: 0,
             selected_capability: "sequence.stats.v1".to_owned(),
+            analysis_backend: AnalysisBackend::Auto,
             annotation_feature_type: "gene".to_owned(),
             annotation_sort: false,
             annotation_visual_feature_id: String::new(),
@@ -1399,6 +1429,7 @@ impl BioApp {
             });
         }
         let capability = route.capability.to_owned();
+        request.execution.backend = self.analysis_backend.protocol_backend();
         let generation = self.project_generation;
         let (sender, receiver) = mpsc::channel();
         self.analysis_job_id = Some(job_id.clone());
@@ -2381,6 +2412,48 @@ impl BioApp {
                     );
                 }
             });
+
+        if capability_has_backend_packs(&self.selected_capability) {
+            let (auto_label, rust_label, python_label, r_label) = (
+                self.text("自动（按偏好表）", "Auto (follow preferences)"),
+                self.text("Rust 原生", "Rust native"),
+                self.text("Python 包", "Python pack"),
+                self.text("R 包", "R pack"),
+            );
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(self.text("运行后端", "Execution backend"));
+                egui::ComboBox::from_id_salt("analysis-backend")
+                    .selected_text(match self.analysis_backend {
+                        AnalysisBackend::Auto => auto_label,
+                        AnalysisBackend::Rust => rust_label,
+                        AnalysisBackend::Python => python_label,
+                        AnalysisBackend::R => r_label,
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(
+                            &mut self.analysis_backend,
+                            AnalysisBackend::Auto,
+                            auto_label,
+                        );
+                        ui.selectable_value(
+                            &mut self.analysis_backend,
+                            AnalysisBackend::Rust,
+                            rust_label,
+                        );
+                        ui.selectable_value(
+                            &mut self.analysis_backend,
+                            AnalysisBackend::Python,
+                            python_label,
+                        );
+                        ui.selectable_value(
+                            &mut self.analysis_backend,
+                            AnalysisBackend::R,
+                            r_label,
+                        );
+                    });
+            });
+        }
 
         let requires_secondary = capability_requires_secondary(&self.selected_capability);
         let primary_index = self.selected_dataset;

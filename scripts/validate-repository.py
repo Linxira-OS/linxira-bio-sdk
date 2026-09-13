@@ -59,6 +59,7 @@ SCHEMA_FILES = (
     "schemas/analysis-result.schema.json",
     "schemas/artifact.schema.json",
     "schemas/benchmark-report.schema.json",
+    "schemas/runtime-preferences.schema.json",
     "schemas/bundle-manifest.schema.json",
     "schemas/capability.schema.json",
     "schemas/dataset-manifest.schema.json",
@@ -111,6 +112,10 @@ CATALOG_AND_MANIFEST_CONTRACTS = (
 )
 
 CAPABILITY_RESULT_CONTRACTS = (
+    (
+        "runtime-preferences.json",
+        "schemas/runtime-preferences.schema.json",
+    ),
     (
         "tests/fixtures/output/benchmark-report.example.json",
         "schemas/benchmark-report.schema.json",
@@ -934,6 +939,25 @@ def validate() -> None:
             if not capability.get("command"):
                 raise ValueError(f"available capability lacks a command: {capability_id}")
             validate_capability_documentation(capability)
+
+    # Runtime preference entries (M2-T7) must name cataloged capabilities,
+    # and only a consistent benchmark verdict may select a non-native
+    # default backend.
+    for index, preference in enumerate(load_json("runtime-preferences.json").get("preferences", [])):
+        preference_capability = preference.get("capability")
+        if preference_capability not in capability_ids:
+            raise ValueError(
+                f"runtime preference {index} names an unknown capability: "
+                f"{preference_capability}"
+            )
+        if (
+            preference.get("default_backend") not in (None, "rust")
+            and preference.get("consistency") != "consistent"
+        ):
+            raise ValueError(
+                f"runtime preference for {preference_capability} selects "
+                f"{preference.get('default_backend')} without a consistent benchmark verdict"
+            )
 
     providers = runtime_catalog.get("providers")
     if not isinstance(providers, list) or not providers:
