@@ -4,12 +4,24 @@
   "title": "Linxira Bio workflow pack manifest",
   "type": "object",
   "required": [
-    "schema_version", "id", "version", "publisher", "license", "entrypoint",
-    "runtime", "input_schema", "output_schema", "platforms", "network",
-    "resources", "files"
+    "schema_version",
+    "id",
+    "version",
+    "publisher",
+    "license",
+    "entrypoint",
+    "runtime",
+    "input_schema",
+    "output_schema",
+    "platforms",
+    "network",
+    "resources",
+    "files"
   ],
   "properties": {
-    "schema_version": { "const": "2" },
+    "schema_version": {
+      "const": "2"
+    },
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$"
@@ -20,32 +32,57 @@
     },
     "publisher": {
       "type": "object",
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "url": { "type": "string", "format": "uri" }
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        }
       },
       "additionalProperties": false
     },
-    "license": { "type": "string", "minLength": 1 },
-    "homepage": { "type": "string", "format": "uri" },
+    "license": {
+      "type": "string",
+      "minLength": 1
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri"
+    },
     "entrypoint": {
       "type": "object",
-      "required": ["path"],
+      "required": [
+        "path"
+      ],
       "properties": {
-        "path": { "$ref": "#/$defs/relativePath" },
+        "path": {
+          "$ref": "#/$defs/relativePath"
+        },
         "arguments": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
     },
     "resume": {
       "type": "object",
-      "required": ["enabled", "state_file"],
+      "required": [
+        "enabled",
+        "state_file"
+      ],
       "properties": {
-        "enabled": { "const": true },
+        "enabled": {
+          "const": true
+        },
         "state_file": {
           "$ref": "#/$defs/relativePath",
           "description": "State file written inside the output directory; a matching state replays the recorded result without re-running the pack"
@@ -55,7 +92,11 @@
     },
     "contract": {
       "type": "object",
-      "required": ["inputs", "outputs", "parameters"],
+      "required": [
+        "inputs",
+        "outputs",
+        "parameters"
+      ],
       "properties": {
         "inputs": {
           "type": "array",
@@ -63,20 +104,59 @@
           "uniqueItems": true,
           "items": {
             "type": "object",
-            "required": ["role", "formats"],
+            "required": [
+              "role",
+              "formats"
+            ],
             "properties": {
-              "role": { "type": "string", "minLength": 1 },
+              "role": {
+                "type": "string",
+                "minLength": 1
+              },
               "formats": {
                 "type": "array",
                 "minItems": 1,
                 "uniqueItems": true,
                 "items": {
                   "enum": [
-                    "fasta", "fastq", "csv", "tsv", "bed", "gff3", "gtf", "vcf", "sam",
-                    "bam", "bcf", "cram", "bigwig", "genbank", "embl", "h5ad", "loom",
-                    "hdf5", "rds", "pdb", "mmcif", "sdf", "axt", "blast-tabular", "blast-xml",
-                    "protein-domains", "meme-text", "mcscanx-collinearity", "newick",
-                    "svg", "xlsx", "json", "jsonl", "parquet", "zip", "unknown"
+                    "fasta",
+                    "fastq",
+                    "csv",
+                    "tsv",
+                    "bed",
+                    "gff3",
+                    "gtf",
+                    "vcf",
+                    "sam",
+                    "bam",
+                    "bcf",
+                    "cram",
+                    "bigwig",
+                    "genbank",
+                    "embl",
+                    "h5ad",
+                    "loom",
+                    "hdf5",
+                    "rds",
+                    "pdb",
+                    "mmcif",
+                    "sdf",
+                    "axt",
+                    "blast-tabular",
+                    "blast-xml",
+                    "protein-domains",
+                    "meme-text",
+                    "mcscanx-collinearity",
+                    "newick",
+                    "svg",
+                    "png",
+                    "pdf",
+                    "xlsx",
+                    "json",
+                    "jsonl",
+                    "parquet",
+                    "zip",
+                    "unknown"
                   ]
                 }
               }
@@ -86,30 +166,82 @@
         },
         "outputs": {
           "type": "object",
-          "required": ["roles", "kind", "formats"],
+          "required": [
+            "roles",
+            "kind",
+            "formats"
+          ],
           "properties": {
             "roles": {
               "type": "array",
               "minItems": 1,
               "uniqueItems": true,
-              "items": { "type": "string", "minLength": 1 }
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             },
-            "kind": { "enum": ["table", "plot", "domain-file", "log", "report", "directory"] },
+            "kind": {
+              "enum": [
+                "table",
+                "plot",
+                "domain-file",
+                "log",
+                "report",
+                "directory"
+              ]
+            },
             "formats": {
               "type": "array",
               "minItems": 1,
               "uniqueItems": true,
               "items": {
                 "enum": [
-                  "fasta", "fastq", "csv", "tsv", "bed", "gff3", "gtf", "vcf", "sam",
-                  "bam", "bcf", "cram", "bigwig", "genbank", "embl", "h5ad", "loom",
-                  "hdf5", "rds", "pdb", "mmcif", "sdf", "axt", "blast-tabular", "blast-xml",
-                  "protein-domains", "meme-text", "mcscanx-collinearity", "newick",
-                  "svg", "xlsx", "json", "jsonl", "parquet", "zip", "unknown"
+                  "fasta",
+                  "fastq",
+                  "csv",
+                  "tsv",
+                  "bed",
+                  "gff3",
+                  "gtf",
+                  "vcf",
+                  "sam",
+                  "bam",
+                  "bcf",
+                  "cram",
+                  "bigwig",
+                  "genbank",
+                  "embl",
+                  "h5ad",
+                  "loom",
+                  "hdf5",
+                  "rds",
+                  "pdb",
+                  "mmcif",
+                  "sdf",
+                  "axt",
+                  "blast-tabular",
+                  "blast-xml",
+                  "protein-domains",
+                  "meme-text",
+                  "mcscanx-collinearity",
+                  "newick",
+                  "svg",
+                  "png",
+                  "pdf",
+                  "xlsx",
+                  "json",
+                  "jsonl",
+                  "parquet",
+                  "zip",
+                  "unknown"
                 ]
               }
             },
-            "media_type": { "type": "string", "minLength": 1 }
+            "media_type": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "additionalProperties": false
         },
@@ -117,7 +249,10 @@
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "additionalProperties": false,
@@ -125,10 +260,25 @@
     },
     "runtime": {
       "type": "object",
-      "required": ["kind", "version", "core_compatibility", "dependency_lock"],
+      "required": [
+        "kind",
+        "version",
+        "core_compatibility",
+        "dependency_lock"
+      ],
       "properties": {
-        "kind": { "enum": ["python", "r", "java", "native"] },
-        "version": { "type": "string", "minLength": 1 },
+        "kind": {
+          "enum": [
+            "python",
+            "r",
+            "java",
+            "native"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
         "core_compatibility": {
           "type": "string",
           "minLength": 1,
@@ -137,45 +287,102 @@
         },
         "dependency_lock": {
           "type": "object",
-          "required": ["path", "sha256"],
+          "required": [
+            "path",
+            "sha256"
+          ],
           "properties": {
-            "path": { "$ref": "#/$defs/relativePath" },
-            "sha256": { "$ref": "#/$defs/sha256" }
+            "path": {
+              "$ref": "#/$defs/relativePath"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
           },
           "additionalProperties": false
         }
       },
       "additionalProperties": false
     },
-    "input_schema": { "$ref": "#/$defs/jsonSchema" },
-    "output_schema": { "$ref": "#/$defs/jsonSchema" },
+    "input_schema": {
+      "$ref": "#/$defs/jsonSchema"
+    },
+    "output_schema": {
+      "$ref": "#/$defs/jsonSchema"
+    },
     "platforms": {
       "type": "array",
-      "items": { "enum": ["windows-gnu", "debian", "arch"] },
+      "items": {
+        "enum": [
+          "windows-gnu",
+          "debian",
+          "arch"
+        ]
+      },
       "minItems": 1,
       "uniqueItems": true
     },
     "network": {
       "type": "object",
-      "required": ["access"],
+      "required": [
+        "access"
+      ],
       "properties": {
-        "access": { "enum": ["none", "required"] },
+        "access": {
+          "enum": [
+            "none",
+            "required"
+          ]
+        },
         "allowed_hosts": {
           "type": "array",
-          "items": { "type": "string", "format": "hostname" },
+          "items": {
+            "type": "string",
+            "format": "hostname"
+          },
           "uniqueItems": true
         }
       },
       "allOf": [
         {
-          "if": { "properties": { "access": { "const": "none" } }, "required": ["access"] },
-          "then": { "properties": { "allowed_hosts": { "maxItems": 0 } } }
+          "if": {
+            "properties": {
+              "access": {
+                "const": "none"
+              }
+            },
+            "required": [
+              "access"
+            ]
+          },
+          "then": {
+            "properties": {
+              "allowed_hosts": {
+                "maxItems": 0
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "access": { "const": "required" } }, "required": ["access"] },
+          "if": {
+            "properties": {
+              "access": {
+                "const": "required"
+              }
+            },
+            "required": [
+              "access"
+            ]
+          },
           "then": {
-            "required": ["allowed_hosts"],
-            "properties": { "allowed_hosts": { "minItems": 1 } }
+            "required": [
+              "allowed_hosts"
+            ],
+            "properties": {
+              "allowed_hosts": {
+                "minItems": 1
+              }
+            }
           }
         }
       ],
@@ -183,18 +390,54 @@
     },
     "resources": {
       "type": "object",
-      "required": ["gpu"],
+      "required": [
+        "gpu"
+      ],
       "properties": {
-        "minimum_memory_mb": { "type": "integer", "minimum": 1 },
-        "minimum_disk_mb": { "type": "integer", "minimum": 1 },
-        "recommended_threads": { "type": "integer", "minimum": 1, "maximum": 65535 },
-        "gpu": { "enum": ["none", "optional", "required"] },
-        "minimum_vram_mb": { "type": "integer", "minimum": 1 }
+        "minimum_memory_mb": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_disk_mb": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "recommended_threads": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "gpu": {
+          "enum": [
+            "none",
+            "optional",
+            "required"
+          ]
+        },
+        "minimum_vram_mb": {
+          "type": "integer",
+          "minimum": 1
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "gpu": { "const": "none" } }, "required": ["gpu"] },
-          "then": { "not": { "required": ["minimum_vram_mb"] } }
+          "if": {
+            "properties": {
+              "gpu": {
+                "const": "none"
+              }
+            },
+            "required": [
+              "gpu"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "minimum_vram_mb"
+              ]
+            }
+          }
         }
       ],
       "additionalProperties": false
@@ -203,10 +446,17 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["path", "sha256"],
+        "required": [
+          "path",
+          "sha256"
+        ],
         "properties": {
-          "path": { "$ref": "#/$defs/relativePath" },
-          "sha256": { "$ref": "#/$defs/sha256" }
+          "path": {
+            "$ref": "#/$defs/relativePath"
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          }
         },
         "additionalProperties": false
       },
@@ -225,7 +475,9 @@
     },
     "jsonSchema": {
       "type": "object",
-      "required": ["type"]
+      "required": [
+        "type"
+      ]
     }
   },
   "additionalProperties": false

@@ -82,6 +82,7 @@ SCHEMA_FILES = (
     "schemas/output-spec.schema.json",
     "schemas/phylogeny-tree-transform.schema.json",
     "schemas/plot-spec.schema.json",
+    "schemas/plot-render-result.schema.json",
     "schemas/protein-domain-parse.schema.json",
     "schemas/protein-properties.schema.json",
     "schemas/reciprocal-best-hits.schema.json",

@@ -1,0 +1,6 @@
+# Direct and transitive pins for pack 0.1.0 (visualization-matplotlib).
+# Runtime: CPython 3.12+ on windows-gnu, debian, arch. The renderer needs
+# matplotlib only; determinism (fixed dpi, suppressed date metadata) is a
+# renderer property, not a pin property. Install into the project
+# interpreter/library; the render result records the interpreter actually used.
+matplotlib>=3.8,<4

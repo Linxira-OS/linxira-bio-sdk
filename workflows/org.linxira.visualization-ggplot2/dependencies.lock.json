@@ -1,0 +1,49 @@
+{
+  "schema_version": "2",
+  "lock_kind": "compatibility-and-resolution-policy",
+  "runtime": {
+    "name": "R",
+    "preferred_version": "4.6.1",
+    "version_requirement": ">=4.4.0,<5.0.0",
+    "release_policy": "host-installed-runtime-recorded-in-provenance",
+    "bioconductor_release": "3.23"
+  },
+  "isolation": {
+    "scope": "host",
+    "interpreter_environment_variable": "LINXIRA_BIO_WORKFLOW_R",
+    "library_environment_variable": "LINXIRA_BIO_WORKFLOW_R_LIBRARY",
+    "declared_packages_must_resolve_from_project_library": false,
+    "all_loaded_non_base_packages_must_resolve_from_project_library": false,
+    "base_and_recommended_packages_may_resolve_from_runtime": true,
+    "global_library_mutation": false,
+    "global_path_mutation": false,
+    "side_by_side_runtime_versions": true,
+    "site_library_fallback": "warn"
+  },
+  "packages": [
+    {
+      "name": "ggplot2",
+      "version": "3.5.x",
+      "source": "cran",
+      "role": "renderer"
+    },
+    {
+      "name": "svglite",
+      "version": "2.1.x",
+      "source": "cran",
+      "role": "deterministic-svg"
+    },
+    {
+      "name": "jsonlite",
+      "version": ">=1.8.9,<3.0.0",
+      "source": "cran",
+      "role": "request"
+    },
+    {
+      "name": "digest",
+      "version": ">=0.6.35,<1.0.0",
+      "source": "cran",
+      "role": "spec-hash"
+    }
+  ]
+}

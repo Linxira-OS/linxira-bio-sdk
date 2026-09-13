@@ -88,6 +88,22 @@
         "set.venn.v1",
         "structure.pdb.summary.v1"
       ]
+    },
+    {
+      "id": "org.linxira.visualization-matplotlib",
+      "capability": "plot.render.v1",
+      "status": "cataloged",
+      "trust": "official",
+      "runtime": "python",
+      "manifest": "workflows/org.linxira.visualization-matplotlib/manifest.json"
+    },
+    {
+      "id": "org.linxira.visualization-ggplot2",
+      "capability": "plot.render.v1",
+      "status": "cataloged",
+      "trust": "official",
+      "runtime": "r",
+      "manifest": "workflows/org.linxira.visualization-ggplot2/manifest.json"
     }
   ]
 }

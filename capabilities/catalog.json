@@ -1619,6 +1619,21 @@
         "tsv",
         "json"
       ]
+    },
+    {
+      "id": "plot.render.v1",
+      "status": "available",
+      "category": "visualization",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio workflow run org.linxira.visualization-matplotlib --request request.json --json",
+      "input_formats": [
+        "json"
+      ],
+      "output_formats": [
+        "svg",
+        "png",
+        "pdf"
+      ]
     }
   ]
 }
