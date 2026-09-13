@@ -5,6 +5,7 @@ use crate::domain::{DomainError, ProteinDomainHit, parse_protein_domains_path};
 use crate::functional::{
     EnrichmentKind, EnrichmentOptions, EnrichmentResult, FunctionalError, overrepresentation_path,
 };
+use linxira_bio_output::{PlotOutputFormat, PlotSpec, PlotTheme};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
@@ -230,6 +231,23 @@ pub fn render_volcano_svg_path(
     output: impl AsRef<Path>,
     options: &VolcanoPlotOptions,
 ) -> Result<SvgVisualizationResult, VisualizationError> {
+    render_volcano_svg_path_with_spec(input, output, options, &PlotSpec::default())
+}
+
+/// PlotSpec-aware entry behind [`render_volcano_svg_path`].
+///
+/// The spec overrides the document title (plus an optional visible
+/// title/subtitle heading), the axis labels, the plotted domain
+/// (`x_range`/`y_range` drop points outside the requested window), the theme
+/// colors, the category palette, and the displayed figure size. Fields the
+/// volcano renderer cannot honor (log axes, grid toggles, fonts, legends,
+/// non-SVG output) are reported through [`SvgVisualizationResult::warnings`].
+pub fn render_volcano_svg_path_with_spec(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &VolcanoPlotOptions,
+    plot_spec: &PlotSpec,
+) -> Result<SvgVisualizationResult, VisualizationError> {
     validate_item_limit(options.max_points, "max_points")?;
     if !options.adjusted_pvalue_threshold.is_finite()
         || !(0.0..=1.0).contains(&options.adjusted_pvalue_threshold)
@@ -281,14 +299,48 @@ pub fn render_volcano_svg_path(
             "volcano input has no finite log2FoldChange/padj rows".to_owned(),
         ));
     }
+    let mut warnings = Vec::new();
+    collect_generic_spec_warnings(plot_spec, &mut warnings);
+    note_unsupported_axis_fields(
+        plot_spec,
+        &mut warnings,
+        true,
+        true,
+        false,
+        "the volcano renderer",
+    );
+    let context = SpecContext::resolve(plot_spec, &mut warnings);
+    let x_domain = usable_range(plot_spec.x_range, &mut warnings, "x");
+    if let Some((minimum, maximum)) = x_domain {
+        clip_domain(&mut points, &mut warnings, "x", |(x, _)| {
+            *x >= minimum && *x <= maximum
+        });
+    }
+    let y_domain = usable_range(plot_spec.y_range, &mut warnings, "y");
+    if let Some((minimum, maximum)) = y_domain {
+        clip_domain(&mut points, &mut warnings, "y", |(_, y)| {
+            *y >= minimum && *y <= maximum
+        });
+    }
     let max_x = points.iter().map(|(x, _)| x.abs()).fold(1.0_f64, f64::max);
     let max_y = points.iter().map(|(_, y)| *y).fold(1.0_f64, f64::max);
     let (width, height) = (DEFAULT_VISUALIZATION_WIDTH, 760_u32);
-    let mut svg = svg_header(width, height, "Differential expression volcano plot");
+    let mut svg = svg_header(
+        width,
+        height,
+        context.document_title("Differential expression volcano plot"),
+        &context,
+    );
     svg.push_str("<line x1=\"100\" y1=\"680\" x2=\"1140\" y2=\"680\" stroke=\"#334\"/><line x1=\"620\" y1=\"60\" x2=\"620\" y2=\"680\" stroke=\"#ccd\"/>");
     for (x, y) in &points {
-        let px = 620.0 + x / max_x * 500.0;
-        let py = 680.0 - y / max_y * 590.0;
+        let px = match x_domain {
+            Some((minimum, maximum)) => 620.0 + (x - minimum) / (maximum - minimum) * 500.0,
+            None => 620.0 + x / max_x * 500.0,
+        };
+        let py = match y_domain {
+            Some((minimum, maximum)) => 680.0 - (y - minimum) / (maximum - minimum) * 590.0,
+            None => 680.0 - y / max_y * 590.0,
+        };
         let significant = *y >= negative_log10(options.adjusted_pvalue_threshold)
             && x.abs() >= options.absolute_log2_fold_change_threshold;
         let color = if significant {
@@ -300,24 +352,62 @@ pub fn render_volcano_svg_path(
             "<circle cx=\"{px:.2}\" cy=\"{py:.2}\" r=\"3\" fill=\"{color}\" fill-opacity=\"0.75\"/>"
         ));
     }
-    push_text(&mut svg, 100.0, 725.0, 18, "#223", "log2 fold change");
-    push_text(&mut svg, 20.0, 50.0, 18, "#223", "-log10 adjusted p value");
+    if let Some(title) = &context.title {
+        push_text(&mut svg, 620.0, 30.0, 18, context.style.heading, title);
+    }
+    if let Some(subtitle) = &context.subtitle {
+        push_text(&mut svg, 620.0, 48.0, 13, context.style.muted, subtitle);
+    }
+    let x_axis_label = plot_spec
+        .x_label
+        .as_deref()
+        .and_then(non_empty)
+        .unwrap_or_else(|| "log2 fold change".to_owned());
+    let y_axis_label = plot_spec
+        .y_label
+        .as_deref()
+        .and_then(non_empty)
+        .unwrap_or_else(|| "-log10 adjusted p value".to_owned());
+    push_text(
+        &mut svg,
+        100.0,
+        725.0,
+        18,
+        context.style.axis,
+        &x_axis_label,
+    );
+    push_text(&mut svg, 20.0, 50.0, 18, context.style.axis, &y_axis_label);
     svg.push_str("</svg>");
     write_new_output(output.as_ref(), svg.as_bytes())?;
+    let (reported_width, reported_height) = context.figure.reported(width, height);
     Ok(SvgVisualizationResult {
         visualization_type: "expression-volcano".to_owned(),
         output_path: output.as_ref().to_string_lossy().into_owned(),
-        width,
-        height,
+        width: reported_width,
+        height: reported_height,
         track_count: 1,
         glyph_count: points.len() as u64,
-        warnings: Vec::new(),
+        warnings,
     })
 }
 
 pub fn render_motif_logo_svg_path(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    render_motif_logo_svg_path_with_spec(input, output, &PlotSpec::default())
+}
+
+/// PlotSpec-aware entry behind [`render_motif_logo_svg_path`].
+///
+/// The spec overrides the document title (plus an optional visible
+/// title/subtitle heading), the theme colors, the letter palette, and the
+/// displayed figure size. Axis fields are reported as ignored warnings
+/// because the motif logo has no numeric axes.
+pub fn render_motif_logo_svg_path_with_spec(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    plot_spec: &PlotSpec,
 ) -> Result<SvgVisualizationResult, VisualizationError> {
     let text = fs::read_to_string(input).map_err(VisualizationError::Io)?;
     let alphabet = text
@@ -356,27 +446,50 @@ pub fn render_motif_logo_svg_path(
             "MEME input has no valid probability matrix".to_owned(),
         ));
     }
+    let mut warnings = Vec::new();
+    collect_generic_spec_warnings(plot_spec, &mut warnings);
+    note_unsupported_axis_fields(
+        plot_spec,
+        &mut warnings,
+        false,
+        false,
+        false,
+        "the motif logo",
+    );
+    let context = SpecContext::resolve(plot_spec, &mut warnings);
     let width = 100_u32.saturating_add((matrix.len() as u32).saturating_mul(90));
     let height = 420_u32;
-    let mut svg = svg_header(width, height, "Motif sequence logo");
+    let mut svg = svg_header(
+        width,
+        height,
+        context.document_title("Motif sequence logo"),
+        &context,
+    );
+    if let Some(title) = &context.title {
+        push_text(&mut svg, 8.0, 24.0, 20, context.style.heading, title);
+    }
+    if let Some(subtitle) = &context.subtitle {
+        push_text(&mut svg, 8.0, 44.0, 13, context.style.muted, subtitle);
+    }
     for (position, values) in matrix.iter().enumerate() {
         for (index, value) in values.iter().enumerate() {
             let h = value * 280.0;
             let x = 55.0 + position as f64 * 90.0;
             let y = 350.0 - index as f64 * 70.0;
-            svg.push_str(&format!("<text x=\"{x:.1}\" y=\"{y:.1}\" font-family=\"sans-serif\" font-size=\"{h:.1}\" fill=\"{}\">{}</text>", color_for(&symbols[index].to_string()), symbols[index]));
+            svg.push_str(&format!("<text x=\"{x:.1}\" y=\"{y:.1}\" font-family=\"sans-serif\" font-size=\"{h:.1}\" fill=\"{}\">{}</text>", context.style.category_color(&symbols[index].to_string()), symbols[index]));
         }
     }
     svg.push_str("</svg>");
     write_new_output(output.as_ref(), svg.as_bytes())?;
+    let (reported_width, reported_height) = context.figure.reported(width, height);
     Ok(SvgVisualizationResult {
         visualization_type: "motif-logo".to_owned(),
         output_path: output.as_ref().to_string_lossy().into_owned(),
-        width,
-        height,
+        width: reported_width,
+        height: reported_height,
         track_count: 1,
         glyph_count: matrix.len() as u64 * symbols.len() as u64,
-        warnings: Vec::new(),
+        warnings,
     })
 }
 
@@ -387,7 +500,22 @@ pub fn render_synteny_svg_path(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
 ) -> Result<SvgVisualizationResult, VisualizationError> {
-    render_synteny_svg_with_options_path(input, output, &SyntenyVisualizationOptions::default())
+    render_synteny_svg_path_with_spec(input, output, &PlotSpec::default())
+}
+
+/// PlotSpec-aware entry behind [`render_synteny_svg_path`]; see
+/// [`render_synteny_svg_with_options_and_spec`] for the applied fields.
+pub fn render_synteny_svg_path_with_spec(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    plot_spec: &PlotSpec,
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    render_synteny_svg_with_options_and_spec(
+        input,
+        output,
+        &SyntenyVisualizationOptions::default(),
+        plot_spec,
+    )
 }
 
 /// Render a local synteny SVG from a tab-separated anchor table.
@@ -396,6 +524,22 @@ pub fn render_synteny_svg_with_options_path(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
     options: &SyntenyVisualizationOptions,
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    render_synteny_svg_with_options_and_spec(input, output, options, &PlotSpec::default())
+}
+
+/// Spec-aware core shared by both public synteny entries.
+///
+/// The spec overrides the document title and visible heading (plus an
+/// optional subtitle), the theme colors, the anchor palette, and the
+/// displayed figure size. Axis fields are reported as ignored warnings
+/// because every style positions anchors along identifier tracks rather
+/// than labeled numeric axes.
+fn render_synteny_svg_with_options_and_spec(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &SyntenyVisualizationOptions,
+    plot_spec: &PlotSpec,
 ) -> Result<SvgVisualizationResult, VisualizationError> {
     let input = input.as_ref();
     let output = output.as_ref();
@@ -452,11 +596,22 @@ pub fn render_synteny_svg_with_options_path(
             "synteny table contains no anchors".to_owned(),
         ));
     }
+    let mut warnings = Vec::new();
+    collect_generic_spec_warnings(plot_spec, &mut warnings);
+    note_unsupported_axis_fields(
+        plot_spec,
+        &mut warnings,
+        false,
+        false,
+        false,
+        "the synteny renderer",
+    );
+    let context = SpecContext::resolve(plot_spec, &mut warnings);
     if options.style == SyntenyPlotStyle::Multiple {
-        return render_multiple_synteny_svg(output, &anchors);
+        return render_multiple_synteny_svg(output, &anchors, &context, warnings);
     }
     if options.style == SyntenyPlotStyle::Circular {
-        return render_circular_synteny_svg(output, &anchors);
+        return render_circular_synteny_svg(output, &anchors, &context, warnings);
     }
     let source_min = anchors
         .iter()
@@ -485,40 +640,54 @@ pub fn render_synteny_svg_with_options_path(
             left + (value - minimum) / (maximum - minimum) * (right - left)
         }
     };
-    let title = if options.style == SyntenyPlotStyle::Micro {
+    let default_title = if options.style == SyntenyPlotStyle::Micro {
         "Micro-synteny anchors"
     } else {
         "Synteny anchors"
     };
-    let mut svg = svg_header(width, height, title);
-    push_text(&mut svg, 24.0, 34.0, 20, "#18332b", title);
+    let heading = context.title.as_deref().unwrap_or(default_title);
+    let mut svg = svg_header(width, height, heading, &context);
+    push_text(&mut svg, 24.0, 34.0, 20, context.style.heading, heading);
+    if let Some(subtitle) = &context.subtitle {
+        push_text(&mut svg, 24.0, 52.0, 13, context.style.muted, subtitle);
+    }
     svg.push_str(&format!("<line x1=\"{left}\" y1=\"110\" x2=\"{right}\" y2=\"110\" stroke=\"#294c62\" stroke-width=\"10\"/><line x1=\"{left}\" y1=\"330\" x2=\"{right}\" y2=\"330\" stroke=\"#6c5634\" stroke-width=\"10\"/>"));
-    push_text(&mut svg, left, 88.0, 13, "#263d36", &anchors[0].0);
-    push_text(&mut svg, left, 370.0, 13, "#263d36", &anchors[0].2);
+    push_text(&mut svg, left, 88.0, 13, context.style.label, &anchors[0].0);
+    push_text(
+        &mut svg,
+        left,
+        370.0,
+        13,
+        context.style.label,
+        &anchors[0].2,
+    );
     for (index, anchor) in anchors.iter().enumerate() {
         let source = scale(anchor.1, source_min, source_max);
         let target = scale(anchor.3, target_min, target_max);
-        svg.push_str(&format!("<path d=\"M {source:.1} 116 C {source:.1} 190, {target:.1} 250, {target:.1} 324\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"0.55\" stroke-width=\"2\"><title>{} -> {}</title></path>", color_for(&format!("{}:{}", anchor.0, anchor.2)), xml_escape(&anchor.0), xml_escape(&anchor.2)));
+        svg.push_str(&format!("<path d=\"M {source:.1} 116 C {source:.1} 190, {target:.1} 250, {target:.1} 324\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"0.55\" stroke-width=\"2\"><title>{} -> {}</title></path>", context.style.category_color(&format!("{}:{}", anchor.0, anchor.2)), xml_escape(&anchor.0), xml_escape(&anchor.2)));
         if index >= MAX_VISUAL_ITEMS {
             break;
         }
     }
     svg.push_str("</svg>");
     write_new_output(output, svg.as_bytes())?;
+    let (reported_width, reported_height) = context.figure.reported(width, height);
     Ok(SvgVisualizationResult {
         visualization_type: format!("synteny-{}", options.style.as_str()),
         output_path: output.display().to_string(),
-        width,
-        height,
+        width: reported_width,
+        height: reported_height,
         track_count: 2,
         glyph_count: anchors.len() as u64,
-        warnings: Vec::new(),
+        warnings,
     })
 }
 
 fn render_multiple_synteny_svg(
     output: &Path,
     anchors: &[(String, f64, String, f64)],
+    context: &SpecContext,
+    warnings: Vec<String>,
 ) -> Result<SvgVisualizationResult, VisualizationError> {
     let mut labels = BTreeSet::new();
     for (source_id, _, target_id, _) in anchors {
@@ -558,19 +727,19 @@ fn render_multiple_synteny_svg(
             .unwrap_or(0) as f64
             * 86.0
     };
-    let mut svg = svg_header(width, height, "Multiple synteny anchors");
-    push_text(
-        &mut svg,
-        24.0,
-        34.0,
-        20,
-        "#18332b",
-        "Multiple synteny anchors",
-    );
+    let heading = context
+        .title
+        .as_deref()
+        .unwrap_or("Multiple synteny anchors");
+    let mut svg = svg_header(width, height, heading, context);
+    push_text(&mut svg, 24.0, 34.0, 20, context.style.heading, heading);
+    if let Some(subtitle) = &context.subtitle {
+        push_text(&mut svg, 24.0, 52.0, 13, context.style.muted, subtitle);
+    }
     for label in &labels {
         let y = y_for(label);
         svg.push_str(&format!("<line x1=\"{left}\" y1=\"{y:.1}\" x2=\"{right}\" y2=\"{y:.1}\" stroke=\"#536b78\" stroke-width=\"8\"/>"));
-        push_text(&mut svg, 20.0, y + 5.0, 13, "#263d36", label);
+        push_text(&mut svg, 20.0, y + 5.0, 13, context.style.label, label);
     }
     for (source_id, source_position, target_id, target_position) in anchors {
         if !labels.contains(source_id) || !labels.contains(target_id) {
@@ -581,24 +750,27 @@ fn render_multiple_synteny_svg(
         let sy = y_for(source_id);
         let ty = y_for(target_id);
         let control_y = (sy + ty) / 2.0;
-        svg.push_str(&format!("<path d=\"M {sx:.1} {sy:.1} C {sx:.1} {control_y:.1}, {tx:.1} {control_y:.1}, {tx:.1} {ty:.1}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"0.52\" stroke-width=\"2\"><title>{} -&gt; {}</title></path>", color_for(&format!("{source_id}:{target_id}")), xml_escape(source_id), xml_escape(target_id)));
+        svg.push_str(&format!("<path d=\"M {sx:.1} {sy:.1} C {sx:.1} {control_y:.1}, {tx:.1} {control_y:.1}, {tx:.1} {ty:.1}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"0.52\" stroke-width=\"2\"><title>{} -&gt; {}</title></path>", context.style.category_color(&format!("{source_id}:{target_id}")), xml_escape(source_id), xml_escape(target_id)));
     }
     svg.push_str("</svg>");
     write_new_output(output, svg.as_bytes())?;
+    let (reported_width, reported_height) = context.figure.reported(width, height);
     Ok(SvgVisualizationResult {
         visualization_type: "synteny-multiple".to_owned(),
         output_path: output.display().to_string(),
-        width,
-        height,
+        width: reported_width,
+        height: reported_height,
         track_count: track_count as u64,
         glyph_count: anchors.len() as u64,
-        warnings: Vec::new(),
+        warnings,
     })
 }
 
 fn render_circular_synteny_svg(
     output: &Path,
     anchors: &[(String, f64, String, f64)],
+    context: &SpecContext,
+    warnings: Vec<String>,
 ) -> Result<SvgVisualizationResult, VisualizationError> {
     let width = DEFAULT_VISUALIZATION_WIDTH;
     let height = 760;
@@ -624,31 +796,32 @@ fn render_circular_synteny_svg(
         let theta = angle(value, offset);
         (cx + radius * theta.cos(), cy + radius * theta.sin())
     };
-    let mut svg = svg_header(width, height, "Circular synteny anchors");
-    push_text(
-        &mut svg,
-        24.0,
-        34.0,
-        20,
-        "#18332b",
-        "Circular synteny anchors",
-    );
+    let heading = context
+        .title
+        .as_deref()
+        .unwrap_or("Circular synteny anchors");
+    let mut svg = svg_header(width, height, heading, context);
+    push_text(&mut svg, 24.0, 34.0, 20, context.style.heading, heading);
+    if let Some(subtitle) = &context.subtitle {
+        push_text(&mut svg, 24.0, 52.0, 13, context.style.muted, subtitle);
+    }
     svg.push_str(&format!("<path d=\"M {:.1} {:.1} A {radius} {radius} 0 0 1 {:.1} {:.1}\" fill=\"none\" stroke=\"#294c62\" stroke-width=\"12\"/><path d=\"M {:.1} {:.1} A {radius} {radius} 0 0 1 {:.1} {:.1}\" fill=\"none\" stroke=\"#6c5634\" stroke-width=\"12\"/>", cx - radius, cy, cx + radius, cy, cx + radius, cy, cx - radius, cy));
     for (source_id, source_position, target_id, target_position) in anchors {
         let (sx, sy) = point(*source_position, std::f64::consts::PI);
         let (tx, ty) = point(*target_position, 0.0);
-        svg.push_str(&format!("<path d=\"M {sx:.1} {sy:.1} Q {cx:.1} {cy:.1} {tx:.1} {ty:.1}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"0.5\" stroke-width=\"2\"><title>{} -&gt; {}</title></path>", color_for(&format!("{source_id}:{target_id}")), xml_escape(source_id), xml_escape(target_id)));
+        svg.push_str(&format!("<path d=\"M {sx:.1} {sy:.1} Q {cx:.1} {cy:.1} {tx:.1} {ty:.1}\" fill=\"none\" stroke=\"{}\" stroke-opacity=\"0.5\" stroke-width=\"2\"><title>{} -&gt; {}</title></path>", context.style.category_color(&format!("{source_id}:{target_id}")), xml_escape(source_id), xml_escape(target_id)));
     }
     svg.push_str("</svg>");
     write_new_output(output, svg.as_bytes())?;
+    let (reported_width, reported_height) = context.figure.reported(width, height);
     Ok(SvgVisualizationResult {
         visualization_type: "synteny-circular".to_owned(),
         output_path: output.display().to_string(),
-        width,
-        height,
+        width: reported_width,
+        height: reported_height,
         track_count: 2,
         glyph_count: anchors.len() as u64,
-        warnings: Vec::new(),
+        warnings,
     })
 }
 
@@ -656,6 +829,22 @@ pub fn render_annotation_structure_svg_path(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
     options: &AnnotationStructureOptions,
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    render_annotation_structure_svg_path_with_spec(input, output, options, &PlotSpec::default())
+}
+
+/// PlotSpec-aware entry behind [`render_annotation_structure_svg_path`].
+///
+/// The spec overrides the SVG `<title>` element, adds an optional subtitle
+/// under the locus heading, toggles the feature row guides (`grid`), swaps
+/// the theme colors and category palette, and rescales the displayed figure
+/// size. Axis fields are reported as ignored warnings; the visible heading
+/// always keeps the locus label.
+pub fn render_annotation_structure_svg_path_with_spec(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &AnnotationStructureOptions,
+    plot_spec: &PlotSpec,
 ) -> Result<SvgVisualizationResult, VisualizationError> {
     validate_item_limit(options.max_features, "max_features")?;
     let features = annotation_visual_features_path(input)?;
@@ -669,15 +858,40 @@ pub fn render_annotation_structure_svg_path(
             options.max_features
         ));
     }
+    collect_generic_spec_warnings(plot_spec, &mut warnings);
+    note_unsupported_axis_fields(
+        plot_spec,
+        &mut warnings,
+        false,
+        false,
+        true,
+        "the annotation renderer",
+    );
+    if !plot_spec.title.trim().is_empty() {
+        warnings.push(
+            "title is applied to the SVG <title> element only; the visible heading keeps the locus label"
+                .to_owned(),
+        );
+    }
+    let context = SpecContext::resolve(plot_spec, &mut warnings);
     let width = DEFAULT_VISUALIZATION_WIDTH;
     let height = 120_u32.saturating_add((selected.len() as u32).saturating_mul(34));
-    let svg = annotation_svg(&selected, &seqid, locus_start, locus_end, width, height);
+    let svg = annotation_svg(
+        &selected,
+        &seqid,
+        locus_start,
+        locus_end,
+        width,
+        height,
+        &context,
+    );
     write_new_output(output.as_ref(), svg.as_bytes())?;
+    let (reported_width, reported_height) = context.figure.reported(width, height);
     Ok(SvgVisualizationResult {
         visualization_type: "annotation-structure".to_owned(),
         output_path: output.as_ref().to_string_lossy().into_owned(),
-        width,
-        height,
+        width: reported_width,
+        height: reported_height,
         track_count: selected.len() as u64,
         glyph_count: selected.len() as u64,
         warnings,
@@ -688,6 +902,21 @@ pub fn render_domain_architecture_svg_path(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
     options: &DomainArchitectureOptions,
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    render_domain_architecture_svg_path_with_spec(input, output, options, &PlotSpec::default())
+}
+
+/// PlotSpec-aware entry behind [`render_domain_architecture_svg_path`].
+///
+/// The spec overrides the document title and visible heading (plus an
+/// optional subtitle), the theme colors, the domain palette, and the
+/// displayed figure size. Axis fields are reported as ignored warnings
+/// because hits are laid out along the protein backbone.
+pub fn render_domain_architecture_svg_path_with_spec(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &DomainArchitectureOptions,
+    plot_spec: &PlotSpec,
 ) -> Result<SvgVisualizationResult, VisualizationError> {
     validate_item_limit(options.max_sequences, "max_sequences")?;
     validate_item_limit(options.max_domains, "max_domains")?;
@@ -742,15 +971,26 @@ pub fn render_domain_architecture_svg_path(
             options.max_domains
         ));
     }
+    collect_generic_spec_warnings(plot_spec, &mut warnings);
+    note_unsupported_axis_fields(
+        plot_spec,
+        &mut warnings,
+        false,
+        false,
+        false,
+        "the domain renderer",
+    );
+    let context = SpecContext::resolve(plot_spec, &mut warnings);
     let width = DEFAULT_VISUALIZATION_WIDTH;
     let height = 100_u32.saturating_add((groups.len() as u32).saturating_mul(74));
-    let svg = domain_svg(&groups, width, height);
+    let svg = domain_svg(&groups, width, height, &context);
     write_new_output(output.as_ref(), svg.as_bytes())?;
+    let (reported_width, reported_height) = context.figure.reported(width, height);
     Ok(SvgVisualizationResult {
         visualization_type: "protein-domain-architecture".to_owned(),
         output_path: output.as_ref().to_string_lossy().into_owned(),
-        width,
-        height,
+        width: reported_width,
+        height: reported_height,
         track_count: groups.len() as u64,
         glyph_count: retained as u64,
         warnings,
@@ -762,35 +1002,139 @@ pub fn render_enrichment_svg_path(
     associations: impl AsRef<Path>,
     output: impl AsRef<Path>,
     kind: EnrichmentKind,
+    analysis_options: EnrichmentOptions,
+    visualization_options: EnrichmentVisualizationOptions,
+) -> Result<SvgVisualizationResult, VisualizationError> {
+    render_enrichment_svg_path_with_spec(
+        genes,
+        associations,
+        output,
+        kind,
+        analysis_options,
+        visualization_options,
+        &PlotSpec::default(),
+    )
+}
+
+/// PlotSpec-aware entry behind [`render_enrichment_svg_path`].
+///
+/// The spec overrides the document title and visible heading (plus an
+/// optional subtitle), the value-axis caption (`x_label`), the value-axis
+/// window (`x_range`, clamping outlier terms), the theme colors, the term
+/// palette, the row guides of the dot plot (`grid`), and the displayed
+/// figure size. `y_label` and every network axis field are reported as
+/// ignored warnings.
+pub fn render_enrichment_svg_path_with_spec(
+    genes: impl AsRef<Path>,
+    associations: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    kind: EnrichmentKind,
     mut analysis_options: EnrichmentOptions,
     visualization_options: EnrichmentVisualizationOptions,
+    plot_spec: &PlotSpec,
 ) -> Result<SvgVisualizationResult, VisualizationError> {
     validate_item_limit(visualization_options.max_terms, "max_terms")?;
     analysis_options.max_terms = visualization_options.max_terms;
     if visualization_options.style == EnrichmentPlotStyle::Network {
         analysis_options.include_genes = true;
     }
-    let result = overrepresentation_path(genes, associations, kind, analysis_options)?;
+    let mut result = overrepresentation_path(genes, associations, kind, analysis_options)?;
     if result.terms.is_empty() {
         return Err(VisualizationError::EmptyInput(
             "enrichment result contains no reportable terms".to_owned(),
         ));
     }
+    let mut warnings = std::mem::take(&mut result.warnings);
+    collect_generic_spec_warnings(plot_spec, &mut warnings);
+    let value_axis = if visualization_options.style == EnrichmentPlotStyle::Network {
+        note_unsupported_axis_fields(
+            plot_spec,
+            &mut warnings,
+            false,
+            false,
+            false,
+            "the enrichment network",
+        );
+        None
+    } else {
+        if plot_spec.y_label.is_some() {
+            warnings
+                .push("y_label is ignored: enrichment terms label the categorical axis".to_owned());
+        }
+        if visualization_options.style == EnrichmentPlotStyle::Bar && !plot_spec.grid {
+            warnings.push(
+                "grid=false is ignored: the enrichment bar renderer draws no gridlines".to_owned(),
+            );
+        }
+        let native_maximum = result
+            .terms
+            .iter()
+            .map(|term| enrichment_value(term, visualization_options.style))
+            .filter(|value| value.is_finite())
+            .fold(0.0_f64, f64::max);
+        match usable_range(plot_spec.x_range, &mut warnings, "x") {
+            Some((minimum, maximum)) => {
+                let outside = result
+                    .terms
+                    .iter()
+                    .filter(|term| {
+                        let value = enrichment_value(term, visualization_options.style);
+                        value < minimum || value > maximum
+                    })
+                    .count();
+                if outside > 0 {
+                    warnings.push(format!(
+                        "x_range clamped {outside} terms outside the requested value window"
+                    ));
+                }
+                Some(EnrichmentValueAxis { minimum, maximum })
+            }
+            None => Some(EnrichmentValueAxis::native(native_maximum)),
+        }
+    };
+    let context = SpecContext::resolve(plot_spec, &mut warnings);
+    let native_caption = match visualization_options.style {
+        EnrichmentPlotStyle::Bar => "-log10 adjusted p-value",
+        EnrichmentPlotStyle::Dot => "Fold enrichment",
+        EnrichmentPlotStyle::Network => "",
+    };
+    let axis_caption = plot_spec
+        .x_label
+        .as_deref()
+        .and_then(non_empty)
+        .unwrap_or_else(|| native_caption.to_owned());
     let width = DEFAULT_VISUALIZATION_WIDTH;
     let (svg, height, glyph_count) = match visualization_options.style {
-        EnrichmentPlotStyle::Bar => enrichment_bar_svg(&result, width),
-        EnrichmentPlotStyle::Dot => enrichment_dot_svg(&result, width),
-        EnrichmentPlotStyle::Network => enrichment_network_svg(&result, width),
+        EnrichmentPlotStyle::Bar => enrichment_bar_svg(
+            &result,
+            width,
+            &context,
+            value_axis
+                .as_ref()
+                .expect("the bar renderer always keeps a value axis"),
+            &axis_caption,
+        ),
+        EnrichmentPlotStyle::Dot => enrichment_dot_svg(
+            &result,
+            width,
+            &context,
+            value_axis
+                .as_ref()
+                .expect("the dot renderer always keeps a value axis"),
+            &axis_caption,
+        ),
+        EnrichmentPlotStyle::Network => enrichment_network_svg(&result, width, &context),
     };
     write_new_output(output.as_ref(), svg.as_bytes())?;
+    let (reported_width, reported_height) = context.figure.reported(width, height);
     Ok(SvgVisualizationResult {
         visualization_type: format!("enrichment-{}", visualization_options.style.as_str()),
         output_path: output.as_ref().to_string_lossy().into_owned(),
-        width,
-        height,
+        width: reported_width,
+        height: reported_height,
         track_count: result.terms.len() as u64,
         glyph_count,
-        warnings: result.warnings,
+        warnings,
     })
 }
 
@@ -870,6 +1214,7 @@ fn annotation_svg(
     locus_end: u64,
     width: u32,
     height: u32,
+    context: &SpecContext,
 ) -> String {
     let left = 270.0_f64;
     let right = f64::from(width) - 40.0;
@@ -877,15 +1222,23 @@ fn annotation_svg(
         .saturating_sub(locus_start)
         .saturating_add(1)
         .max(1) as f64;
-    let mut svg = svg_header(width, height, "Annotation structure");
+    let mut svg = svg_header(
+        width,
+        height,
+        context.document_title("Annotation structure"),
+        context,
+    );
     push_text(
         &mut svg,
         24.0,
         32.0,
         20,
-        "#18332b",
+        context.style.heading,
         &format!("{}:{}-{}", seqid, locus_start, locus_end),
     );
+    if let Some(subtitle) = &context.subtitle {
+        push_text(&mut svg, 24.0, 48.0, 12, context.style.muted, subtitle);
+    }
     svg.push_str(&format!(
         "<line x1=\"{left:.1}\" y1=\"58\" x2=\"{right:.1}\" y2=\"58\" stroke=\"#78928a\" stroke-width=\"1\"/>"
     ));
@@ -906,16 +1259,18 @@ fn annotation_svg(
             24.0,
             y + 5.0,
             13,
-            "#263d36",
+            context.style.label,
             &format!("{}  {}", feature.feature_type, truncate_label(label, 26)),
         );
-        svg.push_str(&format!(
-            "<line x1=\"{left:.1}\" y1=\"{y:.1}\" x2=\"{right:.1}\" y2=\"{y:.1}\" stroke=\"#d7e1dd\" stroke-width=\"1\"/>"
-        ));
+        if context.grid {
+            svg.push_str(&format!(
+                "<line x1=\"{left:.1}\" y1=\"{y:.1}\" x2=\"{right:.1}\" y2=\"{y:.1}\" stroke=\"#d7e1dd\" stroke-width=\"1\"/>"
+            ));
+        }
         svg.push_str(&format!(
             "<rect x=\"{x:.1}\" y=\"{:.1}\" width=\"{feature_width:.1}\" height=\"16\" rx=\"3\" fill=\"{}\"><title>{}</title></rect>",
             y - 8.0,
-            color_for(&feature.feature_type),
+            context.style.category_color(&feature.feature_type),
             xml_escape(&format!(
                 "{} {}:{}-{} ({})",
                 feature.feature_type, feature.seqid, feature.start, feature.end, feature.strand
@@ -926,18 +1281,23 @@ fn annotation_svg(
     svg
 }
 
-fn domain_svg(groups: &[(String, Vec<ProteinDomainHit>)], width: u32, height: u32) -> String {
+fn domain_svg(
+    groups: &[(String, Vec<ProteinDomainHit>)],
+    width: u32,
+    height: u32,
+    context: &SpecContext,
+) -> String {
     let left = 250.0_f64;
     let right = f64::from(width) - 40.0;
-    let mut svg = svg_header(width, height, "Protein domain architecture");
-    push_text(
-        &mut svg,
-        24.0,
-        32.0,
-        20,
-        "#18332b",
-        "Protein domain architecture",
-    );
+    let heading = context
+        .title
+        .as_deref()
+        .unwrap_or("Protein domain architecture");
+    let mut svg = svg_header(width, height, heading, context);
+    push_text(&mut svg, 24.0, 32.0, 20, context.style.heading, heading);
+    if let Some(subtitle) = &context.subtitle {
+        push_text(&mut svg, 24.0, 50.0, 13, context.style.muted, subtitle);
+    }
     for (index, (sequence_id, hits)) in groups.iter().enumerate() {
         let y = 82.0 + index as f64 * 74.0;
         let sequence_length = hits
@@ -952,7 +1312,7 @@ fn domain_svg(groups: &[(String, Vec<ProteinDomainHit>)], width: u32, height: u3
             24.0,
             y + 5.0,
             14,
-            "#263d36",
+            context.style.label,
             &truncate_label(sequence_id, 30),
         );
         svg.push_str(&format!(
@@ -966,7 +1326,7 @@ fn domain_svg(groups: &[(String, Vec<ProteinDomainHit>)], width: u32, height: u3
             svg.push_str(&format!(
                 "<rect x=\"{x:.1}\" y=\"{:.1}\" width=\"{domain_width:.1}\" height=\"24\" rx=\"5\" fill=\"{}\" stroke=\"#ffffff\" stroke-width=\"1\"><title>{}</title></rect>",
                 y - 12.0,
-                color_for(&hit.source),
+                context.style.category_color(&hit.source),
                 xml_escape(&format!(
                     "{} {} {}-{}",
                     hit.source,
@@ -981,7 +1341,7 @@ fn domain_svg(groups: &[(String, Vec<ProteinDomainHit>)], width: u32, height: u3
             right - 70.0,
             y + 28.0,
             11,
-            "#56746a",
+            context.style.muted,
             &format!("{sequence_length} aa"),
         );
     }
@@ -989,49 +1349,49 @@ fn domain_svg(groups: &[(String, Vec<ProteinDomainHit>)], width: u32, height: u3
     svg
 }
 
-fn enrichment_bar_svg(result: &EnrichmentResult, width: u32) -> (String, u32, u64) {
+fn enrichment_bar_svg(
+    result: &EnrichmentResult,
+    width: u32,
+    context: &SpecContext,
+    value_axis: &EnrichmentValueAxis,
+    axis_caption: &str,
+) -> (String, u32, u64) {
     let height = 110_u32.saturating_add((result.terms.len() as u32).saturating_mul(38));
     let left = 390.0_f64;
     let right = f64::from(width) - 60.0;
-    let maximum = result
-        .terms
-        .iter()
-        .map(|term| negative_log10(term.adjusted_p_value))
-        .fold(0.0_f64, f64::max)
-        .max(1.0);
-    let mut svg = svg_header(width, height, "Enrichment bar plot");
-    push_text(
-        &mut svg,
-        24.0,
-        32.0,
-        20,
-        "#18332b",
-        "Enrichment significance",
+    let heading = context
+        .title
+        .as_deref()
+        .unwrap_or("Enrichment significance");
+    let mut svg = svg_header(
+        width,
+        height,
+        context.document_title("Enrichment bar plot"),
+        context,
     );
-    push_text(
-        &mut svg,
-        left,
-        58.0,
-        12,
-        "#56746a",
-        "-log10 adjusted p-value",
-    );
+    push_text(&mut svg, 24.0, 32.0, 20, context.style.heading, heading);
+    if let Some(subtitle) = &context.subtitle {
+        push_text(&mut svg, 24.0, 50.0, 12, context.style.muted, subtitle);
+    }
+    push_text(&mut svg, left, 58.0, 12, context.style.muted, axis_caption);
     for (index, term) in result.terms.iter().enumerate() {
         let y = 84.0 + index as f64 * 38.0;
         let value = negative_log10(term.adjusted_p_value);
-        let bar_width = value / maximum * (right - left);
+        let bar_width = value_axis.fraction(value) * (right - left);
         push_text(
             &mut svg,
             24.0,
             y + 5.0,
             13,
-            "#263d36",
+            context.style.label,
             &truncate_label(&term_label(term), 48),
         );
         svg.push_str(&format!(
             "<rect x=\"{left:.1}\" y=\"{:.1}\" width=\"{bar_width:.1}\" height=\"20\" rx=\"4\" fill=\"{}\"><title>{:.4}</title></rect>",
             y - 10.0,
-            color_for(term.namespace.as_deref().unwrap_or("enrichment")),
+            context
+                .style
+                .category_color(term.namespace.as_deref().unwrap_or("enrichment")),
             value
         ));
     }
@@ -1039,23 +1399,31 @@ fn enrichment_bar_svg(result: &EnrichmentResult, width: u32) -> (String, u32, u6
     (svg, height, result.terms.len() as u64)
 }
 
-fn enrichment_dot_svg(result: &EnrichmentResult, width: u32) -> (String, u32, u64) {
+fn enrichment_dot_svg(
+    result: &EnrichmentResult,
+    width: u32,
+    context: &SpecContext,
+    value_axis: &EnrichmentValueAxis,
+    axis_caption: &str,
+) -> (String, u32, u64) {
     let height = 110_u32.saturating_add((result.terms.len() as u32).saturating_mul(42));
     let left = 390.0_f64;
     let right = f64::from(width) - 60.0;
-    let maximum = result
-        .terms
-        .iter()
-        .map(|term| term.fold_enrichment)
-        .filter(|value| value.is_finite())
-        .fold(0.0_f64, f64::max)
-        .max(1.0);
-    let mut svg = svg_header(width, height, "Enrichment dot plot");
-    push_text(&mut svg, 24.0, 32.0, 20, "#18332b", "Enrichment dot plot");
-    push_text(&mut svg, left, 58.0, 12, "#56746a", "Fold enrichment");
+    let heading = context.title.as_deref().unwrap_or("Enrichment dot plot");
+    let mut svg = svg_header(
+        width,
+        height,
+        context.document_title("Enrichment dot plot"),
+        context,
+    );
+    push_text(&mut svg, 24.0, 32.0, 20, context.style.heading, heading);
+    if let Some(subtitle) = &context.subtitle {
+        push_text(&mut svg, 24.0, 50.0, 12, context.style.muted, subtitle);
+    }
+    push_text(&mut svg, left, 58.0, 12, context.style.muted, axis_caption);
     for (index, term) in result.terms.iter().enumerate() {
         let y = 86.0 + index as f64 * 42.0;
-        let x = left + term.fold_enrichment.max(0.0) / maximum * (right - left);
+        let x = left + value_axis.fraction(term.fold_enrichment) * (right - left);
         let radius = 5.0 + (term.overlap_count as f64).sqrt().min(10.0);
         let opacity = (0.35 + negative_log10(term.adjusted_p_value) / 20.0).clamp(0.35, 1.0);
         push_text(
@@ -1063,15 +1431,19 @@ fn enrichment_dot_svg(result: &EnrichmentResult, width: u32) -> (String, u32, u6
             24.0,
             y + 5.0,
             13,
-            "#263d36",
+            context.style.label,
             &truncate_label(&term_label(term), 48),
         );
-        svg.push_str(&format!(
-            "<line x1=\"{left:.1}\" y1=\"{y:.1}\" x2=\"{right:.1}\" y2=\"{y:.1}\" stroke=\"#edf2f0\"/>"
-        ));
+        if context.grid {
+            svg.push_str(&format!(
+                "<line x1=\"{left:.1}\" y1=\"{y:.1}\" x2=\"{right:.1}\" y2=\"{y:.1}\" stroke=\"#edf2f0\"/>"
+            ));
+        }
         svg.push_str(&format!(
             "<circle cx=\"{x:.1}\" cy=\"{y:.1}\" r=\"{radius:.1}\" fill=\"{}\" fill-opacity=\"{opacity:.3}\"><title>fold {:.4}; overlap {}; adjusted p {:.4e}</title></circle>",
-            color_for(term.namespace.as_deref().unwrap_or("enrichment")),
+            context
+                .style
+                .category_color(term.namespace.as_deref().unwrap_or("enrichment")),
             term.fold_enrichment,
             term.overlap_count,
             term.adjusted_p_value
@@ -1081,7 +1453,11 @@ fn enrichment_dot_svg(result: &EnrichmentResult, width: u32) -> (String, u32, u6
     (svg, height, result.terms.len() as u64)
 }
 
-fn enrichment_network_svg(result: &EnrichmentResult, width: u32) -> (String, u32, u64) {
+fn enrichment_network_svg(
+    result: &EnrichmentResult,
+    width: u32,
+    context: &SpecContext,
+) -> (String, u32, u64) {
     let terms = result.terms.iter().take(12).collect::<Vec<_>>();
     let genes = terms
         .iter()
@@ -1095,15 +1471,20 @@ fn enrichment_network_svg(result: &EnrichmentResult, width: u32) -> (String, u32
     let height = 120_u32.saturating_add((rows as u32).saturating_mul(34));
     let term_x = 290.0_f64;
     let gene_x = f64::from(width) - 250.0;
-    let mut svg = svg_header(width, height, "Enrichment term-gene network");
-    push_text(
-        &mut svg,
-        24.0,
-        32.0,
-        20,
-        "#18332b",
-        "Enrichment term-gene network",
+    let heading = context
+        .title
+        .as_deref()
+        .unwrap_or("Enrichment term-gene network");
+    let mut svg = svg_header(
+        width,
+        height,
+        context.document_title("Enrichment term-gene network"),
+        context,
     );
+    push_text(&mut svg, 24.0, 32.0, 20, context.style.heading, heading);
+    if let Some(subtitle) = &context.subtitle {
+        push_text(&mut svg, 24.0, 50.0, 12, context.style.muted, subtitle);
+    }
     let term_positions = terms
         .iter()
         .enumerate()
@@ -1132,14 +1513,16 @@ fn enrichment_network_svg(result: &EnrichmentResult, width: u32) -> (String, u32
         let y = term_positions[term.term_id.as_str()];
         svg.push_str(&format!(
             "<circle cx=\"{term_x:.1}\" cy=\"{y:.1}\" r=\"8\" fill=\"{}\"/>",
-            color_for(term.namespace.as_deref().unwrap_or("term"))
+            context
+                .style
+                .category_color(term.namespace.as_deref().unwrap_or("term"))
         ));
         push_text(
             &mut svg,
             24.0,
             y + 5.0,
             12,
-            "#263d36",
+            context.style.label,
             &truncate_label(&term_label(term), 38),
         );
     }
@@ -1153,7 +1536,7 @@ fn enrichment_network_svg(result: &EnrichmentResult, width: u32) -> (String, u32
             gene_x + 14.0,
             y + 5.0,
             12,
-            "#263d36",
+            context.style.label,
             &truncate_label(gene, 28),
         );
     }
@@ -1165,6 +1548,41 @@ fn enrichment_network_svg(result: &EnrichmentResult, width: u32) -> (String, u32
             .saturating_add(terms.len() as u64)
             .saturating_add(genes.len() as u64),
     )
+}
+
+/// The numeric value plotted on the shared value axis by the enrichment bar
+/// and dot renderers.
+fn enrichment_value(term: &crate::functional::EnrichmentTerm, style: EnrichmentPlotStyle) -> f64 {
+    match style {
+        EnrichmentPlotStyle::Bar => negative_log10(term.adjusted_p_value),
+        EnrichmentPlotStyle::Dot | EnrichmentPlotStyle::Network => term.fold_enrichment,
+    }
+}
+
+/// The numeric value axis of the enrichment bar and dot renderers: the
+/// data-derived extent or the window requested through `x_range`.
+struct EnrichmentValueAxis {
+    minimum: f64,
+    maximum: f64,
+}
+
+impl EnrichmentValueAxis {
+    /// The data-derived axis `[0, max(values, 1)]` used before PlotSpec.
+    fn native(maximum: f64) -> Self {
+        Self {
+            minimum: 0.0,
+            maximum: maximum.max(1.0),
+        }
+    }
+
+    /// Scales a value onto `[0, 1]` of the axis span, clamping outliers
+    /// back onto the requested window.
+    fn fraction(&self, value: f64) -> f64 {
+        if self.maximum <= self.minimum {
+            return 0.0;
+        }
+        ((value - self.minimum) / (self.maximum - self.minimum)).clamp(0.0, 1.0)
+    }
 }
 
 fn term_label(term: &crate::functional::EnrichmentTerm) -> String {
@@ -1212,10 +1630,22 @@ pub(crate) fn write_new_output(path: &Path, bytes: &[u8]) -> Result<(), Visualiz
     Ok(())
 }
 
-fn svg_header(width: u32, height: u32, title: &str) -> String {
+fn svg_header(width: u32, height: u32, title: &str, context: &SpecContext) -> String {
+    let dimensions = match context.figure {
+        FigureOverride::Native => {
+            format!("width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\"")
+        }
+        FigureOverride::Scaled {
+            width: figure_width,
+            height: figure_height,
+        } => format!(
+            "width=\"{figure_width}\" height=\"{figure_height}\" viewBox=\"0 0 {width} {height}\""
+        ),
+    };
     format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\"><title>{}</title><rect width=\"100%\" height=\"100%\" fill=\"#fbfdfc\"/>",
-        xml_escape(title)
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\" {dimensions}><title>{}</title><rect width=\"100%\" height=\"100%\" fill=\"{}\"/>",
+        xml_escape(title),
+        context.style.background
     )
 }
 
@@ -1251,15 +1681,303 @@ fn xml_escape(value: &str) -> String {
     escaped
 }
 
-fn color_for(value: &str) -> &'static str {
-    const COLORS: [&str; 10] = [
-        "#2f68a5", "#277c63", "#c27e22", "#b1433f", "#2a8f9d", "#7955a3", "#b35d8a", "#6d8034",
-        "#87633b", "#4f6f9d",
-    ];
-    let hash = value.bytes().fold(2_166_136_261_u32, |hash, byte| {
-        hash.wrapping_mul(16_777_619) ^ u32::from(byte)
-    });
-    COLORS[hash as usize % COLORS.len()]
+/// Built-in category palettes for [`PlotSpec::palette`]; `set2` is the exact
+/// table every renderer used before PlotSpec existed, so the default spec
+/// keeps legacy output byte-identical.
+const PALETTE_SET1: &[&str] = &[
+    "#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33", "#a65628", "#f781bf",
+    "#999999", "#8c564b",
+];
+const PALETTE_SET2: &[&str] = &[
+    "#2f68a5", "#277c63", "#c27e22", "#b1433f", "#2a8f9d", "#7955a3", "#b35d8a", "#6d8034",
+    "#87633b", "#4f6f9d",
+];
+const PALETTE_SET3: &[&str] = &[
+    "#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3", "#fdb462", "#b3de69", "#fccde5",
+    "#d9d9d9", "#bc80bd",
+];
+const PALETTE_PASTEL: &[&str] = &[
+    "#fbb4ae", "#b3cde3", "#ccebc5", "#decbe4", "#fed9a6", "#ffffcc", "#e5d8bd", "#fddaec",
+    "#f4a582", "#92c5de",
+];
+const PALETTE_DARK2: &[&str] = &[
+    "#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666",
+    "#6a3d9a", "#b15928",
+];
+const PALETTE_PAIRED: &[&str] = &[
+    "#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00",
+    "#cab2d6", "#6a3d9a",
+];
+
+/// Maps a PlotSpec palette name onto a built-in color table.
+fn palette_named(name: &str) -> Option<&'static [&'static str]> {
+    match name.trim().to_ascii_lowercase().as_str() {
+        "set1" => Some(PALETTE_SET1),
+        "set2" => Some(PALETTE_SET2),
+        "set3" => Some(PALETTE_SET3),
+        "pastel" => Some(PALETTE_PASTEL),
+        "dark2" => Some(PALETTE_DARK2),
+        "paired" => Some(PALETTE_PAIRED),
+        _ => None,
+    }
+}
+
+/// Resolved theme colors and category palette for one rendering pass.
+#[derive(Clone, Copy)]
+struct SvgStyle {
+    background: &'static str,
+    heading: &'static str,
+    label: &'static str,
+    muted: &'static str,
+    axis: &'static str,
+    palette: &'static [&'static str],
+}
+
+impl SvgStyle {
+    /// The exact colors every renderer used before PlotSpec existed.
+    const fn native() -> Self {
+        Self {
+            background: "#fbfdfc",
+            heading: "#18332b",
+            label: "#263d36",
+            muted: "#56746a",
+            axis: "#223",
+            palette: PALETTE_SET2,
+        }
+    }
+
+    fn resolve(spec: &PlotSpec, warnings: &mut Vec<String>) -> Self {
+        let mut style = Self::native();
+        match spec.theme {
+            PlotTheme::Light => {}
+            PlotTheme::Dark => {
+                style.background = "#141a22";
+                style.heading = "#e6edf5";
+                style.label = "#c3cfdd";
+                style.muted = "#91a2b4";
+                style.axis = "#9fb2c8";
+            }
+            PlotTheme::Publication => {
+                style.background = "#ffffff";
+                style.heading = "#000000";
+                style.label = "#111111";
+                style.muted = "#444444";
+                style.axis = "#000000";
+            }
+        }
+        if let Some(palette) = palette_named(&spec.palette) {
+            style.palette = palette;
+        } else {
+            warnings.push(format!(
+                "palette {:?} is not a built-in Rust SVG palette; set2 was used",
+                spec.palette
+            ));
+        }
+        style
+    }
+
+    /// Stable category color for a key, hashed exactly like the legacy
+    /// pre-PlotSpec `color_for` helper.
+    fn category_color(&self, key: &str) -> &'static str {
+        let hash = key.bytes().fold(2_166_136_261_u32, |hash, byte| {
+            hash.wrapping_mul(16_777_619) ^ u32::from(byte)
+        });
+        self.palette[hash as usize % self.palette.len()]
+    }
+}
+
+/// The figure-sizing strategy resolved from a PlotSpec.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FigureOverride {
+    /// Keep the renderer's native canvas.
+    Native,
+    /// Keep the native `viewBox` geometry but display the document at the
+    /// requested pixel size (SVG `preserveAspectRatio` letterboxes it).
+    Scaled { width: u32, height: u32 },
+}
+
+impl FigureOverride {
+    /// The schema-default figure `{800, 600, 150}` is treated as "unset" so
+    /// legacy callers forwarding `PlotSpec::default()` stay byte-identical;
+    /// any other size rescales the displayed SVG.
+    fn resolve(spec: &PlotSpec, warnings: &mut Vec<String>) -> Self {
+        if spec.figure.dpi != 150 {
+            warnings.push(format!(
+                "figure.dpi={} is not applied: SVG output is resolution-independent",
+                spec.figure.dpi
+            ));
+        }
+        if (spec.figure.width, spec.figure.height) == (800, 600) {
+            return Self::Native;
+        }
+        if spec.figure.width == 0 || spec.figure.height == 0 {
+            warnings.push(
+                "figure width and height must be positive; the native figure size was kept"
+                    .to_owned(),
+            );
+            return Self::Native;
+        }
+        Self::Scaled {
+            width: spec.figure.width,
+            height: spec.figure.height,
+        }
+    }
+
+    /// The width/height reported in [`SvgVisualizationResult`].
+    fn reported(self, width: u32, height: u32) -> (u32, u32) {
+        match self {
+            Self::Native => (width, height),
+            Self::Scaled {
+                width: figure_width,
+                height: figure_height,
+            } => (figure_width, figure_height),
+        }
+    }
+}
+
+/// PlotSpec-derived state threaded through the SVG builders.
+struct SpecContext {
+    style: SvgStyle,
+    figure: FigureOverride,
+    title: Option<String>,
+    subtitle: Option<String>,
+    grid: bool,
+}
+
+impl SpecContext {
+    fn resolve(spec: &PlotSpec, warnings: &mut Vec<String>) -> Self {
+        Self {
+            style: SvgStyle::resolve(spec, warnings),
+            figure: FigureOverride::resolve(spec, warnings),
+            title: non_empty(&spec.title),
+            subtitle: non_empty(&spec.subtitle),
+            grid: spec.grid,
+        }
+    }
+
+    /// Document title: the spec override or the renderer default.
+    fn document_title<'a>(&'a self, default: &'a str) -> &'a str {
+        self.title.as_deref().unwrap_or(default)
+    }
+}
+
+/// Trimmed non-empty string, or `None` when the field is unset.
+fn non_empty(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    (!trimmed.is_empty()).then(|| trimmed.to_owned())
+}
+
+/// Records the PlotSpec fields no Rust SVG renderer can honor.
+fn collect_generic_spec_warnings(spec: &PlotSpec, warnings: &mut Vec<String>) {
+    if spec.x_log || spec.y_log {
+        warnings.push(
+            "x_log/y_log are not supported by the Rust SVG fallback; linear axes were rendered"
+                .to_owned(),
+        );
+    }
+    if !spec.legend {
+        warnings.push("legend=false is ignored: the Rust SVG fallback draws no legend".to_owned());
+    }
+    if spec.font.family.is_some() || spec.font.size != 12 {
+        warnings.push(
+            "font overrides are not applied: the Rust SVG fallback keeps sans-serif at native sizes"
+                .to_owned(),
+        );
+    }
+    if spec.output.format != PlotOutputFormat::Svg {
+        warnings.push(format!(
+            "output.format={} is not produced by the Rust SVG fallback; an SVG document was written",
+            match spec.output.format {
+                PlotOutputFormat::Svg => "svg",
+                PlotOutputFormat::Png => "png",
+                PlotOutputFormat::Pdf => "pdf",
+            }
+        ));
+    }
+    if spec.output.interactive {
+        warnings.push(
+            "output.interactive=true is ignored: the Rust SVG fallback writes static documents"
+                .to_owned(),
+        );
+    }
+    if spec
+        .data
+        .as_object()
+        .is_some_and(|object| !object.is_empty())
+    {
+        warnings.push(
+            "spec.data is ignored: this renderer reads its payload from the input file".to_owned(),
+        );
+    }
+}
+
+/// Records the axis-related PlotSpec fields one renderer cannot honor.
+///
+/// `axis_labels`, `ranges`, and `grid` declare per-renderer support; a field
+/// only produces a warning when it is set/non-default *and* unsupported.
+fn note_unsupported_axis_fields(
+    plot_spec: &PlotSpec,
+    warnings: &mut Vec<String>,
+    axis_labels: bool,
+    ranges: bool,
+    grid: bool,
+    renderer: &str,
+) {
+    if !axis_labels && (plot_spec.x_label.is_some() || plot_spec.y_label.is_some()) {
+        warnings.push(format!(
+            "x_label/y_label are ignored: {renderer} has no labeled numeric axes"
+        ));
+    }
+    if !ranges && (plot_spec.x_range.is_some() || plot_spec.y_range.is_some()) {
+        warnings.push(format!(
+            "x_range/y_range are ignored: {renderer} derives its coordinate domain from the input layout"
+        ));
+    }
+    if !grid && !plot_spec.grid {
+        warnings.push(format!(
+            "grid=false is ignored: {renderer} draws no gridlines"
+        ));
+    }
+}
+
+/// Validates a PlotSpec `[min, max]` window; `None` keeps the data-derived
+/// domain when the range is absent or unusable.
+fn usable_range(
+    range: Option<[f64; 2]>,
+    warnings: &mut Vec<String>,
+    axis: &str,
+) -> Option<(f64, f64)> {
+    let [minimum, maximum] = range?;
+    if minimum.is_finite() && maximum.is_finite() && minimum < maximum {
+        Some((minimum, maximum))
+    } else {
+        warnings.push(format!(
+            "{axis}_range must be two finite numbers with min < max; the data-derived domain was used"
+        ));
+        None
+    }
+}
+
+/// Drops points outside a requested domain window and reports the count.
+fn clip_domain(
+    points: &mut Vec<(f64, f64)>,
+    warnings: &mut Vec<String>,
+    axis: &str,
+    keep: impl Fn(&(f64, f64)) -> bool,
+) {
+    let before = points.len();
+    points.retain(|point| keep(point));
+    let dropped = before - points.len();
+    if dropped > 0 {
+        warnings.push(format!(
+            "{axis}_range clipped {dropped} points outside the requested domain"
+        ));
+    }
+    if points.is_empty() {
+        warnings.push(format!(
+            "{axis}_range excluded every point; only the axes were drawn"
+        ));
+    }
 }
 
 #[cfg(test)]
@@ -1398,6 +2116,163 @@ mod tests {
             assert!(svg.contains(expected_title));
             assert!(svg.contains("<path"));
         }
+        fs::remove_dir_all(temporary).expect("remove visualization directory");
+    }
+
+    #[test]
+    fn default_plot_spec_forwarding_matches_legacy_volcano_and_motif_output() {
+        let temporary = temporary_directory();
+        let input = temporary.join("differential.csv");
+        fs::write(
+            &input,
+            "gene,log2FoldChange,padj\nup,2.0,0.001\ndown,-1.5,0.01\nneutral,0.1,0.8\n",
+        )
+        .expect("write differential table");
+        let legacy_volcano = temporary.join("volcano-legacy.svg");
+        let spec_volcano = temporary.join("volcano-spec.svg");
+        super::render_volcano_svg_path(&input, &legacy_volcano, &Default::default())
+            .expect("legacy volcano");
+        super::render_volcano_svg_path_with_spec(
+            &input,
+            &spec_volcano,
+            &Default::default(),
+            &super::PlotSpec::default(),
+        )
+        .expect("spec-driven volcano");
+        assert_eq!(
+            fs::read_to_string(&legacy_volcano).expect("legacy volcano SVG"),
+            fs::read_to_string(&spec_volcano).expect("spec-driven volcano SVG")
+        );
+
+        let meme = fixture_root().join("tests/fixtures/motifs/tiny.meme");
+        let legacy_motif = temporary.join("motif-legacy.svg");
+        let spec_motif = temporary.join("motif-spec.svg");
+        super::render_motif_logo_svg_path(&meme, &legacy_motif).expect("legacy motif logo");
+        super::render_motif_logo_svg_path_with_spec(
+            &meme,
+            &spec_motif,
+            &super::PlotSpec::default(),
+        )
+        .expect("spec-driven motif logo");
+        assert_eq!(
+            fs::read_to_string(&legacy_motif).expect("legacy motif SVG"),
+            fs::read_to_string(&spec_motif).expect("spec-driven motif SVG")
+        );
+        fs::remove_dir_all(temporary).expect("remove visualization directory");
+    }
+
+    #[test]
+    fn plot_spec_overrides_volcano_title_range_and_figure_size() {
+        let temporary = temporary_directory();
+        let input = temporary.join("differential.csv");
+        fs::write(
+            &input,
+            "gene,log2FoldChange,padj\nup,2.0,0.001\ndown,-1.5,0.01\nneutral,0.1,0.8\n",
+        )
+        .expect("write differential table");
+        let spec = super::PlotSpec {
+            title: "Custom volcano".to_owned(),
+            subtitle: "clipped domain".to_owned(),
+            x_label: Some("effect size".to_owned()),
+            x_range: Some([-1.6, 1.0]),
+            figure: linxira_bio_output::PlotFigure {
+                width: 1000,
+                height: 700,
+                ..Default::default()
+            },
+            ..super::PlotSpec::default()
+        };
+        let output = temporary.join("volcano-spec.svg");
+        let result =
+            super::render_volcano_svg_path_with_spec(&input, &output, &Default::default(), &spec)
+                .expect("render volcano with spec");
+        let svg = fs::read_to_string(&output).expect("spec-driven volcano SVG");
+        assert!(svg.contains("<title>Custom volcano</title>"));
+        assert!(svg.contains("clipped domain"));
+        assert!(svg.contains("effect size"));
+        assert!(svg.contains("width=\"1000\""));
+        assert!(svg.contains("height=\"700\""));
+        assert!(svg.contains("viewBox=\"0 0 1200 760\""));
+        assert_eq!(result.glyph_count, 2);
+        assert_eq!((result.width, result.height), (1000, 700));
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("x_range clipped"))
+        );
+        let default_output = temporary.join("volcano-default.svg");
+        super::render_volcano_svg_path(&input, &default_output, &Default::default())
+            .expect("default volcano");
+        assert_ne!(
+            fs::read_to_string(&default_output).expect("default volcano SVG"),
+            svg
+        );
+        fs::remove_dir_all(temporary).expect("remove visualization directory");
+    }
+
+    #[test]
+    fn plot_spec_theme_palette_and_unsupported_fields_warn() {
+        let temporary = temporary_directory();
+        let meme = fixture_root().join("tests/fixtures/motifs/tiny.meme");
+        let spec = super::PlotSpec {
+            theme: super::PlotTheme::Dark,
+            palette: "no-such-palette".to_owned(),
+            x_log: true,
+            legend: false,
+            font: linxira_bio_output::PlotFont {
+                size: 16,
+                ..Default::default()
+            },
+            output: linxira_bio_output::PlotOutput {
+                format: super::PlotOutputFormat::Png,
+                ..Default::default()
+            },
+            data: serde_json::json!({"letters": ["A", "C", "G", "T"]}),
+            x_label: Some("position".to_owned()),
+            x_range: Some([0.0, 10.0]),
+            ..super::PlotSpec::default()
+        };
+        let output = temporary.join("motif-spec.svg");
+        let result = super::render_motif_logo_svg_path_with_spec(&meme, &output, &spec)
+            .expect("render motif logo with spec");
+        let svg = fs::read_to_string(&output).expect("spec-driven motif SVG");
+        assert!(svg.contains("fill=\"#141a22\""));
+        assert!(!svg.contains("#fbfdfc"));
+        let warnings = result.warnings.join("\n");
+        assert!(warnings.contains("no-such-palette"));
+        assert!(warnings.contains("x_log/y_log"));
+        assert!(warnings.contains("legend"));
+        assert!(warnings.contains("font overrides"));
+        assert!(warnings.contains("output.format=png"));
+        assert!(warnings.contains("spec.data"));
+        assert!(warnings.contains("x_label/y_label"));
+        assert!(warnings.contains("x_range/y_range"));
+        fs::remove_dir_all(temporary).expect("remove visualization directory");
+    }
+
+    #[test]
+    fn plot_spec_palette_and_theme_change_rendered_colors() {
+        let temporary = temporary_directory();
+        let meme = fixture_root().join("tests/fixtures/motifs/tiny.meme");
+        let set2_output = temporary.join("motif-set2.svg");
+        let set1_spec = super::PlotSpec {
+            palette: "set1".to_owned(),
+            ..super::PlotSpec::default()
+        };
+        let set1_output = temporary.join("motif-set1.svg");
+        super::render_motif_logo_svg_path_with_spec(
+            &meme,
+            &set2_output,
+            &super::PlotSpec::default(),
+        )
+        .expect("set2 motif logo");
+        super::render_motif_logo_svg_path_with_spec(&meme, &set1_output, &set1_spec)
+            .expect("set1 motif logo");
+        assert_ne!(
+            fs::read_to_string(&set2_output).expect("set2 motif SVG"),
+            fs::read_to_string(&set1_output).expect("set1 motif SVG")
+        );
         fs::remove_dir_all(temporary).expect("remove visualization directory");
     }
 
