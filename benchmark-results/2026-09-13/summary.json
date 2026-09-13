@@ -29,7 +29,8 @@
     "r_version": "R version 4.6.1 (2026-06-24) -- \"Happy Hop\"",
     "in_container": false,
     "page_cache": "warm",
-    "precision": "high"
+    "precision": "high",
+    "code_revision": "9052bcf2cfbe523b60276a319f6e23ce6eebd509"
   },
   "data_sources": [
     {
