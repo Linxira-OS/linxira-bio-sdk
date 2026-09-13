@@ -64,11 +64,11 @@
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "f4f8c1449f27bf100f18f64307fb6df0dbbc44cffe7076a153479bb797fd8864"
+      "sha256": "dd33ef0a251851f65ee74f989da400ca7155f736a4b21a14b2f13aeb887b3cbc"
     },
     {
       "path": "schemas/output.schema.json",
-      "sha256": "31134c50899fa5844cd08311e78a42e527a9fa9be76b075bd0dcda413569ef2d"
+      "sha256": "2027f79a6e7ef27fb74077f317ae3c5cd256eec7d2770f19f69572652f6217db"
     },
     {
       "path": "src/benchmark_harness.R",
@@ -80,7 +80,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.R",
-      "sha256": "1b47c640e415045eefa9ca30e105a75f5f8fee6fd42820a7ad4bc8756d52b789"
+      "sha256": "3c7518d43156fcaa75b97dc6e6222bda19bf31a86a9761ecabfd1c871d037411"
     },
     {
       "path": "src/implementations/expression_pca_v1.R",
@@ -101,6 +101,26 @@
     {
       "path": "tests/reference/set.venn.v1.items.json",
       "sha256": "1bfaa4ef9b7461209d04d7ad36826a96ed6ae22607443efd6adea76d7baaf318"
+    },
+    {
+      "path": "src/implementations/structure_pdb_summary_v1.R",
+      "sha256": "5f2cc32232ac676a9cc128b461c068752bade8a1ddde71c7d18808617c8ca253"
+    },
+    {
+      "path": "tests/reference/structure.pdb.summary.v1.default.json",
+      "sha256": "5996c153020f2b3c67e1e8cf702308c53e0c8da16ae00b7234898ce540eb4673"
+    },
+    {
+      "path": "tests/reference/structure.pdb.summary.v1.plddt.json",
+      "sha256": "e1ad66efc886afa5ce58c5fe75ddb9055f78547e3d712a243e233bcdbd964fdf"
+    },
+    {
+      "path": "tests/reference/structure.pdb.summary.v1.reference-default.json",
+      "sha256": "009e33fe5d8e8ddd5558e49d4c025bf634fe09c946f5f4836fce3c8df63f4679"
+    },
+    {
+      "path": "tests/reference/structure.pdb.summary.v1.reference-plddt.json",
+      "sha256": "6134b76427b14032b800a44e5e2422fcddec865d0c82175b1e6d9ef55cfe2fbf"
     }
   ],
   "contract": {
@@ -124,6 +144,12 @@
           "csv",
           "tsv"
         ]
+      },
+      {
+        "role": "pdb",
+        "formats": [
+          "pdb"
+        ]
       }
     ],
     "outputs": {
@@ -141,7 +167,8 @@
       "components",
       "scale_features",
       "include_items",
-      "max_intersections"
+      "max_intersections",
+      "interpret_b_factors_as_plddt"
     ]
   }
 }

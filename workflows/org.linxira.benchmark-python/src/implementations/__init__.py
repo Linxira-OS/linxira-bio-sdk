@@ -16,9 +16,11 @@ from types import ModuleType
 from . import expression_pca_v1
 from . import sequence_stats_v1
 from . import set_venn_v1
+from . import structure_pdb_summary_v1
 
 IMPLEMENTATIONS: dict[str, ModuleType] = {
     expression_pca_v1.CAPABILITY: expression_pca_v1,
     sequence_stats_v1.CAPABILITY: sequence_stats_v1,
     set_venn_v1.CAPABILITY: set_venn_v1,
+    structure_pdb_summary_v1.CAPABILITY: structure_pdb_summary_v1,
 }

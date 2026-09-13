@@ -12,9 +12,20 @@ text, gzip, and BGZF are detected by content. mmCIF is not accepted.
 
 ## Parameters
 
-The input path is required. `--alphafold-plddt` explicitly interprets polymer
-atom B-factor values as AlphaFold pLDDT. `--json` returns the standard analysis
-result envelope.
+- The input path is required.
+- `--alphafold-plddt`: explicitly interprets polymer atom B-factor values as
+  AlphaFold pLDDT (worker contract parameter
+  `interpret_b_factors_as_plddt`).
+- `--backend auto|rust|python|r`: the implementation backend. `rust` (and
+  omission) runs the native engine; `python` and `r` route through the worker
+  to the benchmark packs, which port the same fixed-width parser semantics
+  field for field (residue grouping, element inference table, pLDDT bands),
+  so summaries match exactly. Object-model libraries (Biopython `Bio.PDB`,
+  `bio3d`) are deliberately not used for this comparison — their altloc and
+  hetflag handling differ from the engine's contract. `auto` consults
+  `runtime-preferences.json`; a non-rust hit emits a
+  `backend_from_preferences` warning.
+- `--json` returns the standard analysis result envelope.
 
 ## Outputs
 
@@ -50,9 +61,10 @@ part of this analysis capability's result contract.
 
 ## Runtime Dependencies
 
-This is a local Rust capability. It has no Python, R, Java, molecular viewer,
-or external command-line dependency and adds no third-party package beyond the
-already registered serialization and gzip dependencies.
+- `rust` (default): a local Rust capability with no external tools beyond the
+  registered serialization and gzip dependencies.
+- `python` / `r`: the matching benchmark pack; both re-implement the parser
+  with no third-party packages. No network access.
 
 ## Citations
 
@@ -62,6 +74,8 @@ for AlphaFold outputs and is applied only when the caller confirms provenance.
 
 ## Troubleshooting
 
-Use the reported line for malformed fixed-width records. Convert mmCIF with a
-maintained structure tool before this capability, or retain mmCIF for a future
-native parser. Do not use `--alphafold-plddt` for crystallographic B-factors.
+- Use the reported line for malformed fixed-width records. Convert mmCIF with a
+  maintained structure tool before this capability, or retain mmCIF for a future
+  native parser. Do not use `--alphafold-plddt` for crystallographic B-factors.
+- `unknown --backend value`: the flag accepts `auto`, `rust`, `python`, and
+  `r` only.
