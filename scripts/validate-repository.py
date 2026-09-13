@@ -59,6 +59,7 @@ SCHEMA_FILES = (
     "schemas/analysis-result.schema.json",
     "schemas/artifact.schema.json",
     "schemas/benchmark-report.schema.json",
+    "schemas/benchmark-summary.schema.json",
     "schemas/runtime-preferences.schema.json",
     "schemas/bundle-manifest.schema.json",
     "schemas/capability.schema.json",
@@ -750,7 +751,64 @@ def validate_schema_contracts() -> tuple[int, int, int]:
     validated_instances += validate_versioned_fixtures(
         ROOT / "tests" / "fixtures" / "results", RESULT_SCHEMAS, schemas
     )
+    validated_instances += validate_benchmark_summaries(schemas)
     return len(schemas), validated_instances, format_check_count
+
+
+def validate_benchmark_summaries(
+    schemas: dict[str, dict[str, object]],
+) -> int:
+    """Every archived run must satisfy the unified summary contract.
+
+    benchmark-results/<date>/summary.json is the archival unit: the schema
+    enforces report ids, purpose, and data-source provenance, and this check
+    additionally rejects duplicate report ids across runs (the numbering
+    scheme only works if ids are never reused).
+    """
+    summary_paths = sorted((ROOT / "benchmark-results").glob("*/summary.json"))
+    if not summary_paths and (ROOT / "benchmark-results").is_dir():
+        raise ValueError(
+            "benchmark-results exists but contains no */summary.json runs; "
+            "archive runs per benchmark-results/README.md or remove the directory"
+        )
+    report_ids: dict[str, str] = {}
+    for summary_path in summary_paths:
+        validate_json_instance(
+            summary_path, "schemas/benchmark-summary.schema.json",
+            schemas["schemas/benchmark-summary.schema.json"],
+        )
+        summary = load_json_path(summary_path)
+        assert isinstance(summary, dict)
+        report_id = summary.get("report_id")
+        assert isinstance(report_id, str)
+        if report_id in report_ids:
+            raise ValueError(
+                f"duplicate benchmark report id {report_id}: "
+                f"{report_ids[report_id]} and {display_path(summary_path)}"
+            )
+        report_ids[report_id] = display_path(summary_path)
+        # Run directories are either YYYY-MM-DD or the script's
+        # YYYYMMDD-HHMMSS timestamp form; both encode the same report date.
+        dir_date = "".join(ch for ch in summary_path.parent.name if ch.isdigit())[:8]
+        if not report_id.startswith(f"bench-{dir_date}-"):
+            raise ValueError(
+                f"benchmark report id {report_id} does not match its run "
+                f"directory date {summary_path.parent.name}"
+            )
+        source_ids = {
+            source.get("id")
+            for source in summary.get("data_sources", [])
+            if isinstance(source, dict)
+        }
+        for entry in summary.get("entries", []):
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("data_source_id") not in source_ids:
+                raise ValueError(
+                    f"benchmark entry {entry.get('id')} references unknown "
+                    f"data_source_id {entry.get('data_source_id')!r}"
+                )
+    return len(summary_paths)
 
 
 def parse_skill_frontmatter(path: Path) -> dict[str, str]:
