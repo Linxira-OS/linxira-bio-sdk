@@ -24,7 +24,8 @@
       "enum": [
         "sequence.stats.v1",
         "expression.pca.v1",
-        "set.venn.v1"
+        "set.venn.v1",
+        "structure.pdb.summary.v1"
       ]
     },
     "inputs": {
@@ -47,7 +48,8 @@
             "enum": [
               "fasta",
               "matrix",
-              "table"
+              "table",
+              "pdb"
             ]
           },
           "cardinality": {
@@ -85,7 +87,8 @@
                   "enum": [
                     "fasta",
                     "csv",
-                    "tsv"
+                    "tsv",
+                    "pdb"
                   ]
                 },
                 "compression": {
@@ -161,6 +164,9 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 10000
+        },
+        "interpret_b_factors_as_plddt": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

@@ -12,8 +12,16 @@
 
 ## 参数
 
-输入路径为必需参数。`--alphafold-plddt` 会显式把聚合物原子的 B-factor 解释
-为 AlphaFold pLDDT；`--json` 返回标准分析结果封装。
+- 输入路径为必需参数。
+- `--alphafold-plddt`：显式把聚合物原子的 B-factor 解释为 AlphaFold pLDDT
+  （worker 契约参数名 `interpret_b_factors_as_plddt`）。
+- `--backend auto|rust|python|r`：实现后端。`rust`（及缺省）运行原生引擎；
+  `python` 和 `r` 经 worker 路由到 benchmark 包，两者按同一套固定列解析语义
+  逐字段移植（残基分组、元素推断表、pLDDT 分档），摘要完全一致。对象模型库
+  （Biopython `Bio.PDB`、`bio3d`）的 altloc 与 hetflag 处理与引擎契约不同，
+  刻意不用于本对比。`auto` 查询 `runtime-preferences.json`：命中非 rust
+  后端时输出 `backend_from_preferences` 警告。
+- `--json` 返回标准分析结果封装。
 
 ## 输出
 
@@ -45,8 +53,10 @@ PNG；这些显示行为不属于本分析能力的结果契约。
 
 ## 运行时依赖
 
-这是纯本地 Rust 能力，不依赖 Python、R、Java、分子查看器或外部命令行工具；
-除仓库已登记的序列化和 gzip 依赖外，不新增第三方包。
+- `rust`（默认）：纯本地 Rust 能力，除仓库已登记的序列化和 gzip 依赖外，不
+  依赖外部工具。
+- `python` / `r`：对应的 benchmark 包；两者均以零第三方依赖复刻解析器。
+  均无网络访问。
 
 ## 引用
 
@@ -55,5 +65,6 @@ PDB 列语义遵循 wwPDB 旧版 PDB 格式规范。AlphaFold pLDDT 解释遵循
 
 ## 故障排除
 
-固定列记录损坏时按错误中的行号定位。mmCIF 可先用成熟结构工具转换，或保留到
-后续原生解析器处理。晶体学 B-factor 不应使用 `--alphafold-plddt`。
+- 固定列记录损坏时按错误中的行号定位。mmCIF 可先用成熟结构工具转换，或保留到
+  后续原生解析器处理。晶体学 B-factor 不应使用 `--alphafold-plddt`。
+- `unknown --backend value`：该参数只接受 `auto`、`rust`、`python`、`r`。
