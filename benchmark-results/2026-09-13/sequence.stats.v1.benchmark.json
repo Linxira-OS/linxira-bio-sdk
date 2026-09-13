@@ -1,0 +1,253 @@
+{
+  "schema_version": "1",
+  "capability": "sequence.stats.v1",
+  "dataset_class": "sequence",
+  "backends": [
+    {
+      "backend": "rust",
+      "repeats": 5,
+      "median_wall_ms": 40.0,
+      "min_wall_ms": 30.0,
+      "max_wall_ms": 40.0,
+      "iqr_wall_ms": 10.0,
+      "median_peak_rss_mb": 5.91015625,
+      "median_cpu_ms": 0.0,
+      "runs": [
+        {
+          "backend": "rust",
+          "run_index": 1,
+          "wall_ms": 40.0,
+          "cpu_ms": 0.0,
+          "peak_rss_mb": 5.98046875,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 544,
+          "ok": true
+        },
+        {
+          "backend": "rust",
+          "run_index": 2,
+          "wall_ms": 40.0,
+          "cpu_ms": 0.0,
+          "peak_rss_mb": 5.78125,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 544,
+          "ok": true
+        },
+        {
+          "backend": "rust",
+          "run_index": 3,
+          "wall_ms": 30.0,
+          "cpu_ms": 0.0,
+          "peak_rss_mb": 5.91015625,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 544,
+          "ok": true
+        },
+        {
+          "backend": "rust",
+          "run_index": 4,
+          "wall_ms": 40.0,
+          "cpu_ms": 0.0,
+          "peak_rss_mb": 5.66015625,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 544,
+          "ok": true
+        },
+        {
+          "backend": "rust",
+          "run_index": 5,
+          "wall_ms": 30.0,
+          "cpu_ms": 0.0,
+          "peak_rss_mb": 5.921875,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 544,
+          "ok": true
+        }
+      ]
+    },
+    {
+      "backend": "python",
+      "repeats": 5,
+      "median_wall_ms": 330.0,
+      "min_wall_ms": 300.0,
+      "max_wall_ms": 340.0,
+      "iqr_wall_ms": 20.0,
+      "median_peak_rss_mb": 43.828125,
+      "median_cpu_ms": 220.0,
+      "runs": [
+        {
+          "backend": "python",
+          "run_index": 1,
+          "wall_ms": 300.0,
+          "cpu_ms": 190.0,
+          "peak_rss_mb": 43.78125,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 12288,
+          "output_bytes": 1673,
+          "ok": true,
+          "self_reported_wall_ms": 11.993,
+          "self_reported_peak_rss_mb": 43.781
+        },
+        {
+          "backend": "python",
+          "run_index": 2,
+          "wall_ms": 330.0,
+          "cpu_ms": 220.0,
+          "peak_rss_mb": 43.8203125,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 12288,
+          "output_bytes": 1671,
+          "ok": true,
+          "self_reported_wall_ms": 9.995,
+          "self_reported_peak_rss_mb": 43.82
+        },
+        {
+          "backend": "python",
+          "run_index": 3,
+          "wall_ms": 340.0,
+          "cpu_ms": 220.0,
+          "peak_rss_mb": 43.8984375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 12288,
+          "output_bytes": 1673,
+          "ok": true,
+          "self_reported_wall_ms": 10.741,
+          "self_reported_peak_rss_mb": 43.723
+        },
+        {
+          "backend": "python",
+          "run_index": 4,
+          "wall_ms": 340.0,
+          "cpu_ms": 220.0,
+          "peak_rss_mb": 43.8515625,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 12288,
+          "output_bytes": 1673,
+          "ok": true,
+          "self_reported_wall_ms": 13.647,
+          "self_reported_peak_rss_mb": 43.852
+        },
+        {
+          "backend": "python",
+          "run_index": 5,
+          "wall_ms": 320.0,
+          "cpu_ms": 210.0,
+          "peak_rss_mb": 43.828125,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 12288,
+          "output_bytes": 1673,
+          "ok": true,
+          "self_reported_wall_ms": 10.566,
+          "self_reported_peak_rss_mb": 43.828
+        }
+      ]
+    },
+    {
+      "backend": "r",
+      "repeats": 5,
+      "median_wall_ms": 2110.0,
+      "min_wall_ms": 1980.0,
+      "max_wall_ms": 2140.0,
+      "iqr_wall_ms": 50.0,
+      "median_peak_rss_mb": 237.61328125,
+      "median_cpu_ms": 1940.0,
+      "runs": [
+        {
+          "backend": "r",
+          "run_index": 1,
+          "wall_ms": 2090.0,
+          "cpu_ms": 1940.0,
+          "peak_rss_mb": 237.61328125,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 12288,
+          "output_bytes": 1562,
+          "ok": true,
+          "self_reported_wall_ms": 92.897,
+          "self_reported_peak_rss_mb": 232.27
+        },
+        {
+          "backend": "r",
+          "run_index": 2,
+          "wall_ms": 2140.0,
+          "cpu_ms": 1990.0,
+          "peak_rss_mb": 237.75,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 12288,
+          "output_bytes": 1563,
+          "ok": true,
+          "self_reported_wall_ms": 94.703,
+          "self_reported_peak_rss_mb": 232.324
+        },
+        {
+          "backend": "r",
+          "run_index": 3,
+          "wall_ms": 1980.0,
+          "cpu_ms": 1850.0,
+          "peak_rss_mb": 237.68359375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 12288,
+          "output_bytes": 1563,
+          "ok": true,
+          "self_reported_wall_ms": 81.308,
+          "self_reported_peak_rss_mb": 232.266
+        },
+        {
+          "backend": "r",
+          "run_index": 4,
+          "wall_ms": 2140.0,
+          "cpu_ms": 2010.0,
+          "peak_rss_mb": 237.49609375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 12288,
+          "output_bytes": 1562,
+          "ok": true,
+          "self_reported_wall_ms": 85.459,
+          "self_reported_peak_rss_mb": 232.25
+        },
+        {
+          "backend": "r",
+          "run_index": 5,
+          "wall_ms": 2110.0,
+          "cpu_ms": 1890.0,
+          "peak_rss_mb": 237.609375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 12288,
+          "output_bytes": 1563,
+          "ok": true,
+          "self_reported_wall_ms": 91.434,
+          "self_reported_peak_rss_mb": 232.266
+        }
+      ]
+    }
+  ],
+  "speedup": 8.25,
+  "memory_saving": 0.8651515151515151,
+  "consistency": "consistent",
+  "findings": [],
+  "environment": {
+    "os": "linux",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2",
+    "cpu_model": "Intel(R) Core(TM) Ultra 5 225H",
+    "total_memory_mb": 7940,
+    "distro": "Arch Linux",
+    "wsl_distro": "arch-linux-current",
+    "wsl_version": "wsl2",
+    "host_os": "Microsoft Windows [Version 10.0.26200.9168]",
+    "host_model": "XIAOMI REDMI Book Pro 14 2025",
+    "host_cpu_model": "Intel(R) Core(TM) Ultra 5 225H",
+    "host_logical_processors": 14,
+    "host_total_memory_mb": 32189,
+    "engine_version": "1.0.1",
+    "python_version": "Python 3.14.6",
+    "r_version": "R version 4.6.1 (2026-06-24) -- \"Happy Hop\"",
+    "in_container": false,
+    "page_cache": "warm",
+    "precision": "high"
+  },
+  "sampled_at": "2026-09-13T12:38:59Z"
+}

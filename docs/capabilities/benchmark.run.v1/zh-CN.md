@@ -35,10 +35,12 @@
 - `DIR/<capability>.benchmark.json`：benchmark 报告（符合
   `benchmark-report.schema.json`），包含各后端的逐次运行、中位数、最小/最大、
   四分位距、峰值 RSS、一致性判定、字段级差异清单，以及完整环境披露
-  （操作系统、内核、CPU、内存、引擎/Python/R 版本、容器标记、页缓存与
-  计时精度标签）。每条运行记录带可选的 `self_reported_wall_ms` 与
-  `self_reported_peak_rss_mb`（来自 pack 的进程内埋点），可以看清 `wall_ms`
-  中解释器启动占比。
+  （操作系统、内核、发行版、CPU、内存、引擎/Python/R 版本、容器标记、页缓存与
+  计时精度标签）。在 WSL 内运行时，披露还会额外记录 Windows 主机信息：`cmd.exe
+  /c ver` 的版本串、机型、CPU 型号、逻辑处理器数与物理内存，均通过 interop
+  桥探测；interop 不可用时这些字段直接省略而非猜测。每条运行记录带可选的
+  `self_reported_wall_ms` 与 `self_reported_peak_rss_mb`（来自 pack 的进程内
+  埋点），可以看清 `wall_ms` 中解释器启动占比。
 - `DIR/<capability>.benchmark.md`：同一报告的人类可读摘要，含自报计时表。
 - `speedup` = `median_wall(首个非 rust 后端) / median_wall(rust)`；
   `memory_saving` = `1 - median_peak_rss(rust) / median_peak_rss(首个非 rust

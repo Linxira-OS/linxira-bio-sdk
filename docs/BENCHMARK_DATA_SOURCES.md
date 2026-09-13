@@ -12,6 +12,10 @@
 - **数据治理**：4TB 原始数据、SRR/SRA 归档、受控或研究数据**永不进 Git 仓库**；仅回传
   `benchmark-results/<date>/summary.json + summary.md` 与报告图表。
 - **回传物**：性能指标（加速比、内存、输出体积、一致性），不含原始数据本体。
+- **既有基线**：仓库 fixture 上的三端（Rust/Python/R）一致性基线见
+  `benchmark-results/2026-09-13/`（summary.json + summary.md + 各能力完整报告，
+  含 Windows 宿主机/WSL 环境披露）。该基线使用仓库内置小样本，**不得**与本文件的
+  4TB 真实数据跑分混排对比。
 
 ## 2. 数据类别（用于 benchmark 归类与后端偏好）
 

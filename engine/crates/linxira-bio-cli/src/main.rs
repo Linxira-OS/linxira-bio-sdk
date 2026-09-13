@@ -6604,22 +6604,65 @@ fn benchmark_summary_markdown(report: &BenchmarkReport) -> String {
             markdown.push_str(&format!("- `{}`: {}\n", finding.field, finding.detail));
         }
     }
-    markdown.push_str(&format!(
-        "\n## Environment\n\n- os: {} {}\n- engine: {}\n- python: {}\n- R: {}\n",
+    let mut environment_section = String::from("\n## Environment\n\n");
+    environment_section.push_str(&format!(
+        "- os: {} {}\n",
         report.environment.os,
         report
             .environment
             .kernel
             .as_deref()
-            .unwrap_or("(unknown kernel)"),
+            .unwrap_or("(unknown kernel)")
+    ));
+    if let Some(distro) = report.environment.distro.as_deref() {
+        let wsl = match (
+            report.environment.wsl_distro.as_deref(),
+            report.environment.wsl_version.as_deref(),
+        ) {
+            (Some(name), Some(version)) => format!(" (WSL distro: {name}, {version})"),
+            (Some(name), None) => format!(" (WSL distro: {name})"),
+            (None, Some(version)) => format!(" ({version})"),
+            (None, None) => String::new(),
+        };
+        environment_section.push_str(&format!("- distro: {distro}{wsl}\n"));
+    }
+    if let Some(cpu) = report.environment.cpu_model.as_deref() {
+        environment_section.push_str(&format!("- guest cpu: {cpu}\n"));
+    }
+    if let Some(memory) = report.environment.total_memory_mb {
+        environment_section.push_str(&format!("- guest memory: {memory} MB\n"));
+    }
+    if let Some(host_os) = report.environment.host_os.as_deref() {
+        environment_section.push_str(&format!("- host os (Windows): {host_os}\n"));
+    }
+    if let Some(model) = report.environment.host_model.as_deref() {
+        environment_section.push_str(&format!("- host model: {model}\n"));
+    }
+    if let Some(cpu) = report.environment.host_cpu_model.as_deref() {
+        let cores = report
+            .environment
+            .host_logical_processors
+            .map(|count| format!(" ({count} logical processors)"))
+            .unwrap_or_default();
+        environment_section.push_str(&format!("- host cpu: {cpu}{cores}\n"));
+    }
+    if let Some(memory) = report.environment.host_total_memory_mb {
+        environment_section.push_str(&format!("- host memory: {memory} MB\n"));
+    }
+    environment_section.push_str(&format!(
+        "- engine: {}\n- python: {}\n- R: {}\n- container: {}\n- page cache: {}\n- timing precision: {}\n",
         report.environment.engine_version,
         report
             .environment
             .python_version
             .as_deref()
             .unwrap_or("n/a"),
-        report.environment.r_version.as_deref().unwrap_or("n/a")
+        report.environment.r_version.as_deref().unwrap_or("n/a"),
+        if report.environment.in_container { "yes" } else { "no" },
+        report.environment.page_cache,
+        report.environment.precision
     ));
+    markdown.push_str(&environment_section);
     markdown
 }
 

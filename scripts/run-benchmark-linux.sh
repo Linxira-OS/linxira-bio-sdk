@@ -422,9 +422,27 @@ lines.append("")
 if environment:
     kernel = environment.get("kernel") or ""
     lines.append(f"- os: {environment.get('os')}" + (f" {kernel}" if kernel else ""))
-    lines.append(f"- cpu: {environment.get('cpu_model', 'unknown')}")
+    distro = environment.get("distro")
+    if distro:
+        wsl_note = ""
+        if environment.get("wsl_distro") or environment.get("wsl_version"):
+            parts = [p for p in (environment.get("wsl_distro"), environment.get("wsl_version")) if p]
+            wsl_note = f" (WSL: {', '.join(parts)})"
+        lines.append(f"- distro: {distro}{wsl_note}")
+    lines.append(f"- guest cpu: {environment.get('cpu_model', 'unknown')}")
     memory = environment.get("total_memory_mb")
-    lines.append(f"- memory: {memory / 1024:.1f} GiB" if memory else "- memory: unknown")
+    lines.append(f"- guest memory: {memory / 1024:.1f} GiB" if memory else "- guest memory: unknown")
+    if environment.get("host_os"):
+        lines.append(f"- host os (Windows): {environment['host_os']}")
+    if environment.get("host_model"):
+        lines.append(f"- host model: {environment['host_model']}")
+    if environment.get("host_cpu_model"):
+        cores = environment.get("host_logical_processors")
+        suffix = f" ({cores} logical processors)" if cores else ""
+        lines.append(f"- host cpu: {environment['host_cpu_model']}{suffix}")
+    host_memory = environment.get("host_total_memory_mb")
+    if host_memory:
+        lines.append(f"- host memory: {host_memory / 1024:.1f} GiB")
     lines.append(f"- engine: {environment.get('engine_version')}")
     lines.append(f"- python: {environment.get('python_version', 'n/a')}")
     lines.append(f"- R: {environment.get('r_version', 'n/a')}")
