@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "visualization-matplotlib request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["plot_spec"],
+  "properties": {
+    "plot_spec": {
+      "type": "object",
+      "description": "A plot-spec.schema.json instance; every field (title, labels, ranges, log axes, grid, theme, palette, legend, figure size/dpi, font, output format) is honored."
+    },
+    "output_path": {
+      "type": "string",
+      "default": "figure.svg",
+      "description": "Caller-composed output filename, relative to the request file; the extension is replaced by the requested format."
+    }
+  }
+}

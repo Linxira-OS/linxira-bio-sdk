@@ -137,6 +137,8 @@ pub fn embedded_document(capability: &str, locale: &str) -> Option<&'static str>
         ("phylogeny.tree.transform.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/phylogeny.tree.transform.v1/zh-CN.md")),
         ("phylogeny.tree.visualize.v1", "en-US") => Some(include_str!("../../../docs/capabilities/phylogeny.tree.visualize.v1/en-US.md")),
         ("phylogeny.tree.visualize.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/phylogeny.tree.visualize.v1/zh-CN.md")),
+        ("plot.render.v1", "en-US") => Some(include_str!("../../../docs/capabilities/plot.render.v1/en-US.md")),
+        ("plot.render.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/plot.render.v1/zh-CN.md")),
         ("primer.epcr.v1", "en-US") => Some(include_str!("../../../docs/capabilities/primer.epcr.v1/en-US.md")),
         ("primer.epcr.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/primer.epcr.v1/zh-CN.md")),
         ("protein.domain.parse.v1", "en-US") => Some(include_str!("../../../docs/capabilities/protein.domain.parse.v1/en-US.md")),

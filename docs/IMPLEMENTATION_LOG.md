@@ -29,6 +29,7 @@
 | 2026-09-13 | `structure.pdb.summary.v1` 三端 | 固定列 PDB 解析器（MODEL/ENDMDL 状态机、元素推断、pLDDT 分档）的 Python/R 移植 | M3 #3 三端 | pack parity（max rel err 0.0）；bench-20260913-001 | current |
 | 2026-09-13 | benchmark 环境披露 | 报告新增 Windows 宿主机/WSL 探测（interop）与 distro/wsl 字段 | 跨环境数字可追溯 | commit 9052bcf；bench-20260913-001 | current |
 | 2026-09-13 | `scripts/materialize-r-lock.py` | 下载加固：https-only + host allowlist + 重定向后校验 | Mimosa 深扫 SSRF high | scan-2026-09-13T10-06-04（seal sha256:9656b8d3…） | current |
+| 2026-09-13 | `plot.render.v1` 双包 | 新增 matplotlib/ggplot2 绘图 pack（M1-T1/T2）：PlotSpec 全参数渲染、svg/png 字节稳定（固定 svg hash 盐 / svglite）、跨后端 data_summary 一致性断言 | 回应"绘图=可复现数据产品"设计定位；M1 落地 | 双 pack 测试（py 5/5、R 全过、跨后端一致） | current |
 
 ## v2 迁移模板（Upgrading to v2）
 

@@ -89,6 +89,9 @@ the agent skills that select and validate them.
 - Read `skills/visualize-bio-results/SKILL.md` for implemented annotation,
   enrichment, and protein-domain SVG plots plus the native interactive
   PDB/mmCIF structure viewer.
+- Read `skills/render-bio-plots/SKILL.md` for the implemented
+  `plot.render.v1` capability (deterministic matplotlib/ggplot2 figure
+  rendering from a PlotSpec).
 - Read `skills/inspect-bio-dataset/SKILL.md` before analyzing imported data.
 - Read `skills/export-bio-table/SKILL.md` to export supported result tables.
 - Read `skills/configure-bio-environment/SKILL.md` to audit managed Python, R,
