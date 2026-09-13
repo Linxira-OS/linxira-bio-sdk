@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "description": "Template for scripts/run-benchmark-linux.sh. Copy to benchmark-datasets.json, point the inputs at local data, and edit the id/paths; the real manifest is intentionally not committed (it names private 4TB data). Each entry runs one `linxira-bio benchmark run`. source_url, when present, is rendered in summary.md next to the advantage entry and should point at the public provenance of the dataset (see docs/BENCHMARK_DATA_SOURCES.md).",
+  "datasets": [
+    {
+      "id": "tiny-smoke",
+      "capability": "sequence.stats.v1",
+      "dataset_class": "sequence",
+      "backends": "rust,python,r",
+      "repeat": 5,
+      "inputs": {
+        "fasta": "tests/fixtures/sequences/tiny.fa"
+      }
+    },
+    {
+      "id": "example-matrix",
+      "capability": "expression.pca.v1",
+      "dataset_class": "matrix",
+      "backends": "rust,python,r",
+      "repeat": 3,
+      "inputs": {
+        "matrix": "/data/expression/tumor-normal-counts.tsv"
+      },
+      "source_url": "https://example.org/dataset/provenance"
+    }
+  ]
+}
