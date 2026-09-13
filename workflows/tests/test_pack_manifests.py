@@ -28,7 +28,10 @@ class WorkflowManifestTests(unittest.TestCase):
     def test_catalog_capabilities_and_aliases_are_globally_unique(self) -> None:
         catalog = load_json(CATALOG_PATH)
         pack_ids: set[str] = set()
-        capabilities: set[str] = set()
+        # The same capability is intentionally served by multiple packs on
+        # different runtimes (rust/python/r three-way design): uniqueness is
+        # per (capability, runtime), not per capability alone.
+        capability_runtimes: set[tuple[str, str]] = set()
         for pack in catalog["packs"]:
             self.assertNotIn(pack["id"], pack_ids)
             pack_ids.add(pack["id"])
@@ -36,8 +39,9 @@ class WorkflowManifestTests(unittest.TestCase):
             self.assertEqual(len(aliases), len(set(aliases)))
             self.assertNotIn(pack["capability"], aliases)
             for capability in [pack["capability"], *aliases]:
-                self.assertNotIn(capability, capabilities)
-                capabilities.add(capability)
+                key = (capability, pack["runtime"])
+                self.assertNotIn(key, capability_runtimes)
+                capability_runtimes.add(key)
 
     def test_cataloged_pack_manifests_are_complete_and_exact(self) -> None:
         catalog = load_json(CATALOG_PATH)
@@ -98,10 +102,15 @@ class WorkflowManifestTests(unittest.TestCase):
         self.assertTrue(contract["parameters"])
         declared_roles = {entry["role"] for entry in contract["inputs"]}
         input_schema = load_json(pack_root / manifest["input_schema"]["$ref"])
-        schema_roles = {
-            entry.get("properties", {}).get("role", {}).get("const")
-            for entry in input_schema["properties"]["inputs"].get("allOf", [])
-        }
+        inputs_property = input_schema["properties"].get("inputs")
+        schema_roles = (
+            {
+                entry.get("properties", {}).get("role", {}).get("const")
+                for entry in inputs_property.get("allOf", [])
+            }
+            if isinstance(inputs_property, dict)
+            else set()
+        )
         schema_roles.discard(None)
         if schema_roles:
             self.assertEqual(
@@ -135,8 +144,28 @@ class WorkflowManifestTests(unittest.TestCase):
             self.verify_wgcna_r_runtime_policy(pack_root, manifest, catalog_entry)
         elif pack_id == "org.linxira.medical-survival":
             self.verify_survival_r_runtime_policy(pack_root, manifest, catalog_entry)
+        elif pack_id in {
+            "org.linxira.benchmark-r",
+            "org.linxira.visualization-ggplot2",
+        }:
+            self.verify_host_r_runtime_policy(pack_root, manifest)
         else:
             self.fail(f"no R runtime policy defined for pack {pack_id}")
+
+    def verify_host_r_runtime_policy(self, pack_root: Path, manifest: dict) -> None:
+        """Benchmark/viz packs resolve against the host interpreter library
+        instead of a fully project-isolated library; the lock still pins the
+        resolution policy and the dependency set."""
+        lock = load_json(pack_root / manifest["runtime"]["dependency_lock"]["path"])
+        self.assertEqual(lock["schema_version"], "2")
+        self.assertEqual(lock["lock_kind"], "compatibility-and-resolution-policy")
+        self.assertEqual(lock["runtime"]["version_requirement"],
+                         manifest["runtime"]["version"])
+        self.assertIn(lock["isolation"]["scope"], {"benchmark-host", "host"})
+        self.assertTrue(
+            lock.get("packages") or lock.get("direct_requirements"),
+            "host-policy lock must pin packages",
+        )
 
     def verify_survival_r_runtime_policy(
         self, pack_root: Path, manifest: dict, catalog_entry: dict
