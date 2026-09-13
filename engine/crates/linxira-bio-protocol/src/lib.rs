@@ -647,6 +647,35 @@ pub struct BenchmarkEnvironment {
     pub cpu_model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total_memory_mb: Option<u64>,
+    /// PRETTY_NAME from `/etc/os-release` (the Linux guest view, e.g.
+    /// "Arch Linux"); distinguishes the actual distro from the kernel string.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub distro: Option<String>,
+    /// `WSL_DISTRO_NAME` when the benchmark runs inside a WSL distribution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wsl_distro: Option<String>,
+    /// `wsl2` or `wsl1`, derived from the kernel release string.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wsl_version: Option<String>,
+    /// Windows host version reported by `cmd.exe /c ver` over WSL interop
+    /// (e.g. "Microsoft Windows [Version 10.0.26200.1]").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_os: Option<String>,
+    /// Windows host machine model ("manufacturer model") over WSL interop.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_model: Option<String>,
+    /// Windows host CPU model over WSL interop; the guest `/proc/cpuinfo`
+    /// already shows the same silicon but the host view is authoritative.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_cpu_model: Option<String>,
+    /// Logical processors of the Windows host (the guest view is capped by
+    /// the WSL allocation).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_logical_processors: Option<u64>,
+    /// Physical RAM of the Windows host in MB, distinct from the WSL guest
+    /// allocation reported by `total_memory_mb`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_total_memory_mb: Option<u64>,
     pub engine_version: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub python_version: Option<String>,
@@ -1155,6 +1184,14 @@ mod tests {
                 kernel: Some("6.18.33".to_owned()),
                 cpu_model: Some("test cpu".to_owned()),
                 total_memory_mb: Some(16_000),
+                distro: None,
+                wsl_distro: None,
+                wsl_version: None,
+                host_os: None,
+                host_model: None,
+                host_cpu_model: None,
+                host_logical_processors: None,
+                host_total_memory_mb: None,
                 engine_version: "1.0.1".to_owned(),
                 python_version: None,
                 r_version: None,

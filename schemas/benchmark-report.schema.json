@@ -236,6 +236,69 @@
           ],
           "minimum": 0
         },
+        "distro": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "PRETTY_NAME from /etc/os-release (Linux guest view)."
+        },
+        "wsl_distro": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "WSL_DISTRO_NAME when the benchmark ran inside WSL."
+        },
+        "wsl_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "wsl1",
+            "wsl2",
+            null
+          ],
+          "description": "Derived from the microsoft marker in the kernel release."
+        },
+        "host_os": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Windows host version from cmd.exe /c ver over WSL interop."
+        },
+        "host_model": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Windows host machine model (manufacturer model) over WSL interop."
+        },
+        "host_cpu_model": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Windows host CPU model over WSL interop."
+        },
+        "host_logical_processors": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Logical processors of the Windows host; the guest view is capped by the WSL allocation."
+        },
+        "host_total_memory_mb": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Physical RAM of the Windows host in MB, distinct from the WSL guest allocation."
+        },
         "engine_version": {
           "type": "string"
         },
