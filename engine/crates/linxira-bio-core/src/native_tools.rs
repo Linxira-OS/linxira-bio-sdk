@@ -1310,6 +1310,170 @@ pub fn run_kraken2_classification(
     result
 }
 
+/// Options for one `salmon quant` invocation (M4 `expression.quantify.v1`).
+#[derive(Debug, Clone)]
+pub struct SalmonQuantOptions {
+    /// Path to a pre-built salmon index directory.
+    pub index: PathBuf,
+    /// Automatic library-type detection (`-l A`) unless overridden.
+    pub lib_type: String,
+    pub threads: u32,
+    /// `--validateMappings` for selective alignment mode.
+    pub validate_mappings: bool,
+}
+
+impl Default for SalmonQuantOptions {
+    fn default() -> Self {
+        Self {
+            index: PathBuf::new(),
+            lib_type: "A".to_owned(),
+            threads: 1,
+            validate_mappings: true,
+        }
+    }
+}
+
+/// One row of a salmon `quant.sf` (Name, Length, EffectiveLength, TPM,
+/// NumReads).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SalmonQuantRecord {
+    pub name: String,
+    pub length: u64,
+    pub effective_length: u64,
+    pub tpm: f64,
+    pub num_reads: f64,
+}
+
+/// Parse the `quant.sf` table salmon writes into its output directory.
+pub fn parse_salmon_quant_sf(text: &str) -> Result<Vec<SalmonQuantRecord>, NativeToolError> {
+    let mut lines = text.lines();
+    let header = lines
+        .next()
+        .ok_or_else(|| NativeToolError::InvalidOption("quant.sf is empty".to_owned()))?;
+    let columns: Vec<&str> = header.split('\t').collect();
+    if columns != ["Name", "Length", "EffectiveLength", "TPM", "NumReads"] {
+        return Err(NativeToolError::InvalidOption(format!(
+            "unexpected quant.sf header: {header:?}"
+        )));
+    }
+    let mut records = Vec::new();
+    for line in lines {
+        if line.is_empty() {
+            continue;
+        }
+        let fields: Vec<&str> = line.split('\t').collect();
+        if fields.len() != 5 {
+            return Err(NativeToolError::InvalidOption(format!(
+                "quant.sf row does not have five columns: {line:?}"
+            )));
+        }
+        records.push(SalmonQuantRecord {
+            name: fields[0].to_owned(),
+            length: fields[1]
+                .parse()
+                .map_err(|_| invalid_quant_field("Length", fields[1]))?,
+            effective_length: fields[2]
+                .parse()
+                .map_err(|_| invalid_quant_field("EffectiveLength", fields[2]))?,
+            tpm: fields[3]
+                .parse()
+                .map_err(|_| invalid_quant_field("TPM", fields[3]))?,
+            num_reads: fields[4]
+                .parse()
+                .map_err(|_| invalid_quant_field("NumReads", fields[4]))?,
+        });
+    }
+    if records.is_empty() {
+        return Err(NativeToolError::InvalidOption(
+            "quant.sf has no transcript rows".to_owned(),
+        ));
+    }
+    Ok(records)
+}
+
+fn invalid_quant_field(column: &str, value: &str) -> NativeToolError {
+    NativeToolError::InvalidOption(format!("invalid quant.sf {column} value: {value:?}"))
+}
+
+/// `salmon quant` arguments, controlled and shell-free.
+pub fn salmon_quant_arguments(
+    reads: &[PathBuf],
+    output: &Path,
+    options: &SalmonQuantOptions,
+) -> Vec<OsString> {
+    let mut arguments: Vec<OsString> = vec![
+        "quant".into(),
+        "-i".into(),
+        options.index.as_os_str().to_owned(),
+        "-l".into(),
+        options.lib_type.as_str().into(),
+        "-p".into(),
+        options.threads.to_string().into(),
+        "-o".into(),
+        output.as_os_str().to_owned(),
+    ];
+    match reads {
+        [mate1, mate2] => {
+            arguments.push("-1".into());
+            arguments.push(mate1.as_os_str().to_owned());
+            arguments.push("-2".into());
+            arguments.push(mate2.as_os_str().to_owned());
+        }
+        [single] => {
+            arguments.push("-r".into());
+            arguments.push(single.as_os_str().to_owned());
+        }
+        _ => {}
+    }
+    if options.validate_mappings {
+        arguments.push("--validateMappings".into());
+    }
+    arguments
+}
+
+/// Run `salmon quant` over the given reads (paired two files, or one single
+/// file) and parse the resulting `quant.sf`. The quant table is copied to
+/// `output` so the caller keeps a stable artifact next to its results.
+pub fn run_salmon_quant(
+    reads: &[PathBuf],
+    output: impl AsRef<Path>,
+    options: &SalmonQuantOptions,
+) -> Result<(Vec<SalmonQuantRecord>, u64), NativeToolError> {
+    if !matches!(reads.len(), 1 | 2) {
+        return Err(NativeToolError::InvalidOption(
+            "salmon quant requires one single-end read file or two paired-end files".to_owned(),
+        ));
+    }
+    if options.index.as_os_str().is_empty() {
+        return Err(NativeToolError::InvalidOption(
+            "salmon quant requires --index".to_owned(),
+        ));
+    }
+    if options.threads == 0 {
+        return Err(NativeToolError::InvalidOption(
+            "salmon quant requires at least one thread".to_owned(),
+        ));
+    }
+    let executable = configured_program("LINXIRA_BIO_SALMON", "salmon");
+    let output = output.as_ref();
+    let working = create_temporary_directory(output, "salmon")?;
+    let quant_dir = working.join("quant");
+    let result = (|| {
+        let arguments = salmon_quant_arguments(reads, &quant_dir, options);
+        run_native_command(&executable, &arguments, false)?;
+        let quant_sf =
+            fs::read_to_string(quant_dir.join("quant.sf")).map_err(NativeToolError::Io)?;
+        let records = parse_salmon_quant_sf(&quant_sf)?;
+        if let Some(parent) = output.parent() {
+            fs::create_dir_all(parent).map_err(NativeToolError::Io)?;
+        }
+        fs::write(output, quant_sf.as_bytes()).map_err(NativeToolError::Io)?;
+        Ok((records, quant_sf.len() as u64))
+    })();
+    let _ = fs::remove_dir_all(&working);
+    result
+}
+
 /// Run Kraken2 with controlled arguments (no shell) and reduce its `--report`
 /// into the abundance table written to `output`.
 pub fn run_kraken2_path(

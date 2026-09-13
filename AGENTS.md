@@ -63,6 +63,9 @@ the agent skills that select and validate them.
 - Read `skills/analyze-expression-matrix/SKILL.md` for implemented CSV/TSV
   matrix QC, normalization, PCA, sample/feature clustering, and native
   clustered-heatmap preparation.
+- Read `skills/quantify-expression/SKILL.md` for the implemented
+  `expression.quantify.v1` capability (native salmon quant orchestration
+  with quant.sf cross-check summaries).
 - Read `skills/analyze-differential-expression/SKILL.md` for implemented local
   bulk RNA-seq differential expression and its research-use-only medical
   entrypoint.
