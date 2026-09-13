@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "preferences": [
+    {
+      "capability": "sequence.stats.v1",
+      "dataset_class": "sequence",
+      "default_backend": "rust",
+      "measured": {
+        "rust": {
+          "wall_ms": 30.0,
+          "peak_rss_mb": 5.8046875
+        },
+        "python": {
+          "wall_ms": 270.0,
+          "peak_rss_mb": 43.69140625
+        },
+        "r": {
+          "wall_ms": 1770.0,
+          "peak_rss_mb": 238.515625
+        }
+      },
+      "sampled_on": "2026-09-11T15:27:50Z",
+      "speedup": null,
+      "consistency": "consistent"
+    }
+  ]
+}

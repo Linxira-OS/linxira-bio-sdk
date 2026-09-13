@@ -106,7 +106,7 @@ use linxira_bio_export::{ExportFormat, ensure_distinct_input_output, export_json
 use linxira_bio_protocol::{
     AnalysisResult, AnalysisResultV2, ArtifactFile, BioDataFormat, CompressionFormat, Diagnostic,
     DiagnosticSeverity, ExecutionBackend, ExecutionMode, JobRequest, JobRequestV2, OutputArtifact,
-    OutputArtifactKind, SCHEMA_VERSION, SCHEMA_VERSION_V2,
+    OutputArtifactKind, RuntimePreferences, SCHEMA_VERSION, SCHEMA_VERSION_V2,
 };
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
@@ -149,15 +149,24 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         return Err("the current worker supports local-cpu and container execution only".into());
     }
 
-    // M2-T3: an explicit non-Rust backend routes the whole request to the
-    // matching benchmark pack, which must honour the same input roles and
-    // result shape as the native implementation below.
+    // M2-T7: an explicit backend routes the whole request to the matching
+    // benchmark pack. Without one ("auto"), the benchmark-derived preference
+    // table decides; a miss or a `rust` entry keeps the native engine.
     if let Some(backend) = request
         .execution
         .backend
         .filter(|backend| *backend != ExecutionBackend::Rust)
     {
         return workflow::execute_benchmark_backend_v1(base_directory, request, backend);
+    }
+    if request.execution.backend.is_none() {
+        let preferred = RuntimePreferences::load()?
+            .default_backend_for(&request.capability)
+            .filter(|backend| *backend != ExecutionBackend::Rust);
+        if let Some(backend) = preferred {
+            let result = workflow::execute_benchmark_backend_v1(base_directory, request, backend);
+            return annotate_backend_redirect(result, backend);
+        }
     }
 
     match request.capability.as_str() {
@@ -306,6 +315,41 @@ pub fn execute_request_v2(request: JobRequestV2, base_directory: &Path) -> Worke
     }
 }
 
+/// Marks an envelope that ran on a preference-selected backend (M2-T7): a
+/// `warning` diagnostic keeps the automatic redirect visible in the result
+/// the user received. Parse or shape problems return the body unchanged —
+/// the annotation must never turn a good run into a failure.
+fn annotate_backend_redirect(
+    result: WorkerResult<String>,
+    backend: ExecutionBackend,
+) -> WorkerResult<String> {
+    let body = result?;
+    let Ok(mut envelope) = serde_json::from_str::<serde_json::Value>(&body) else {
+        return Ok(body);
+    };
+    if envelope.get("status").and_then(serde_json::Value::as_str) != Some("ok") {
+        return Ok(body);
+    }
+    let Some(object) = envelope.as_object_mut() else {
+        return Ok(body);
+    };
+    let diagnostics = object
+        .entry("diagnostics")
+        .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+    if let Some(list) = diagnostics.as_array_mut() {
+        list.push(serde_json::json!({
+            "code": "backend_from_preferences",
+            "severity": "warning",
+            "message": format!(
+                "this job ran on the {} backend selected by runtime-preferences.json; \
+                 pass an explicit backend to override",
+                backend.as_str()
+            ),
+        }));
+    }
+    Ok(serde_json::to_string(&envelope)?)
+}
+
 fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> WorkerResult<String> {
     if !matches!(
         request.execution.mode,
@@ -347,6 +391,20 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
             &verified_inputs,
             backend,
         );
+    }
+    if request.execution.backend.is_none() {
+        let preferred = RuntimePreferences::load()?
+            .default_backend_for(&request.capability)
+            .filter(|backend| *backend != ExecutionBackend::Rust);
+        if let Some(backend) = preferred {
+            let result = workflow::execute_benchmark_backend_v2(
+                base_directory,
+                request,
+                &verified_inputs,
+                backend,
+            );
+            return annotate_backend_redirect(result, backend);
+        }
     }
 
     match request.capability.as_str() {
@@ -6874,8 +6932,8 @@ mod tests {
     use super::{execute_request, execute_request_v2, validate_v2_inputs};
     use linxira_bio_protocol::{
         AnalysisResultV2, ArtifactFile, BioDataFormat, CompressionFormat, DiagnosticSeverity,
-        ExecutionRequest, InputArtifact, InputCardinality, JobRequest, JobRequestV2, JobStatus,
-        SCHEMA_VERSION, SCHEMA_VERSION_V2,
+        ExecutionBackend, ExecutionRequest, InputArtifact, InputCardinality, JobRequest,
+        JobRequestV2, JobStatus, SCHEMA_VERSION, SCHEMA_VERSION_V2,
     };
     use std::collections::BTreeMap;
     use std::fs;
@@ -6883,6 +6941,37 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEMPORARY_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn annotates_ok_envelopes_with_the_preference_redirect() {
+        use super::annotate_backend_redirect;
+
+        let ok =
+            r#"{"schema_version":"2","status":"ok","result":{"gc_percent":60.0},"diagnostics":[]}"#;
+        let annotated = annotate_backend_redirect(Ok(ok.to_owned()), ExecutionBackend::Python)
+            .expect("annotation succeeds");
+        let envelope: serde_json::Value = serde_json::from_str(&annotated).expect("json");
+        let codes: Vec<&str> = envelope["diagnostics"]
+            .as_array()
+            .expect("diagnostics array")
+            .iter()
+            .filter_map(|diagnostic| diagnostic["code"].as_str())
+            .collect();
+        assert!(codes.contains(&"backend_from_preferences"));
+        assert!(
+            annotated.contains("python backend selected by runtime-preferences.json"),
+            "the diagnostic names the backend and its source: {annotated}"
+        );
+
+        let error = r#"{"schema_version":"2","status":"error","result":{},"diagnostics":[{"code":"workflow_failed","severity":"error","message":"x"}]}"#;
+        let untouched = annotate_backend_redirect(Ok(error.to_owned()), ExecutionBackend::Python)
+            .expect("annotation succeeds");
+        assert_eq!(untouched, error, "error envelopes are returned unchanged");
+
+        let not_json = annotate_backend_redirect(Ok("segfault".to_owned()), ExecutionBackend::R)
+            .expect("annotation succeeds");
+        assert_eq!(not_json, "segfault", "unparseable bodies pass through");
+    }
 
     #[test]
     fn rejects_non_string_environment_mode() {

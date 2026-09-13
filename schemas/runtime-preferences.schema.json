@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/runtime-preferences.v1.json",
+  "title": "Linxira Bio runtime backend preferences",
+  "description": "Benchmark-derived default backends per capability and dataset class (ROADMAP M2-T7). Written back by benchmark tooling; consulted by the worker and the CLI when a request carries no explicit backend. Only consistent benchmark verdicts may drive a default.",
+  "type": "object",
+  "required": ["schema_version", "preferences"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "preferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["capability", "default_backend"],
+        "properties": {
+          "capability": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*\\.v[1-9][0-9]*$"
+          },
+          "dataset_class": {
+            "description": "Data class the measurement was taken on (e.g. sequence, matrix, srr). Informational for resolution: the worker matches by capability, first entry wins.",
+            "type": "string",
+            "minLength": 1
+          },
+          "default_backend": {
+            "enum": ["rust", "python", "r"]
+          },
+          "measured": {
+            "description": "Median wall-time and peak RSS per backend key (rust, python, r) from the source benchmark report.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["wall_ms"],
+              "properties": {
+                "wall_ms": { "type": "number", "minimum": 0 },
+                "peak_rss_mb": { "type": ["number", "null"], "minimum": 0 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "sampled_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "speedup": {
+            "description": "median_wall(default_backend) / median_wall(rust); null when the default is rust.",
+            "type": ["number", "null"],
+            "exclusiveMinimum": 0
+          },
+          "consistency": {
+            "enum": ["consistent", "inconsistent", "failed"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
