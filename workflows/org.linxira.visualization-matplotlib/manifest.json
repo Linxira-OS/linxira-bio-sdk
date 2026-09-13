@@ -95,7 +95,7 @@
   "files": [
     {
       "path": "NOTICE.md",
-      "sha256": "132cbb0b7d0d4bdc24742977ade976aa54447d9ef41c1dbd4c1d350b1efa8b5f"
+      "sha256": "a5ee4314d68657fa654207dab66abc003175f70d8635337ac241460c6c454e1b"
     },
     {
       "path": "requirements.lock",
