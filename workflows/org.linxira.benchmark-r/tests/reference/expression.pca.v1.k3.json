@@ -1,0 +1,118 @@
+{
+ "feature_count": 4,
+ "sample_count": 4,
+ "scaled_features": false,
+ "total_variance": 36174.0,
+ "components": [
+  {
+   "component": 1,
+   "eigenvalue": 36118.95440617699,
+   "explained_variance_percent": 99.84783105594347,
+   "top_positive_loadings": [
+    {
+     "feature": "Gene1",
+     "loading": 0.9277065548099759
+    },
+    {
+     "feature": "Gene4",
+     "loading": 0.0823601895123354
+    }
+   ],
+   "top_negative_loadings": [
+    {
+     "feature": "Gene2",
+     "loading": -0.3640988937254075
+    },
+    {
+     "feature": "Gene3",
+     "loading": -0.003056621342553785
+    }
+   ]
+  },
+  {
+   "component": 2,
+   "eigenvalue": 54.54579356310214,
+   "explained_variance_percent": 0.15078728800547947,
+   "top_positive_loadings": [
+    {
+     "feature": "Gene3",
+     "loading": 0.13832714495642506
+    }
+   ],
+   "top_negative_loadings": [
+    {
+     "feature": "Gene2",
+     "loading": -0.909458324984398
+    },
+    {
+     "feature": "Gene1",
+     "loading": -0.3389849380672594
+    },
+    {
+     "feature": "Gene4",
+     "loading": -0.1970795977474918
+    }
+   ]
+  },
+  {
+   "component": 3,
+   "eigenvalue": 0.49980025989517257,
+   "explained_variance_percent": 0.0013816560510177824,
+   "top_positive_loadings": [
+    {
+     "feature": "Gene3",
+     "loading": 0.7558078849274341
+    },
+    {
+     "feature": "Gene4",
+     "loading": 0.6522554779365177
+    }
+   ],
+   "top_negative_loadings": [
+    {
+     "feature": "Gene1",
+     "loading": -0.057378025509726246
+    },
+    {
+     "feature": "Gene2",
+     "loading": -0.004999477165501461
+    }
+   ]
+  }
+ ],
+ "samples": [
+  {
+   "sample": "control_1",
+   "scores": [
+    -170.93172513809816,
+    -3.0347309728661647,
+    -0.7974088389499958
+   ]
+  },
+  {
+   "sample": "control_2",
+   "scores": [
+    -157.93742309431903,
+    2.749579614849892,
+    0.8426792264684223
+   ]
+  },
+  {
+   "sample": "treated_1",
+   "scores": [
+    156.7690468475561,
+    8.710741903607941,
+    -0.2986849542513071
+   ]
+  },
+  {
+   "sample": "treated_2",
+   "scores": [
+    172.1001013848611,
+    -8.425590545591671,
+    0.25341456673288054
+   ]
+  }
+ ],
+ "warnings": []
+}

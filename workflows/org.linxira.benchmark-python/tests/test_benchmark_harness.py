@@ -275,5 +275,109 @@ class ParityTests(unittest.TestCase):
         self.assertIn("output directory appeared", envelope["diagnostics"][0]["message"])
 
 
+class ParityCompareMixin:
+    """Recursive 1e-6 relative comparison against a recorded Rust result."""
+
+    REFERENCE_DIR = PACK_ROOT / "tests" / "reference"
+
+    def compare_with_reference(self, reference, actual, path="$"):
+        if isinstance(reference, dict):
+            self.assertEqual(set(reference), set(actual), path)
+            for key, expected in reference.items():
+                self.assertIn(key, actual, f"{path}.{key}")
+                self.compare_with_reference(expected, actual[key], f"{path}.{key}")
+        elif isinstance(reference, list):
+            self.assertEqual(len(reference), len(actual), path)
+            for index, (expected, value) in enumerate(zip(reference, actual)):
+                self.compare_with_reference(expected, value, f"{path}[{index}]")
+        elif isinstance(reference, bool):
+            self.assertEqual(reference, actual, path)
+        elif isinstance(reference, (int, float)):
+            scale = max(abs(reference), abs(actual))
+            if scale == 0:
+                self.assertEqual(reference, actual, path)
+            else:
+                self.assertLessEqual(
+                    abs(reference - actual) / scale,
+                    1e-6,
+                    f"{path}: {reference} vs {actual}",
+                )
+        else:
+            self.assertEqual(reference, actual, path)
+
+    def load_reference(self, name):
+        return json.loads((self.REFERENCE_DIR / name).read_text(encoding="utf-8"))
+
+
+@unittest.skipUnless(HAVE_BIOPYTHON, "Biopython is not installed")
+class ExpressionPcaParityTests(ParityCompareMixin, unittest.TestCase):
+    """M3 #5: the NumPy port must match the Rust engine's PCA field by field."""
+
+    def setUp(self):
+        try:
+            import numpy  # noqa: F401
+
+            self.implementation = MODULE.IMPLEMENTATIONS["expression.pca.v1"]
+        except ImportError:
+            self.skipTest("NumPy is not installed")
+
+    def test_matches_the_rust_engine_on_the_fixture(self):
+        reference = self.load_reference("expression.pca.v1.k3.json")
+        actual = self.implementation.run(
+            {"matrix": REPOSITORY_ROOT / "tests" / "fixtures" / "expression-matrix" / "deseq2-counts.csv"},
+            {"components": 3, "scale_features": False},
+        )
+        self.compare_with_reference(reference, actual)
+
+    def test_rejects_missing_and_non_numeric_values_like_the_engine(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "matrix.csv"
+            path.write_text("gene,s1,s2\ng1,1,NA\ng2,2,3\n", encoding="utf-8")
+            with self.assertRaises(ValueError, msg="missing values are rejected"):
+                self.implementation.run({"matrix": path}, {})
+            path.write_text("gene,s1,s2\ng1,1,x\ng2,2,3\n", encoding="utf-8")
+            with self.assertRaises(ValueError, msg="non-numeric values are rejected"):
+                self.implementation.run({"matrix": path}, {})
+
+    def test_constant_features_warn_and_rank_limits_components(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "matrix.csv"
+            # Two samples only: the rank permits exactly one component.
+            path.write_text("gene,s1,s2\ng1,1,2\ng2,5,6\ng3,7,8\n", encoding="utf-8")
+            result = self.implementation.run({"matrix": path}, {"components": 5})
+            self.assertEqual(len(result["components"]), 1)
+            self.assertTrue(
+                any("matrix rank permits at most 1" in warning for warning in result["warnings"])
+            )
+
+
+class SetVennParityTests(ParityCompareMixin, unittest.TestCase):
+    """M3 #7: exact set arithmetic, no third-party library involved."""
+
+    def setUp(self):
+        self.implementation = MODULE.IMPLEMENTATIONS["set.venn.v1"]
+        self.sets_table = REPOSITORY_ROOT / "tests" / "fixtures" / "set-analysis" / "sets.tsv"
+
+    def test_matches_the_rust_engine_on_the_fixture(self):
+        self.compare_with_reference(
+            self.load_reference("set.venn.v1.default.json"),
+            self.implementation.run({"table": self.sets_table}, {}),
+        )
+
+    def test_items_mode_matches_the_rust_engine(self):
+        self.compare_with_reference(
+            self.load_reference("set.venn.v1.items.json"),
+            self.implementation.run({"table": self.sets_table}, {"include_items": True}),
+        )
+
+    def test_rejects_more_than_six_columns_like_the_engine(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "wide.tsv"
+            header = "\t".join(f"set{i}" for i in range(7))
+            path.write_text(f"{header}\n" + "\t".join("a" for _ in range(7)) + "\n", encoding="utf-8")
+            with self.assertRaises(ValueError, msg="six-column limit"):
+                self.implementation.run({"table": path}, {})
+
+
 if __name__ == "__main__":
     unittest.main()

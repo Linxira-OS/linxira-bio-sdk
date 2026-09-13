@@ -10,7 +10,15 @@
 
 ## 参数
 
-用 `--components N` 请求主成分数。特征始终中心化；`--scale` 还会按样本标准差缩放。
+- `--components N`：请求的主成分数（默认 2）。
+- `--scale`：非恒定特征再按样本标准差缩放（worker 契约参数名 `scale_features`）。
+- `--backend auto|rust|python|r`：实现后端。`rust`（及缺省）运行原生引擎；
+  `python` 和 `r` 经 worker 路由到 benchmark 包
+  （`org.linxira.benchmark-python` / `org.linxira.benchmark-r`），两者按同一
+  确定性幂迭代（最大绝对分量取正）复刻实现，结果落在 1e-6 一致性容差内。
+  `auto` 查询 `runtime-preferences.json`：命中非 rust 后端时输出
+  `backend_from_preferences` 警告。
+- `--json`：输出完整结果封装。
 
 ## 输出
 
@@ -33,7 +41,9 @@ PCA 属于探索性分析，不能单独证明生物学分组或显著性。缺�
 
 ## 运行时依赖
 
-中心化协方差算子和特征求解器均为本地 Rust 实现。
+- `rust`（默认）：中心化协方差算子和特征求解器均为本地 Rust 实现。
+- `python` / `r`：对应的 benchmark 包——Python 需 `numpy`，R 无需额外包
+  （base R 的 `sin`/`cos` 幂迭代）。均无网络访问。
 
 ## 引用
 
@@ -41,4 +51,5 @@ PCA 属于探索性分析，不能单独证明生物学分组或显著性。缺�
 
 ## 故障排除
 
-无法解析全部主成分时移除恒定特征；特征数值尺度不可直接比较时启用缩放。
+- 无法解析全部主成分时移除恒定特征；特征数值尺度不可直接比较时启用缩放。
+- `unknown --backend value`：该参数只接受 `auto`、`rust`、`python`、`r`。
