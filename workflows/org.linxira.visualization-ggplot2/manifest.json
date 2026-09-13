@@ -95,7 +95,7 @@
   "files": [
     {
       "path": "NOTICE.md",
-      "sha256": "1646bdb913d698d64e59d51780e07004661628f73f7c93e0cffde3839f278f6c"
+      "sha256": "ebeaade18be78e281411a96f932eb9945c7ae19f849133b3248adf4a035fd16a"
     },
     {
       "path": "dependencies.lock.json",
