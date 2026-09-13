@@ -1,0 +1,93 @@
+{
+  "analysis_type": "custom",
+  "query_input_count": 4,
+  "query_mapped_count": 3,
+  "query_unmapped_count": 1,
+  "background_gene_count": 8,
+  "tested_term_count": 6,
+  "reported_term_count": 6,
+  "omitted_term_count": 0,
+  "terms": [
+    {
+      "term_id": "custom:stress",
+      "term_name": "Stress response",
+      "namespace": "custom",
+      "overlap_count": 3,
+      "query_gene_count": 3,
+      "background_term_count": 4,
+      "background_gene_count": 8,
+      "fold_enrichment": 2.0,
+      "p_value": 0.07142857142857131,
+      "adjusted_p_value": 0.4285714285714279,
+      "overlap_genes": []
+    },
+    {
+      "term_id": "GO:0000001",
+      "term_name": "Process A",
+      "namespace": "go",
+      "overlap_count": 2,
+      "query_gene_count": 3,
+      "background_term_count": 3,
+      "background_gene_count": 8,
+      "fold_enrichment": 1.7777777777777777,
+      "p_value": 0.28571428571428537,
+      "adjusted_p_value": 0.5714285714285707,
+      "overlap_genes": []
+    },
+    {
+      "term_id": "map00010",
+      "term_name": "Pathway A",
+      "namespace": "kegg",
+      "overlap_count": 2,
+      "query_gene_count": 3,
+      "background_term_count": 3,
+      "background_gene_count": 8,
+      "fold_enrichment": 1.7777777777777777,
+      "p_value": 0.28571428571428537,
+      "adjusted_p_value": 0.5714285714285707,
+      "overlap_genes": []
+    },
+    {
+      "term_id": "GO:0000002",
+      "term_name": "Process B",
+      "namespace": "go",
+      "overlap_count": 1,
+      "query_gene_count": 3,
+      "background_term_count": 2,
+      "background_gene_count": 8,
+      "fold_enrichment": 1.3333333333333333,
+      "p_value": 0.6428571428571423,
+      "adjusted_p_value": 0.6428571428571423,
+      "overlap_genes": []
+    },
+    {
+      "term_id": "GO:0000003",
+      "term_name": "Function C",
+      "namespace": "go",
+      "overlap_count": 1,
+      "query_gene_count": 3,
+      "background_term_count": 2,
+      "background_gene_count": 8,
+      "fold_enrichment": 1.3333333333333333,
+      "p_value": 0.6428571428571423,
+      "adjusted_p_value": 0.6428571428571423,
+      "overlap_genes": []
+    },
+    {
+      "term_id": "map00020",
+      "term_name": "Pathway B",
+      "namespace": "kegg",
+      "overlap_count": 1,
+      "query_gene_count": 3,
+      "background_term_count": 2,
+      "background_gene_count": 8,
+      "fold_enrichment": 1.3333333333333333,
+      "p_value": 0.6428571428571423,
+      "adjusted_p_value": 0.6428571428571423,
+      "overlap_genes": []
+    }
+  ],
+  "warnings": [
+    "1 query identifiers were absent from the association universe"
+  ]
+}

@@ -73,7 +73,8 @@
       "capability_aliases": [
         "expression.pca.v1",
         "set.venn.v1",
-        "structure.pdb.summary.v1"
+        "structure.pdb.summary.v1",
+        "enrichment.overrepresentation.v1"
       ]
     },
     {
@@ -86,7 +87,8 @@
       "capability_aliases": [
         "expression.pca.v1",
         "set.venn.v1",
-        "structure.pdb.summary.v1"
+        "structure.pdb.summary.v1",
+        "enrichment.overrepresentation.v1"
       ]
     },
     {

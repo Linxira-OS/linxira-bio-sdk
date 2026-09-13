@@ -259,6 +259,7 @@ pub enum BioDataFormat {
     Fastq,
     Csv,
     Tsv,
+    Txt,
     Bed,
     Gff3,
     Gtf,

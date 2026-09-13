@@ -431,5 +431,35 @@ class StructurePdbParityTests(ParityCompareMixin, unittest.TestCase):
                 self.implementation.run({"pdb": path}, {})
 
 
+class EnrichmentOverrepresentationParityTests(ParityCompareMixin, unittest.TestCase):
+    """M3 #6: the ORA port must match the engine term for term."""
+
+    def setUp(self):
+        self.implementation = MODULE.IMPLEMENTATIONS["enrichment.overrepresentation.v1"]
+        self.genes = REPOSITORY_ROOT / "tests" / "fixtures" / "functional" / "genes.txt"
+        self.associations = REPOSITORY_ROOT / "tests" / "fixtures" / "functional" / "associations.tsv"
+
+    def test_matches_the_rust_engine_default_and_include_genes(self):
+        for reference_name, parameters in (
+            ("enrichment.overrepresentation.v1.default.json", {}),
+            ("enrichment.overrepresentation.v1.genes.json", {"include_genes": True}),
+        ):
+            reference = self.load_reference(reference_name)
+            actual = self.implementation.run(
+                {"genes": self.genes, "associations": self.associations}, parameters
+            )
+            self.compare_with_reference(reference, actual, reference_name)
+            self.assertTrue(
+                any("absent from the association universe" in warning for warning in actual["warnings"])
+            )
+
+    def test_unmapped_universe_fails_like_the_engine(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            query = Path(tmp) / "genes.txt"
+            query.write_text("gene_id\nzzz1\nzzz2\n", encoding="utf-8")
+            with self.assertRaises(Exception):
+                self.implementation.run({"genes": query, "associations": self.associations}, {})
+
+
 if __name__ == "__main__":
     unittest.main()

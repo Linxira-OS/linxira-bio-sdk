@@ -25,7 +25,8 @@
         "sequence.stats.v1",
         "expression.pca.v1",
         "set.venn.v1",
-        "structure.pdb.summary.v1"
+        "structure.pdb.summary.v1",
+        "enrichment.overrepresentation.v1"
       ]
     },
     "inputs": {
@@ -49,7 +50,9 @@
               "fasta",
               "matrix",
               "table",
-              "pdb"
+              "pdb",
+              "genes",
+              "associations"
             ]
           },
           "cardinality": {
@@ -167,6 +170,20 @@
         },
         "interpret_b_factors_as_plddt": {
           "type": "boolean"
+        },
+        "min_overlap": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "max_terms": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 100
+        },
+        "include_genes": {
+          "type": "boolean",
+          "default": false
         }
       },
       "additionalProperties": false

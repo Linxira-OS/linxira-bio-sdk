@@ -41,3 +41,12 @@ Cite the association source, universe definition, identifier mapping, filters, a
 ## Troubleshooting
 
 Ensure both files use the same identifier system and review `query_unmapped_count` before interpretation.
+
+## Backend Selection
+
+- `--backend auto|rust|python|r` routes to the engine, the benchmark-python
+  pack, or the benchmark-r pack. The pack implementations are stdlib/base-R
+  ports of the engine's own math (log-factorial hypergeometric upper tail
+  and Benjamini-Hochberg with the engine's tie-breaking); scipy/gseapy and
+  clusterProfiler are deliberately not used so three-way parity stays
+  bitwise-comparable.

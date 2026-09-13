@@ -30,6 +30,7 @@
 | 2026-09-13 | benchmark 环境披露 | 报告新增 Windows 宿主机/WSL 探测（interop）与 distro/wsl 字段 | 跨环境数字可追溯 | commit 9052bcf；bench-20260913-001 | current |
 | 2026-09-13 | `scripts/materialize-r-lock.py` | 下载加固：https-only + host allowlist + 重定向后校验 | Mimosa 深扫 SSRF high | scan-2026-09-13T10-06-04（seal sha256:9656b8d3…） | current |
 | 2026-09-13 | `plot.render.v1` 双包 | 新增 matplotlib/ggplot2 绘图 pack（M1-T1/T2）：PlotSpec 全参数渲染、svg/png 字节稳定（固定 svg hash 盐 / svglite）、跨后端 data_summary 一致性断言 | 回应"绘图=可复现数据产品"设计定位；M1 落地 | 双 pack 测试（py 5/5、R 全过、跨后端一致） | current |
+| 2026-09-13 | `enrichment.overrepresentation.v1` 三端 | 引擎 ORA 的 Python/R 移植（log 阶乘超几何上尾 + 同款 BH 平局规则；刻意不用 gseapy/clusterProfiler）。修复两处移植语义：查询表头行跳过、BH rank 反向错误、R jsonlite 单元素数组坍缩 | M3 #6 三端 | 双 pack parity 对 Rust golden（default+include_genes）；WSL E2E Consistent（rust 90ms / py 390ms / r 500ms，4.33x） | current |
 
 ## v2 迁移模板（Upgrading to v2）
 

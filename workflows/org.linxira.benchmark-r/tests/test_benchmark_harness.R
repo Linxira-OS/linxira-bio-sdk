@@ -299,12 +299,32 @@ with_workspace(function(workspace) {
   ), silent = TRUE)
   stopifnot(inherits(outcome, "try-error"))
 
+  # --- M3 #6: ORA parity (two recorded engine outputs) ---------------------
+  ora <- registry[["enrichment.overrepresentation.v1"]]
+  stopifnot(!is.null(ora))
+  genes_fixture <- file.path(repository_root, "tests", "fixtures", "functional", "genes.txt")
+  associations_fixture <- file.path(repository_root, "tests", "fixtures", "functional", "associations.tsv")
+  for (case in list(
+    list("enrichment.overrepresentation.v1.default.json", list()),
+    list("enrichment.overrepresentation.v1.genes.json", list(include_genes = TRUE))
+  )) {
+    parity_compare("$", read_reference(case[[1L]]),
+                   roundtrip(ora$run(list(genes = genes_fixture,
+                                          associations = associations_fixture),
+                                     case[[2L]])))
+  }
+  bad_query <- file.path(workspace, "bad-genes.txt")
+  writeLines(c("gene_id", "zzz1", "zzz2"), bad_query)
+  outcome <- try(ora$run(list(genes = bad_query, associations = associations_fixture),
+                         list()), silent = TRUE)
+  stopifnot(inherits(outcome, "try-error"))
+
   bad_missing <- file.path(workspace, "missing.csv")
   writeLines(c("gene,s1,s2", "g1,1,NA", "g2,2,3"), bad_missing)
   outcome <- try(pca$run(list(matrix = bad_missing), list()), silent = TRUE)
   stopifnot(inherits(outcome, "try-error"))
 
-  cat("PCA/Venn/PDB parity OK; max relative error:", format(parity_max_rel), "\n")
+  cat("PCA/Venn/PDB/ORA parity OK; max relative error:", format(parity_max_rel), "\n")
 })
 
 cat("benchmark-r harness tests passed", if (have_biostrings) "(with Biostrings parity)" else "(validation only)", "\n")
