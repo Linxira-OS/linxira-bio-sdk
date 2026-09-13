@@ -132,6 +132,15 @@ documents for the product boundary, staged scope, supported data formats, and
 non-Visual-Studio build direction. The exact read, inspect, analysis, and
 export matrix is in `docs/DATA_FORMATS.md`.
 
+## Plotting
+
+Plotting defaults to the native Python (matplotlib) and R (ggplot2) packs
+(`plot.render.v1`); the Rust SVG visualizers stay as the zero-dependency
+fallback for their dedicated chart families until a mature Rust plotting
+stack is adopted. Figures are deterministic: identical PlotSpec inputs render
+to identical bytes, and every visual parameter (axes, theme, palette, size,
+dpi, format, output filename) is explicit.
+
 ## Benchmarks
 
 Every measured performance claim lives under `benchmark-results/` and follows

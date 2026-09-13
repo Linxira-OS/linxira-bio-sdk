@@ -1,0 +1,121 @@
+{
+  "schema_version": "2",
+  "id": "org.linxira.visualization-matplotlib",
+  "version": "0.1.0",
+  "publisher": {
+    "name": "Linxira OS",
+    "url": "https://github.com/Linxira-OS"
+  },
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
+  "entrypoint": {
+    "path": "src/render.py",
+    "arguments": [
+      "--request",
+      "{request}",
+      "--result",
+      "{result}"
+    ]
+  },
+  "runtime": {
+    "kind": "python",
+    "version": "3.12.x",
+    "core_compatibility": ">=0.1.0,<2.0.0",
+    "dependency_lock": {
+      "path": "requirements.lock",
+      "sha256": "3ea838f643058e7d9aab754b1688ce087f04fbbc429900fed849e8dd5c1bfd16"
+    }
+  },
+  "input_schema": {
+    "type": "object",
+    "$ref": "schemas/input.schema.json"
+  },
+  "output_schema": {
+    "type": "object",
+    "$ref": "schemas/output.schema.json"
+  },
+  "platforms": [
+    "windows-gnu",
+    "debian",
+    "arch"
+  ],
+  "network": {
+    "access": "none",
+    "allowed_hosts": []
+  },
+  "resources": {
+    "minimum_memory_mb": 256,
+    "minimum_disk_mb": 100,
+    "recommended_threads": 1,
+    "gpu": "none"
+  },
+  "contract": {
+    "inputs": [
+      {
+        "role": "plot-spec",
+        "formats": [
+          "json"
+        ]
+      }
+    ],
+    "outputs": {
+      "roles": [
+        "figure"
+      ],
+      "kind": "plot",
+      "formats": [
+        "svg",
+        "png",
+        "pdf"
+      ],
+      "media_type": "image/*"
+    },
+    "parameters": [
+      "output_path",
+      "title",
+      "subtitle",
+      "x_label",
+      "y_label",
+      "x_range",
+      "y_range",
+      "x_log",
+      "y_log",
+      "grid",
+      "theme",
+      "palette",
+      "legend",
+      "figure.width",
+      "figure.height",
+      "figure.dpi",
+      "font.family",
+      "font.size",
+      "output.format"
+    ]
+  },
+  "files": [
+    {
+      "path": "NOTICE.md",
+      "sha256": "e4bfdf9e3107df31f83b1062dea502c32585ed4cc6f4531358a7aa335ae0e732"
+    },
+    {
+      "path": "requirements.lock",
+      "sha256": "3ea838f643058e7d9aab754b1688ce087f04fbbc429900fed849e8dd5c1bfd16"
+    },
+    {
+      "path": "schemas/input.schema.json",
+      "sha256": "019c268426e0f0698a038b28fec3dec20024d96f034c9e259cb6c8e4ae260300"
+    },
+    {
+      "path": "schemas/output.schema.json",
+      "sha256": "afc7828326b242bc0723769954a395f3de5ba60263a9e245b71dc7d959436eda"
+    },
+    {
+      "path": "src/render.py",
+      "sha256": "94e51647fbfc7bceba0a4d5939ad0e4d3ae0aa5055c9273adbb41f8f7692bb60"
+    },
+    {
+      "path": "tests/test_render.py",
+      "sha256": "f870d18c47b2b012ef6463af4f5a43e59a965c080ba491249bd7516d7ecb9200"
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "visualization-matplotlib result",
+  "type": "object",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "required": [
+        "schema_version",
+        "backend",
+        "plot_spec_sha256",
+        "artifact",
+        "data_summary",
+        "warnings"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1"
+        },
+        "backend": {
+          "const": "matplotlib"
+        },
+        "plot_spec_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "format",
+            "width",
+            "height",
+            "dpi",
+            "bytes"
+          ],
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "format": {
+              "enum": [
+                "svg",
+                "png",
+                "pdf"
+              ]
+            },
+            "width": {
+              "type": "integer"
+            },
+            "height": {
+              "type": "integer"
+            },
+            "dpi": {
+              "type": "integer"
+            },
+            "bytes": {
+              "type": "integer"
+            }
+          }
+        },
+        "data_summary": {
+          "$ref": "#/$defs/data_summary"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "required": [
+        "schema_version",
+        "backend",
+        "status",
+        "message"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1"
+        },
+        "backend": {
+          "const": "matplotlib"
+        },
+        "status": {
+          "const": "error"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "data_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "series_count",
+        "point_counts",
+        "x_range",
+        "y_range"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "scatter",
+            "line",
+            "bar",
+            "box",
+            "violin",
+            "heatmap"
+          ]
+        },
+        "series_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "point_counts": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "x_range": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "y_range": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    }
+  }
+}

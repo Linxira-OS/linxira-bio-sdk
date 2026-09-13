@@ -1,0 +1,121 @@
+{
+  "schema_version": "2",
+  "id": "org.linxira.visualization-ggplot2",
+  "version": "0.1.0",
+  "publisher": {
+    "name": "Linxira OS",
+    "url": "https://github.com/Linxira-OS"
+  },
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
+  "entrypoint": {
+    "path": "src/render.R",
+    "arguments": [
+      "--request",
+      "{request}",
+      "--result",
+      "{result}"
+    ]
+  },
+  "runtime": {
+    "kind": "r",
+    "version": "4.6.1",
+    "core_compatibility": ">=0.1.0,<2.0.0",
+    "dependency_lock": {
+      "path": "dependencies.lock.json",
+      "sha256": "2b37ef4007b61da2bc29fe8010f2fc80a1648631155b9e4383080deb88684355"
+    }
+  },
+  "input_schema": {
+    "type": "object",
+    "$ref": "schemas/input.schema.json"
+  },
+  "output_schema": {
+    "type": "object",
+    "$ref": "schemas/output.schema.json"
+  },
+  "platforms": [
+    "windows-gnu",
+    "debian",
+    "arch"
+  ],
+  "network": {
+    "access": "none",
+    "allowed_hosts": []
+  },
+  "resources": {
+    "minimum_memory_mb": 256,
+    "minimum_disk_mb": 100,
+    "recommended_threads": 1,
+    "gpu": "none"
+  },
+  "contract": {
+    "inputs": [
+      {
+        "role": "plot-spec",
+        "formats": [
+          "json"
+        ]
+      }
+    ],
+    "outputs": {
+      "roles": [
+        "figure"
+      ],
+      "kind": "plot",
+      "formats": [
+        "svg",
+        "png",
+        "pdf"
+      ],
+      "media_type": "image/*"
+    },
+    "parameters": [
+      "output_path",
+      "title",
+      "subtitle",
+      "x_label",
+      "y_label",
+      "x_range",
+      "y_range",
+      "x_log",
+      "y_log",
+      "grid",
+      "theme",
+      "palette",
+      "legend",
+      "figure.width",
+      "figure.height",
+      "figure.dpi",
+      "font.family",
+      "font.size",
+      "output.format"
+    ]
+  },
+  "files": [
+    {
+      "path": "NOTICE.md",
+      "sha256": "6084c957c58790f9061c10ad692d595e2356bd1b7e84f9146e238785cd5ca29d"
+    },
+    {
+      "path": "dependencies.lock.json",
+      "sha256": "2b37ef4007b61da2bc29fe8010f2fc80a1648631155b9e4383080deb88684355"
+    },
+    {
+      "path": "schemas/input.schema.json",
+      "sha256": "ce02430224362a8cb040e99135d9cc9bab888d1320a8fb830be5f9a500ada7ca"
+    },
+    {
+      "path": "schemas/output.schema.json",
+      "sha256": "3b668e2e8e368035cf5b790eb060961893c0651f03fa851e4267af5dd0aec9bb"
+    },
+    {
+      "path": "src/render.R",
+      "sha256": "925322da009490677a391a1a442d9362e3fdb581e8e4a593fbb428d74d0d64ef"
+    },
+    {
+      "path": "tests/test_render.R",
+      "sha256": "36e63216566d055fa532596b3403895cd48c546857dd1b16c57e71ef595f3835"
+    }
+  ]
+}
