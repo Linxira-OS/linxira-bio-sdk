@@ -231,11 +231,22 @@ fn parse_elapsed(value: &str) -> Option<f64> {
 /// arguments only (no shell, no user-controlled program names), keeping the
 /// environment disclosure side-effect free.
 pub fn environment_snapshot(engine_version: &str) -> BenchmarkEnvironment {
+    let kernel = read_kernel();
+    let wsl_version = wsl_version_from_kernel(kernel.as_deref());
+    let host = wsl_version.as_deref().and_then(read_windows_host_overview);
     BenchmarkEnvironment {
         os: std::env::consts::OS.to_owned(),
-        kernel: read_kernel(),
+        kernel,
         cpu_model: read_cpu_model(),
         total_memory_mb: read_total_memory_mb(),
+        distro: read_distro(),
+        wsl_distro: std::env::var("WSL_DISTRO_NAME").ok(),
+        wsl_version,
+        host_os: host.as_ref().map(|host| host.os.clone()),
+        host_model: host.as_ref().map(|host| host.model.clone()),
+        host_cpu_model: host.as_ref().map(|host| host.cpu_model.clone()),
+        host_logical_processors: host.as_ref().and_then(|host| host.logical_processors),
+        host_total_memory_mb: host.as_ref().and_then(|host| host.total_memory_mb),
         engine_version: engine_version.to_owned(),
         python_version: probe_python_version(),
         r_version: first_line_of(
@@ -248,6 +259,130 @@ pub fn environment_snapshot(engine_version: &str) -> BenchmarkEnvironment {
         page_cache: "warm".to_owned(),
         precision: precision_label(),
     }
+}
+
+/// One-shot view of the Windows host behind a WSL guest, captured over the
+/// interop bridge so reports disclose the machine a WSL benchmark really
+/// ran on (version, model, CPU, RAM) instead of only the guest allocation.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct WindowsHostOverview {
+    pub os: String,
+    pub model: String,
+    pub cpu_model: String,
+    pub logical_processors: Option<u64>,
+    pub total_memory_mb: Option<u64>,
+}
+
+/// WSL kernels carry a `microsoft` marker (`…-microsoft-standard-WSL2` for
+/// WSL2); plain `Microsoft` markers appear on WSL1 kernels.
+fn wsl_version_from_kernel(kernel: Option<&str>) -> Option<String> {
+    let kernel = kernel?;
+    let lowered = kernel.to_ascii_lowercase();
+    if lowered.contains("wsl2") {
+        Some("wsl2".to_owned())
+    } else if lowered.contains("microsoft") {
+        Some("wsl1".to_owned())
+    } else {
+        None
+    }
+}
+
+fn read_distro() -> Option<String> {
+    let os_release = std::fs::read_to_string("/etc/os-release").ok()?;
+    for line in os_release.lines() {
+        if let Some(pretty) = line.strip_prefix("PRETTY_NAME=") {
+            return Some(pretty.trim().trim_matches('"').to_owned());
+        }
+    }
+    None
+}
+
+/// Probes the Windows host via `cmd.exe /c ver` and one PowerShell CIM call.
+/// Both fail cleanly to `None` when interop is disabled or the host tools are
+/// unavailable, so the snapshot stays usable inside plain containers.
+fn read_windows_host_overview(wsl_version: &str) -> Option<WindowsHostOverview> {
+    // WSL1 does not ship the full CIM surface over interop; version alone is
+    // still disclosed from `ver`.
+    let os = std::process::Command::new("cmd.exe")
+        .arg("/c")
+        .arg("ver")
+        .output()
+        .ok()
+        .and_then(|output| parse_windows_ver(&String::from_utf8_lossy(&output.stdout)))?;
+    if wsl_version != "wsl2" {
+        return Some(WindowsHostOverview {
+            os,
+            ..WindowsHostOverview::default()
+        });
+    }
+    let hardware = std::process::Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "$cs = Get-CimInstance Win32_ComputerSystem; \
+             $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1; \
+             '{0}|{1}|{2}|{3}|{4}' -f $cs.Manufacturer, $cs.Model, $cpu.Name, \
+             $cs.NumberOfLogicalProcessors, [math]::Round($cs.TotalPhysicalMemory / 1MB)",
+        ])
+        .output()
+        .ok()
+        .and_then(|output| parse_windows_hardware(&String::from_utf8_lossy(&output.stdout)))
+        .unwrap_or_default();
+    Some(WindowsHostOverview {
+        os,
+        model: hardware.0,
+        cpu_model: hardware.1,
+        logical_processors: hardware.2,
+        total_memory_mb: hardware.3,
+    })
+}
+
+/// `ver` prints a banner like `Microsoft Windows [Version 10.0.x.y]`, but the
+/// word inside the brackets is localized and arrives in the OEM codepage
+/// (mojibake after lossy UTF-8 decoding). The ASCII build number is the only
+/// stable part, so the banner is normalized to `[Version <build>]`.
+fn parse_windows_ver(output: &str) -> Option<String> {
+    let banner = output
+        .lines()
+        .map(str::trim)
+        .find(|line| line.starts_with("Microsoft Windows"))?;
+    let build = banner.split(['[', ']']).nth(1).and_then(|inner| {
+        inner.split_whitespace().find(|token| {
+            token.chars().next().is_some_and(|c| c.is_ascii_digit())
+                && token.chars().all(|c| c.is_ascii_digit() || c == '.')
+        })
+    });
+    match build {
+        Some(build) => Some(format!("Microsoft Windows [Version {build}]")),
+        None => Some(
+            banner
+                .chars()
+                .filter(char::is_ascii)
+                .collect::<String>()
+                .trim()
+                .to_owned(),
+        ),
+    }
+}
+
+/// Parses the `manufacturer|model|cpu|logical processors|memory MB` line
+/// emitted by the PowerShell probe.
+fn parse_windows_hardware(output: &str) -> Option<(String, String, Option<u64>, Option<u64>)> {
+    let line = output
+        .lines()
+        .map(str::trim)
+        .find(|line| line.contains('|'))?;
+    let fields: Vec<&str> = line.split('|').map(str::trim).collect();
+    if fields.len() != 5 {
+        return None;
+    }
+    let model = format!("{} {}", fields[0], fields[1]).trim().to_owned();
+    Some((
+        model,
+        fields[2].to_owned(),
+        fields[3].parse::<u64>().ok(),
+        fields[4].parse::<u64>().ok(),
+    ))
 }
 
 /// `high` with an external `/usr/bin/time -v` wrapper, `degraded` with
@@ -331,7 +466,8 @@ fn read_total_memory_mb() -> Option<u64> {
 mod tests {
     use super::{
         TimeVerboseMetrics, diff_envelopes, diff_result_envelopes, environment_snapshot, iqr,
-        median, parse_time_verbose,
+        median, parse_time_verbose, parse_windows_hardware, parse_windows_ver,
+        wsl_version_from_kernel,
     };
     use serde_json::json;
 
@@ -448,5 +584,64 @@ mod tests {
         assert_eq!(environment.engine_version, "1.2.3");
         assert_eq!(environment.page_cache, "warm");
         assert!(environment.precision == "high" || environment.precision == "degraded");
+        // Host disclosure only applies inside WSL; elsewhere it stays absent
+        // instead of guessing.
+        if environment.wsl_version.is_none() {
+            assert_eq!(environment.host_os, None);
+            assert_eq!(environment.host_model, None);
+            assert_eq!(environment.host_total_memory_mb, None);
+        }
+    }
+
+    #[test]
+    fn wsl_version_comes_from_the_kernel_marker() {
+        assert_eq!(
+            wsl_version_from_kernel(Some("6.6.87.2-microsoft-standard-WSL2")),
+            Some("wsl2".to_owned())
+        );
+        assert_eq!(
+            wsl_version_from_kernel(Some("4.4.0-Microsoft")),
+            Some("wsl1".to_owned())
+        );
+        assert_eq!(wsl_version_from_kernel(Some("6.12.4-arch1-1")), None);
+        assert_eq!(wsl_version_from_kernel(None), None);
+    }
+
+    #[test]
+    fn windows_ver_parser_normalizes_localized_banners() {
+        assert_eq!(
+            parse_windows_ver("\r\nMicrosoft Windows [Version 10.0.26200.1]\r\n"),
+            Some("Microsoft Windows [Version 10.0.26200.1]".to_owned())
+        );
+        // OEM-encoded localized word ("版本") decodes to mojibake; only the
+        // ASCII build survives and the banner is normalized.
+        assert_eq!(
+            parse_windows_ver("\r\nMicrosoft Windows [\u{ffb0}\u{ffb1} 10.0.26200.9168]\r\n"),
+            Some("Microsoft Windows [Version 10.0.26200.9168]".to_owned())
+        );
+        // A banner without a bracketed build degrades to its ASCII content.
+        assert_eq!(
+            parse_windows_ver("  Microsoft Windows \u{fffd}Pro\r\n"),
+            Some("Microsoft Windows Pro".to_owned())
+        );
+        assert_eq!(parse_windows_ver("anything else"), None);
+    }
+
+    #[test]
+    fn windows_hardware_parser_splits_the_cim_line() {
+        let parsed = parse_windows_hardware(
+            "\r\nLENOVO|82X6|AMD Ryzen 9 7945HX with Radeon Graphics|32|64461\r\n",
+        );
+        assert_eq!(
+            parsed,
+            Some((
+                "LENOVO 82X6".to_owned(),
+                "AMD Ryzen 9 7945HX with Radeon Graphics".to_owned(),
+                Some(32),
+                Some(64461),
+            ))
+        );
+        assert_eq!(parse_windows_hardware("LENOVO|82X6|CPU"), None);
+        assert_eq!(parse_windows_hardware(""), None);
     }
 }

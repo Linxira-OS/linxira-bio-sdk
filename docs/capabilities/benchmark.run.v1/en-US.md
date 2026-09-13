@@ -41,8 +41,12 @@ matrix, and the public benchmark page.
 - `DIR/<capability>.benchmark.json`: the benchmark report (schema
   `benchmark-report.schema.json`) with per-backend runs, medians, min/max,
   IQR, peak RSS, consistency verdict, field-level findings, and the full
-  environment disclosure (OS, kernel, CPU, memory, engine/Python/R versions,
-  container flag, page-cache and timing-precision labels). Each run record
+  environment disclosure (OS, kernel, distro, CPU, memory, engine/Python/R
+  versions, container flag, page-cache and timing-precision labels). Inside
+  WSL the disclosure additionally records the Windows host: `cmd.exe /c ver`
+  output, machine model, CPU model, logical processors, and physical RAM,
+  each captured over the interop bridge and omitted (not guessed) when
+  interop is unavailable. Each run record
   carries optional `self_reported_wall_ms` and `self_reported_peak_rss_mb`
   from the pack's in-process instrumentation, so the interpreter start-up
   share of `wall_ms` is visible.
