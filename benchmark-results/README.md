@@ -64,6 +64,14 @@ schema：`schemas/benchmark-summary.schema.json`。逐字段：
 - **未跑完也保留**：中断/部分完成的批次以 `status: "partial"` 入库并注明
   缺口（哪些 run 未完成、原因），不得因"没跑完"而丢弃已测得的数据。
 
+## 3c. 对话级溯源交付（Conversation-level Provenance，强制）
+
+凡**实际使用**了对方机器/NAS 上的数据（读取、跑分、交叉验证），当轮对话必须
+额外交付一段**可复制的数据来源清单**，逐条写明：数据集 id、检索号（SRR/PRJ）、
+公开来源 URL（SRA Run Browser / BioProject 页面，公开数据可直接检索得到）、
+本批用途与对应 `report_id`。该清单与 summary.json 的 `data_sources` 字段一致，
+供人工到对端逐条核对下载出处。
+
 ## 4. 环境入库口径（Environment Disclosure）
 
 每份报告与 summary 都携带完整环境（os/kernel/distro/guest cpu/memory、
