@@ -30,6 +30,8 @@ DATASETS="benchmark-datasets.json"
 OUTPUT="benchmark-results"
 REPEAT="3"
 BACKENDS="rust,python,r"
+SRA_LIST=""
+SRA_CAPABILITY="fastq.qc.v1"
 SKIP_WRITEBACK=0
 
 while [ $# -gt 0 ]; do
@@ -39,6 +41,8 @@ while [ $# -gt 0 ]; do
     --output) OUTPUT="${2:?--output requires a path}"; shift 2 ;;
     --repeat) REPEAT="${2:?--repeat requires a number}"; shift 2 ;;
     --backends) BACKENDS="${2:?--backends requires a list}"; shift 2 ;;
+    --sra) SRA_LIST="${2:?--sra requires a list file}"; shift 2 ;;
+    --sra-capability) SRA_CAPABILITY="${2:?--sra-capability requires an id}"; shift 2 ;;
     --skip-writeback) SKIP_WRITEBACK=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown option: $1" >&2; usage; exit 2 ;;
@@ -53,10 +57,11 @@ if ! command -v "$PYTHON" >/dev/null 2>&1; then
   echo "python3 is required for planning and aggregation" >&2
   exit 4
 fi
-if [ ! -f "$DATASETS" ]; then
+if [ -z "$SRA_LIST" ] && [ ! -f "$DATASETS" ]; then
   echo "dataset manifest not found: $DATASETS" >&2
   echo "copy benchmark-datasets.example.json to benchmark-datasets.json and point" >&2
-  echo "the inputs at your local data; the real manifest is intentionally not committed" >&2
+  echo "the inputs at your local data; the real manifest is intentionally not committed." >&2
+  echo "an SRR-only run with --sra does not need the manifest" >&2
   exit 4
 fi
 if [ -z "$CLI" ]; then
@@ -76,7 +81,10 @@ mkdir -p "$RUN_DIR/plan" "$RUN_DIR/runs" || exit 4
 
 # Turn the JSON manifest into one shell fragment per run; shlex quoting
 # keeps paths with spaces safe. Each fragment defines plan_* variables.
-"$PYTHON" - "$DATASETS" "$RUN_DIR/plan" "$REPEAT" "$BACKENDS" <<'PYPLAN'
+# Skipped entirely for an SRR-only run (--sra without a dataset manifest).
+PLAN_FAILED=0
+if [ -f "$DATASETS" ]; then
+"$PYTHON" - "$DATASETS" "$RUN_DIR/plan" "$REPEAT" "$BACKENDS" <<'PYPLAN' || PLAN_FAILED=1
 import json
 import pathlib
 import shlex
@@ -113,15 +121,124 @@ for index, entry in enumerate(entries):
         fragment, encoding="utf-8"
     )
 PYPLAN
-if [ $? -ne 0 ]; then
+if [ "$PLAN_FAILED" -ne 0 ]; then
   echo "dataset manifest is invalid" >&2
   exit 4
+fi
 fi
 
 COMPLETED=0
 COMMAND_FAILURES=0
 BENCH_FAILURES=0
+
+# M2-T8: segmented SRR benchmarking. Each entry of the --sra list file is a
+# local .sra path; the unpack step (sra-tools, M0-T11) and the downstream
+# capability run are timed separately and recorded in
+# sra-work/<slug>/segment.json so the summary can disclose both segments.
+SRA_FAILURES=0
+if [ -n "$SRA_LIST" ]; then
+  if ! command -v fasterq-dump >/dev/null 2>&1 && ! command -v fastq-dump >/dev/null 2>&1; then
+    echo "sra-tools (fasterq-dump) not found on PATH; --sra entries are skipped" >&2
+    SRA_FAILURES=1
+  else
+    mkdir -p "$RUN_DIR/sra-work"
+    while IFS= read -r sra_path || [ -n "$sra_path" ]; do
+      case "$sra_path" in ''|\#*) continue ;; esac
+      slug=$(basename "$sra_path")
+      slug="${slug%.*}"
+      out_dir="$RUN_DIR/sra-work/$slug"
+      mkdir -p "$out_dir"
+      echo "== SRR segment $sra_path -> $out_dir"
+      unpack_started=$(date +%s%3N)
+      if command -v /usr/bin/time >/dev/null 2>&1; then
+        if ! /usr/bin/time -v -o "$out_dir/unpack-time.txt" \
+            fasterq-dump --split-3 -O "$out_dir" "$sra_path" \
+            > "$out_dir/unpack.log" 2>&1; then
+          echo "   unpack failed; see $out_dir/unpack.log" >&2
+          SRA_FAILURES=$((SRA_FAILURES + 1))
+          continue
+        fi
+      else
+        if ! fasterq-dump --split-3 -O "$out_dir" "$sra_path" \
+            > "$out_dir/unpack.log" 2>&1; then
+          echo "   unpack failed; see $out_dir/unpack.log" >&2
+          SRA_FAILURES=$((SRA_FAILURES + 1))
+          continue
+        fi
+      fi
+      unpack_wall_ms=$(( $(date +%s%3N) - unpack_started ))
+      unpacked_fastq=$(ls "$out_dir"/*.fastq 2>/dev/null | head -1)
+      if [ -z "$unpacked_fastq" ]; then
+        echo "   unpack produced no FASTQ; see $out_dir/unpack.log" >&2
+        SRA_FAILURES=$((SRA_FAILURES + 1))
+        continue
+      fi
+      downstream_args=(benchmark run "$SRA_CAPABILITY" "fastq=$unpacked_fastq")
+      if "$CLI" "${downstream_args[@]}" \
+          --backends "$BACKENDS" \
+          --repeat "$REPEAT" \
+          --output "$out_dir" \
+          --dataset-class srr > "$out_dir/benchmark.log" 2>&1; then
+        COMPLETED=$((COMPLETED + 1))
+      else
+        COMMAND_FAILURES=$((COMMAND_FAILURES + 1))
+        echo "   downstream benchmark failed; see $out_dir/benchmark.log" >&2
+      fi
+      "$PYTHON" - "$out_dir" "$unpack_wall_ms" "$sra_path" "$SRA_CAPABILITY" <<'PYSEG'
+import json
+import pathlib
+import sys
+
+out_dir = pathlib.Path(sys.argv[1])
+unpack_wall_ms = int(sys.argv[2])
+sra_path = sys.argv[3]
+capability = sys.argv[4]
+
+peak_rss_kb = None
+time_report = out_dir / "unpack-time.txt"
+if time_report.is_file():
+    for line in time_report.read_text(encoding="utf-8", errors="replace").splitlines():
+        if line.startswith("Maximum resident set size"):
+            digits = "".join(character for character in line if character.isdigit())
+            if digits:
+                peak_rss_kb = int(digits)
+            break
+
+segment = {
+    "sra": sra_path,
+    "unpack": {
+        "tool": "fasterq-dump --split-3",
+        "wall_ms": unpack_wall_ms,
+        "peak_rss_mb": (peak_rss_kb / 1024.0) if peak_rss_kb else None,
+        "outputs": [path.name for path in sorted(out_dir.glob("*.fastq"))],
+    },
+    "downstream": {"capability": capability, "status": "missing-report", "report": None},
+}
+report = out_dir / f"{capability}.benchmark.json"
+if report.is_file():
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    segment["downstream"] = {
+        "capability": capability,
+        "status": "ok" if payload.get("consistency") == "consistent" else "failed",
+        "consistency": payload.get("consistency"),
+        "speedup": payload.get("speedup"),
+        "report": report.name,
+        "backends": {
+            backend.get("backend"): backend.get("median_wall_ms")
+            for backend in payload.get("backends", [])
+        },
+    }
+(out_dir / "segment.json").write_text(
+    json.dumps(segment, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+)
+PYSEG
+    done < "$SRA_LIST"
+  fi
+fi
+
 for fragment in "$RUN_DIR"/plan/*.plan.sh; do
+  # An SRR-only run has no plan fragments at all.
+  [ -f "$fragment" ] || continue
   # shellcheck source=/dev/null
   source "$fragment"
   slug_dir="$RUN_DIR/runs/$plan_slug"
@@ -169,7 +286,8 @@ backends_flag = sys.argv[3]
 repeat_flag = sys.argv[4]
 cli = sys.argv[5]
 
-manifest = json.loads(pathlib.Path(manifest_path).read_text(encoding="utf-8"))
+manifest_file = pathlib.Path(manifest_path)
+manifest = json.loads(manifest_file.read_text(encoding="utf-8")) if manifest_file.is_file() else {}
 entries_manifest = manifest.get("datasets", [])
 
 entries = []
@@ -223,6 +341,13 @@ summary = {
     "environment": environment,
     "entries": entries,
 }
+
+# M2-T8: merge the segmented SRR runs (unpack + downstream) if present.
+segmented = []
+for segment_path in sorted((run_dir / "sra-work").glob("*/segment.json")) if (run_dir / "sra-work").is_dir() else []:
+    segmented.append(json.loads(segment_path.read_text(encoding="utf-8")))
+if segmented:
+    summary["segmented"] = segmented
 (run_dir / "summary.json").write_text(
     json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
 )
@@ -231,7 +356,10 @@ lines = []
 lines.append(f"# Benchmark summary — {run_dir.name}")
 lines.append("")
 lines.append(f"- backends: {backends_flag} — repeat: {repeat_flag}")
-lines.append(f"- datasets: `{manifest_path}` (local, intentionally not committed)")
+if pathlib.Path(manifest_path).is_file():
+    lines.append(f"- datasets: `{manifest_path}` (local, intentionally not committed)")
+else:
+    lines.append("- datasets: none (SRR-only run)")
 lines.append(f"- engine: {summary['engine']}")
 lines.append("- methodology: one untimed warmup per backend, median of timed repeats, "
              "page_cache: warm; precision per report (`high` with /usr/bin/time -v, "
@@ -314,6 +442,29 @@ if failures:
                      f"see {record['report'] or 'run.log'}")
     lines.append("")
 
+if segmented:
+    lines.append("## SRR segmented runs")
+    lines.append("")
+    lines.append("Unpack (sra-tools `fasterq-dump --split-3`) and the downstream capability "
+                 "are timed separately; both segments are warm-cache.")
+    lines.append("")
+    lines.append("| SRR | unpack wall (ms) | unpack peak RSS (MB) | downstream | consistency | rust (ms) |")
+    lines.append("|---|---|---|---|---|---|")
+    for segment in segmented:
+        unpack = segment.get("unpack", {})
+        downstream = segment.get("downstream", {})
+        rss = unpack.get("peak_rss_mb")
+        rust_wall = downstream.get("backends", {}).get("rust")
+        lines.append(
+            f"| {pathlib.Path(segment.get('sra', '?')).name} "
+            f"| {unpack.get('wall_ms', 'n/a')} "
+            f"| {f'{rss:.1f}' if rss else 'n/a'} "
+            f"| {downstream.get('capability', 'n/a')} ({downstream.get('status', 'n/a')}) "
+            f"| {downstream.get('consistency', 'n/a')} "
+            f"| {f'{rust_wall:.1f}' if rust_wall else 'n/a'} |"
+        )
+    lines.append("")
+
 (run_dir / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 print(f"wrote {run_dir / 'summary.json'}")
 print(f"wrote {run_dir / 'summary.md'}")
@@ -323,7 +474,7 @@ if [ $? -ne 0 ]; then
   exit 4
 fi
 
-echo "benchmark matrix: $COMPLETED run(s), $COMMAND_FAILURES command failure(s), $BENCH_FAILURES failed verdict(s)"
+echo "benchmark matrix: $COMPLETED run(s), $COMMAND_FAILURES command failure(s), $BENCH_FAILURES failed verdict(s), $SRA_FAILURES sra segment failure(s)"
 if [ "$COMMAND_FAILURES" -gt 0 ]; then
   exit 3
 fi
