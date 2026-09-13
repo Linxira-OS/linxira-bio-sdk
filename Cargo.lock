@@ -1915,6 +1915,7 @@ version = "1.0.1"
 dependencies = [
  "eframe",
  "flate2",
+ "linxira-bio-core",
  "linxira-bio-export",
  "linxira-bio-protocol",
  "linxira-bio-worker",
