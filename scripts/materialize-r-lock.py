@@ -145,19 +145,65 @@ def compute_closure(
     return sorted(resolved)
 
 
+ALLOWED_URL_HOSTS = {
+    "bioconductor.org",
+    "www.bioconductor.org",
+    "cloud.r-project.org",
+    "cran.r-project.org",
+}
+
+
+def allowlisted_hosts() -> set[str]:
+    """Hard-coded official hosts plus operator additions via the environment
+    (comma-separated), so mirrors can be used without weakening the default."""
+    configured = os.environ.get("LINXIRA_R_MIRROR_ALLOWLIST", "")
+    hosts = set(ALLOWED_URL_HOSTS)
+    for host in configured.split(","):
+        host = host.strip().lower()
+        if host:
+            hosts.add(host)
+    return hosts
+
+
+def validate_url(url: str, hosts: set[str]) -> None:
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme.lower() != "https":
+        raise ValueError(f"refusing non-https URL: {url}")
+    host = (parsed.hostname or "").lower()
+    if host not in hosts:
+        raise ValueError(f"refusing URL on non-allowlisted host {host!r}: {url}")
+    if ".." in parsed.path:
+        raise ValueError(f"refusing URL with a path-traversal segment: {url}")
+
+
+def validate_response_url(response: urllib.response.addinfourl, hosts: set[str]) -> None:
+    """Redirects are followed by urlopen; the FINAL URL must pass too."""
+    final = response.geturl()
+    parsed = urllib.parse.urlsplit(final)
+    if parsed.scheme.lower() != "https" or (parsed.hostname or "").lower() not in hosts:
+        response.close()
+        raise ValueError(f"refusing redirected response from: {final}")
+
+
 def fetch_text(url: str) -> str:
+    hosts = allowlisted_hosts()
+    validate_url(url, hosts)
     request = urllib.request.Request(
         url, headers={"User-Agent": "linxira-bio-sdk-release/0.1.0"}
     )
     with urllib.request.urlopen(request, timeout=60) as response:
+        validate_response_url(response, hosts)
         return response.read().decode("utf-8", errors="replace")
 
 
 def fetch_bytes(url: str) -> bytes:
+    hosts = allowlisted_hosts()
+    validate_url(url, hosts)
     request = urllib.request.Request(
         url, headers={"User-Agent": "linxira-bio-sdk-release/0.1.0"}
     )
     with urllib.request.urlopen(request, timeout=120) as response:
+        validate_response_url(response, hosts)
         return response.read()
 
 
