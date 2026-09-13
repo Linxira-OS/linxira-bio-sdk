@@ -23,8 +23,11 @@
       "minLength": 1
     },
     "capability": {
-      "type": "string",
-      "minLength": 1
+      "enum": [
+        "sequence.stats.v1",
+        "expression.pca.v1",
+        "set.venn.v1"
+      ]
     },
     "status": {
       "enum": [
@@ -335,6 +338,112 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 100
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "capability": {
+            "const": "expression.pca.v1"
+          },
+          "status": {
+            "const": "ok"
+          }
+        },
+        "required": [
+          "capability",
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "required": [
+              "feature_count",
+              "sample_count",
+              "scaled_features",
+              "total_variance",
+              "components",
+              "samples",
+              "warnings"
+            ],
+            "properties": {
+              "feature_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sample_count": {
+                "type": "integer",
+                "minimum": 2
+              },
+              "scaled_features": {
+                "type": "boolean"
+              },
+              "total_variance": {
+                "type": "number",
+                "minimum": 0
+              },
+              "components": {
+                "type": "array",
+                "minItems": 1
+              },
+              "samples": {
+                "type": "array",
+                "minItems": 2
+              },
+              "warnings": {
+                "type": "array"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "capability": {
+            "const": "set.venn.v1"
+          },
+          "status": {
+            "const": "ok"
+          }
+        },
+        "required": [
+          "capability",
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "required": [
+              "set_count",
+              "union_size",
+              "set_sizes",
+              "intersections"
+            ],
+            "properties": {
+              "set_count": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 6
+              },
+              "union_size": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "set_sizes": {
+                "type": "array"
+              },
+              "intersections": {
+                "type": "array"
               }
             },
             "additionalProperties": false

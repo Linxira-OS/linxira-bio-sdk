@@ -12,8 +12,18 @@ two samples, and one non-constant feature.
 
 ## Parameters
 
-Use `--components N` to request components. Features are centered; `--scale`
-also divides non-constant features by sample standard deviation.
+- `--components N`: number of components to request (default 2).
+- `--scale`: also divide non-constant features by their sample standard
+  deviation (parameter name `scale_features` on the worker contract).
+- `--backend auto|rust|python|r`: the implementation backend. `rust` (and
+  omission) runs the native engine; `python` and `r` route through the worker
+  to the benchmark packs (`org.linxira.benchmark-python` /
+  `org.linxira.benchmark-r`), which re-implement the same deterministic
+  eigensolver (largest-magnitude component positive) so results match within
+  the 1e-6 consistency tolerance. `auto` consults
+  `runtime-preferences.json`; a non-rust hit emits a
+  `backend_from_preferences` warning.
+- `--json`: print the full result envelope.
 
 ## Outputs
 
@@ -39,7 +49,10 @@ analysis is capped at 10 million matrix cells.
 
 ## Runtime Dependencies
 
-The centered covariance operator and eigensolver are implemented in local Rust.
+- `rust` (default): the centered covariance operator and eigensolver are
+  implemented in local Rust.
+- `python` / `r`: the matching benchmark pack — Python needs `numpy`, R needs
+  no extra packages (base `sin`/`cos` power iteration). No network access.
 
 ## Citations
 
@@ -47,5 +60,7 @@ Cite PCA and any upstream normalization method used to create the analyzed matri
 
 ## Troubleshooting
 
-Remove constant features if all requested components cannot be resolved. Scale
-features when their numeric ranges are not directly comparable.
+- Remove constant features if all requested components cannot be resolved. Scale
+  features when their numeric ranges are not directly comparable.
+- `unknown --backend value`: the flag accepts `auto`, `rust`, `python`, and
+  `r` only.

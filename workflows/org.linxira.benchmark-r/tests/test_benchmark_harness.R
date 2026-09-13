@@ -192,4 +192,83 @@ if (!have_biostrings) {
   })
 }
 
+# --- M3 #5/#7: PCA and Venn parity (no Biostrings needed) -------------------
+reference_dir <- file.path(pack_root, "tests", "reference")
+read_reference <- function(name) {
+  jsonlite::fromJSON(file.path(reference_dir, name), simplifyVector = FALSE)
+}
+roundtrip <- function(value) {
+  jsonlite::fromJSON(
+    jsonlite::toJSON(value, auto_unbox = TRUE, null = "null", na = "null", digits = NA),
+    simplifyVector = FALSE
+  )
+}
+parity_max_rel <- 0
+parity_compare <- function(path, expected, got) {
+  if (is.null(expected) && is.null(got)) return(invisible())
+  if (is.list(expected) && !is.null(names(expected))) {
+    stopifnot(setequal(names(expected), names(got)))
+    for (name in names(expected)) {
+      parity_compare(paste0(path, "$", name), expected[[name]], got[[name]])
+    }
+  } else if (is.list(expected)) {
+    stopifnot(length(expected) == length(got))
+    for (index in seq_along(expected)) {
+      parity_compare(paste0(path, "[", index, "]"), expected[[index]], got[[index]])
+    }
+  } else if (is.character(expected)) {
+    if (!identical(as.character(expected), as.character(got))) {
+      stop(sprintf("%s: %s vs %s", path,
+                   paste(expected, collapse = ","), paste(got, collapse = ",")))
+    }
+  } else if (is.logical(expected)) {
+    stopifnot(identical(isTRUE(expected), isTRUE(got)))
+  } else if (is.numeric(expected)) {
+    scale <- max(abs(expected), abs(got), na.rm = TRUE)
+    if (scale == 0) {
+      stopifnot(expected == got)
+    } else {
+      relative <- abs(expected - got) / scale
+      if (relative > 1e-6) {
+        stop(sprintf("%s: %s vs %s (relative %g)", path,
+                     format(expected, digits = 17), format(got, digits = 17), relative))
+      }
+      parity_max_rel <<- max(parity_max_rel, relative)
+    }
+  } else {
+    stop(paste0(path, ": unhandled reference type ", class(expected)))
+  }
+  invisible()
+}
+
+sets_table <- file.path(repository_root, "tests", "fixtures", "set-analysis", "sets.tsv")
+pca_matrix <- file.path(repository_root, "tests", "fixtures", "expression-matrix", "deseq2-counts.csv")
+
+with_workspace(function(workspace) {
+  registry <- load_implementations(file.path(SCRIPT_DIRECTORY, "implementations"))
+  venn <- registry[["set.venn.v1"]]
+  pca <- registry[["expression.pca.v1"]]
+  stopifnot(!is.null(venn), !is.null(pca))
+
+  parity_compare("$", read_reference("set.venn.v1.default.json"),
+                 roundtrip(venn$run(list(table = sets_table), list())))
+  parity_compare("$", read_reference("set.venn.v1.items.json"),
+                 roundtrip(venn$run(list(table = sets_table), list(include_items = TRUE))))
+
+  wide <- file.path(workspace, "wide.tsv")
+  writeLines(paste(paste0("set", 0:6), collapse = "\t"), wide)
+  outcome <- try(venn$run(list(table = wide), list()), silent = TRUE)
+  stopifnot(inherits(outcome, "try-error"))
+
+  parity_compare("$", read_reference("expression.pca.v1.k3.json"),
+                 roundtrip(pca$run(list(matrix = pca_matrix), list(components = 3))))
+
+  bad_missing <- file.path(workspace, "missing.csv")
+  writeLines(c("gene,s1,s2", "g1,1,NA", "g2,2,3"), bad_missing)
+  outcome <- try(pca$run(list(matrix = bad_missing), list()), silent = TRUE)
+  stopifnot(inherits(outcome, "try-error"))
+
+  cat("PCA/Venn parity OK; max relative error:", format(parity_max_rel), "\n")
+})
+
 cat("benchmark-r harness tests passed", if (have_biostrings) "(with Biostrings parity)" else "(validation only)", "\n")

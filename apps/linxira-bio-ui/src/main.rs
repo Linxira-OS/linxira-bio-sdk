@@ -287,7 +287,10 @@ impl AnalysisBackend {
 /// Capabilities with a registered benchmark-pack implementation; extend as
 /// the packs gain capabilities (M3).
 fn capability_has_backend_packs(capability: &str) -> bool {
-    matches!(capability, "sequence.stats.v1")
+    matches!(
+        capability,
+        "sequence.stats.v1" | "expression.pca.v1" | "set.venn.v1"
+    )
 }
 
 /// One backend's aggregated result of a GUI benchmark comparison (M2-T5).
@@ -4776,7 +4779,9 @@ fn run_benchmark_task(
         };
 
     let pack_backends: Vec<ExecutionBackend> = match capability.as_str() {
-        "sequence.stats.v1" => vec![ExecutionBackend::Python, ExecutionBackend::R],
+        "sequence.stats.v1" | "expression.pca.v1" | "set.venn.v1" => {
+            vec![ExecutionBackend::Python, ExecutionBackend::R]
+        }
         _ => Vec::new(),
     };
     let mut rows = Vec::new();

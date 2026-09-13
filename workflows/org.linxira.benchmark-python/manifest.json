@@ -64,11 +64,11 @@
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "4ddb6ef19ebccb91388db94f07049567dc9d64cb8155473211fb9f157853fceb"
+      "sha256": "712cfbd0dd287009bf2654f06703760ed4c82b375fc9507cde039eea9c26e4d3"
     },
     {
       "path": "schemas/output.schema.json",
-      "sha256": "2fa960e7298eff5aebd2ebe72db68d29c98de539b25b36b9441b6641b3432afd"
+      "sha256": "868609bd7fcc62af131166b703ea5ac8f5923c6254dc4e3fa1c0b553c94f5d5a"
     },
     {
       "path": "src/benchmark_harness.py",
@@ -76,7 +76,7 @@
     },
     {
       "path": "src/implementations/__init__.py",
-      "sha256": "55146658fede3f30af9fbe13a1893ca35f95c58e916f41d86797eb26989e8ba2"
+      "sha256": "9c11efd1dcfd2c8681ee38ec00b16c9ea7888a24a7afa8afc16d299bb59c41dd"
     },
     {
       "path": "src/implementations/sequence_stats_v1.py",
@@ -84,7 +84,27 @@
     },
     {
       "path": "tests/test_benchmark_harness.py",
-      "sha256": "b80bf986228a5942ce5e4f7161148f9d6eae3ecfec9741ae2fd586167cd1e87e"
+      "sha256": "11ba106334ddeb358702afb18f990508f08c1849c0f6fbb0b0b11f9fa41cf229"
+    },
+    {
+      "path": "src/implementations/expression_pca_v1.py",
+      "sha256": "85194235563e5ff3102b0eb491124e1719f56bacd8048c942aeedfeb642318ca"
+    },
+    {
+      "path": "src/implementations/set_venn_v1.py",
+      "sha256": "658a4beb3b486cf3ce59cd0c3f1ecea34725a7a49ef759c54127f2dbb0284788"
+    },
+    {
+      "path": "tests/reference/expression.pca.v1.k3.json",
+      "sha256": "f7ace555db543769ddb0a393e5f87d5933091413b98b6ed3cf8cf635ac82fc28"
+    },
+    {
+      "path": "tests/reference/set.venn.v1.default.json",
+      "sha256": "40dce78eabb48ae889be31acf8c0f8e8510985541da0778ec380a5e066d1bd5d"
+    },
+    {
+      "path": "tests/reference/set.venn.v1.items.json",
+      "sha256": "1bfaa4ef9b7461209d04d7ad36826a96ed6ae22607443efd6adea76d7baaf318"
     }
   ],
   "contract": {
@@ -93,6 +113,20 @@
         "role": "fasta",
         "formats": [
           "fasta"
+        ]
+      },
+      {
+        "role": "matrix",
+        "formats": [
+          "csv",
+          "tsv"
+        ]
+      },
+      {
+        "role": "table",
+        "formats": [
+          "csv",
+          "tsv"
         ]
       }
     ],
@@ -107,7 +141,11 @@
       "media_type": "application/json"
     },
     "parameters": [
-      "output_directory"
+      "output_directory",
+      "components",
+      "scale_features",
+      "include_items",
+      "max_intersections"
     ]
   }
 }
