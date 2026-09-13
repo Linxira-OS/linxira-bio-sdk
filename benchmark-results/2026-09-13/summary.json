@@ -1,6 +1,8 @@
 {
   "schema_version": "1",
+  "report_id": "bench-20260913-001",
   "generated_at": "2026-09-13",
+  "purpose": "First three-way (rust/python/r) consistency and speed baseline on repository fixtures after M3 packs: verifies numerical parity and quantifies interpreter start-up and memory overhead on small inputs.",
   "methodology": {
     "backends_flag": "--backends rust,python,r",
     "repeat_flag": "--repeat 5",
@@ -29,12 +31,39 @@
     "page_cache": "warm",
     "precision": "high"
   },
+  "data_sources": [
+    {
+      "id": "fixture-expression-deseq2-counts",
+      "origin": "repository-fixture",
+      "reference": "tests/fixtures/expression-matrix/deseq2-counts.csv",
+      "note": "Count matrix used by expression.pca.v1 with components=3."
+    },
+    {
+      "id": "fixture-sequences-tiny",
+      "origin": "repository-fixture",
+      "reference": "tests/fixtures/sequences/tiny.fa",
+      "note": "3-record FASTA used by sequence.stats.v1."
+    },
+    {
+      "id": "fixture-set-analysis-sets",
+      "origin": "repository-fixture",
+      "reference": "tests/fixtures/set-analysis/sets.tsv",
+      "note": "Identifier-set table used by set.venn.v1 with default parameters."
+    },
+    {
+      "id": "fixture-structure-alphafold-style",
+      "origin": "repository-fixture",
+      "reference": "tests/fixtures/structure-pdb-summary/alphafold-style.pdb",
+      "note": "AlphaFold-style PDB used by structure.pdb.summary.v1 in default mode."
+    }
+  ],
   "entries": [
     {
       "id": "expression-pca",
       "capability": "expression.pca.v1",
       "dataset_class": "matrix",
       "dataset": "repository fixture tests/fixtures/expression-matrix/deseq2-counts.csv (components=3)",
+      "data_source_id": "fixture-expression-deseq2-counts",
       "status": "ok",
       "consistency": "consistent",
       "speedup": 7.5,
@@ -67,6 +96,7 @@
       "capability": "sequence.stats.v1",
       "dataset_class": "sequence",
       "dataset": "repository fixture tests/fixtures/sequences/tiny.fa (3 records, FASTA)",
+      "data_source_id": "fixture-sequences-tiny",
       "status": "ok",
       "consistency": "consistent",
       "speedup": 8.25,
@@ -99,6 +129,7 @@
       "capability": "set.venn.v1",
       "dataset_class": "other",
       "dataset": "repository fixture tests/fixtures/set-analysis/sets.tsv (default parameters)",
+      "data_source_id": "fixture-set-analysis-sets",
       "status": "ok",
       "consistency": "consistent",
       "speedup": 7.75,
@@ -131,6 +162,7 @@
       "capability": "structure.pdb.summary.v1",
       "dataset_class": "structure",
       "dataset": "repository fixture tests/fixtures/structure-pdb-summary/alphafold-style.pdb (default mode)",
+      "data_source_id": "fixture-structure-alphafold-style",
       "status": "ok",
       "consistency": "consistent",
       "speedup": 8.0,
