@@ -69,7 +69,11 @@
       "status": "cataloged",
       "trust": "official",
       "runtime": "python",
-      "manifest": "workflows/org.linxira.benchmark-python/manifest.json"
+      "manifest": "workflows/org.linxira.benchmark-python/manifest.json",
+      "capability_aliases": [
+        "expression.pca.v1",
+        "set.venn.v1"
+      ]
     },
     {
       "id": "org.linxira.benchmark-r",
@@ -77,7 +81,11 @@
       "status": "cataloged",
       "trust": "official",
       "runtime": "r",
-      "manifest": "workflows/org.linxira.benchmark-r/manifest.json"
+      "manifest": "workflows/org.linxira.benchmark-r/manifest.json",
+      "capability_aliases": [
+        "expression.pca.v1",
+        "set.venn.v1"
+      ]
     }
   ]
 }

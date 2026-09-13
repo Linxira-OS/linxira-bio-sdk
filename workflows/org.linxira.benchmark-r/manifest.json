@@ -64,11 +64,11 @@
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "1ecabcb054dd23686b6a20182526d955bbc1f01bdc32c3a6d6cfa1bc440da49c"
+      "sha256": "f4f8c1449f27bf100f18f64307fb6df0dbbc44cffe7076a153479bb797fd8864"
     },
     {
       "path": "schemas/output.schema.json",
-      "sha256": "1cd4d146c5c1659953bb293985ff0475787c3047076d973353c0f7b4407cf85a"
+      "sha256": "31134c50899fa5844cd08311e78a42e527a9fa9be76b075bd0dcda413569ef2d"
     },
     {
       "path": "src/benchmark_harness.R",
@@ -80,7 +80,27 @@
     },
     {
       "path": "tests/test_benchmark_harness.R",
-      "sha256": "6155700d3d294c662e56b439b70b06dc2c798195260c27625377d408c093917e"
+      "sha256": "1b47c640e415045eefa9ca30e105a75f5f8fee6fd42820a7ad4bc8756d52b789"
+    },
+    {
+      "path": "src/implementations/expression_pca_v1.R",
+      "sha256": "2bfa9e13a5964956d214149def072eae80e4d1866c309355f415e4d3efff2d83"
+    },
+    {
+      "path": "src/implementations/set_venn_v1.R",
+      "sha256": "ae428b097fa8c9d545d8a7e16c7761a1b10cf8022534f08d04f957777f617417"
+    },
+    {
+      "path": "tests/reference/expression.pca.v1.k3.json",
+      "sha256": "f7ace555db543769ddb0a393e5f87d5933091413b98b6ed3cf8cf635ac82fc28"
+    },
+    {
+      "path": "tests/reference/set.venn.v1.default.json",
+      "sha256": "40dce78eabb48ae889be31acf8c0f8e8510985541da0778ec380a5e066d1bd5d"
+    },
+    {
+      "path": "tests/reference/set.venn.v1.items.json",
+      "sha256": "1bfaa4ef9b7461209d04d7ad36826a96ed6ae22607443efd6adea76d7baaf318"
     }
   ],
   "contract": {
@@ -89,6 +109,20 @@
         "role": "fasta",
         "formats": [
           "fasta"
+        ]
+      },
+      {
+        "role": "matrix",
+        "formats": [
+          "csv",
+          "tsv"
+        ]
+      },
+      {
+        "role": "table",
+        "formats": [
+          "csv",
+          "tsv"
         ]
       }
     ],
@@ -103,7 +137,11 @@
       "media_type": "application/json"
     },
     "parameters": [
-      "output_directory"
+      "output_directory",
+      "components",
+      "scale_features",
+      "include_items",
+      "max_intersections"
     ]
   }
 }
