@@ -642,6 +642,10 @@ pub struct BenchmarkFinding {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BenchmarkEnvironment {
     pub os: String,
+    /// Exact source revision (git sha) embedded at build time; every
+    /// evaluation is tied to the code that produced it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_revision: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kernel: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1182,6 +1186,7 @@ mod tests {
             findings: Vec::new(),
             environment: BenchmarkEnvironment {
                 os: "linux".to_owned(),
+                code_revision: Some("0123456789abcdef".to_owned()),
                 kernel: Some("6.18.33".to_owned()),
                 cpu_model: Some("test cpu".to_owned()),
                 total_memory_mb: Some(16_000),

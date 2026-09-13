@@ -6605,6 +6605,9 @@ fn benchmark_summary_markdown(report: &BenchmarkReport) -> String {
         }
     }
     let mut environment_section = String::from("\n## Environment\n\n");
+    if let Some(revision) = report.environment.code_revision.as_deref() {
+        environment_section.push_str(&format!("- code revision: {revision}\n"));
+    }
     environment_section.push_str(&format!(
         "- os: {} {}\n",
         report.environment.os,

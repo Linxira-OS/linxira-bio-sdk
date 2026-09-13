@@ -73,7 +73,8 @@
         "engine_version",
         "in_container",
         "page_cache",
-        "precision"
+        "precision",
+        "code_revision"
       ],
       "additionalProperties": false,
       "properties": {
@@ -81,50 +82,93 @@
           "type": "string"
         },
         "kernel": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "cpu_model": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "total_memory_mb": {
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "distro": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "wsl_distro": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "wsl_version": {
-          "type": ["string", "null"],
-          "enum": ["wsl1", "wsl2", null]
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "wsl1",
+            "wsl2",
+            null
+          ]
         },
         "host_os": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "host_model": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "host_cpu_model": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "host_logical_processors": {
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "host_total_memory_mb": {
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "engine_version": {
           "type": "string"
         },
         "python_version": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "r_version": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "in_container": {
           "type": "boolean"
@@ -134,6 +178,10 @@
         },
         "precision": {
           "type": "string"
+        },
+        "code_revision": {
+          "type": "string",
+          "description": "Exact source revision (git sha) the evaluation ran on."
         }
       }
     },
@@ -144,7 +192,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "origin", "reference"],
+        "required": [
+          "id",
+          "origin",
+          "reference"
+        ],
         "properties": {
           "id": {
             "type": "string",
@@ -206,22 +258,42 @@
           },
           "status": {
             "type": "string",
-            "enum": ["ok", "failed", "missing-report"]
+            "enum": [
+              "ok",
+              "failed",
+              "missing-report",
+              "partial"
+            ]
           },
           "consistency": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "speedup": {
-            "type": ["number", "null"]
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "memory_saving": {
-            "type": ["number", "null"]
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "precision": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "report": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "File name of the full benchmark report inside this run directory."
           },
           "backends": {
@@ -229,13 +301,24 @@
             "additionalProperties": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["median_wall_ms", "median_peak_rss_mb", "ok_runs", "repeats"],
+              "required": [
+                "median_wall_ms",
+                "median_peak_rss_mb",
+                "ok_runs",
+                "repeats"
+              ],
               "properties": {
                 "median_wall_ms": {
-                  "type": ["number", "null"]
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 },
                 "median_peak_rss_mb": {
-                  "type": ["number", "null"]
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 },
                 "ok_runs": {
                   "type": "integer",

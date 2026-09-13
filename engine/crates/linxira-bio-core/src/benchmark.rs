@@ -236,6 +236,7 @@ pub fn environment_snapshot(engine_version: &str) -> BenchmarkEnvironment {
     let host = wsl_version.as_deref().and_then(read_windows_host_overview);
     BenchmarkEnvironment {
         os: std::env::consts::OS.to_owned(),
+        code_revision: Some(env!("LINXIRA_CODE_REVISION").to_owned()),
         kernel,
         cpu_model: read_cpu_model(),
         total_memory_mb: read_total_memory_mb(),

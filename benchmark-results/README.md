@@ -47,6 +47,23 @@ schema：`schemas/benchmark-summary.schema.json`。逐字段：
   数据，不删除任何东西**），`origin` 标 `private-server`。
 - 入库物 = 指标 + 报告 + 环境，**永远不含原始数据本体**。
 
+## 3a. 版本溯源（Code Revision，强制）
+
+- **每次评估必须标注代码版本**：summary 与每份报告的 environment 均携带
+  `code_revision`（构建时嵌入的 git sha）。同一数据在不同开发版本上测出的
+  数字**分库存放、禁止混排对比**；对比表必须写明各自的 `report_id` 与
+  `code_revision`。
+- 引擎自 1.0.2 起自动嵌入 sha；1.0.1 及更早的历史报告回填时在 summary.json
+  的 environment 里手工补 `code_revision`（如 bench-20260913-001 → 9052bcf）。
+
+## 3b. 数据保留（Retention，强制）
+
+- **重测不覆盖**：同一数据可以反复重测（包括对方机器已算过的），但每次测量
+  都是新的一次入库——新 `report_id`、新日期目录或同目录新编号，**旧结果永不
+  覆盖、永不删除**；版本间对比靠 report_id + code_revision 关联。
+- **未跑完也保留**：中断/部分完成的批次以 `status: "partial"` 入库并注明
+  缺口（哪些 run 未完成、原因），不得因"没跑完"而丢弃已测得的数据。
+
 ## 4. 环境入库口径（Environment Disclosure）
 
 每份报告与 summary 都携带完整环境（os/kernel/distro/guest cpu/memory、
