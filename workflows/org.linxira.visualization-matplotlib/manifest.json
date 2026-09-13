@@ -107,7 +107,7 @@
     },
     {
       "path": "schemas/output.schema.json",
-      "sha256": "afc7828326b242bc0723769954a395f3de5ba60263a9e245b71dc7d959436eda"
+      "sha256": "42fdb86e983711d27b48229cd59fbb4f1e23be289b18f9ed3f02a1bfb78b6694"
     },
     {
       "path": "src/render.py",
