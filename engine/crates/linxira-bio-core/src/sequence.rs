@@ -1,12 +1,12 @@
 use flate2::read::MultiGzDecoder;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
 use std::path::Path;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SequenceStats {
     pub sequence_count: u64,
     pub total_bases: u64,

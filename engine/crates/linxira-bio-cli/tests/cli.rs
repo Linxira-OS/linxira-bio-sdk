@@ -6,6 +6,30 @@ use std::{fs, process};
 static TEMPORARY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
+fn sequence_stats_rejects_an_unknown_backend_before_running() {
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args([
+            "sequence",
+            "stats",
+            "tests/fixtures/sequences/tiny.fa",
+            "--backend",
+            "fortran",
+        ])
+        .output()
+        .expect("run sequence stats with an unknown backend");
+
+    assert!(
+        !output.status.success(),
+        "an unknown backend must fail the command"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("unknown --backend value"),
+        "expected a usage error naming the flag, got: {stderr}"
+    );
+}
+
+#[test]
 fn prints_top_level_help_successfully() {
     for flag in ["-h", "--help"] {
         let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))

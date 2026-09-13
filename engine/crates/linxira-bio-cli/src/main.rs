@@ -115,10 +115,10 @@ use linxira_bio_output::{
 use linxira_bio_protocol::{
     AnalysisResult, BENCHMARK_REPORT_SCHEMA_VERSION, BenchmarkBackendSummary, BenchmarkFinding,
     BenchmarkReport, BenchmarkRun, BenchmarkVerdict, CompressionFormat, ExecutionBackend,
-    ExecutionMode, WorkflowPackManifest, WorkflowRuntimeKind,
-    semver_range::core_compatibility_matches,
+    ExecutionMode, ExecutionRequest, JobRequest, RuntimePreferences, SCHEMA_VERSION,
+    WorkflowPackManifest, WorkflowRuntimeKind, semver_range::core_compatibility_matches,
 };
-use linxira_bio_worker::v2_contract;
+use linxira_bio_worker::{execute_request, v2_contract};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -444,13 +444,8 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         [benchmark, run, arguments @ ..] if benchmark == "benchmark" && run == "run" => {
             run_benchmark_command(arguments)
         }
-        [sequence, stats, path] if sequence == "sequence" && stats == "stats" => {
-            print_sequence_stats(path, false)
-        }
-        [sequence, stats, path, json]
-            if sequence == "sequence" && stats == "stats" && json == "--json" =>
-        {
-            print_sequence_stats(path, true)
+        [sequence, stats, arguments @ ..] if sequence == "sequence" && stats == "stats" => {
+            run_sequence_stats_command(arguments)
         }
         [sequence, extract, arguments @ ..] if sequence == "sequence" && extract == "extract" => {
             print_sequence_extract(arguments)
@@ -1621,6 +1616,175 @@ fn print_plan_text(plan: &EnvironmentPlan) {
     if plan.requires_confirmation {
         println!("No changes were applied. This is a transaction preview only.");
     }
+}
+
+/// `sequence stats` (M2-T7): runs the native engine in-process by default;
+/// `--backend auto|rust|python|r` selects the implementation backend. `auto`
+/// (and omission) consult `runtime-preferences.json`; python/r route through
+/// the worker to the benchmark packs.
+fn run_sequence_stats_command(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    const CAPABILITY: &str = "sequence.stats.v1";
+    let mut path = None;
+    let mut json = false;
+    let mut backend = None;
+    let mut index = 0;
+    while index < arguments.len() {
+        let argument = &arguments[index];
+        let (flag, inline_value) = split_cli_flag(argument);
+        match flag.as_str() {
+            "--json" => json = true,
+            "--backend" => {
+                let value = cli_flag_value(inline_value, arguments, &mut index, "--backend")?;
+                match ExecutionBackend::parse(&value) {
+                    Some(parsed) => backend = Some(parsed),
+                    None if value.eq_ignore_ascii_case("auto") => backend = None,
+                    None => {
+                        return Err(CliError::usage(format!(
+                            "unknown --backend value {value:?}; expected auto, rust, python, or r"
+                        )));
+                    }
+                }
+            }
+            other if other.starts_with('-') => {
+                return Err(CliError::usage(format!(
+                    "unknown sequence stats option: {other}"
+                )));
+            }
+            other => {
+                if path.is_some() {
+                    return Err(CliError::usage("sequence stats takes exactly one input"));
+                }
+                path = Some(other.to_owned());
+            }
+        }
+        index += 1;
+    }
+    let Some(path) = path else {
+        return Err(CliError::usage(
+            "sequence stats requires one input: linxira-bio sequence stats <input.fasta[.gz]> \
+             [--backend auto|rust|python|r] [--json]",
+        ));
+    };
+
+    let effective = match backend {
+        Some(parsed) => Some(parsed),
+        None => RuntimePreferences::load()?.default_backend_for(CAPABILITY),
+    };
+    // `auto` may redirect to a pack: the CLI resolves the table itself to
+    // pick the execution route, so it also owns the redirect disclosure.
+    let from_preferences =
+        backend.is_none() && effective.is_some_and(|backend| backend != ExecutionBackend::Rust);
+    match effective {
+        None | Some(ExecutionBackend::Rust) => print_sequence_stats(&path, json),
+        Some(pack_backend) => {
+            run_sequence_stats_via_worker(&path, json, CAPABILITY, pack_backend, from_preferences)
+        }
+    }
+}
+
+/// Executes `sequence.stats.v1` through the worker on a benchmark-pack
+/// backend. The pack writes into a temporary output directory that is
+/// removed after the envelope has been read; the result object has the same
+/// field set as the native engine, so both output modes render identically.
+fn run_sequence_stats_via_worker(
+    path: &str,
+    json: bool,
+    capability: &str,
+    backend: ExecutionBackend,
+    from_preferences: bool,
+) -> Result<(), Box<dyn Error>> {
+    let unique = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or_default();
+    let output_directory =
+        std::env::temp_dir().join(format!("linxira-bio-stats-{}-{unique}", std::process::id()));
+    // Only the parent exists here: the workflow executor refuses a
+    // pre-existing output directory because the pack creates it atomically.
+    let mut inputs = BTreeMap::new();
+    inputs.insert("fasta".to_owned(), path.to_owned());
+    let request = JobRequest {
+        schema_version: SCHEMA_VERSION.to_owned(),
+        job_id: format!("sequence-stats-cli-{unique}"),
+        capability: capability.to_owned(),
+        inputs,
+        execution: ExecutionRequest {
+            mode: ExecutionMode::LocalCpu,
+            backend: Some(backend),
+        },
+        parameters: serde_json::json!({
+            "output_directory": output_directory.display().to_string(),
+        }),
+    };
+    let outcome = execute_request(request, std::path::Path::new("."));
+    let printed = (|| -> Result<(), Box<dyn Error>> {
+        let body = outcome.map_err(|error| CliError::execution(error.to_string()))?;
+        let mut envelope: serde_json::Value = serde_json::from_str(body.trim())?;
+        if envelope.get("status").and_then(|status| status.as_str()) != Some("ok") {
+            let message = envelope
+                .get("diagnostics")
+                .and_then(|diagnostics| diagnostics.as_array())
+                .map(|diagnostics| {
+                    diagnostics
+                        .iter()
+                        .filter_map(|diagnostic| {
+                            diagnostic
+                                .get("message")
+                                .and_then(|message| message.as_str())
+                        })
+                        .collect::<Vec<_>>()
+                        .join("; ")
+                })
+                .unwrap_or_else(|| "worker returned an error envelope".to_owned());
+            return Err(CliError::execution(message));
+        }
+        if from_preferences
+            && let Some(object) = envelope.as_object_mut()
+            && let Some(list) = object
+                .entry("diagnostics")
+                .or_insert_with(|| serde_json::Value::Array(Vec::new()))
+                .as_array_mut()
+        {
+            list.push(serde_json::json!({
+                "code": "backend_from_preferences",
+                "severity": "warning",
+                "message": format!(
+                    "this job ran on the {} backend selected by runtime-preferences.json; \
+                     pass an explicit --backend to override",
+                    backend.as_str()
+                ),
+            }));
+        }
+        for diagnostic in envelope
+            .get("diagnostics")
+            .and_then(|diagnostics| diagnostics.as_array())
+            .into_iter()
+            .flatten()
+            .filter(|diagnostic| {
+                diagnostic
+                    .get("severity")
+                    .and_then(|severity| severity.as_str())
+                    == Some("warning")
+            })
+        {
+            if let Some(message) = diagnostic
+                .get("message")
+                .and_then(|message| message.as_str())
+            {
+                eprintln!("warning: {message}");
+            }
+        }
+        if json {
+            println!("{}", serde_json::to_string_pretty(&envelope)?);
+        } else {
+            let stats: SequenceStats =
+                serde_json::from_value(envelope.get("result").cloned().unwrap_or_default())?;
+            print_stats_text(&stats);
+        }
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&output_directory);
+    printed
 }
 
 fn print_sequence_stats(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
@@ -7344,7 +7508,7 @@ fn usage() -> &'static str {
         "  linxira-bio workflow packs [--json]\n",
         "  linxira-bio workflow run <pack-id> <request.json> <result.json>\n",
         "  linxira-bio dataset inspect <input> [--json]\n",
-        "  linxira-bio sequence stats <input.fasta[.gz]> [--json]\n",
+        "  linxira-bio sequence stats <input.fasta[.gz]> [--backend auto|rust|python|r] [--json]\n",
         "  linxira-bio sequence extract <input.fasta[.gz]> <output.fasta> [--id ID ...] [--region ID:START-END[:+|-] ...] [--strict] [--json]\n",
         "  linxira-bio sequence filter <input.fasta[.gz]> <output.fasta> [--min-length N] [--max-length N] [--min-gc-percent P] [--max-gc-percent P] [--max-n-percent P] [--json]\n",
         "  linxira-bio sequence reverse-complement <input.fasta[.gz]> <output.fasta> [--json]\n",

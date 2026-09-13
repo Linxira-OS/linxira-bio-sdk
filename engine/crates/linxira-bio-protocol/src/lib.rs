@@ -89,6 +89,120 @@ impl ExecutionBackend {
     }
 }
 
+/// Schema version of `runtime-preferences.json` (M2-T7).
+pub const RUNTIME_PREFERENCES_SCHEMA_VERSION: u32 = 1;
+/// Environment override pointing at a runtime preference table; the only
+/// location error that is treated as fatal (explicit configuration must not
+/// silently vanish).
+pub const RUNTIME_PREFERENCES_ENV: &str = "LINXIRA_BIO_RUNTIME_PREFERENCES";
+
+/// Benchmark-derived default backends, written back by benchmark runs
+/// (ROADMAP M2-T7). One entry per capability (plus dataset class); the file
+/// order is precedence when several entries match one capability.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RuntimePreferences {
+    pub schema_version: u32,
+    #[serde(default)]
+    pub preferences: Vec<RuntimePreference>,
+}
+
+impl Default for RuntimePreferences {
+    fn default() -> Self {
+        Self {
+            schema_version: RUNTIME_PREFERENCES_SCHEMA_VERSION,
+            preferences: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RuntimePreference {
+    pub capability: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dataset_class: Option<String>,
+    pub default_backend: ExecutionBackend,
+    #[serde(default)]
+    pub measured: BTreeMap<String, BackendMeasurement>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sampled_on: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speedup: Option<f64>,
+    /// `consistent` | `inconsistent` | `failed` as reported by the source
+    /// benchmark; only `consistent` entries should drive the default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub consistency: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct BackendMeasurement {
+    pub wall_ms: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub peak_rss_mb: Option<f64>,
+}
+
+impl RuntimePreferences {
+    /// Default backend for a capability: the first matching entry wins.
+    /// A table with an unrecognized `schema_version` is inert, so an older
+    /// binary never acts on a table format it cannot understand.
+    pub fn default_backend_for(&self, capability: &str) -> Option<ExecutionBackend> {
+        if self.schema_version != RUNTIME_PREFERENCES_SCHEMA_VERSION {
+            return None;
+        }
+        self.preferences
+            .iter()
+            .find(|entry| entry.capability == capability)
+            .map(|entry| entry.default_backend)
+    }
+
+    /// Loads the table: `LINXIRA_BIO_RUNTIME_PREFERENCES` (explicit; must
+    /// exist and parse), then `runtime-preferences.json` in the working
+    /// directory, then next to the executable, then the table embedded at
+    /// build time. Candidate files that fail to parse are skipped so a
+    /// stale table next to an old binary cannot break every job; an
+    /// explicitly configured path propagates its error.
+    pub fn load() -> Result<Self, String> {
+        if let Some(configured) = std::env::var_os(RUNTIME_PREFERENCES_ENV) {
+            if configured.is_empty() {
+                return Err(format!("{RUNTIME_PREFERENCES_ENV} must not be empty"));
+            }
+            return read_preferences_file(std::path::Path::new(&configured)).map_err(|error| {
+                format!("{RUNTIME_PREFERENCES_ENV} is not a usable preference table: {error}")
+            });
+        }
+        let mut candidates = Vec::new();
+        if let Ok(current) = std::env::current_dir() {
+            candidates.push(current.join("runtime-preferences.json"));
+        }
+        if let Ok(executable) = std::env::current_exe()
+            && let Some(directory) = executable.parent()
+        {
+            candidates.push(directory.join("runtime-preferences.json"));
+        }
+        for candidate in candidates {
+            if candidate.is_file()
+                && let Ok(preferences) = read_preferences_file(&candidate)
+            {
+                return Ok(preferences);
+            }
+        }
+        Ok(embedded_runtime_preferences())
+    }
+}
+
+fn read_preferences_file(path: &std::path::Path) -> Result<RuntimePreferences, String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|error| format!("could not read {}: {error}", path.display()))?;
+    serde_json::from_str(&text)
+        .map_err(|error| format!("could not parse {}: {error}", path.display()))
+}
+
+/// The repository's `runtime-preferences.json` at build time; the shipped
+/// fallback when no file is found on disk.
+pub fn embedded_runtime_preferences() -> RuntimePreferences {
+    serde_json::from_str(include_str!("../../../../runtime-preferences.json"))
+        .expect("embedded runtime-preferences.json must be valid")
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum JobStatus {
@@ -712,13 +826,75 @@ pub struct WorkflowPackManifest {
 #[cfg(test)]
 mod tests {
     use super::{
-        AnalysisResult, AnalysisResultV2, BENCHMARK_REPORT_SCHEMA_VERSION, BenchmarkBackendSummary,
-        BenchmarkEnvironment, BenchmarkReport, BenchmarkRun, BenchmarkVerdict, BioDataFormat,
-        CompressionFormat, DatasetManifest, DatasetRelationshipKind, DiagnosticSeverity,
-        ExecutionMode, InputCardinality, JobRequest, JobRequestV2, JobStatus, NetworkAccess,
-        SCHEMA_VERSION, SCHEMA_VERSION_V2, ValidationState, WorkflowPackManifest,
-        WorkflowRuntimeKind,
+        AnalysisResult, AnalysisResultV2, BENCHMARK_REPORT_SCHEMA_VERSION, BackendMeasurement,
+        BenchmarkBackendSummary, BenchmarkEnvironment, BenchmarkReport, BenchmarkRun,
+        BenchmarkVerdict, BioDataFormat, CompressionFormat, DatasetManifest,
+        DatasetRelationshipKind, DiagnosticSeverity, ExecutionBackend, ExecutionMode,
+        InputCardinality, JobRequest, JobRequestV2, JobStatus, NetworkAccess,
+        RUNTIME_PREFERENCES_SCHEMA_VERSION, RuntimePreference, RuntimePreferences, SCHEMA_VERSION,
+        SCHEMA_VERSION_V2, ValidationState, WorkflowPackManifest, WorkflowRuntimeKind,
     };
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn runtime_preferences_hit_miss_and_schema_version_paths() {
+        let table = RuntimePreferences {
+            schema_version: RUNTIME_PREFERENCES_SCHEMA_VERSION,
+            preferences: vec![RuntimePreference {
+                capability: "sequence.stats.v1".to_owned(),
+                dataset_class: Some("sequence".to_owned()),
+                default_backend: ExecutionBackend::Python,
+                measured: BTreeMap::from([
+                    (
+                        "rust".to_owned(),
+                        BackendMeasurement {
+                            wall_ms: 30.0,
+                            peak_rss_mb: Some(5.8),
+                        },
+                    ),
+                    (
+                        "python".to_owned(),
+                        BackendMeasurement {
+                            wall_ms: 270.0,
+                            peak_rss_mb: Some(43.7),
+                        },
+                    ),
+                ]),
+                sampled_on: Some("2026-09-11T15:27:50Z".to_owned()),
+                speedup: Some(9.0),
+                consistency: Some("consistent".to_owned()),
+            }],
+        };
+
+        assert_eq!(
+            table.default_backend_for("sequence.stats.v1"),
+            Some(ExecutionBackend::Python),
+            "a matching capability resolves its recorded default backend"
+        );
+        assert_eq!(
+            table.default_backend_for("expression.pca.v1"),
+            None,
+            "a missing capability falls back to the native engine"
+        );
+        assert_eq!(
+            RuntimePreferences::default().default_backend_for("sequence.stats.v1"),
+            None,
+            "an empty table resolves nothing"
+        );
+        let stale = RuntimePreferences {
+            schema_version: 99,
+            ..table.clone()
+        };
+        assert_eq!(
+            stale.default_backend_for("sequence.stats.v1"),
+            None,
+            "an unrecognized schema version makes the table inert"
+        );
+
+        let serialized = serde_json::to_string(&table).expect("serialize");
+        let parsed: RuntimePreferences = serde_json::from_str(&serialized).expect("round trip");
+        assert_eq!(parsed, table);
+    }
 
     #[test]
     fn parses_local_job_request() {
