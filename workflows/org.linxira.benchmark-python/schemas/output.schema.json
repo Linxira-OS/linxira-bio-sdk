@@ -26,7 +26,8 @@
       "enum": [
         "sequence.stats.v1",
         "expression.pca.v1",
-        "set.venn.v1"
+        "set.venn.v1",
+        "structure.pdb.summary.v1"
       ]
     },
     "status": {
@@ -443,6 +444,109 @@
                 "type": "array"
               },
               "intersections": {
+                "type": "array"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "capability": {
+            "const": "structure.pdb.summary.v1"
+          },
+          "status": {
+            "const": "ok"
+          }
+        },
+        "required": [
+          "capability",
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "required": [
+              "format",
+              "coordinate_units",
+              "model_count",
+              "chain_count",
+              "residue_count",
+              "atom_count",
+              "polymer_atom_count",
+              "hetero_atom_count",
+              "element_counts",
+              "bounds",
+              "b_factor_summary",
+              "alphafold_confidence",
+              "models",
+              "residues",
+              "atoms",
+              "warnings"
+            ],
+            "properties": {
+              "format": {
+                "const": "pdb"
+              },
+              "coordinate_units": {
+                "const": "angstrom"
+              },
+              "model_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "chain_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "residue_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "atom_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "polymer_atom_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "hetero_atom_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "element_counts": {
+                "type": "object"
+              },
+              "bounds": {
+                "type": "object"
+              },
+              "b_factor_summary": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "alphafold_confidence": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "models": {
+                "type": "array"
+              },
+              "residues": {
+                "type": "array"
+              },
+              "atoms": {
+                "type": "array"
+              },
+              "warnings": {
                 "type": "array"
               }
             },

@@ -263,12 +263,48 @@ with_workspace(function(workspace) {
   parity_compare("$", read_reference("expression.pca.v1.k3.json"),
                  roundtrip(pca$run(list(matrix = pca_matrix), list(components = 3))))
 
+  # --- M3 #3: PDB summary parity (four recorded engine outputs) ------------
+  pdb_impl <- registry[["structure.pdb.summary.v1"]]
+  stopifnot(!is.null(pdb_impl))
+  pdb_cases <- list(
+    list("structure.pdb.summary.v1.default.json",
+         file.path(repository_root, "tests", "fixtures", "structure-pdb-summary", "alphafold-style.pdb"),
+         FALSE),
+    list("structure.pdb.summary.v1.plddt.json",
+         file.path(repository_root, "tests", "fixtures", "structure-pdb-summary", "alphafold-style.pdb"),
+         TRUE),
+    list("structure.pdb.summary.v1.reference-default.json",
+         file.path(repository_root, "tests", "fixtures", "structure-analysis", "reference.pdb"),
+         FALSE),
+    list("structure.pdb.summary.v1.reference-plddt.json",
+         file.path(repository_root, "tests", "fixtures", "structure-analysis", "reference.pdb"),
+         TRUE)
+  )
+  for (case in pdb_cases) {
+    parity_compare("$", read_reference(case[[1L]]),
+                   roundtrip(pdb_impl$run(
+                     list(pdb = case[[2L]]),
+                     list(interpret_b_factors_as_plddt = case[[3L]])
+                   )))
+  }
+  # Out-of-range B-factor under pLDDT interpretation must fail like the engine.
+  bad_plddt <- file.path(workspace, "bad-plddt.pdb")
+  writeLines(c(
+    "ATOM      1  N   GLY A   1      11.104  13.207   9.657  1.00 99.99           N  ",
+    "ATOM      2  CA  GLY A   1      12.204  13.707   9.157  1.00 -0.01           C  "
+  ), bad_plddt)
+  outcome <- try(pdb_impl$run(
+    list(pdb = bad_plddt),
+    list(interpret_b_factors_as_plddt = TRUE)
+  ), silent = TRUE)
+  stopifnot(inherits(outcome, "try-error"))
+
   bad_missing <- file.path(workspace, "missing.csv")
   writeLines(c("gene,s1,s2", "g1,1,NA", "g2,2,3"), bad_missing)
   outcome <- try(pca$run(list(matrix = bad_missing), list()), silent = TRUE)
   stopifnot(inherits(outcome, "try-error"))
 
-  cat("PCA/Venn parity OK; max relative error:", format(parity_max_rel), "\n")
+  cat("PCA/Venn/PDB parity OK; max relative error:", format(parity_max_rel), "\n")
 })
 
 cat("benchmark-r harness tests passed", if (have_biostrings) "(with Biostrings parity)" else "(validation only)", "\n")

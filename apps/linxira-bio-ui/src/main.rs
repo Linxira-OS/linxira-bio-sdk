@@ -289,7 +289,7 @@ impl AnalysisBackend {
 fn capability_has_backend_packs(capability: &str) -> bool {
     matches!(
         capability,
-        "sequence.stats.v1" | "expression.pca.v1" | "set.venn.v1"
+        "sequence.stats.v1" | "expression.pca.v1" | "set.venn.v1" | "structure.pdb.summary.v1"
     )
 }
 
@@ -4779,7 +4779,7 @@ fn run_benchmark_task(
         };
 
     let pack_backends: Vec<ExecutionBackend> = match capability.as_str() {
-        "sequence.stats.v1" | "expression.pca.v1" | "set.venn.v1" => {
+        "sequence.stats.v1" | "expression.pca.v1" | "set.venn.v1" | "structure.pdb.summary.v1" => {
             vec![ExecutionBackend::Python, ExecutionBackend::R]
         }
         _ => Vec::new(),

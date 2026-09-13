@@ -379,5 +379,57 @@ class SetVennParityTests(ParityCompareMixin, unittest.TestCase):
                 self.implementation.run({"table": path}, {})
 
 
+class StructurePdbParityTests(ParityCompareMixin, unittest.TestCase):
+    """M3 #3: the PDB summary port must match the engine field for field."""
+
+    def setUp(self):
+        self.implementation = MODULE.IMPLEMENTATIONS["structure.pdb.summary.v1"]
+        self.alphafold = REPOSITORY_ROOT / "tests" / "fixtures" / "structure-pdb-summary" / "alphafold-style.pdb"
+        self.reference_structure = REPOSITORY_ROOT / "tests" / "fixtures" / "structure-analysis" / "reference.pdb"
+
+    def test_matches_the_rust_engine_on_both_fixtures(self):
+        for fixture, reference_name in (
+            (self.alphafold, "structure.pdb.summary.v1.default.json"),
+            (self.reference_structure, "structure.pdb.summary.v1.reference-default.json"),
+        ):
+            reference = self.load_reference(reference_name)
+            actual = self.implementation.run({"pdb": fixture}, {})
+            self.compare_with_reference(reference, actual, reference_name)
+
+    def test_plddt_interpretation_matches_the_rust_engine(self):
+        for fixture, reference_name in (
+            (self.alphafold, "structure.pdb.summary.v1.plddt.json"),
+            (self.reference_structure, "structure.pdb.summary.v1.reference-plddt.json"),
+        ):
+            reference = self.load_reference(reference_name)
+            actual = self.implementation.run(
+                {"pdb": fixture}, {"interpret_b_factors_as_plddt": True}
+            )
+            self.compare_with_reference(reference, actual, reference_name)
+            bands = actual["alphafold_confidence"]["bands"]
+            total = sum(bands.values())
+            self.assertEqual(total, actual["alphafold_confidence"]["residue_count"])
+
+    def test_plddt_interpretation_rejects_out_of_range_b_factors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "bad.pdb"
+            path.write_text(
+                "ATOM      1  N   GLY A   1      11.104  13.207   9.657  1.00 99.99           N  \n"
+                "ATOM      2  CA  GLY A   1      12.204  13.707   9.157  1.00 -0.01           C  \n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(ValueError, msg="pLDDT range"):
+                self.implementation.run(
+                    {"pdb": path}, {"interpret_b_factors_as_plddt": True}
+                )
+
+    def test_rejects_a_file_without_atom_records(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "empty.pdb"
+            path.write_text("HEADER    EMPTY\nEND\n", encoding="utf-8")
+            with self.assertRaises(ValueError, msg="no atoms"):
+                self.implementation.run({"pdb": path}, {})
+
+
 if __name__ == "__main__":
     unittest.main()

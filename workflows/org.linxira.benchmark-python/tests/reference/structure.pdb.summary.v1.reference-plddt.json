@@ -1,0 +1,250 @@
+{
+ "format": "pdb",
+ "coordinate_units": "angstrom",
+ "model_count": 1,
+ "chain_count": 2,
+ "residue_count": 5,
+ "atom_count": 5,
+ "polymer_atom_count": 4,
+ "hetero_atom_count": 1,
+ "element_counts": {
+  "C": 4,
+  "O": 1
+ },
+ "bounds": {
+  "min": {
+   "x": 0.0,
+   "y": 0.0,
+   "z": 0.0
+  },
+  "max": {
+   "x": 8.0,
+   "y": 8.0,
+   "z": 8.0
+  },
+  "center": {
+   "x": 4.0,
+   "y": 4.0,
+   "z": 4.0
+  },
+  "span": {
+   "x": 8.0,
+   "y": 8.0,
+   "z": 8.0
+  }
+ },
+ "b_factor_summary": {
+  "count": 5,
+  "min": 20.0,
+  "max": 90.0,
+  "mean": 64.0
+ },
+ "alphafold_confidence": {
+  "source": "pdb-b-factor-explicit",
+  "residue_count": 4,
+  "min_plddt": 60.0,
+  "max_plddt": 90.0,
+  "mean_plddt": 75.0,
+  "bands": {
+   "very_high_count": 1,
+   "confident_count": 2,
+   "low_count": 1,
+   "very_low_count": 0
+  }
+ },
+ "models": [
+  {
+   "model_id": "1",
+   "atom_count": 5,
+   "residue_count": 5,
+   "chains": [
+    {
+     "chain_id": "A",
+     "atom_count": 4,
+     "residue_count": 4,
+     "polymer_residue_count": 4,
+     "hetero_residue_count": 0
+    },
+    {
+     "chain_id": "B",
+     "atom_count": 1,
+     "residue_count": 1,
+     "polymer_residue_count": 0,
+     "hetero_residue_count": 1
+    }
+   ]
+  }
+ ],
+ "residues": [
+  {
+   "index": 0,
+   "model_id": "1",
+   "chain_id": "A",
+   "sequence_number": "1",
+   "insertion_code": null,
+   "name": "ALA",
+   "is_hetero": false,
+   "atom_count": 1,
+   "plddt": 90.0
+  },
+  {
+   "index": 1,
+   "model_id": "1",
+   "chain_id": "A",
+   "sequence_number": "2",
+   "insertion_code": null,
+   "name": "GLY",
+   "is_hetero": false,
+   "atom_count": 1,
+   "plddt": 80.0
+  },
+  {
+   "index": 2,
+   "model_id": "1",
+   "chain_id": "A",
+   "sequence_number": "3",
+   "insertion_code": null,
+   "name": "SER",
+   "is_hetero": false,
+   "atom_count": 1,
+   "plddt": 70.0
+  },
+  {
+   "index": 3,
+   "model_id": "1",
+   "chain_id": "A",
+   "sequence_number": "4",
+   "insertion_code": null,
+   "name": "VAL",
+   "is_hetero": false,
+   "atom_count": 1,
+   "plddt": 60.0
+  },
+  {
+   "index": 4,
+   "model_id": "1",
+   "chain_id": "B",
+   "sequence_number": "101",
+   "insertion_code": null,
+   "name": "HOH",
+   "is_hetero": true,
+   "atom_count": 1,
+   "plddt": null
+  }
+ ],
+ "atoms": [
+  {
+   "index": 0,
+   "serial": "1",
+   "record": "atom",
+   "model_id": "1",
+   "residue_index": 0,
+   "name": "CA",
+   "alternate_location": null,
+   "residue_name": "ALA",
+   "chain_id": "A",
+   "residue_sequence_number": "1",
+   "insertion_code": null,
+   "position": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+   },
+   "occupancy": 1.0,
+   "b_factor": 90.0,
+   "element": "C",
+   "formal_charge": null
+  },
+  {
+   "index": 1,
+   "serial": "2",
+   "record": "atom",
+   "model_id": "1",
+   "residue_index": 1,
+   "name": "CA",
+   "alternate_location": null,
+   "residue_name": "GLY",
+   "chain_id": "A",
+   "residue_sequence_number": "2",
+   "insertion_code": null,
+   "position": {
+    "x": 4.0,
+    "y": 0.0,
+    "z": 0.0
+   },
+   "occupancy": 1.0,
+   "b_factor": 80.0,
+   "element": "C",
+   "formal_charge": null
+  },
+  {
+   "index": 2,
+   "serial": "3",
+   "record": "atom",
+   "model_id": "1",
+   "residue_index": 2,
+   "name": "CA",
+   "alternate_location": null,
+   "residue_name": "SER",
+   "chain_id": "A",
+   "residue_sequence_number": "3",
+   "insertion_code": null,
+   "position": {
+    "x": 0.0,
+    "y": 4.0,
+    "z": 0.0
+   },
+   "occupancy": 1.0,
+   "b_factor": 70.0,
+   "element": "C",
+   "formal_charge": null
+  },
+  {
+   "index": 3,
+   "serial": "4",
+   "record": "atom",
+   "model_id": "1",
+   "residue_index": 3,
+   "name": "CA",
+   "alternate_location": null,
+   "residue_name": "VAL",
+   "chain_id": "A",
+   "residue_sequence_number": "4",
+   "insertion_code": null,
+   "position": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 4.0
+   },
+   "occupancy": 1.0,
+   "b_factor": 60.0,
+   "element": "C",
+   "formal_charge": null
+  },
+  {
+   "index": 4,
+   "serial": "5",
+   "record": "hetatm",
+   "model_id": "1",
+   "residue_index": 4,
+   "name": "O",
+   "alternate_location": null,
+   "residue_name": "HOH",
+   "chain_id": "B",
+   "residue_sequence_number": "101",
+   "insertion_code": null,
+   "position": {
+    "x": 8.0,
+    "y": 8.0,
+    "z": 8.0
+   },
+   "occupancy": 1.0,
+   "b_factor": 20.0,
+   "element": "O",
+   "formal_charge": null
+  }
+ ],
+ "warnings": [
+  "B-factor values were interpreted as AlphaFold pLDDT because the caller explicitly requested it; PDB content alone does not establish AlphaFold provenance"
+ ]
+}

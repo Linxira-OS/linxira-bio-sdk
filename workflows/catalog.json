@@ -72,7 +72,8 @@
       "manifest": "workflows/org.linxira.benchmark-python/manifest.json",
       "capability_aliases": [
         "expression.pca.v1",
-        "set.venn.v1"
+        "set.venn.v1",
+        "structure.pdb.summary.v1"
       ]
     },
     {
@@ -84,7 +85,8 @@
       "manifest": "workflows/org.linxira.benchmark-r/manifest.json",
       "capability_aliases": [
         "expression.pca.v1",
-        "set.venn.v1"
+        "set.venn.v1",
+        "structure.pdb.summary.v1"
       ]
     }
   ]

@@ -64,11 +64,11 @@
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "712cfbd0dd287009bf2654f06703760ed4c82b375fc9507cde039eea9c26e4d3"
+      "sha256": "62c66e698139ae9c7838cc1640dc5e85bcf06ad1ac1571b2009c9556aa1066bc"
     },
     {
       "path": "schemas/output.schema.json",
-      "sha256": "868609bd7fcc62af131166b703ea5ac8f5923c6254dc4e3fa1c0b553c94f5d5a"
+      "sha256": "b606aabe2b4e46e17598fa61c5fa10b5431eafabdde42db272f21f44772d6360"
     },
     {
       "path": "src/benchmark_harness.py",
@@ -76,7 +76,7 @@
     },
     {
       "path": "src/implementations/__init__.py",
-      "sha256": "9c11efd1dcfd2c8681ee38ec00b16c9ea7888a24a7afa8afc16d299bb59c41dd"
+      "sha256": "eae4aa1d27b97843f7fd3805bafa76f32b41f647d3e3d0e2103dfb08cb0fcc92"
     },
     {
       "path": "src/implementations/sequence_stats_v1.py",
@@ -84,7 +84,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.py",
-      "sha256": "11ba106334ddeb358702afb18f990508f08c1849c0f6fbb0b0b11f9fa41cf229"
+      "sha256": "88aa1703290dbf0927abe62b9f521a1206e25a7701a004dc4f764abecb6cc4be"
     },
     {
       "path": "src/implementations/expression_pca_v1.py",
@@ -105,6 +105,26 @@
     {
       "path": "tests/reference/set.venn.v1.items.json",
       "sha256": "1bfaa4ef9b7461209d04d7ad36826a96ed6ae22607443efd6adea76d7baaf318"
+    },
+    {
+      "path": "src/implementations/structure_pdb_summary_v1.py",
+      "sha256": "a5f217d31b9c5511f4c7981ffac9b611743c41f454c36545b8b837f4b26d649a"
+    },
+    {
+      "path": "tests/reference/structure.pdb.summary.v1.default.json",
+      "sha256": "5996c153020f2b3c67e1e8cf702308c53e0c8da16ae00b7234898ce540eb4673"
+    },
+    {
+      "path": "tests/reference/structure.pdb.summary.v1.plddt.json",
+      "sha256": "e1ad66efc886afa5ce58c5fe75ddb9055f78547e3d712a243e233bcdbd964fdf"
+    },
+    {
+      "path": "tests/reference/structure.pdb.summary.v1.reference-default.json",
+      "sha256": "009e33fe5d8e8ddd5558e49d4c025bf634fe09c946f5f4836fce3c8df63f4679"
+    },
+    {
+      "path": "tests/reference/structure.pdb.summary.v1.reference-plddt.json",
+      "sha256": "6134b76427b14032b800a44e5e2422fcddec865d0c82175b1e6d9ef55cfe2fbf"
     }
   ],
   "contract": {
@@ -128,6 +148,12 @@
           "csv",
           "tsv"
         ]
+      },
+      {
+        "role": "pdb",
+        "formats": [
+          "pdb"
+        ]
       }
     ],
     "outputs": {
@@ -145,7 +171,8 @@
       "components",
       "scale_features",
       "include_items",
-      "max_intersections"
+      "max_intersections",
+      "interpret_b_factors_as_plddt"
     ]
   }
 }
