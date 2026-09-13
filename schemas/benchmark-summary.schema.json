@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/schemas/benchmark-summary.schema.json",
+  "title": "Benchmark run summary",
+  "description": "Unified archival contract for every benchmark-results/<date>/summary.json. Each run must carry a unique report id, a one-line purpose, machine-checkable data-source provenance, and the full environment disclosure so numbers from different machines can never be silently mixed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "report_id",
+    "generated_at",
+    "purpose",
+    "methodology",
+    "engine",
+    "environment",
+    "data_sources",
+    "entries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1"
+    },
+    "report_id": {
+      "type": "string",
+      "pattern": "^bench-[0-9]{8}-[0-9]{3}$",
+      "description": "Unique run id: bench-YYYYMMDD-NNN. NNN starts at 001 per calendar day; scan benchmark-results/*/summary.json before assigning."
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "Run date (YYYY-MM-DD) matching the parent directory name."
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 8,
+      "description": "One sentence stating what this run measured and why (what was tested / purpose)."
+    },
+    "methodology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backends_flag",
+        "repeat_flag",
+        "warmup",
+        "page_cache",
+        "disclosure"
+      ],
+      "properties": {
+        "backends_flag": {
+          "type": "string"
+        },
+        "repeat_flag": {
+          "type": "string"
+        },
+        "warmup": {
+          "type": "string"
+        },
+        "page_cache": {
+          "type": "string"
+        },
+        "disclosure": {
+          "type": "string"
+        }
+      }
+    },
+    "engine": {
+      "type": "string",
+      "description": "Engine version string from the benchmark environment."
+    },
+    "environment": {
+      "type": "object",
+      "required": [
+        "os",
+        "engine_version",
+        "in_container",
+        "page_cache",
+        "precision"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "os": {
+          "type": "string"
+        },
+        "kernel": {
+          "type": ["string", "null"]
+        },
+        "cpu_model": {
+          "type": ["string", "null"]
+        },
+        "total_memory_mb": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "distro": {
+          "type": ["string", "null"]
+        },
+        "wsl_distro": {
+          "type": ["string", "null"]
+        },
+        "wsl_version": {
+          "type": ["string", "null"],
+          "enum": ["wsl1", "wsl2", null]
+        },
+        "host_os": {
+          "type": ["string", "null"]
+        },
+        "host_model": {
+          "type": ["string", "null"]
+        },
+        "host_cpu_model": {
+          "type": ["string", "null"]
+        },
+        "host_logical_processors": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "host_total_memory_mb": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "engine_version": {
+          "type": "string"
+        },
+        "python_version": {
+          "type": ["string", "null"]
+        },
+        "r_version": {
+          "type": ["string", "null"]
+        },
+        "in_container": {
+          "type": "boolean"
+        },
+        "page_cache": {
+          "type": "string"
+        },
+        "precision": {
+          "type": "string"
+        }
+      }
+    },
+    "data_sources": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Every input dataset this run consumed, with provenance. Raw data itself never enters git for external sources; this record plus the input_sha256 in each report is the traceability chain.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "origin", "reference"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable id referenced by entries[].data_source_id."
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "repository-fixture",
+              "public-download",
+              "private-server",
+              "generated"
+            ],
+            "description": "repository-fixture: tracked under tests/fixtures. public-download: fetched from the cited URL. private-server: staged on an approved server, never committed. generated: synthesized by a script named in the note."
+          },
+          "reference": {
+            "type": "string",
+            "description": "Repository path (fixtures) or source URL (downloads); for private-server data use the server-side path plus an access note."
+          },
+          "note": {
+            "type": "string",
+            "description": "Optional retrieval number (SRR/PRJ/DOI), size, or handling note."
+          }
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "capability",
+          "dataset_class",
+          "dataset",
+          "data_source_id",
+          "status",
+          "report"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "dataset_class": {
+            "type": "string"
+          },
+          "dataset": {
+            "type": "string",
+            "description": "What exact input/parameters were measured (file plus options)."
+          },
+          "data_source_id": {
+            "type": "string",
+            "description": "Links to data_sources[].id; the provenance chain for this entry."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ok", "failed", "missing-report"]
+          },
+          "consistency": {
+            "type": ["string", "null"]
+          },
+          "speedup": {
+            "type": ["number", "null"]
+          },
+          "memory_saving": {
+            "type": ["number", "null"]
+          },
+          "precision": {
+            "type": ["string", "null"]
+          },
+          "report": {
+            "type": ["string", "null"],
+            "description": "File name of the full benchmark report inside this run directory."
+          },
+          "backends": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["median_wall_ms", "median_peak_rss_mb", "ok_runs", "repeats"],
+              "properties": {
+                "median_wall_ms": {
+                  "type": ["number", "null"]
+                },
+                "median_peak_rss_mb": {
+                  "type": ["number", "null"]
+                },
+                "ok_runs": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "repeats": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "segmented": {
+      "type": "array",
+      "description": "Optional SRR segmented runs (unpack vs downstream timing).",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

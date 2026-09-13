@@ -33,6 +33,7 @@ BACKENDS="rust,python,r"
 SRA_LIST=""
 SRA_CAPABILITY="fastq.qc.v1"
 SKIP_WRITEBACK=0
+PURPOSE=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -44,6 +45,7 @@ while [ $# -gt 0 ]; do
     --sra) SRA_LIST="${2:?--sra requires a list file}"; shift 2 ;;
     --sra-capability) SRA_CAPABILITY="${2:?--sra-capability requires an id}"; shift 2 ;;
     --skip-writeback) SKIP_WRITEBACK=1; shift ;;
+    --purpose) PURPOSE="${2:?--purpose requires a sentence}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown option: $1" >&2; usage; exit 2 ;;
   esac
@@ -275,9 +277,10 @@ for fragment in "$RUN_DIR"/plan/*.plan.sh; do
   fi
 done
 
-"$PYTHON" - "$RUN_DIR" "$DATASETS" "$BACKENDS" "$REPEAT" "$CLI" <<'PYAGG'
+"$PYTHON" - "$RUN_DIR" "$DATASETS" "$BACKENDS" "$REPEAT" "$CLI" "$PURPOSE" <<'PYAGG'
 import json
 import pathlib
+import re
 import sys
 
 run_dir = pathlib.Path(sys.argv[1])
@@ -285,10 +288,49 @@ manifest_path = sys.argv[2]
 backends_flag = sys.argv[3]
 repeat_flag = sys.argv[4]
 cli = sys.argv[5]
+purpose = sys.argv[6]
 
 manifest_file = pathlib.Path(manifest_path)
 manifest = json.loads(manifest_file.read_text(encoding="utf-8")) if manifest_file.is_file() else {}
 entries_manifest = manifest.get("datasets", [])
+
+# Archival convention (benchmark-results/README.md): every summary carries a
+# unique report id bench-YYYYMMDD-NNN, a purpose sentence, and per-dataset
+# provenance. The NNN is allocated by scanning prior summaries so ids are
+# never reused.
+date8 = re.sub(r"\D", "", run_dir.name)[:8] or "19700101"
+run_date = f"{date8[:4]}-{date8[4:6]}-{date8[6:8]}"
+prior_roots = [run_dir.parent, run_dir.parents[2] / "benchmark-results"]
+used = set()
+for root in prior_roots:
+    if not root.is_dir():
+        continue
+    for prior in root.glob("*/summary.json"):
+        match = re.search(r"bench-(\d{8})-(\d{3})", prior.read_text(encoding="utf-8"))
+        if match and match.group(1) == date8:
+            used.add(int(match.group(2)))
+sequence = max(used, default=0) + 1
+report_id = f"bench-{date8}-{sequence:03d}"
+
+data_sources = []
+for manifest_entry in entries_manifest:
+    source_id = manifest_entry.get("id") or manifest_entry.get("capability")
+    inputs = manifest_entry.get("inputs") or {}
+    first_input = next(iter(inputs.values()), "") if isinstance(inputs, dict) else ""
+    source_url = manifest_entry.get("source_url", "")
+    if source_url:
+        origin, reference = "public-download", source_url
+    elif str(first_input).startswith("tests/fixtures/"):
+        origin, reference = "repository-fixture", first_input
+    else:
+        origin, reference = "private-server", first_input or source_id
+    data_sources.append({
+        "id": source_id,
+        "origin": origin,
+        "reference": reference,
+        "note": "; ".join(f"{role}={path}" for role, path in inputs.items())
+        if isinstance(inputs, dict) else "",
+    })
 
 entries = []
 environment = None
@@ -298,11 +340,15 @@ for index, manifest_entry in enumerate(entries_manifest):
     name = manifest_entry.get("id") or manifest_entry.get("capability")
     matches = [report for report in reports if report.parent.name.endswith(f"-{name}")]
     report_path = matches[0] if matches else None
+    inputs = manifest_entry.get("inputs") or {}
     record = {
         "id": name,
         "capability": manifest_entry.get("capability"),
         "dataset_class": manifest_entry.get("dataset_class", "other"),
-        "source_url": manifest_entry.get("source_url", ""),
+        "dataset": "; ".join(f"{role}={path}" for role, path in inputs.items())
+        if isinstance(inputs, dict) and inputs
+        else str(manifest_entry.get("dataset", name)),
+        "data_source_id": name,
         "status": "missing-report",
         "report": str(report_path.relative_to(run_dir)) if report_path else None,
     }
@@ -329,7 +375,13 @@ for index, manifest_entry in enumerate(entries_manifest):
 
 summary = {
     "schema_version": "1",
-    "generated_at": run_dir.name,
+    "report_id": report_id,
+    "generated_at": run_date,
+    "purpose": purpose or (
+        f"Benchmark run over {len(entries_manifest) or 'SRA'} dataset(s) with "
+        f"{backends_flag} backends at {repeat_flag} repeats "
+        f"(dataset manifest: {pathlib.Path(manifest_path).name})."
+    ),
     "methodology": {
         "backends_flag": backends_flag,
         "repeat_flag": repeat_flag,
@@ -339,6 +391,7 @@ summary = {
     },
     "engine": engine_version or "unknown",
     "environment": environment,
+    "data_sources": data_sources,
     "entries": entries,
 }
 
@@ -348,6 +401,20 @@ for segment_path in sorted((run_dir / "sra-work").glob("*/segment.json")) if (ru
     segmented.append(json.loads(segment_path.read_text(encoding="utf-8")))
 if segmented:
     summary["segmented"] = segmented
+    if not data_sources:
+        for segment in segmented:
+            sra = str(segment.get("sra", ""))
+            data_sources.append({
+                "id": pathlib.Path(sra).stem or sra,
+                "origin": "public-download",
+                "reference": sra,
+                "note": "SRA archive staged locally (sra-tools fasterq-dump).",
+            })
+if not data_sources:
+    raise SystemExit(
+        "no data sources recorded: pass a dataset manifest or --sra list "
+        "so the summary can carry provenance (benchmark-results/README.md)"
+    )
 (run_dir / "summary.json").write_text(
     json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
 )
@@ -355,11 +422,20 @@ if segmented:
 lines = []
 lines.append(f"# Benchmark summary — {run_dir.name}")
 lines.append("")
+lines.append(f"- report id: `{report_id}` — {run_date}")
+lines.append(f"- purpose: {summary['purpose']}")
 lines.append(f"- backends: {backends_flag} — repeat: {repeat_flag}")
 if pathlib.Path(manifest_path).is_file():
     lines.append(f"- datasets: `{manifest_path}` (local, intentionally not committed)")
 else:
     lines.append("- datasets: none (SRR-only run)")
+if data_sources:
+    lines.append("")
+    lines.append("Data sources (provenance):")
+    for source in data_sources:
+        note = f" — {source['note']}" if source.get("note") else ""
+        lines.append(f"- `{source['id']}` [{source['origin']}]: {source['reference']}{note}")
+lines.append("")
 lines.append(f"- engine: {summary['engine']}")
 lines.append("- methodology: one untimed warmup per backend, median of timed repeats, "
              "page_cache: warm; precision per report (`high` with /usr/bin/time -v, "
@@ -404,13 +480,19 @@ advantages = [
     and (record.get("speedup") or record.get("memory_saving") is not None)
 ]
 if advantages:
+    source_urls = {
+        source["id"]: source["reference"]
+        for source in data_sources
+        if source.get("origin") == "public-download"
+    }
     for record in advantages:
         parts = []
         if record.get("speedup"):
             parts.append(f"{record['speedup']:.2f}x faster than rust")
         if record.get("memory_saving") is not None:
             parts.append(f"{record['memory_saving'] * 100:.1f}% more peak RSS than rust")
-        source = f" (source: {record['source_url']})" if record.get("source_url") else ""
+        url = source_urls.get(record.get("data_source_id"), "")
+        source = f" (source: {url})" if url else ""
         lines.append(f"- {record['capability']} [{record['dataset_class']}]: "
                      + ", ".join(parts) + source)
 else:

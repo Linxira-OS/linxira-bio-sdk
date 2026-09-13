@@ -132,6 +132,25 @@ documents for the product boundary, staged scope, supported data formats, and
 non-Visual-Studio build direction. The exact read, inspect, analysis, and
 export matrix is in `docs/DATA_FORMATS.md`.
 
+## Benchmarks
+
+Every measured performance claim lives under `benchmark-results/` and follows
+the archival convention in `benchmark-results/README.md`: a unique report id
+(`bench-YYYYMMDD-NNN`), a one-line purpose, machine-checkable data-source
+provenance (raw data itself never enters git; repo fixtures are the
+exception), and the full environment disclosure — when a run happens inside
+WSL, the report also records the Windows host version, machine model, CPU,
+logical processors, and physical RAM alongside the guest view. Summaries are
+validated against `schemas/benchmark-summary.schema.json` in CI.
+
+The first three-way (rust/python/r) baseline is
+`benchmark-results/2026-09-13/` (`bench-20260913-001`): four capabilities
+consistent at 1e-6 tolerance, rust ≈ 40 ms median vs python 300–330 ms
+(speedup 7.5–8.25x) with ~85% memory saving on small fixtures. Dataset
+provenance for real-data runs is tracked in
+`docs/BENCHMARK_DATA_SOURCES.md`; implementation iterations (v1/v2
+coexistence, algorithm changes) are logged in `docs/IMPLEMENTATION_LOG.md`.
+
 ## Source Policy
 
 `GPTomics/bioSkills` is a primary method and example source.
