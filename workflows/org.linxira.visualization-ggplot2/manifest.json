@@ -23,7 +23,7 @@
     "core_compatibility": ">=0.1.0,<2.0.0",
     "dependency_lock": {
       "path": "dependencies.lock.json",
-      "sha256": "2b37ef4007b61da2bc29fe8010f2fc80a1648631155b9e4383080deb88684355"
+      "sha256": "e3dd638f605c06395f7dc76e651cce8a657c115270af6e2a5b26b1bcf596c149"
     }
   },
   "input_schema": {
@@ -99,15 +99,15 @@
     },
     {
       "path": "dependencies.lock.json",
-      "sha256": "2b37ef4007b61da2bc29fe8010f2fc80a1648631155b9e4383080deb88684355"
+      "sha256": "e3dd638f605c06395f7dc76e651cce8a657c115270af6e2a5b26b1bcf596c149"
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "ce02430224362a8cb040e99135d9cc9bab888d1320a8fb830be5f9a500ada7ca"
+      "sha256": "f6f762f725ddca2e6de36b989c074e391d10ecd2ffeea94fda4645f27989c495"
     },
     {
       "path": "schemas/output.schema.json",
-      "sha256": "3b668e2e8e368035cf5b790eb060961893c0651f03fa851e4267af5dd0aec9bb"
+      "sha256": "171058a4e0c7d6376dfa93dc77135834ca39d0ff2fff705ada246e8cf0603099"
     },
     {
       "path": "src/render.R",
