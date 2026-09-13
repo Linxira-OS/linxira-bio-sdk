@@ -324,6 +324,13 @@
         "precision": {
           "type": "string",
           "description": "high with /usr/bin/time -v, degraded with Instant only."
+        },
+        "code_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Exact source revision (git sha) the evaluation ran on."
         }
       }
     },

@@ -929,7 +929,7 @@ struct PixelCanvas {
 impl PixelCanvas {
     fn new(width: u32, height: u32, background: egui::Color32) -> Self {
         let mut pixels = vec![0_u8; width as usize * height as usize * 4];
-        for pixel in pixels.chunks_exact_mut(4) {
+        for pixel in pixels.as_chunks_mut::<4>().0 {
             pixel.copy_from_slice(&[background.r(), background.g(), background.b(), 255]);
         }
         Self {
