@@ -17,6 +17,9 @@ use linxira_bio_core::coordinate::{
     extract_structure_sequences_path, measure_structure_geometry_path, mmcif_summary_path,
     parse_atom_selector, structure_contact_map_path, superpose_structures_path,
 };
+use linxira_bio_core::curve_fit::{
+    CurveFitOptions, CurveFitResult, curve_fit_path, parse_curve_fit_model,
+};
 use linxira_bio_core::dataset::{DatasetInspection, DatasetSupport, inspect_dataset};
 use linxira_bio_core::domain::{ProteinDomainParseResult, parse_protein_domains_path};
 use linxira_bio_core::dotplot::{DotplotOptions, render_dotplot_svg_path};
@@ -60,6 +63,7 @@ use linxira_bio_core::native_tools::{
     run_rnafold_path, run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path,
     run_trimal_path, run_wgcna_path,
 };
+use linxira_bio_core::npz::{NpzImportOptions, NpzImportResult, npz_to_matrix_path};
 use linxira_bio_core::pharmacogenomics::{pharmacogenomics_path, render_pgx_table};
 use linxira_bio_core::phylogeny::{
     DistanceMatrixOptions, DistanceMatrixResult, TreeTransformOptions, TreeTransformResult,
@@ -789,6 +793,12 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if rna == "rna" && secondary_structure == "secondary-structure" =>
         {
             print_rnafold(arguments)
+        }
+        [curve, fit, arguments @ ..] if curve == "curve" && fit == "fit" => {
+            print_curve_fit(arguments)
+        }
+        [matrix, from_npz, arguments @ ..] if matrix == "matrix" && from_npz == "from-npz" => {
+            print_matrix_from_npz(arguments)
         }
         [expression, quantify, arguments @ ..]
             if expression == "expression" && quantify == "quantify" =>
@@ -7263,6 +7273,150 @@ fn print_rnafold(arguments: &[String]) -> Result<(), Box<dyn Error>> {
         result,
         json,
     )
+}
+
+fn print_curve_fit(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut path = None;
+    let mut model = parse_curve_fit_model("4pl")?;
+    let mut options = CurveFitOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--model" => {
+                index += 1;
+                model =
+                    parse_curve_fit_model(arguments.get(index).ok_or("--model requires a value")?)?;
+            }
+            "--max-iterations" => {
+                index += 1;
+                options.max_iterations = arguments
+                    .get(index)
+                    .ok_or("--max-iterations requires a value")?
+                    .parse()
+                    .map_err(|_| "max-iterations must be a positive integer")?;
+            }
+            "--tolerance" => {
+                index += 1;
+                options.tolerance = arguments
+                    .get(index)
+                    .ok_or("--tolerance requires a value")?
+                    .parse()
+                    .map_err(|_| "tolerance must be a positive number")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown curve fit option: {value}").into());
+            }
+            value if path.is_none() => path = Some(value),
+            value => return Err(format!("unexpected curve fit argument: {value}").into()),
+        }
+        index += 1;
+    }
+    let path = path.ok_or("curve fit requires an input table path")?;
+    let result = curve_fit_path(Path::new(path), model, &options)?;
+    if json {
+        print_analysis_json("curve-fit", "curve.fit.v1", result)
+    } else {
+        print_curve_fit_text(&result);
+        Ok(())
+    }
+}
+
+fn print_curve_fit_text(result: &CurveFitResult) {
+    println!("model	{}", result.model.as_str());
+    println!("point_count	{}", result.point_count);
+    for parameter in &result.parameters {
+        println!("parameter	{}	{:.6}", parameter.name, parameter.value);
+    }
+    println!("r_squared	{:.6}", result.r_squared);
+    println!("rmse	{:.6}", result.rmse);
+    println!("iterations	{}", result.iterations);
+    for warning in &result.warnings {
+        println!("warning	{warning}");
+    }
+}
+
+fn print_matrix_from_npz(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut options = NpzImportOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--matrix-name" => {
+                index += 1;
+                options.matrix_name = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--matrix-name requires a value")?
+                        .to_owned(),
+                );
+            }
+            "--row-labels" => {
+                index += 1;
+                options.row_labels_name = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--row-labels requires a value")?
+                        .to_owned(),
+                );
+            }
+            "--col-labels" => {
+                index += 1;
+                options.column_labels_name = Some(
+                    arguments
+                        .get(index)
+                        .ok_or("--col-labels requires a value")?
+                        .to_owned(),
+                );
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown matrix from-npz option: {value}").into());
+            }
+            value if input.is_none() => input = Some(value),
+            value if output.is_none() => output = Some(value),
+            value => return Err(format!("unexpected matrix from-npz argument: {value}").into()),
+        }
+        index += 1;
+    }
+    let input = input.ok_or("matrix from-npz requires an input .npz path")?;
+    let output = output.ok_or("matrix from-npz requires an output .csv or .tsv path")?;
+    let result = npz_to_matrix_path(Path::new(input), Path::new(output), &options)?;
+    if json {
+        let warnings = result.warnings.clone();
+        print_analysis_json_with_warnings("matrix-from-npz", "matrix.from-npz.v1", result, warnings)
+    } else {
+        print_matrix_from_npz_text(&result);
+        Ok(())
+    }
+}
+
+fn print_matrix_from_npz_text(result: &NpzImportResult) {
+    for array in &result.input_arrays {
+        println!(
+            "array	{}	shape={}	dtype={}",
+            array.name,
+            array
+                .shape
+                .iter()
+                .map(u64::to_string)
+                .collect::<Vec<_>>()
+                .join("x"),
+            array.dtype
+        );
+    }
+    println!("matrix_array	{}", result.matrix_array);
+    println!("rows	{}", result.rows);
+    println!("cols	{}", result.cols);
+    println!("cell_count	{}", result.cell_count);
+    println!("output_path	{}", result.output_path);
+    println!("output_bytes	{}", result.output_bytes);
+    for warning in &result.warnings {
+        println!("warning	{warning}");
+    }
 }
 
 fn print_expression_quantify(arguments: &[String]) -> Result<(), Box<dyn Error>> {

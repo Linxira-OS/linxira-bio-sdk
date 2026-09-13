@@ -66,6 +66,11 @@ the agent skills that select and validate them.
 - Read `skills/quantify-expression/SKILL.md` for the implemented
   `expression.quantify.v1` capability (native salmon quant orchestration
   with quant.sf cross-check summaries).
+- Read `skills/import-npz-matrix/SKILL.md` for the implemented
+  `matrix.from-npz.v1` npz-to-CSV/TSV matrix import capability.
+- Read `skills/fit-dose-response-curves/SKILL.md` for the implemented
+  `curve.fit.v1` capability (IC50/ELISA 4PL, Michaelis-Menten,
+  Lineweaver-Burk fitting).
 - Read `skills/analyze-differential-expression/SKILL.md` for implemented local
   bulk RNA-seq differential expression and its research-use-only medical
   entrypoint.

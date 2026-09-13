@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/curve-fit.v1.json",
+  "title": "Linxira Bio curve fit result",
+  "type": "object",
+  "required": ["model", "point_count", "parameters", "r_squared", "rmse", "residuals", "iterations", "warnings"],
+  "properties": {
+    "model": {
+      "type": "string",
+      "enum": ["four-parameter-logistic", "michaelis-menten", "lineweaver-burk"]
+    },
+    "point_count": {"type": "integer", "minimum": 1},
+    "parameters": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["name", "value", "standard_error"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "value": {"type": "number"},
+          "standard_error": {"type": ["number", "null"], "minimum": 0}
+        },
+        "additionalProperties": false
+      }
+    },
+    "r_squared": {"type": "number", "maximum": 1},
+    "rmse": {"type": "number", "minimum": 0},
+    "residuals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["x", "y", "fit", "residual"],
+        "properties": {
+          "x": {"type": "number"},
+          "y": {"type": "number"},
+          "fit": {"type": "number"},
+          "residual": {"type": "number"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "iterations": {"type": "integer", "minimum": 0},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}
