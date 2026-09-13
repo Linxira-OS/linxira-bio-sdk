@@ -11,11 +11,11 @@ name = "linxira-bio"
 path = "src/main.rs"
 
 [dependencies]
-linxira-bio-core = { version = "1.0.1", path = "../linxira-bio-core" }
-linxira-bio-export = { version = "1.0.1", path = "../linxira-bio-export" }
-linxira-bio-output = { version = "1.0.1", path = "../linxira-bio-output" }
-linxira-bio-protocol = { version = "1.0.1", path = "../linxira-bio-protocol" }
-linxira-bio-worker = { version = "1.0.1", path = "../linxira-bio-worker" }
+linxira-bio-core = { version = "1.0.2", path = "../linxira-bio-core" }
+linxira-bio-export = { version = "1.0.2", path = "../linxira-bio-export" }
+linxira-bio-output = { version = "1.0.2", path = "../linxira-bio-output" }
+linxira-bio-protocol = { version = "1.0.2", path = "../linxira-bio-protocol" }
+linxira-bio-worker = { version = "1.0.2", path = "../linxira-bio-worker" }
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
