@@ -64,11 +64,11 @@
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "4273c390c5f891068aa117844b01fa30a8c9c82c825bd9071a495eef8f04abf9"
+      "sha256": "e6726b92f756327fd6456ae151926c2409591bb1e315c859068db3800f3faf55"
     },
     {
       "path": "schemas/output.schema.json",
-      "sha256": "b606aabe2b4e46e17598fa61c5fa10b5431eafabdde42db272f21f44772d6360"
+      "sha256": "c58466a3f75418012dc0c1d468a7a8b1fe0cb77bea79a85413d5de02cddcd2be"
     },
     {
       "path": "src/benchmark_harness.py",
@@ -96,15 +96,15 @@
     },
     {
       "path": "tests/reference/expression.pca.v1.k3.json",
-      "sha256": "f7ace555db543769ddb0a393e5f87d5933091413b98b6ed3cf8cf635ac82fc28"
+      "sha256": "6127df80a9864b167078cf04af755e59c1dc2d2c6f3364344ec967d72b296f15"
     },
     {
       "path": "tests/reference/set.venn.v1.default.json",
-      "sha256": "40dce78eabb48ae889be31acf8c0f8e8510985541da0778ec380a5e066d1bd5d"
+      "sha256": "2705bdabc1b4408910248f607ce1d21539d536204dfc356ec198c1cb7be1c2b9"
     },
     {
       "path": "tests/reference/set.venn.v1.items.json",
-      "sha256": "1bfaa4ef9b7461209d04d7ad36826a96ed6ae22607443efd6adea76d7baaf318"
+      "sha256": "a96ac050ba5d102cbe41823caa2524657e3bedf918088a084fd266b4220d3370"
     },
     {
       "path": "src/implementations/structure_pdb_summary_v1.py",
@@ -112,19 +112,19 @@
     },
     {
       "path": "tests/reference/structure.pdb.summary.v1.default.json",
-      "sha256": "5996c153020f2b3c67e1e8cf702308c53e0c8da16ae00b7234898ce540eb4673"
+      "sha256": "563d04906b5b690c317a9a62f00f3b1b0064dc1d5f7d506d65fc80294aaa6c9e"
     },
     {
       "path": "tests/reference/structure.pdb.summary.v1.plddt.json",
-      "sha256": "e1ad66efc886afa5ce58c5fe75ddb9055f78547e3d712a243e233bcdbd964fdf"
+      "sha256": "c158cc5d1f44a33e40624d5daaa2e368debf9b5b0ab9638b7d24064fdc70d178"
     },
     {
       "path": "tests/reference/structure.pdb.summary.v1.reference-default.json",
-      "sha256": "009e33fe5d8e8ddd5558e49d4c025bf634fe09c946f5f4836fce3c8df63f4679"
+      "sha256": "8cb27db5a525be551444efad4857a1950244785ec6252c92b901645201dbb716"
     },
     {
       "path": "tests/reference/structure.pdb.summary.v1.reference-plddt.json",
-      "sha256": "6134b76427b14032b800a44e5e2422fcddec865d0c82175b1e6d9ef55cfe2fbf"
+      "sha256": "10065e1482e027e9d6d11068d7e365f299be4b9807ef17f8c43d35aa1b9793e6"
     },
     {
       "path": "src/implementations/enrichment_overrepresentation_v1.py",
