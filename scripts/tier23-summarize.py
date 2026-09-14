@@ -103,7 +103,7 @@ def main() -> None:
             "data_source_id": r["run"],
             "status": "ok",
             "consistency": (f"TPM r={r['tpm_pearson_r']}, NumReads relative "
-                            f"difference {r['numreads_diff']}, rows {r['quant_lines']}"),
+                            f"difference {r['numdiff_rel']}, rows {r['quant_lines']}"),
             "speedup": None,
             "memory_saving": None,
             "precision": "second-resolution wall clock",
