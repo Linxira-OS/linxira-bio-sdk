@@ -139,6 +139,9 @@ for run in "${RUNS[@]}"; do
     continue
   fi
   quant_wall=$((end-start))
+  # Our own downloaded SRA copy is disposable once quant succeeds; only the
+  # authoritative source archive on the storage host is kept.
+  rm -f "$sra"
   util=$(python3 -c "print(f'{100*($q_user+$q_sys)/max($quant_wall,1):.1f}')")
   lines=$(($(wc -l < "$outdir/quant.sf") - 1))
 
