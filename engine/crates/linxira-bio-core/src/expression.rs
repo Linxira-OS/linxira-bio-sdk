@@ -1888,5 +1888,19 @@ mod tests {
                 .windows(2)
                 .any(|pair| pair[0] == "-2" && pair[1] == "r2.fq")
         );
+        let biased = salmon_quant_arguments(
+            &[
+                std::path::PathBuf::from("r1.fq"),
+                std::path::PathBuf::from("r2.fq"),
+            ],
+            std::path::Path::new("/out"),
+            &SalmonQuantOptions {
+                seq_bias: true,
+                gc_bias: true,
+                ..options
+            },
+        );
+        assert!(biased.contains(&"--seqBias".into()));
+        assert!(biased.contains(&"--gcBias".into()));
     }
 }
