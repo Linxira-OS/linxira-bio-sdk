@@ -1334,12 +1334,13 @@ impl Default for SalmonQuantOptions {
 }
 
 /// One row of a salmon `quant.sf` (Name, Length, EffectiveLength, TPM,
-/// NumReads).
+/// NumReads). `EffectiveLength` is fractional in real salmon output, so both
+/// lengths are kept as `f64` (integral in practice but parsed as float).
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SalmonQuantRecord {
     pub name: String,
-    pub length: u64,
-    pub effective_length: u64,
+    pub length: f64,
+    pub effective_length: f64,
     pub tpm: f64,
     pub num_reads: f64,
 }
@@ -1370,10 +1371,10 @@ pub fn parse_salmon_quant_sf(text: &str) -> Result<Vec<SalmonQuantRecord>, Nativ
         records.push(SalmonQuantRecord {
             name: fields[0].to_owned(),
             length: fields[1]
-                .parse()
+                .parse::<f64>()
                 .map_err(|_| invalid_quant_field("Length", fields[1]))?,
             effective_length: fields[2]
-                .parse()
+                .parse::<f64>()
                 .map_err(|_| invalid_quant_field("EffectiveLength", fields[2]))?,
             tpm: fields[3]
                 .parse()

@@ -1822,7 +1822,7 @@ mod tests {
         let records = crate::native_tools::parse_salmon_quant_sf(quant_sf_fixture()).expect("rows");
         assert_eq!(records.len(), 3);
         assert_eq!(records[0].name, "transcriptA");
-        assert_eq!(records[0].effective_length, 450);
+        assert_eq!(records[0].effective_length, 450.0);
         assert!((records[2].num_reads - 12.25).abs() < 1e-12);
         assert!(crate::native_tools::parse_salmon_quant_sf("Name\tWrong\n").is_err());
         assert!(
