@@ -20,6 +20,7 @@
 - `--lib-type A`（默认 `A` 自动检测）：salmon 文库类型。
 - `--threads N`（默认 1）：salmon 并行度。
 - `--no-validate-mappings`：关闭 `--validateMappings`（默认启用选择性比对模式）。
+| `--seq-bias` / `--gc-bias` | 关 | salmon `--seqBias`/`--gcBias` 偏差建模；参照管线的双端运行通常两者全开 |
 - `--json`：输出标准结果信封。
 - salmon 可执行文件经 `LINXIRA_BIO_SALMON` 或 `PATH` 解析。
 
