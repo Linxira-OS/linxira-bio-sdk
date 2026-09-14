@@ -1,0 +1,395 @@
+{
+  "schema_version": "1",
+  "report_id": "bench-20260914-004",
+  "generated_at": "2026-09-14",
+  "purpose": "Batch reproducibility on 10 normally-covering tier23 samples",
+  "methodology": {
+    "backends_flag": "rust-orchestrated upstream salmon (see engine)",
+    "repeat_flag": "1 per run (batched serial cross-check)",
+    "warmup": "none; cold cache per segment",
+    "page_cache": "cold",
+    "disclosure": "3-sigma principle: per-metric distributions over passing runs are reported as mean/stdev/3-sigma interval; batch-level PASS requires zero outliers beyond 3 sigma and worst TPM r >= 0.995"
+  },
+  "engine": "1.0.3",
+  "environment": {
+    "os": "linux",
+    "kernel": "7.2.3-1-cachyos",
+    "cpu_model": "Intel Xeon E5-2676 v3 @ 2.40GHz (24 threads; pinned cores 8-15, nice 10)",
+    "total_memory_mb": 31744,
+    "distro": "CachyOS (arch-based)",
+    "gpu": "AMD Radeon RX 580 2048SP (unused; CPU-only workload)",
+    "memory": "32 GiB DDR3-1600 (2x16 GiB)",
+    "storage": "Kingston 120GB SSD (system); WDC 500GB 7200rpm HDD (benchmark I/O); Seagate 3TB HDD (reference data)",
+    "engine_version": "1.0.3",
+    "code_revision": "v1.0.3 + ff90f7d + d674472 + bias flags",
+    "in_container": false,
+    "page_cache": "cold",
+    "precision": "high (second-resolution wall clock, bash time user/sys)"
+  },
+  "data_sources": [
+    {
+      "id": "tier23-samples",
+      "origin": "public-download",
+      "reference": "NCBI SRA",
+      "note": "paired-end"
+    },
+    {
+      "id": "salmon-index",
+      "origin": "private-server",
+      "reference": "Pinku1 CDS index",
+      "note": "read-only"
+    },
+    {
+      "id": "reference-quants",
+      "origin": "private-server",
+      "reference": "legacy quant.sf",
+      "note": "read-only"
+    }
+  ],
+  "entries": [
+    {
+      "id": "SRR15243898",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SRR15243898 SRA -> fasterq-dump -> CLI quantify (-l A -p 8 --validateMappings --seqBias --gcBias)",
+      "data_source_id": "SRR15243898",
+      "status": "ok",
+      "consistency": "TPM r=1.000000, NumReads relative difference 0.000e+00, rows 33955",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 677000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      },
+      "cpu": {
+        "model": "",
+        "cores_pinned": "",
+        "threads": "",
+        "quant_user_s": 0.0,
+        "quant_sys_s": 0.0,
+        "quant_util_pct": 0.0
+      }
+    },
+    {
+      "id": "SRR1552100",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SRR1552100 SRA -> fasterq-dump -> CLI quantify (-l A -p 8 --validateMappings --seqBias --gcBias)",
+      "data_source_id": "SRR1552100",
+      "status": "ok",
+      "consistency": "TPM r=1.000000, NumReads relative difference 0.000e+00, rows 33955",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 684000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      },
+      "cpu": {
+        "model": "",
+        "cores_pinned": "8",
+        "threads": "8",
+        "quant_user_s": 521.796,
+        "quant_sys_s": 21.34,
+        "quant_util_pct": 79.4
+      }
+    },
+    {
+      "id": "SRR1552203",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SRR1552203 SRA -> fasterq-dump -> CLI quantify (-l A -p 8 --validateMappings --seqBias --gcBias)",
+      "data_source_id": "SRR1552203",
+      "status": "ok",
+      "consistency": "TPM r=1.000000, NumReads relative difference 0.000e+00, rows 33955",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 645000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      },
+      "cpu": {
+        "model": "",
+        "cores_pinned": "8",
+        "threads": "8",
+        "quant_user_s": 508.095,
+        "quant_sys_s": 20.375,
+        "quant_util_pct": 81.9
+      }
+    },
+    {
+      "id": "SRR1552215",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SRR1552215 SRA -> fasterq-dump -> CLI quantify (-l A -p 8 --validateMappings --seqBias --gcBias)",
+      "data_source_id": "SRR1552215",
+      "status": "ok",
+      "consistency": "TPM r=1.000000, NumReads relative difference 0.000e+00, rows 33955",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 614000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      },
+      "cpu": {
+        "model": "",
+        "cores_pinned": "8",
+        "threads": "8",
+        "quant_user_s": 526.325,
+        "quant_sys_s": 21.361,
+        "quant_util_pct": 89.2
+      }
+    },
+    {
+      "id": "SRR1552217",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SRR1552217 SRA -> fasterq-dump -> CLI quantify (-l A -p 8 --validateMappings --seqBias --gcBias)",
+      "data_source_id": "SRR1552217",
+      "status": "ok",
+      "consistency": "TPM r=1.000000, NumReads relative difference 0.000e+00, rows 33955",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 534000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      },
+      "cpu": {
+        "model": "",
+        "cores_pinned": "8",
+        "threads": "8",
+        "quant_user_s": 527.614,
+        "quant_sys_s": 20.419,
+        "quant_util_pct": 102.6
+      }
+    },
+    {
+      "id": "SRR1552218",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SRR1552218 SRA -> fasterq-dump -> CLI quantify (-l A -p 8 --validateMappings --seqBias --gcBias)",
+      "data_source_id": "SRR1552218",
+      "status": "ok",
+      "consistency": "TPM r=1.000000, NumReads relative difference 0.000e+00, rows 33955",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 661000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      },
+      "cpu": {
+        "model": "",
+        "cores_pinned": "8",
+        "threads": "8",
+        "quant_user_s": 521.942,
+        "quant_sys_s": 20.398,
+        "quant_util_pct": 82.0
+      }
+    },
+    {
+      "id": "SRR17715775",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SRR17715775 SRA -> fasterq-dump -> CLI quantify (-l A -p 8 --validateMappings --seqBias --gcBias)",
+      "data_source_id": "SRR17715775",
+      "status": "ok",
+      "consistency": "TPM r=1.000000, NumReads relative difference 0.000e+00, rows 33955",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 613000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      },
+      "cpu": {
+        "model": "",
+        "cores_pinned": "8",
+        "threads": "8",
+        "quant_user_s": 570.889,
+        "quant_sys_s": 18.176,
+        "quant_util_pct": 96.1
+      }
+    },
+    {
+      "id": "SRR17715776",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SRR17715776 SRA -> fasterq-dump -> CLI quantify (-l A -p 8 --validateMappings --seqBias --gcBias)",
+      "data_source_id": "SRR17715776",
+      "status": "ok",
+      "consistency": "TPM r=1.000000, NumReads relative difference 0.000e+00, rows 33955",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 526000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      },
+      "cpu": {
+        "model": "",
+        "cores_pinned": "8",
+        "threads": "8",
+        "quant_user_s": 591.625,
+        "quant_sys_s": 17.269,
+        "quant_util_pct": 115.8
+      }
+    },
+    {
+      "id": "SRR17715777",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SRR17715777 SRA -> fasterq-dump -> CLI quantify (-l A -p 8 --validateMappings --seqBias --gcBias)",
+      "data_source_id": "SRR17715777",
+      "status": "ok",
+      "consistency": "TPM r=1.000000, NumReads relative difference 0.000e+00, rows 33955",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 685000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      },
+      "cpu": {
+        "model": "",
+        "cores_pinned": "8",
+        "threads": "8",
+        "quant_user_s": 585.437,
+        "quant_sys_s": 20.078,
+        "quant_util_pct": 88.4
+      }
+    },
+    {
+      "id": "SRR17715778",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SRR17715778 SRA -> fasterq-dump -> CLI quantify (-l A -p 8 --validateMappings --seqBias --gcBias)",
+      "data_source_id": "SRR17715778",
+      "status": "ok",
+      "consistency": "TPM r=1.000000, NumReads relative difference 0.000e+00, rows 33955",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 390000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      },
+      "cpu": {
+        "model": "",
+        "cores_pinned": "8",
+        "threads": "8",
+        "quant_user_s": 592.576,
+        "quant_sys_s": 15.623,
+        "quant_util_pct": 155.9
+      }
+    }
+  ],
+  "statistics": {
+    "tpm_pearson_r": {
+      "n": 10,
+      "mean": 1.0,
+      "stdev": 0.0,
+      "sigma_3_interval": [
+        1.0,
+        1.0
+      ],
+      "outliers_beyond_3sigma": 0,
+      "min": 1.0,
+      "max": 1.0
+    },
+    "numreads_rel_diff": {
+      "n": 10,
+      "mean": 0.0,
+      "stdev": 0.0,
+      "sigma_3_interval": [
+        0.0,
+        0.0
+      ],
+      "outliers_beyond_3sigma": 0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "quant_wall_s": {
+      "n": 10,
+      "mean": 602.9,
+      "stdev": 94.38037696235142,
+      "sigma_3_interval": [
+        319.7588691129457,
+        886.0411308870542
+      ],
+      "outliers_beyond_3sigma": 0,
+      "min": 390.0,
+      "max": 685.0
+    },
+    "unpack_wall_s": {
+      "n": 10,
+      "mean": 250.8,
+      "stdev": 27.360961646517875,
+      "sigma_3_interval": [
+        168.7171150604464,
+        332.8828849395536
+      ],
+      "outliers_beyond_3sigma": 0,
+      "min": 204.0,
+      "max": 302.0
+    },
+    "worst_tpm_pearson_r": 1.0,
+    "sigma_3_acceptance": "PASS",
+    "runs_passed": 10,
+    "runs_failed": 0
+  }
+}
