@@ -763,12 +763,13 @@ def validate_benchmark_summaries(
 ) -> int:
     """Every archived run must satisfy the unified summary contract.
 
-    benchmark-results/<date>/summary.json is the archival unit: the schema
+    benchmark-results/<date>/summary.json is the archival unit (same-day
+    batches append as summary-<NNN>.json in the same directory): the schema
     enforces report ids, purpose, and data-source provenance, and this check
     additionally rejects duplicate report ids across runs (the numbering
     scheme only works if ids are never reused).
     """
-    summary_paths = sorted((ROOT / "benchmark-results").glob("*/summary.json"))
+    summary_paths = sorted((ROOT / "benchmark-results").glob("*/summary*.json"))
     if not summary_paths and (ROOT / "benchmark-results").is_dir():
         raise ValueError(
             "benchmark-results exists but contains no */summary.json runs; "
