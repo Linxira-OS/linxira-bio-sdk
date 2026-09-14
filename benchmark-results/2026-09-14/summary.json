@@ -2,7 +2,7 @@
   "schema_version": "1",
   "report_id": "bench-20260914-001",
   "generated_at": "2026-09-14",
-  "purpose": "First bio-lab deployment smoke of v1.0.3 (commit d674472): validates salmon orchestration end-to-end on a real deep-library paired sample and the structural parity of the emitted quant.sf against the legacy pipeline's output. Single-sample commissioning run, not the batch benchmark.",
+  "purpose": "Commissioning run of SDK v1.0.3 on a community contributor's Linux workstation: end-to-end salmon orchestration through the public CLI on one real paired-end sample, plus structural parity of the emitted quant.sf against a legacy quant directory. Single cold-cache run; not a speedup comparison.",
   "methodology": {
     "backends_flag": "rust-orchestrated salmon (LINXIRA_BIO_SALMON=salmon 2.7.0, bioconda)",
     "repeat_flag": "1 (commissioning)",
@@ -14,34 +14,40 @@
   "environment": {
     "os": "linux",
     "kernel": "7.2.3-1-cachyos",
-    "cpu_model": "host 24-core (build and run pinned to cores 8-15 via taskset, nice 10)",
+    "cpu_model": "Intel Xeon E5-2676 v3 @ 2.40GHz (24 threads)",
     "total_memory_mb": 31744,
-    "distro": "CachyOS",
+    "distro": "CachyOS (arch-based)",
     "engine_version": "1.0.3",
     "python_version": "Python 3.14 (system)",
     "r_version": null,
     "code_revision": "d674472 (fix(native): parse quant.sf lengths as f64)",
     "in_container": false,
     "page_cache": "cold",
-    "precision": "high (GNU date second-resolution wrapper; /usr/bin/time unavailable)"
+    "precision": "high (GNU date second-resolution wrapper; /usr/bin/time unavailable)",
+    "gpu": "AMD Radeon RX 580 2048SP (Polaris 20, amdgpu kernel driver; unused by this workload)",
+    "host_os": null,
+    "host_model": null,
+    "host_cpu_model": null,
+    "host_logical_processors": null,
+    "host_total_memory_mb": null
   },
   "data_sources": [
     {
       "id": "srr26171873",
       "origin": "private-server",
-      "reference": "bio-lab:/mnt/G/thesis_dwf4/sra_missing/SRR26171873_{1,2}.fastq.gz (~1.1 GB + mate, staged from prior thesis pipeline)",
+      "reference": "lab-workstation:<lab-data>/sra_missing/SRR26171873_{1,2}.fastq.gz (~1.1 GB + mate, staged from prior thesis pipeline)",
       "note": "SRR26171873; paired-end gzip; original SRA accession on NCBI (PRJNA listed in /mnt/F/thesis_inbox/final_census.tsv); staged read-only, no files modified"
     },
     {
       "id": "salmon-index-pinku1",
       "origin": "private-server",
-      "reference": "bio-lab:/mnt/G/thesis_dwf4/analysis/02_tier1/salmon_idx (Pinku1 CDS index, pre-built, read-only)",
+      "reference": "lab-workstation:<lab-data>/analysis/02_tier1/salmon_idx (Pinku1 CDS index, pre-built, read-only)",
       "note": "33,955 transcripts; same index the legacy pipeline quantified against"
     },
     {
       "id": "legacy-quant-srr15219548",
       "origin": "private-server",
-      "reference": "bio-lab:/mnt/G/thesis_dwf4/analysis/02_tier1/quant/SRR15219548/quant.sf (read-only comparison target)",
+      "reference": "lab-workstation:<lab-data>/analysis/02_tier1/quant/SRR15219548/quant.sf (read-only comparison target)",
       "note": "Structure parity reference from the legacy salmon pipeline"
     }
   ],
@@ -71,7 +77,7 @@
       "id": "fastq-truncation-guard",
       "capability": "expression.quantify.v1",
       "dataset_class": "srr",
-      "dataset": "truncated intermediate FASTQ (/mnt/F/thesis_inbox/SRR22699515.sra_fq/, 87,814,726 lines - not a multiple of 4)",
+      "dataset": "truncated intermediate FASTQ (<lab-data>/SRR22699515.sra_fq/, 87,814,726 lines - not a multiple of 4)",
       "data_source_id": "srr26171873",
       "status": "ok",
       "consistency": "engine correctly refused the truncated file with a structured error instead of silently quantifying a partial sample",

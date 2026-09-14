@@ -1,73 +1,106 @@
-# Benchmark summary — 2026-09-13（三端基线 / three-way baseline）
+# Linxira Bio SDK — three-backend baseline benchmark (2026-09-13)
 
-> **范围（Scope）**：这是仓库内置 fixture 上的 **Rust + Python + R 三端基线**，用于验证三实现
-> 数值一致并量化 Rust 相对解释器实现的启动/内存优势。**不是** 4TB 真实数据集跑分（那批等
-> Linux 服务器空闲后按 `docs/BENCHMARK_DATA_SOURCES.md` 的来源清单执行）。
-> This is the repository-fixture **three-way baseline** (Rust vs Python vs R) for
-> numerical-consistency validation and start-up/memory comparison. It is **not**
-> the 4TB real-dataset benchmark.
+> Audience: open-source contributors and anyone evaluating the SDK's
+> performance claims. Everything needed to reproduce the numbers is below:
+> exact hardware, software versions, data sources (public SRA accessions and
+> repository fixtures), command lines, and acceptance criteria.
+>
+> 报告双语：英文为主，文末附中文摘要（For the Chinese summary, see the last
+> section）。
 
-- 后端（backends）：`rust,python,r` — 重复（repeat）：5（每后端先做 1 次不计时的预热 / one
-  untimed warmup per backend before the timed repeats）
-- 页缓存（page cache）：warm — warm-cache 数字不得与 cold-cache 混用（ROADMAP 7.1）
-- 数据集（datasets）：全部来自仓库 fixture，见下表 `dataset` 列（no external data）
+**Report ID**: `bench-20260913-001` · **Code revision**: `9052bcf` · **Engine**: 1.0.1
 
-## 结果（Results）
+## 1. What was measured
 
-| capability | dataset | dataset_class | 一致性 | rust (ms) | python (ms) | r (ms) | speedup | memory saving |
-|---|---|---|---|---|---|---|---|---|
-| sequence.stats.v1 | tiny.fa（3 条 FASTA） | sequence | Consistent | 40.0 | 330.0 | 2110.0 | 8.25x | 86.5% |
-| expression.pca.v1 | deseq2-counts.csv（components=3） | matrix | Consistent | 40.0 | 300.0 | 460.0 | 7.50x | 85.1% |
-| set.venn.v1 | sets.tsv（默认参数） | other | Consistent | 40.0 | 310.0 | 400.0 | 7.75x | 85.7% |
-| structure.pdb.summary.v1 | alphafold-style.pdb（默认模式） | structure | Consistent | 40.0 | 320.0 | 410.0 | 8.00x | 86.3% |
+Rust is the SDK's native engine; the same four capabilities were also
+re-implemented in pure Python and pure R inside benchmark packs, so all
+three backends run the identical analysis on identical inputs. This run
+establishes (a) three-way numerical parity and (b) the start-up/memory
+overhead an interpreter pays on small inputs. It is **not** a comparison
+against external bioinformatics tools.
 
-- `speedup` = `median_wall(首个非 rust 后端) / median_wall(rust)`；此处对比后端为 **python**。
-  对比 R 的话：sequence.stats 52.75x、pca 11.5x、venn 10.0x、pdb 10.25x。
-- `memory saving` = `1 - median_peak_rss(rust) / median_peak_rss(python)`。
-- 中位峰值 RSS（median peak RSS）：rust ≈ 5.9–6.5 MB；python ≈ 43.8–44.0 MB；
-  r ≈ 70.8–70.9 MB（sequence.stats 的 R 走 Biostrings，237.6 MB）。
-- 一致性（consistency）均为 **Consistent（高精度）**：三端结果包在 1e-6 相对容差内逐字段
-  一致（pack 对照测试对 Rust golden 的最大相对误差：PCA/Venn 2.26e-11，PDB 0.0）。
-- 微小 fixture 上解释器启动占主导：`wall_ms` 的主体是 Python/R 进程冷启动，这也是
-  self-reported（进程内）计时表存在的原因——见各 `*.benchmark.md`。
+| capability | dataset | rust | python | r | speedup (rust→python) | memory saving |
+|---|---|---|---|---|---|---|
+| `sequence.stats.v1` | 3-record FASTA | 40 ms | 330 ms | 2110 ms | 8.25× | 86.5% |
+| `expression.pca.v1` | counts CSV (3 components) | 40 ms | 300 ms | 460 ms | 7.50× | 85.1% |
+| `set.venn.v1` | identifier-set TSV | 40 ms | 310 ms | 400 ms | 7.75× | 85.7% |
+| `structure.pdb.summary.v1` | AlphaFold-style PDB | 40 ms | 320 ms | 410 ms | 8.00× | 86.3% |
 
-## Environment（环境披露 / disclosure）
+Consistency: all four capabilities **Consistent** across backends at 1e-6
+relative tolerance (pack parity tests vs the Rust golden outputs: PCA/Venn
+max relative error 2.26e-11, PDB exactly 0.0).
 
-报告生成于 **WSL2 内**，因此同时披露 Windows 宿主机与 WSL 客户机两层环境。
+On fixtures this small the wall time is dominated by interpreter start-up;
+that is precisely what these numbers characterize. Throughput on real data
+is measured separately (see `2026-09-14`).
 
-- os: linux 6.18.33.2-microsoft-standard-WSL2
-- distro: Arch Linux（WSL distro: arch-linux-current, wsl2）
-- guest cpu: Intel(R) Core(TM) Ultra 5 225H
-- guest memory: 7940 MB（WSL2 分配额，非物理内存）
-- host os (Windows): Microsoft Windows [Version 10.0.26200.9168]（Windows 11）
-- host model: XIAOMI REDMI Book Pro 14 2025
-- host cpu: Intel(R) Core(TM) Ultra 5 225H（14 logical processors）
-- host memory: 32189 MB（≈31.4 GiB 物理内存）
-- engine: linxira-bio-cli 1.0.1（release 构建，Rust）
-- python: Python 3.14.6（Arch Linux 系统 python，pack 依赖纯标准库 + Biopython 1.88）
-- R: R version 4.6.1 (2026-06-24) "Happy Hop"（pack 依赖 jsonlite/digest/Biostrings 2.80.2）
-- container: no（原生 WSL2，无 Docker 层）
-- page cache: warm；timing precision: high（`/usr/bin/time -v`）
+## 2. Environment (full disclosure)
 
-### 采集中文 Windows 版本串的说明（localized `ver` note）
+| item | value |
+|---|---|
+| OS | Linux (WSL2 guest), kernel `6.18.33.2-microsoft-standard-WSL2` |
+| Distro | Arch Linux (`arch-linux-current`), wsl2 |
+| CPU | Intel Core Ultra 5 225H, 14 logical processors |
+| RAM | 7940 MB visible to the WSL2 guest (host physical: 32189 MB) |
+| GPU | Intel Arc 130T (integrated, driver 32.0.101.8991) — **not used**; all workloads are CPU-only |
+| Host OS | Windows 11, build 26200.9168 (`cmd.exe /c ver`, disclosed via WSL interop) |
+| Rust | engine 1.0.1, release profile |
+| Python | 3.14.6 (pack: stdlib + Biopython 1.88) |
+| R | 4.6.1 (pack: jsonlite, digest, Biostrings 2.80.2) |
+| Container | none |
+| Page cache | warm (one untimed warmup run per backend, then 5 timed repeats) |
+| Timing | `high` (external `/usr/bin/time -v`: wall/CPU/peak RSS) |
 
-`cmd.exe /c ver` 的 "版本" 一词随系统区域设置以 OEM 代码页输出；引擎只提取括号内稳定的
-ASCII build 号并规范化为 `[Version <build>]`，避免任何区域设置下出现乱码。
+## 3. Methodology
 
-## 文件（Files）
+- One untimed warmup per backend, then `--repeat 5`; medians reported,
+  min/max/IQR in the JSON reports.
+- Cross-backend consistency: structured field-level diff, numeric relative
+  tolerance 1e-6; any drift lists the differing fields.
+- `speedup = median_wall(python) / median_wall(rust)`;
+  `memory saving = 1 − median_peak_rss(rust) / median_peak_rss(python)`.
+- Warm-cache numbers must not be mixed with cold-cache runs.
 
-- `summary.json` — 本摘要的机器可读版（含全部 entries 与完整 environment 对象）
-- `<capability>.benchmark.json` / `.md` — 各能力完整报告（逐次运行、min/max/IQR、
-  self-reported 计时、一致性 findings）
+## 4. Data sources
 
-## 复现（Reproduce）
+All inputs are repository fixtures committed in this repo:
+
+- `tests/fixtures/sequences/tiny.fa` (3-record FASTA)
+- `tests/fixtures/expression-matrix/deseq2-counts.csv`
+- `tests/fixtures/set-analysis/sets.tsv`
+- `tests/fixtures/structure-pdb-summary/alphafold-style.pdb`
+
+No external data was used; nothing here requires credentials or controlled
+access.
+
+## 5. Reproduce
 
 ```bash
-# WSL2 (Arch) 内，仓库根目录：
-export LINXIRA_BIO_WORKFLOW_ROOT=/tmp/lx-workflows   # workflows 副本，避开 repo 内 Windows 构建缓存
-cargo build --release -p linxira-bio-cli             # CARGO_TARGET_DIR=/tmp/lt
-target/release/linxira-bio benchmark run structure.pdb.summary.v1 \
-  pdb=tests/fixtures/structure-pdb-summary/alphafold-style.pdb \
-  --backends rust,python,r --repeat 5 --output benchmark-results/2026-09-13 --dataset-class structure
-# 其余三个能力同理（sequence.stats.v1 / expression.pca.v1 / set.venn.v1）
+linxira-bio benchmark run sequence.stats.v1 \
+  fasta=tests/fixtures/sequences/tiny.fa \
+  --backends rust,python,r --repeat 5 \
+  --output benchmark-results/2026-09-13 --dataset-class sequence
+# repeat per capability: expression.pca.v1 / set.venn.v1 / structure.pdb.summary.v1
 ```
+
+Raw reports (`<capability>.benchmark.json|.md`) and the machine-readable
+`summary.json` live in this directory.
+
+---
+
+## 中文摘要
+
+**测了什么**：四个分析能力（序列统计 / PCA / 韦恩图 / PDB 摘要）在 Rust、
+Python、R 三个后端上以相同输入各跑 5 次。三端结果在 1e-6 容差内逐字段一致
+（对 Rust golden 的最大相对误差 2.26e-11 / 0.0）。小样本上解释器启动占主导：
+Python 慢 7.5–8.25×，峰值内存多约 6 倍；速度随真实数据规模的变化另见
+`2026-09-14`。
+
+**环境**：WSL2（Arch Linux guest，内核 6.18.33.2-microsoft-standard-WSL2），
+Windows 11 主机，Intel Core Ultra 5 225H（14 逻辑核），GPU 为 Intel Arc 130T
+集成显卡（**未使用**，全部为 CPU 负载），guest 内存 7940 MB / 主机 32189 MB，
+Rust 1.0.1 / Python 3.14.6 / R 4.6.1，warm cache，`/usr/bin/time -v` 高精度
+计时。
+
+**数据**：全部为仓库内置 fixture（见上），无外部数据、无受控数据。
+**复现**：见 §5 命令行。

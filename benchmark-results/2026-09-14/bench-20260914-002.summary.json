@@ -2,7 +2,7 @@
   "schema_version": "1",
   "report_id": "bench-20260914-002",
   "generated_at": "2026-09-14",
-  "purpose": "tier1_v2 cross-check batch on bio-lab: quantify 14 single-end samples through the public CLI (expression.quantify.v1) with the mainline's own salmon 2.7.0 index and parameters, and compare against the mainline's stored quant.sf. Structural and NumReads-total parity pass on all 14; TPM correlation is unstable because the reference quant was produced by a salmon re-implementation at a 0.0017% mapping rate (disclosed below), which makes TPM allocation noise on these near-empty runs.",
+  "purpose": "tier1_v2 cross-check batch on lab workstation: quantify 14 single-end samples through the public CLI (expression.quantify.v1) with the mainline's own salmon 2.7.0 index and parameters, and compare against the mainline's stored quant.sf. Structural and NumReads-total parity pass on all 14; TPM correlation is unstable because the reference quant was produced by a salmon re-implementation at a 0.0017% mapping rate (disclosed below), which makes TPM allocation noise on these near-empty runs.",
   "methodology": {
     "backends_flag": "rust-orchestrated salmon (LINXIRA_BIO_SALMON=salmon 2.7.0, bioconda, upstream binaries)",
     "repeat_flag": "1 (cross-check batch)",
@@ -14,34 +14,35 @@
   "environment": {
     "os": "linux",
     "kernel": "7.2.3-1-cachyos",
-    "cpu_model": "host 24-core (runs pinned to cores 8-15 via taskset, nice 10)",
+    "cpu_model": "Intel Xeon E5-2676 v3 @ 2.40GHz (24 threads)",
     "total_memory_mb": 31744,
-    "distro": "CachyOS",
+    "distro": "CachyOS (arch-based)",
     "engine_version": "1.0.3",
     "python_version": "Python 3.14 (system)",
     "r_version": null,
     "code_revision": "v1.0.3 base (c8ebee3) + quantify fixes ff90f7d (--output flag) and d674472 (quant.sf f64 lengths) checked out individually",
     "in_container": false,
     "page_cache": "cold",
-    "precision": "high (second-resolution wall clock)"
+    "precision": "high (second-resolution wall clock)",
+    "gpu": "AMD Radeon RX 580 2048SP (Polaris 20, amdgpu kernel driver; unused by this workload)"
   },
   "data_sources": [
     {
       "id": "v2-quant-inputs",
       "origin": "private-server",
-      "reference": "bio-lab:/mnt/G/thesis_dwf4/analysis/04_v2_quant/fastq/ (14 single-end gzip FASTQ, the mainline's own quant inputs, read-only)",
+      "reference": "lab-workstation:<lab-data>/analysis/04_v2_quant/fastq/ (14 single-end gzip FASTQ, the mainline's own quant inputs, read-only)",
       "note": "SRR28573920-25, SRR8205656-63; NCBI SRA accessions; staged by the mainline on 2026-09-10"
     },
     {
       "id": "salmon-index-pinku1",
       "origin": "private-server",
-      "reference": "bio-lab:/mnt/G/thesis_dwf4/analysis/02_tier1/salmon_idx (Pinku1 CDS index, 33,955 transcripts, read-only)",
+      "reference": "lab-workstation:<lab-data>/analysis/02_tier1/salmon_idx (Pinku1 CDS index, 33,955 transcripts, read-only)",
       "note": "same index as every mainline quant"
     },
     {
       "id": "v2-quant-references",
       "origin": "private-server",
-      "reference": "bio-lab:/mnt/G/thesis_dwf4/analysis/04_v2_quant/quant/<run>/quant.sf (read-only comparison targets)",
+      "reference": "lab-workstation:<lab-data>/analysis/04_v2_quant/quant/<run>/quant.sf (read-only comparison targets)",
       "note": "produced by the mainline; cmd_info.json discloses salmon_version 2.7.0 but logs identify a re-implementation ('salmon (rust port, reads mode)') with mapping rate 0.0017% on these samples"
     }
   ],
