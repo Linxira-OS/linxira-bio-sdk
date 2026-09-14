@@ -26,6 +26,7 @@ pipeline outputs can be checked field by field.
 - `--lib-type A` (default `A`, automatic detection): salmon library type.
 - `--threads N` (default 1): salmon parallelism.
 - `--no-validate-mappings`: disable `--validateMappings` (selective
+| `--seq-bias` / `--gc-bias` | off | salmon `--seqBias`/`--gcBias` bias modeling; the reference paired-end pipelines enable both |
   alignment mode is the default).
 - `--json`: emit the standard result envelope.
 - The salmon binary resolves via `LINXIRA_BIO_SALMON` or `PATH`.
