@@ -1,0 +1,72 @@
+{
+  "schema_version": "1",
+  "report_id": "bench-20260914-002",
+  "generated_at": "2026-09-14",
+  "purpose": "tier1_v2 cross-check batch on bio-lab: quantify 14 single-end samples through the public CLI (expression.quantify.v1) with the mainline's own salmon 2.7.0 index and parameters, and compare against the mainline's stored quant.sf. Structural and NumReads-total parity pass on all 14; TPM correlation is unstable because the reference quant was produced by a salmon re-implementation at a 0.0017% mapping rate (disclosed below), which makes TPM allocation noise on these near-empty runs.",
+  "methodology": {
+    "backends_flag": "rust-orchestrated salmon (LINXIRA_BIO_SALMON=salmon 2.7.0, bioconda, upstream binaries)",
+    "repeat_flag": "1 (cross-check batch)",
+    "warmup": "none; cold cache",
+    "page_cache": "cold",
+    "disclosure": "single cold-cache cross-check run per sample; reference implementation is a salmon re-implementation (see entries[].reference_implementation), so TPM pass-lines are not meaningful here"
+  },
+  "engine": "1.0.3",
+  "environment": {
+    "os": "linux",
+    "kernel": "7.2.3-1-cachyos",
+    "cpu_model": "host 24-core (runs pinned to cores 8-15 via taskset, nice 10)",
+    "total_memory_mb": 31744,
+    "distro": "CachyOS",
+    "engine_version": "1.0.3",
+    "python_version": "Python 3.14 (system)",
+    "r_version": null,
+    "code_revision": "v1.0.3 base (c8ebee3) + quantify fixes ff90f7d (--output flag) and d674472 (quant.sf f64 lengths) checked out individually",
+    "in_container": false,
+    "page_cache": "cold",
+    "precision": "high (second-resolution wall clock)"
+  },
+  "data_sources": [
+    {
+      "id": "v2-quant-inputs",
+      "origin": "private-server",
+      "reference": "bio-lab:/mnt/G/thesis_dwf4/analysis/04_v2_quant/fastq/ (14 single-end gzip FASTQ, the mainline's own quant inputs, read-only)",
+      "note": "SRR28573920-25, SRR8205656-63; NCBI SRA accessions; staged by the mainline on 2026-09-10"
+    },
+    {
+      "id": "salmon-index-pinku1",
+      "origin": "private-server",
+      "reference": "bio-lab:/mnt/G/thesis_dwf4/analysis/02_tier1/salmon_idx (Pinku1 CDS index, 33,955 transcripts, read-only)",
+      "note": "same index as every mainline quant"
+    },
+    {
+      "id": "v2-quant-references",
+      "origin": "private-server",
+      "reference": "bio-lab:/mnt/G/thesis_dwf4/analysis/04_v2_quant/quant/<run>/quant.sf (read-only comparison targets)",
+      "note": "produced by the mainline; cmd_info.json discloses salmon_version 2.7.0 but logs identify a re-implementation ('salmon (rust port, reads mode)') with mapping rate 0.0017% on these samples"
+    }
+  ],
+  "entries": [
+    {
+      "id": "v2-crosscheck-batch",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "14 single-end gzip FASTQ vs Pinku1 CDS index, threads 8, lib-type A, validateMappings",
+      "data_source_id": "v2-quant-inputs",
+      "status": "partial",
+      "consistency": "rows_match=1 on all 14 (33,955 transcripts, identical IDs/header); NumReads total within 0.0013% on all 14; TPM Pearson r 0.0-0.94 - not comparable because the reference quant mapped only ~192 of 11.4M fragments (salmon re-implementation at degenerate coverage)",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock (5-17 s per run)",
+      "report": "bench/benchmark.csv on bio-lab (mirror of the per-run rows below)",
+      "backends": {
+        "rust": {
+          "median_wall_ms": 10500.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 14,
+          "repeats": 14
+        }
+      },
+      "reference_implementation": "salmon re-implementation ('rust port, reads mode' v2.7.0 per reference logs); upstream salmon numbers must not be blended with it"
+    }
+  ]
+}
