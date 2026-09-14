@@ -6623,6 +6623,15 @@ fn benchmark_summary_markdown(report: &BenchmarkReport) -> String {
     if let Some(revision) = report.environment.code_revision.as_deref() {
         environment_section.push_str(&format!("- code revision: {revision}\n"));
     }
+    if let Some(gpu) = report.environment.gpu.as_deref() {
+        environment_section.push_str(&format!("- gpu: {gpu}\n"));
+    }
+    if let Some(memory) = report.environment.memory.as_deref() {
+        environment_section.push_str(&format!("- memory modules: {memory}\n"));
+    }
+    if let Some(storage) = report.environment.storage.as_deref() {
+        environment_section.push_str(&format!("- storage: {storage}\n"));
+    }
     environment_section.push_str(&format!(
         "- os: {} {}\n",
         report.environment.os,
