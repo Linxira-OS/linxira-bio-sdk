@@ -98,9 +98,9 @@ for run in "${RUNS[@]}"; do
     if [[ "$PULL_SOURCE" == *:* ]]; then
       scp_args=(-q)
       [ -n "$SCP_IDENTITY" ] && scp_args+=(-i "$SCP_IDENTITY")
-      scp "${scp_args[@]}" "$PULL_SOURCE/$run" "$sra"
+      scp "${scp_args[@]}" "$PULL_SOURCE/$run.sra" "$sra"
     else
-      cp "$PULL_SOURCE/$run" "$sra"
+      cp "$PULL_SOURCE/$run.sra" "$sra"
     fi
   else
     echo "MISS $run (no local SRA and no --pull-source)" >&2
