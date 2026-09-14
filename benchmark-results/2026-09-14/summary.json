@@ -1,0 +1,85 @@
+{
+  "schema_version": "1",
+  "report_id": "bench-20260914-001",
+  "generated_at": "2026-09-14",
+  "purpose": "First bio-lab deployment smoke of v1.0.3 (commit d674472): validates salmon orchestration end-to-end on a real deep-library paired sample and the structural parity of the emitted quant.sf against the legacy pipeline's output. Single-sample commissioning run, not the batch benchmark.",
+  "methodology": {
+    "backends_flag": "rust-orchestrated salmon (LINXIRA_BIO_SALMON=salmon 2.7.0, bioconda)",
+    "repeat_flag": "1 (commissioning)",
+    "warmup": "none; cold cache first run on this host",
+    "page_cache": "cold",
+    "disclosure": "single cold-cache commissioning run; do not compare against warm-cache repeats"
+  },
+  "engine": "1.0.3",
+  "environment": {
+    "os": "linux",
+    "kernel": "7.2.3-1-cachyos",
+    "cpu_model": "host 24-core (build and run pinned to cores 8-15 via taskset, nice 10)",
+    "total_memory_mb": 31744,
+    "distro": "CachyOS",
+    "engine_version": "1.0.3",
+    "python_version": "Python 3.14 (system)",
+    "r_version": null,
+    "code_revision": "d674472 (fix(native): parse quant.sf lengths as f64)",
+    "in_container": false,
+    "page_cache": "cold",
+    "precision": "high (GNU date second-resolution wrapper; /usr/bin/time unavailable)"
+  },
+  "data_sources": [
+    {
+      "id": "srr26171873",
+      "origin": "private-server",
+      "reference": "bio-lab:/mnt/G/thesis_dwf4/sra_missing/SRR26171873_{1,2}.fastq.gz (~1.1 GB + mate, staged from prior thesis pipeline)",
+      "note": "SRR26171873; paired-end gzip; original SRA accession on NCBI (PRJNA listed in /mnt/F/thesis_inbox/final_census.tsv); staged read-only, no files modified"
+    },
+    {
+      "id": "salmon-index-pinku1",
+      "origin": "private-server",
+      "reference": "bio-lab:/mnt/G/thesis_dwf4/analysis/02_tier1/salmon_idx (Pinku1 CDS index, pre-built, read-only)",
+      "note": "33,955 transcripts; same index the legacy pipeline quantified against"
+    },
+    {
+      "id": "legacy-quant-srr15219548",
+      "origin": "private-server",
+      "reference": "bio-lab:/mnt/G/thesis_dwf4/analysis/02_tier1/quant/SRR15219548/quant.sf (read-only comparison target)",
+      "note": "Structure parity reference from the legacy salmon pipeline"
+    }
+  ],
+  "entries": [
+    {
+      "id": "salmon-e2e-srr26171873",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SRR26171873 paired-end gzip FASTQ vs Pinku1 CDS index, threads 8, lib-type A (auto), validateMappings",
+      "data_source_id": "srr26171873",
+      "status": "ok",
+      "consistency": "structural parity: 33,955 rows, transcript IDs and header format identical to legacy quant.sf (SRR15219548 reference format)",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 59000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      }
+    },
+    {
+      "id": "fastq-truncation-guard",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "truncated intermediate FASTQ (/mnt/F/thesis_inbox/SRR22699515.sra_fq/, 87,814,726 lines - not a multiple of 4)",
+      "data_source_id": "srr26171873",
+      "status": "ok",
+      "consistency": "engine correctly refused the truncated file with a structured error instead of silently quantifying a partial sample",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": null,
+      "report": null,
+      "backends": {}
+    }
+  ]
+}
