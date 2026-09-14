@@ -237,6 +237,9 @@ pub fn environment_snapshot(engine_version: &str) -> BenchmarkEnvironment {
     BenchmarkEnvironment {
         os: std::env::consts::OS.to_owned(),
         code_revision: Some(env!("LINXIRA_CODE_REVISION").to_owned()),
+        gpu: std::env::var("LINXIRA_BIO_GPU")
+            .ok()
+            .filter(|value| !value.is_empty()),
         kernel,
         cpu_model: read_cpu_model(),
         total_memory_mb: read_total_memory_mb(),

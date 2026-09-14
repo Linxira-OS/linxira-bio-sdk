@@ -646,6 +646,10 @@ pub struct BenchmarkEnvironment {
     /// evaluation is tied to the code that produced it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code_revision: Option<String>,
+    /// GPU model and driver as disclosed by the host; even CPU-only
+    /// workloads disclose it so readers can rule out accelerator effects.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gpu: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kernel: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1187,6 +1191,7 @@ mod tests {
             environment: BenchmarkEnvironment {
                 os: "linux".to_owned(),
                 code_revision: Some("0123456789abcdef".to_owned()),
+                gpu: None,
                 kernel: Some("6.18.33".to_owned()),
                 cpu_model: Some("test cpu".to_owned()),
                 total_memory_mb: Some(16_000),

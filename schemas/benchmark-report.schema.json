@@ -331,6 +331,13 @@
             "null"
           ],
           "description": "Exact source revision (git sha) the evaluation ran on."
+        },
+        "gpu": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "GPU model and driver as disclosed by the host; null/omitted when not captured."
         }
       }
     },

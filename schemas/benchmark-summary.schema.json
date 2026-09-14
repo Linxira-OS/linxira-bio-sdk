@@ -74,7 +74,8 @@
         "in_container",
         "page_cache",
         "precision",
-        "code_revision"
+        "code_revision",
+        "gpu"
       ],
       "additionalProperties": false,
       "properties": {
@@ -182,6 +183,10 @@
         "code_revision": {
           "type": "string",
           "description": "Exact source revision (git sha) the evaluation ran on."
+        },
+        "gpu": {
+          "type": "string",
+          "description": "GPU model and driver as disclosed by the host; null/omitted when not captured."
         }
       }
     },
