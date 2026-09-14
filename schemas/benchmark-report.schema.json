@@ -338,6 +338,20 @@
             "null"
           ],
           "description": "GPU model and driver as disclosed by the host; null/omitted when not captured."
+        },
+        "memory": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "RAM generation and speed as disclosed by the host (e.g. DDR3-1600, LPDDR5X-8533)."
+        },
+        "storage": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Storage topology backing the benchmark I/O: SSD vs HDD per mount, with models."
         }
       }
     },

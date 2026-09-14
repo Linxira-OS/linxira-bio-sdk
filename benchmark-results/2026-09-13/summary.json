@@ -31,7 +31,9 @@
     "page_cache": "warm",
     "precision": "high",
     "code_revision": "9052bcf2cfbe523b60276a319f6e23ce6eebd509",
-    "gpu": "Intel Arc 130T (integrated, driver 32.0.101.8991; unused by this workload)"
+    "gpu": "Intel Arc 130T (integrated, driver 32.0.101.8991; unused by this workload)",
+    "memory": "32 GiB LPDDR5X-8533 MT/s (SMBIOS reports 8x4 GiB SK Hynix)",
+    "storage": "NVMe SSD: Samsung PM991a 512 GB (system) + YMTC PC411 1 TB; WSL2 guest filesystem lives on NVMe SSD"
   },
   "data_sources": [
     {

@@ -42,6 +42,8 @@ is measured separately (see `2026-09-14`).
 | Distro | Arch Linux (`arch-linux-current`), wsl2 |
 | CPU | Intel Core Ultra 5 225H, 14 logical processors |
 | RAM | 7940 MB visible to the WSL2 guest (host physical: 32189 MB) |
+| RAM modules | 32 GiB LPDDR5X-8533 MT/s (SMBIOS reports 8×4 GiB SK Hynix) |
+| Storage | NVMe SSDs: Samsung PM991a 512 GB (system) + YMTC PC411 1 TB; the WSL2 guest filesystem lives on NVMe SSD |
 | GPU | Intel Arc 130T (integrated, driver 32.0.101.8991) — **not used**; all workloads are CPU-only |
 | Host OS | Windows 11, build 26200.9168 (`cmd.exe /c ver`, disclosed via WSL interop) |
 | Rust | engine 1.0.1, release profile |
@@ -95,6 +97,10 @@ Python、R 三个后端上以相同输入各跑 5 次。三端结果在 1e-6 容
 （对 Rust golden 的最大相对误差 2.26e-11 / 0.0）。小样本上解释器启动占主导：
 Python 慢 7.5–8.25×，峰值内存多约 6 倍；速度随真实数据规模的变化另见
 `2026-09-14`。
+
+**硬件存储口径**：WSL2 文件系统位于 **NVMe 固态硬盘**（三星 PM991a 512 GB
++ YMTC PC411 1 TB）；内存 32 GiB **LPDDR5X-8533**；GPU 为 Intel Arc 130T 集成
+显卡（未使用）。
 
 **环境**：WSL2（Arch Linux guest，内核 6.18.33.2-microsoft-standard-WSL2），
 Windows 11 主机，Intel Core Ultra 5 225H（14 逻辑核），GPU 为 Intel Arc 130T

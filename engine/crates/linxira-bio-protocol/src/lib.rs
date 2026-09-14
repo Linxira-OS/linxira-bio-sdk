@@ -650,6 +650,12 @@ pub struct BenchmarkEnvironment {
     /// workloads disclose it so readers can rule out accelerator effects.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gpu: Option<String>,
+    /// RAM generation and speed as disclosed by the host (e.g. DDR3-1600).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory: Option<String>,
+    /// Storage topology backing the benchmark I/O (SSD vs HDD per mount).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kernel: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1192,6 +1198,8 @@ mod tests {
                 os: "linux".to_owned(),
                 code_revision: Some("0123456789abcdef".to_owned()),
                 gpu: None,
+                memory: None,
+                storage: None,
                 kernel: Some("6.18.33".to_owned()),
                 cpu_model: Some("test cpu".to_owned()),
                 total_memory_mb: Some(16_000),

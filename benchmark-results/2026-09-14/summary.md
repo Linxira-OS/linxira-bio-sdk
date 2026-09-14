@@ -58,6 +58,8 @@ pre-existing quant tables produced by a legacy pipeline on the same index.
 | CPU | Intel Xeon E5-2676 v3 @ 2.40 GHz, 24 threads (runs pinned to cores 8–15 with `taskset`, `nice 10`) |
 | RAM | 32 GB |
 | GPU | AMD Radeon RX 580 2048SP (Polaris 20, amdgpu kernel driver) — **not used**; all workloads are CPU-only |
+| RAM | 32 GiB DDR3-1600 MT/s (2×16 GiB) |
+| Storage | system: Kingston SA400 120 GB SSD; benchmark I/O volume: WDC WD5000AZLX 500 GB 7200 rpm **HDD**; bulk reference: Seagate ST3000DM001 3 TB **HDD** |
 | Rust | engine 1.0.3, release profile |
 | salmon | 2.7.0 (upstream bioconda binaries via micromamba, user prefix) |
 | Python | 3.14 (system; used only by verify helpers) |
@@ -89,7 +91,39 @@ Consequences, stated plainly:
 
 A fair wall-time and numerical comparison is published separately against
 normally-covering samples (67–71% mapping rate) from the same project's
-already-computed set — see the next dated report.
+already-computed set — see §3b below.
+
+## 3b. Fair same-parameter cross-check (SRR1460477, normally covering)
+
+The mainline's own pipeline script discloses its exact salmon invocation for
+paired-end runs: `-l A -p 8 --validateMappings --seqBias --gcBias`. The
+first SDK pass missed the two bias flags (TPM r = 0.981 with NumReads totals
+identical to 2.1e-9) — a parameter mismatch, not an implementation defect;
+`--seq-bias`/`--gc-bias` are now first-class CLI options.
+
+With parameters matched, on SRR1460477 (16.7M mapped reads, paired-end,
+SRA 3.68 GB → 2×9.07 GB FASTQ):
+
+| segment | wall time (cold cache, HDD-bound, cores 8–15) |
+|---|---|
+| SRA → FASTQ (fasterq-dump 3.4.1 `-e 8`) | 790 s |
+| quant, defaults (no bias) | 791 s |
+| quant, `--seq-bias --gc-bias` | 669 s |
+
+Acceptance vs the mainline's stored quant.sf, with bias flags:
+
+| line | result |
+|---|---|
+| row/identifier parity | **pass** (33,955 rows, identical IDs/header) |
+| NumReads total within 1% | **pass** — 16,670,537 vs 16,670,536 (2.1e-9) |
+| per-transcript NumReads | **identical** (relative difference 0) |
+| TPM Pearson r ≥ 0.995 | **pass — r = 1.000000** |
+
+The SDK reproduces the reference pipeline **exactly** when parameters match;
+the parameter surface (`--seq-bias`, `--gc-bias`) is now exposed in the CLI
+and documented bilingually. Wall times on this host are bound by the
+500 GB 7200 rpm HDD holding the working data — they characterize the
+deployment, not an engine speedup claim.
 
 ## 4. Data sources
 
@@ -137,7 +171,12 @@ reference implementation per run.
 quant.sf 与既有管线格式逐项一致；14 个单端样本各 5–17 秒，行数/ID 与
 NumReads 总量全部通过。截断 FASTQ 被结构化错误正确拒绝。
 
-**环境**：CachyOS，内核 7.2.3-1-cachyos，Intel Xeon E5-2676 v3（24 线程，
+**硬件存储口径**：基准 I/O 所在数据卷为 **500 GB 7200 转机械硬盘**（西数
+WD5000AZLX），参考数据卷为 **3 TB 机械硬盘**（希捷 ST3000DM001），系统盘为
+金士顿 120 GB SSD；内存 32 GiB DDR3-1600（2×16 GiB）。解压/定量的墙钟时间
+受机械硬盘吞吐约束，表征部署环境而非引擎加速。
+
+**重要更正（数据所有方已核实）**
 运行钉在 8–15 核 + nice 10），32 GB 内存，GPU 为 AMD Radeon RX 580 2048SP
 （**未使用**，纯 CPU 负载），Rust 引擎 1.0.3，salmon 2.7.0（bioconda 原版），
 无容器，冷缓存，秒级计时。

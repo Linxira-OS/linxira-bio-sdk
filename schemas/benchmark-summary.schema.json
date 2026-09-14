@@ -75,7 +75,9 @@
         "page_cache",
         "precision",
         "code_revision",
-        "gpu"
+        "gpu",
+        "memory",
+        "storage"
       ],
       "additionalProperties": false,
       "properties": {
@@ -187,6 +189,14 @@
         "gpu": {
           "type": "string",
           "description": "GPU model and driver as disclosed by the host; null/omitted when not captured."
+        },
+        "memory": {
+          "type": "string",
+          "description": "RAM generation and speed as disclosed by the host (e.g. DDR3-1600, LPDDR5X-8533)."
+        },
+        "storage": {
+          "type": "string",
+          "description": "Storage topology backing the benchmark I/O: SSD vs HDD per mount, with models."
         }
       }
     },
