@@ -7426,6 +7426,8 @@ fn print_expression_quantify(arguments: &[String]) -> Result<(), Box<dyn Error>>
     let mut lib_type = "A".to_owned();
     let mut threads = 1_u32;
     let mut validate_mappings = true;
+    let mut seq_bias = false;
+    let mut gc_bias = false;
     let mut json = false;
     let mut position = 0;
     while position < arguments.len() {
@@ -7462,6 +7464,8 @@ fn print_expression_quantify(arguments: &[String]) -> Result<(), Box<dyn Error>>
                     .map_err(|_| "threads must be a positive integer")?;
             }
             "--no-validate-mappings" => validate_mappings = false,
+            "--seq-bias" => seq_bias = true,
+            "--gc-bias" => gc_bias = true,
             "--json" => json = true,
             value if value.starts_with('-') => {
                 return Err(format!("unknown expression quantify option: {value}").into());
@@ -7482,6 +7486,8 @@ fn print_expression_quantify(arguments: &[String]) -> Result<(), Box<dyn Error>>
         lib_type,
         threads,
         validate_mappings,
+        seq_bias,
+        gc_bias,
     };
     let result = expression_quantify_path(&reads, &output, &options)?;
     if json {

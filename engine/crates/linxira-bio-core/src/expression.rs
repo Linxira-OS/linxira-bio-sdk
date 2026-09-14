@@ -1841,6 +1841,8 @@ mod tests {
             lib_type: "A".to_owned(),
             threads: 8,
             validate_mappings: true,
+            seq_bias: false,
+            gc_bias: false,
         };
         let single = salmon_quant_arguments(
             &[std::path::PathBuf::from("reads.fq")],
