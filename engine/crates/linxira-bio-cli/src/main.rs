@@ -7445,6 +7445,14 @@ fn print_expression_quantify(arguments: &[String]) -> Result<(), Box<dyn Error>>
                     .ok_or("--lib-type requires a value")?
                     .to_owned();
             }
+            "--output" => {
+                position += 1;
+                output = Some(PathBuf::from(
+                    arguments
+                        .get(position)
+                        .ok_or("--output requires a quant.sf path")?,
+                ));
+            }
             "--threads" => {
                 position += 1;
                 threads = arguments
