@@ -1320,6 +1320,11 @@ pub struct SalmonQuantOptions {
     pub threads: u32,
     /// `--validateMappings` for selective alignment mode.
     pub validate_mappings: bool,
+    /// `--seqBias`: model and correct sequence-specific biases (paired-end
+    /// runs in the reference pipelines typically enable this).
+    pub seq_bias: bool,
+    /// `--gcBias`: model and correct fragment-GC biases.
+    pub gc_bias: bool,
 }
 
 impl Default for SalmonQuantOptions {
@@ -1329,6 +1334,8 @@ impl Default for SalmonQuantOptions {
             lib_type: "A".to_owned(),
             threads: 1,
             validate_mappings: true,
+            seq_bias: false,
+            gc_bias: false,
         }
     }
 }
@@ -1428,6 +1435,12 @@ pub fn salmon_quant_arguments(
     }
     if options.validate_mappings {
         arguments.push("--validateMappings".into());
+    }
+    if options.seq_bias {
+        arguments.push("--seqBias".into());
+    }
+    if options.gc_bias {
+        arguments.push("--gcBias".into());
     }
     arguments
 }
