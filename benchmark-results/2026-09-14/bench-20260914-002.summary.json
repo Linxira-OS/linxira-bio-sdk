@@ -24,7 +24,9 @@
     "in_container": false,
     "page_cache": "cold",
     "precision": "high (second-resolution wall clock)",
-    "gpu": "AMD Radeon RX 580 2048SP (Polaris 20, amdgpu kernel driver; unused by this workload)"
+    "gpu": "AMD Radeon RX 580 2048SP (Polaris 20, amdgpu kernel driver; unused by this workload)",
+    "memory": "32 GiB DDR3-1600 MT/s (2x16 GiB DIMM_B1/D1, 72-bit width)",
+    "storage": "system/log: Kingston SA400S37 120 GB SSD; benchmark I/O (/mnt/F-equivalent data volume): WDC WD5000AZLX 500 GB 7200rpm HDD; bulk reference data: Seagate ST3000DM001 3 TB HDD"
   },
   "data_sources": [
     {

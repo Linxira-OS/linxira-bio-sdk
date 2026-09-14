@@ -29,7 +29,9 @@
     "host_model": null,
     "host_cpu_model": null,
     "host_logical_processors": null,
-    "host_total_memory_mb": null
+    "host_total_memory_mb": null,
+    "memory": "32 GiB DDR3-1600 MT/s (2x16 GiB DIMM_B1/D1, 72-bit width)",
+    "storage": "system/log: Kingston SA400S37 120 GB SSD; benchmark I/O (/mnt/F-equivalent data volume): WDC WD5000AZLX 500 GB 7200rpm HDD; bulk reference data: Seagate ST3000DM001 3 TB HDD"
   },
   "data_sources": [
     {

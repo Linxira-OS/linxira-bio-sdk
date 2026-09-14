@@ -1,0 +1,116 @@
+{
+  "schema_version": "1",
+  "report_id": "bench-20260914-003",
+  "generated_at": "2026-09-14",
+  "purpose": "Fair same-parameter cross-check on a normally-covering tier23 sample (SRR1460477, 67-71% mapping class): full pipeline SRA-to-quant.sf through the public CLI with the mainline's exact salmon parameters (--seqBias --gcBias included after the first pass revealed the parameter gap), then transcript-level comparison against the mainline's stored quant.sf. Result: NumReads identical (relative difference 0) and TPM Pearson r = 1.000000 - the SDK reproduces the reference pipeline bit-for-bit when parameters match.",
+  "methodology": {
+    "backends_flag": "rust-orchestrated upstream salmon 2.7.0 (bioconda), -l A, -p 8, --validateMappings, --seqBias --gcBias",
+    "repeat_flag": "1 per segment (unpack / quantify), cold cache",
+    "warmup": "none",
+    "page_cache": "cold",
+    "disclosure": "wall times are HDD-throughput-bound on this host (benchmark I/O volume is a 500 GB 7200rpm HDD); timings characterize the deployment, not an engine speedup claim"
+  },
+  "engine": "1.0.3",
+  "environment": {
+    "os": "linux",
+    "kernel": "7.2.3-1-cachyos",
+    "cpu_model": "Intel Xeon E5-2676 v3 @ 2.40GHz (24 threads; runs pinned to cores 8-15, nice 10)",
+    "total_memory_mb": 31744,
+    "distro": "CachyOS (arch-based)",
+    "gpu": "AMD Radeon RX 580 2048SP (Polaris 20, amdgpu kernel driver; unused by this workload)",
+    "memory": "32 GiB DDR3-1600 MT/s (2x16 GiB DIMM_B1/D1, 72-bit width)",
+    "storage": "system/log: Kingston SA400S37 120 GB SSD; benchmark I/O data volume: WDC WD5000AZLX 500 GB 7200rpm HDD; bulk reference data: Seagate ST3000DM001 3 TB HDD",
+    "engine_version": "1.0.3",
+    "python_version": "Python 3.14 (system)",
+    "r_version": null,
+    "code_revision": "v1.0.3 base (c8ebee3) + quantify fixes ff90f7d/d674472 + bias flags (post-582cf0e checkout)",
+    "in_container": false,
+    "page_cache": "cold",
+    "precision": "high (second-resolution wall clock per segment)"
+  },
+  "data_sources": [
+    {
+      "id": "srr1460477-sra",
+      "origin": "public-download",
+      "reference": "NCBI SRA SRR1460477 (PRJNA253089, buckwheat transcriptomics); staged from the lab NAS archive copy (3,678,896,677 bytes, byte-identical) to the SDK workspace",
+      "note": "normally-covering paired-end sample; mainline quant exists and maps 16,670,536 reads"
+    },
+    {
+      "id": "salmon-index-pinku1",
+      "origin": "private-server",
+      "reference": "lab-workstation salmon index, Pinku1 CDS (33,955 transcripts), read-only",
+      "note": "same index as every mainline quant"
+    },
+    {
+      "id": "legacy-quant-srr1460477",
+      "origin": "private-server",
+      "reference": "lab-workstation mainline quant output for SRR1460477 (quant.sf + cmd_info.json), read-only",
+      "note": "cmd_info discloses upstream salmon 2.7.0 with -l A -p 8 --validateMappings --seqBias --gcBias on paired-end runs"
+    }
+  ],
+  "entries": [
+    {
+      "id": "srr1460477-unpack",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "fasterq-dump 3.4.1 -e 8 --force (SRA 3.68 GB to 2x 9.07 GB FASTQ)",
+      "data_source_id": "srr1460477-sra",
+      "status": "ok",
+      "consistency": "both mates written completely (9,073,211,410 bytes each)",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 790000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      }
+    },
+    {
+      "id": "srr1460477-quant-nobias",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SDK quantify, defaults (no bias correction) - parameter-mismatch pass, kept as evidence",
+      "data_source_id": "srr1460477-sra",
+      "status": "ok",
+      "consistency": "NumReads total 16,670,537 vs 16,670,536 (2.1e-9); per-transcript redistribution on 8,533/33,955 transcripts, TPM r = 0.9809 - mismatch traced to missing --seqBias/--gcBias, not to either implementation",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 791000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      }
+    },
+    {
+      "id": "srr1460477-quant-biased",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "SDK quantify with the mainline's exact parameters (--seq-bias --gc-bias), compared transcript-by-transcript against the mainline quant.sf",
+      "data_source_id": "srr1460477-sra",
+      "status": "ok",
+      "consistency": "NumReads identical per transcript (total 16,670,537 both, relative difference 0); TPM Pearson r = 1.000000 - PASS on the 0.995 acceptance line",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 669000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 1,
+          "repeats": 1
+        }
+      }
+    }
+  ]
+}
