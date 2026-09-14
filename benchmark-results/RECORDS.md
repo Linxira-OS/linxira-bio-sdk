@@ -84,11 +84,16 @@ per segment · per-run CPU accounting (model/cores/threads/user+sys)
 | SRR1552217 | 228 | 534 | 102.6 | 1.000000 | 0 | PASS |
 | SRR1552218 | 234 | 661 | 82.0 | 1.000000 | 0 | PASS |
 | SRR17715775 | 204 | 613 | 96.1 | 1.000000 | 0 | PASS |
-| SRR17715776–78 | running to completion — final table lands with the archived JSON |
+| SRR17715776 | 275 | 526 | 115.8 | 1.000000 | 0 | PASS |
+| SRR17715777 | 236 | 685 | 88.4 | 1.000000 | 0 | PASS |
+| SRR17715778 | 257 | 390 | 155.9 | 1.000000 | 0 | PASS |
 
-Batch statistics (mean ± 3σ over passing runs) are computed at ingest by
-`scripts/tier23-summarize.py`; acceptance = zero 3σ outliers + worst
-TPM r ≥ 0.995. Running tally: 7/7 r = 1.000000, NumReads diff = 0.
+**Final: 10/10 PASS.** Batch statistics (ingest via
+`scripts/tier23-summarize.py`): TPM Pearson r mean 1.000000 σ 0.000000,
+NumReads relative difference mean 0 σ 0, quant wall 602.9 ± 94.4 s
+(3σ interval [319.8, 886.0]), unpack wall 250.8 ± 27.4 s ([168.7, 332.9]) —
+**zero 3σ outliers on every metric**. Archived as
+`bench-20260914-004.summary.json`.
 
 ## 5. Honest-claims summary (what the website may say)
 
