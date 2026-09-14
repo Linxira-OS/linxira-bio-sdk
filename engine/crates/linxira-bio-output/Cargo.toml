@@ -8,7 +8,7 @@ repository.workspace = true
 
 [dependencies]
 flate2 = "1.1"
-linxira-bio-export = { version = "1.0.2", path = "../linxira-bio-export" }
-linxira-bio-protocol = { version = "1.0.2", path = "../linxira-bio-protocol" }
+linxira-bio-export = { version = "1.0.3", path = "../linxira-bio-export" }
+linxira-bio-protocol = { version = "1.0.3", path = "../linxira-bio-protocol" }
 serde.workspace = true
 serde_json.workspace = true
