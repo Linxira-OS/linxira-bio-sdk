@@ -20,8 +20,8 @@
     "wsl_distro": "arch-linux-current",
     "wsl_version": "wsl2",
     "host_os": "Microsoft Windows [Version 10.0.26200.9168]",
-    "host_model": "XIAOMI REDMI Book Pro 14 2025",
-    "host_cpu_model": "Intel(R) Core(TM) Ultra 5 225H",
+    "host_model": "14-inch consumer laptop (model name withheld)",
+    "host_cpu_model": "Intel Core Ultra 5 225H",
     "host_logical_processors": 14,
     "host_total_memory_mb": 32189,
     "engine_version": "1.0.1",
@@ -30,7 +30,8 @@
     "in_container": false,
     "page_cache": "warm",
     "precision": "high",
-    "code_revision": "9052bcf2cfbe523b60276a319f6e23ce6eebd509"
+    "code_revision": "9052bcf2cfbe523b60276a319f6e23ce6eebd509",
+    "gpu": "Intel Arc 130T (integrated, driver 32.0.101.8991; unused by this workload)"
   },
   "data_sources": [
     {
