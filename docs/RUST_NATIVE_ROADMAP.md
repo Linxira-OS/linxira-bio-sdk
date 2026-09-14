@@ -42,7 +42,7 @@
 | current external use | Rust binding | gain | cost | risk |
 |---|---|---|---|---|
 | minimap2 (long-read alignment) | `minimap2-sys`/`minimap2` crate | no process spawn; streaming API; same aligner core | medium | medium |
-| SRA archives (fasterq-dump) | ncbi-vdb FFI (**no mature pure-Rust reader exists**) | enables **streamed SRA→salmon without the 18 GB intermediate** — the real win is orchestration, not decode speed | high (FFI + paired-stream plumbing) | medium-high |
+| SRA archives (fasterq-dump) | **`ncbi-vdb-sys` (ArcInstitute) — Rust FFI to ncbi-vdb, ships a fastq-dump-style stdout example; FDA CFSAN also maintains Rust SRA tooling** | decode stays C-speed, but in-process record streaming enables **zero-intermediate SRA→salmon** (no 18 GB temp) plus overlapped decode/compress/quant stages: measured unpack 790 s + quant 669 s serial vs projected max(decode, quant) on HDD | high (bindings are young: 6 stars, self-declared not feature-complete; we must add edge-case tests) | medium |
 
 Note on SRA: upstream salmon consumes FASTQ streams, so the Tier-2 SRA
 binding pays off only together with a piped pipeline (SRA → decode →
