@@ -92,22 +92,11 @@ run_pair() { # run_pair <run> <mate1.nas> <mate2.nas-or-empty> <theirs.sf>
   echo "DONE $run wall=$((end-start))s $verdict"
 }
 
-# 15 paired runs (NAS _1/_2) with legacy references where they exist
-for run in SRR15218238 SRR15218239 SRR15218240 SRR15218241 SRR15218242 SRR15218243 \
-           SRR30067610 SRR30067611 SRR15219548 SRR15219549 SRR15219550 SRR15219551 \
-           SRR15219552 SRR15219553 SRR15219554; do
-  m1="$NAS/${run}_1.fastq.gz"; m2="$NAS/${run}_2.fastq.gz"
-  [ -s "$m1" ] || { echo "MISS $m1"; continue; }
-  [ -s "$m2" ] || m2=""
-  theirs=""
-  [ -f "$QUAR/${run}_1/quant.sf" ] && theirs="$QUAR/${run}_1/quant.sf"
-  [ -z "$theirs" ] && [ -f "$V2Q/$run/quant.sf" ] && theirs="$V2Q/$run/quant.sf"
-  run_pair "$run" "$m1" "$m2" "$theirs"
-done
-
-# 8 single-end runs (legacy refs in v2_quant)
-for run in SRR8205656 SRR8205657 SRR8205658 SRR8205659 SRR8205660 SRR8205661 SRR8205662 SRR8205663; do
-  m1="$NAS/${run}.fastq.gz"
+# 14 single-end runs staged on /mnt/G (the mainline's own quant inputs);
+# paired NAS runs are deferred until a NAS->lab key path exists.
+for run in SRR8205656 SRR8205657 SRR8205658 SRR8205659 SRR8205660 SRR8205661 SRR8205662 SRR8205663 \
+           SRR28573920 SRR28573921 SRR28573922 SRR28573923 SRR28573924 SRR28573925; do
+  m1="/mnt/G/thesis_dwf4/analysis/04_v2_quant/fastq/${run}.fastq.gz"
   [ -s "$m1" ] || { echo "MISS $m1"; continue; }
   theirs="$V2Q/$run/quant.sf"
   [ -f "$theirs" ] || theirs=""
