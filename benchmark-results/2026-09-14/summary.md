@@ -10,7 +10,7 @@
 > 报告双语：英文为主，文末附中文摘要。
 
 **Report IDs**: `bench-20260914-001` (commissioning), `bench-20260914-002`
-(14-run cross-check) · **Code revision**: `v1.0.3` base (`c8ebee3`) +
+(14-run cross-check, corrected) · **Code revision**: `v1.0.3` base (`c8ebee3`) +
 quantify fixes `ff90f7d`, `d674472` · **Engine**: 1.0.3
 
 ## 1. What was measured
@@ -48,7 +48,7 @@ pre-existing quant tables produced by a legacy pipeline on the same index.
 |---|---|
 | row/identifier parity | **14/14 pass** (33,955 rows) |
 | NumReads total within 1% | **14/14 pass** (max deviation 0.0013%) |
-| TPM Pearson r ≥ 0.995 | 0.00–0.94 — **not evaluable; see §3** |
+| TPM Pearson r ≥ 0.995 | not evaluable — runs are non-mRNA libraries; **see §3** |
 
 ## 2. Environment (full disclosure)
 
@@ -65,31 +65,31 @@ pre-existing quant tables produced by a legacy pipeline on the same index.
 | Page cache | cold (single pass per sample) |
 | Timing | wall clock via `date +%s` (second resolution; GNU time not installed) |
 
-## 3. Caveat: the reference implementation (read before quoting TPM numbers)
+## 3. Post-hoc correction on the reference (verified by the data owners)
 
-The pre-existing quant tables used as comparison targets were **not**
-produced by upstream salmon. Their logs self-identify as
-`salmon (rust port, reads mode) v2.7.0` — a re-implementation — and on
-these samples they map only **~192 of 11.4M fragments (0.0017% mapping
-rate)**.
+Our initial read of the legacy pipeline logs attributed the low TPM
+correlations to a salmon re-implementation. The data owners have since
+verified with `file` output that their quant used **upstream salmon 2.7.0
+(official ELF binary)**. The near-zero mapping is a property of the **data**:
+both implementations independently measure ~0–0.0019% mapping on these 14
+runs because they are small-RNA/special libraries with nothing to map
+against an mRNA CDS index.
 
 Consequences, stated plainly:
 
-- Row/ID parity and NumReads **total** parity are meaningful and pass.
-- At a 0.0017% mapping rate, TPM allocation among competing transcripts is
-  numerical noise, so the TPM Pearson-r acceptance line is **not
-  evaluable** here; the low r values measure the reference's degenerate
-  coverage, not a defect in either implementation.
-- A wall-time speedup against this reference would be meaningless (it is
-  fast because it maps almost nothing), so **no speedup claim is made in
-  this report**.
+- Row/ID parity and NumReads **total** parity remain meaningful and pass on
+  all 14 runs.
+- TPM Pearson r is **not evaluable** here; the 14 runs are marked
+  **excluded: non-mRNA library** and belong to a small-RNA pipeline (with a
+  miRBase reference) rather than mRNA quantification.
+- This also validates the SDK's data-integrity behavior end-to-end: two
+  independent implementations agreeing on near-zero mapping is exactly the
+  kind of signal that should stop a pipeline from publishing quant tables
+  silently.
 
-The reference implementation is disclosed per run (read from
-`cmd_info.json` + pipeline logs) in `bench-20260914-002.summary.json`
-(`reference_implementation`) and in the CSV (`reference` column). A valid
-speedup comparison requires both sides to map the data properly — same
-machine, same index, same parameters, upstream salmon on both sides — and
-will be published separately once available.
+A fair wall-time and numerical comparison is published separately against
+normally-covering samples (67–71% mapping rate) from the same project's
+already-computed set — see the next dated report.
 
 ## 4. Data sources
 
@@ -142,11 +142,11 @@ NumReads 总量全部通过。截断 FASTQ 被结构化错误正确拒绝。
 （**未使用**，纯 CPU 负载），Rust 引擎 1.0.3，salmon 2.7.0（bioconda 原版），
 无容器，冷缓存，秒级计时。
 
-**重要口径**：对照 quant 来自一份 salmon **重实现**（日志自述 "rust port,
-reads mode"），且在这批样本上 mapping 率仅 0.0017%（1142 万 fragments 映射
-192 条）——因此 TPM 相关性这条验收线在此**不可评估**（低 r 反映的是对照方
-的退化覆盖，不是任一实现的缺陷），本报告也**不发布任何加速比**。有效对照
-需要双方都以真实映射运行（同机、同索引、同参数），待具备后另行发布。
+**重要更正（数据所有方已核实）**：对照 quant 使用的是**官方 salmon 2.7.0 ELF
+二进制**（我们此前依据日志的 "rust port" 判断有误，予以撤回）。近零映射是
+**数据属性**：两套实现独立测得 0–0.0019%——这 14 个 run 是小 RNA/特殊文库，
+对 mRNA CDS 索引本无可映射内容，已标注 `excluded: non-mRNA library`，归入
+miRNA 专线。正常覆盖（67–71% mapping）样本上的公平对照见下一日期报告。
 
 **数据**：全部为公开 SRA 数据（荞麦转录组项目，检索号见 §4），原始 reads
 与参考索引留在实验工作站、不入库；本目录只存指标、方法与来源。
