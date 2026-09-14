@@ -170,6 +170,13 @@ license, scientific correctness, and executable behavior have been reviewed.
 The ignored `.research/` directory contains disposable source clones and must
 not enter a release.
 
+## Ethical Use
+
+Maintainers publish a non-binding values statement in `ETHICAL_USE.md` — it
+is not part of the AGPL-3.0-or-later license, adds no usage restrictions,
+and does not affect the project's open-source status. The license alone
+governs the code.
+
 ## License
 
 Project-owned code, skills, GUI, SDK, worker, and network-facing services are
