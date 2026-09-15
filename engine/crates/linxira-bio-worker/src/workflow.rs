@@ -1417,6 +1417,20 @@ fn safe_pack_path(root: &Path, relative: &str) -> WorkerResult<PathBuf> {
     Ok(resolved)
 }
 
+/// `std::fs::canonicalize` returns extended-length (`\\?\`) paths on
+/// Windows; child interpreters such as Rscript reject that prefix, so strip
+/// it again (UNC shares keep their `\\server` form).
+fn strip_verbatim_prefix(path: PathBuf) -> PathBuf {
+    let text = path.as_os_str().to_string_lossy();
+    if let Some(remainder) = text.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{remainder}"));
+    }
+    match text.strip_prefix(r"\\?\") {
+        Some(remainder) => PathBuf::from(remainder),
+        None => path,
+    }
+}
+
 fn resolve_output_directory(
     base_directory: &Path,
     parameters: &serde_json::Value,
@@ -1444,7 +1458,7 @@ fn resolve_output_directory(
             if !parent.is_dir() {
                 return Err("workflow output parent is not a directory".into());
             }
-            Ok(parent.join(name))
+            Ok(strip_verbatim_prefix(parent.join(name)))
         }
         // Default layout (M0-T13): classify by capability domain under the
         // workspace and timestamp the directory so repeated runs never

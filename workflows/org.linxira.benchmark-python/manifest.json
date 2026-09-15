@@ -56,7 +56,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "cd98858b1da9016b75b6ebdcd85250bab87b3a0599fcc1d867c99c3b85cae6a6"
+      "sha256": "fbadca23a10f07cd1cb2904bb4fca0c663b4f16f7524e2fa0d92e44da921575c"
     },
     {
       "path": "requirements.lock",
@@ -64,11 +64,11 @@
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "e6726b92f756327fd6456ae151926c2409591bb1e315c859068db3800f3faf55"
+      "sha256": "b36d1ab78d4515bacef81b8017e163cbe06f560539ff5e2914b220ac79c68f09"
     },
     {
       "path": "schemas/output.schema.json",
-      "sha256": "c58466a3f75418012dc0c1d468a7a8b1fe0cb77bea79a85413d5de02cddcd2be"
+      "sha256": "7d7f75389a21c1e159186a9c264858c2afdc5a4be8e9678c8d4bfe15773e64f8"
     },
     {
       "path": "src/benchmark_harness.py",
@@ -76,7 +76,7 @@
     },
     {
       "path": "src/implementations/__init__.py",
-      "sha256": "a1d4f68a87144f4470bb512631797e4f9daed740d50022ff7bcc6945c7bc20ec"
+      "sha256": "0dee5472720df969d761d02107673a938e5421f4a78df7460ddb87c07d192bbf"
     },
     {
       "path": "src/implementations/sequence_stats_v1.py",
@@ -84,7 +84,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.py",
-      "sha256": "ccaf20241b0be9f8ef95596fc8166743feb7c9cd1b4d73d5519c68c62ee9b396"
+      "sha256": "875ac5202b213b9d99b63981e436a047232ffe93c2cc4c743c5383bee561e26b"
     },
     {
       "path": "src/implementations/expression_pca_v1.py",
@@ -137,6 +137,14 @@
     {
       "path": "tests/reference/enrichment.overrepresentation.v1.genes.json",
       "sha256": "610d9407d7c3891afa20c1e7637ae5c4aa61ba0c25af9c69155773b17910489c"
+    },
+    {
+      "path": "src/implementations/fastq_qc_v1.py",
+      "sha256": "4d63ee94341b9d2bb5939acc8720ceffd80bf6ed5eb67f24732be3a6b9a5700a"
+    },
+    {
+      "path": "tests/reference/fastq.qc.v1.default.json",
+      "sha256": "0e03e465e398ba65c133f353f30ec05e6885926b7844d9dcca43fc39943a29e9"
     }
   ],
   "contract": {
@@ -182,6 +190,12 @@
           "tsv",
           "csv"
         ]
+      },
+      {
+        "role": "fastq",
+        "formats": [
+          "fastq"
+        ]
       }
     ],
     "outputs": {
@@ -203,7 +217,9 @@
       "interpret_b_factors_as_plddt",
       "min_overlap",
       "max_terms",
-      "include_genes"
+      "include_genes",
+      "max_cycles",
+      "quality_encoding"
     ]
   }
 }

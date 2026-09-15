@@ -2409,8 +2409,14 @@ fn executes_a_workflow_pack_through_a_container_runtime() {
         .as_str()
         .expect("artifact path")
         .to_owned();
+    // Component-wise comparison of canonical forms: the remapped artifact
+    // path and the test's output directory may differ in the Windows
+    // extended-length (`\\?\`) prefix depending on where canonicalization
+    // happened, so a raw string prefix check would be fragile.
+    let artifact = std::fs::canonicalize(&artifact_path).expect("canonicalize artifact path");
+    let expected_root = std::fs::canonicalize(&output_directory).expect("canonicalize output");
     assert!(
-        artifact_path.starts_with(&output_directory.to_string_lossy().into_owned()),
+        artifact.starts_with(&expected_root),
         "artifact paths must be remapped back to host locations: {artifact_path}"
     );
     assert!(

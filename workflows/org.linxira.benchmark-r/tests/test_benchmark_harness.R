@@ -324,6 +324,42 @@ with_workspace(function(workspace) {
   outcome <- try(pca$run(list(matrix = bad_missing), list()), silent = TRUE)
   stopifnot(inherits(outcome, "try-error"))
 
+  # --- M3 tier-1: FASTQ QC parity (recorded engine output) ------------------
+  fastq <- registry[["fastq.qc.v1"]]
+  stopifnot(!is.null(fastq))
+  stopifnot(identical(fastq$input_roles, "fastq"))
+  stopifnot(identical(sort(fastq$parameters), c("max_cycles", "quality_encoding")))
+  valid_fastq <- file.path(repository_root, "tests", "fixtures", "fastq-qc", "valid.fastq")
+  parity_compare(
+    "$",
+    read_reference("fastq.qc.v1.default.json"),
+    roundtrip(fastq$run(list(fastq = valid_fastq), list()))
+  )
+  capped <- fastq$run(list(fastq = valid_fastq), list(max_cycles = 3))
+  stopifnot(length(capped$per_cycle) == 3L, length(capped$warnings) == 1L)
+  # Explicit Phred+64 with high quality bytes only ('I' = 73): selects the
+  # legacy counters (Q20 starts at 84) and rejects bytes below the offset.
+  legacy_fastq <- file.path(workspace, "legacy.fastq")
+  writeLines(c("@r", "ACGT", "+", "IIII"), legacy_fastq)
+  legacy <- fastq$run(list(fastq = legacy_fastq), list(quality_encoding = "phred+64"))
+  stopifnot(identical(legacy$quality_encoding, "phred+64"))
+  stopifnot(legacy$q20_percent == 0, legacy$q30_percent == 0, length(legacy$warnings) == 0L)
+  low_offset <- file.path(workspace, "low-offset.fastq")
+  writeLines(c("@r", "ACGT", "+", "5555"), low_offset)
+  outcome <- try(fastq$run(list(fastq = low_offset), list(quality_encoding = "phred+64")),
+                 silent = TRUE)
+  stopifnot(inherits(outcome, "try-error"))
+  outcome <- try(fastq$run(
+    list(fastq = file.path(repository_root, "tests", "fixtures", "fastq-qc", "truncated.fastq")),
+    list()
+  ), silent = TRUE)
+  stopifnot(inherits(outcome, "try-error"))
+  outcome <- try(fastq$run(
+    list(fastq = file.path(repository_root, "tests", "fixtures", "fastq-qc", "length-mismatch.fastq")),
+    list()
+  ), silent = TRUE)
+  stopifnot(inherits(outcome, "try-error"))
+
   cat("PCA/Venn/PDB/ORA parity OK; max relative error:", format(parity_max_rel), "\n")
 })
 

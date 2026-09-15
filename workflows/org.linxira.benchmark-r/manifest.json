@@ -60,15 +60,15 @@
     },
     {
       "path": "README.md",
-      "sha256": "d61692e1e3b2b1672ebf6053d72a42c672df84e8968017db39d32866cf74b135"
+      "sha256": "bcb90b6a5df5e49498b8306017a4df16bf698cffcf29cb56631b6721aee8136d"
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "26bc9f38f0f51612f05e80db558bafbb68b14514a8d5f7ee97dc03486022c50e"
+      "sha256": "cd874996781ec59e26012d55b5ee0e0cb21cf34bbb5fe007331d6460ec4dcc20"
     },
     {
       "path": "schemas/output.schema.json",
-      "sha256": "187a73a53b1e0c83a7e9a6eff9013a57a65d9c450b96178c1a161a2aa65fb8e4"
+      "sha256": "d1131d7cf019983f3fe8527e2bcc3cf715d4ec65571cb51c9544e47cb5b6f853"
     },
     {
       "path": "src/benchmark_harness.R",
@@ -80,7 +80,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.R",
-      "sha256": "5f49e392255d6e157d692d172d0d06296a1f111fb843fbc1622d921836be4e86"
+      "sha256": "01214f64e4c62698522dcae43057fe6326b9394e60670ad7315b264a612a2ba3"
     },
     {
       "path": "src/implementations/expression_pca_v1.R",
@@ -133,6 +133,14 @@
     {
       "path": "tests/reference/enrichment.overrepresentation.v1.genes.json",
       "sha256": "610d9407d7c3891afa20c1e7637ae5c4aa61ba0c25af9c69155773b17910489c"
+    },
+    {
+      "path": "src/implementations/fastq_qc_v1.R",
+      "sha256": "7ae5227e4d438a7446efc9bd50f1365dede720b0c11d7305fb33a1e35dd67ddc"
+    },
+    {
+      "path": "tests/reference/fastq.qc.v1.default.json",
+      "sha256": "0e03e465e398ba65c133f353f30ec05e6885926b7844d9dcca43fc39943a29e9"
     }
   ],
   "contract": {
@@ -178,6 +186,12 @@
           "tsv",
           "csv"
         ]
+      },
+      {
+        "role": "fastq",
+        "formats": [
+          "fastq"
+        ]
       }
     ],
     "outputs": {
@@ -199,7 +213,9 @@
       "interpret_b_factors_as_plddt",
       "min_overlap",
       "max_terms",
-      "include_genes"
+      "include_genes",
+      "max_cycles",
+      "quality_encoding"
     ]
   }
 }
