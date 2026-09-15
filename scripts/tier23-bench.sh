@@ -34,7 +34,7 @@ set -euo pipefail
 CLI=""; INDEX=""; SRA_DIR=""; FASTQ_DIR=""; REFERENCE_DIR=""; OUTPUT_DIR=""
 TMP_DIR=""; CSV=""; PIN=""; PULL_SOURCE=""; SCP_IDENTITY=""; FASTERQ="fasterq-dump"
 CORES=8; THREADS=8; CPU_MODEL=""
-SINGLE=0; KEEP_SRA=0
+SINGLE=0; KEEP_SRA=0; NO_BIAS=0
 RUNS=()
 
 while [ $# -gt 0 ]; do
@@ -55,6 +55,7 @@ while [ $# -gt 0 ]; do
     --fasterq) FASTERQ="$2"; shift 2 ;;
     --single) SINGLE=1; shift ;;
     --keep-sra) KEEP_SRA=1; shift ;;
+    --no-bias) NO_BIAS=1; shift ;;
     --runs) shift; while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do RUNS+=("$1"); shift; done ;;
     -h|--help) sed -n '2,42p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
@@ -172,9 +173,11 @@ for run in "${RUNS[@]}"; do
   start=$(date +%s)
   set +e
   TIMEFORMAT='%3R %3U %3S'
+  BIAS_FLAGS=(--seq-bias --gc-bias)
+  [ "$NO_BIAS" -eq 1 ] && BIAS_FLAGS=()
   { time "${PIN_WORDS[@]}" "$CLI" expression quantify \
       "${reads[@]}" \
-      --index "$INDEX" --threads "$THREADS" --seq-bias --gc-bias \
+      --index "$INDEX" --threads "$THREADS" "${BIAS_FLAGS[@]}" \
       --output "$outdir/quant.sf" --json \
       > "$outdir/quantify.json" 2> "$outdir/quantify.log"; } 2> "$outdir/cpu.time"
   rc=$?
