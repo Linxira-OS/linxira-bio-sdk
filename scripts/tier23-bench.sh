@@ -128,6 +128,7 @@ for run in "${RUNS[@]}"; do
     reads=()
     TMP_DIR="${TMP_DIR:-$OUTPUT_DIR/tmp}"
     mkdir -p "$TMP_DIR/$run"
+    fq="$TMP_DIR/$run-fq"
     sra="$SRA_DIR/$run.sra"
     [ -s "$sra" ] || sra="$SRA_DIR/$run"
     if [ -s "$sra" ]; then
