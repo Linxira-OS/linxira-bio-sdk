@@ -1,0 +1,80 @@
+{
+  "schema_version": "1",
+  "report_id": "bench-20260915-004",
+  "generated_at": "2026-09-15",
+  "purpose": "Over-representation enrichment across a Tartary buckwheat study's differential-expression contrasts and WGCNA modules: three contrasts (blue-light vs dark, young fruit vs leaf, mature fruit vs leaf; padj < 0.05 and |lfc| > 1, direction-split UP/DOWN) and 13 WGCNA modules, each tested for GO, KEGG pathway and KO terms (26 runs) with the hypergeometric upper tail and Benjamini-Hochberg correction. The gene universe is the ID-bridge-mapped, annotated subset (GO 14,944 / KO 13,912 / KEGG 8,929 genes); term descriptions come from go-basic.obo and rest.kegg.jp.",
+  "methodology": {
+    "backends_flag": "linxira-bio enrichment custom (Rust hypergeometric + BH), one run per gene set, 8 threads pinned",
+    "repeat_flag": "1 per gene set and term type",
+    "warmup": "none",
+    "page_cache": "warm",
+    "disclosure": "wall times are per-run engine time; at this scale the runs are CPU-trivial and the value is determinism and schema-checked outputs, not speed"
+  },
+  "engine": "1.0.3",
+  "environment": {
+    "os": "linux",
+    "kernel": "7.2.3-1-cachyos",
+    "cpu_model": "Intel Xeon E5-2676 v3 @ 2.40GHz (24 threads; runs pinned to cores 8-15, nice 10)",
+    "total_memory_mb": 31744,
+    "distro": "CachyOS (arch-based)",
+    "gpu": "AMD Radeon RX 580 2048SP (Polaris 20, amdgpu kernel driver; unused by these workloads)",
+    "memory": "32 GiB DDR3-1600 MT/s (2x16 GiB DIMM_B1/D1, 72-bit width)",
+    "storage": "system/log: Kingston SA400S37 120 GB SSD; benchmark I/O data volume: WDC WD5000AZLX 500 GB 7200rpm HDD; bulk reference data: Seagate ST3000DM001 3 TB HDD",
+    "engine_version": "1.0.3",
+    "python_version": "Python 3.14 (system)",
+    "r_version": null,
+    "code_revision": "v1.0.3 release binary (workstation deployment, built 2026-09-14) + post-release ops scripts",
+    "in_container": false,
+    "page_cache": "warm",
+    "precision": "hundredth-of-a-second wall clock per run"
+  },
+  "data_sources": [
+    {
+      "id": "eggnog-annotation",
+      "origin": "private-server",
+      "reference": "eggNOG-mapper v2 annotation of the study proteome (27,981 genes; GO / KEGG_ko / KEGG_Pathway columns)",
+      "note": "ID bridge: GWHTBJBL/GWHPBJBL shared 6-digit tail, 27,908/33,955 mapped, zero duplicate tails"
+    },
+    {
+      "id": "deg-sets",
+      "origin": "private-server",
+      "reference": "differential-expression outputs for the study's contrasts (public SRA underneath); significance padj < 0.05 and |lfc| > 1",
+      "note": "3,577 / 9,630 / 12,875 significant genes reproduced exactly"
+    },
+    {
+      "id": "wgcna-modules",
+      "origin": "private-server",
+      "reference": "WGCNA module assignments: 24-sample network (11 modules) and 8-sample network (2 modules)",
+      "note": "module membership mapped through the same ID bridge"
+    },
+    {
+      "id": "term-names",
+      "origin": "public-download",
+      "reference": "go-basic.obo (geneontology.org) and rest.kegg.jp KO/pathway name lists",
+      "note": "descriptions embedded in the association tables"
+    }
+  ],
+  "entries": [
+    {
+      "id": "ora-26runs",
+      "capability": "enrichment.overrepresentation.v1",
+      "dataset_class": "other",
+      "dataset": "26 over-representation runs (6 DEG direction sets x GO/KEGG/KO + 13 WGCNA modules x GO/KEGG), median engine wall",
+      "data_source_id": "eggnog-annotation",
+      "status": "ok",
+      "consistency": "26/26 runs completed; significant-term counts recorded per run in the ledger; total engine wall 17.2 s",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "hundredth-of-a-second wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 70.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 26,
+          "repeats": 26
+        }
+      }
+    }
+  ]
+}
