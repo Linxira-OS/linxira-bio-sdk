@@ -70,7 +70,7 @@ else
 fi
 [ ${#RUNS[@]} -gt 0 ] || { echo "no --runs given" >&2; exit 4; }
 read -ra PIN_WORDS <<< "$PIN"
-CPU_MODEL=$(lscpu 2>/dev/null | awk '/Model name|型号名称/ {sub(/^[^:]*:[[:space:]]*/,""); print; exit}')
+CPU_MODEL=$(lscpu 2>/dev/null | grep -E 'Model name|型号名称' | head -1 | sed -E 's/^.*[:：][[:space:]]*//')
 CSV="${CSV:-$OUTPUT_DIR/benchmark.csv}"
 mkdir -p "$OUTPUT_DIR" "${TMP_DIR:-.}" "$(dirname "$CSV")"
 [ -f "$CSV" ] || echo "run,unpack_wall_s,quant_wall_s,quant_user_s,quant_sys_s,cpu_util_pct,cpu_model,cores_pinned,threads,quant_lines,tpm_pearson_r,numreads_diff,verdict" > "$CSV"
