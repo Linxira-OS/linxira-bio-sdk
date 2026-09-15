@@ -132,6 +132,22 @@ documents for the product boundary, staged scope, supported data formats, and
 non-Visual-Studio build direction. The exact read, inspect, analysis, and
 export matrix is in `docs/DATA_FORMATS.md`.
 
+## On Rust
+
+This is not a "rewrite everything in Rust" project, and Rust is not an
+ideology here. The engine uses Rust because its design language — ownership,
+explicit errors, and cargo/clippy as a shared discipline — makes development
+and review calmer: whole classes of defects are caught before the program
+runs, and deterministic, schema-checked outputs become the default rather
+than an aspiration. Rust is chosen where that development and checking
+confidence pays for itself.
+
+The boundary is deliberate. Mature native tools (salmon, kraken2, BLAST,
+HMMER, minimap2) stay external and are orchestrated, not reimplemented.
+Python and R are first-class backends with their own independent
+implementations, and plotting defaults to matplotlib and ggplot2. Rust takes
+the parts it is good at; everything else keeps the tool it already fits.
+
 ## Plotting
 
 Plotting defaults to the native Python (matplotlib) and R (ggplot2) packs
