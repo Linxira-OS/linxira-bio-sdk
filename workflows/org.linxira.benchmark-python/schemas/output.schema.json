@@ -1,560 +1,561 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://linxira.org/schemas/workflows/benchmark-python/output.v1.json",
-  "title": "Result envelope written by the Python benchmark harness",
-  "description": "Identical envelope shape to the native engine's result for the same capability, plus one JSON artifact holding the result object and an info diagnostic with the self-reported in-process timing.",
-  "type": "object",
-  "required": [
-    "schema_version",
-    "job_id",
-    "capability",
-    "status",
-    "result",
-    "artifacts",
-    "provenance",
-    "diagnostics"
-  ],
-  "properties": {
-    "schema_version": {
-      "const": "2"
-    },
-    "job_id": {
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://linxira.org/schemas/workflows/benchmark-python/output.v1.json",
+ "title": "Result envelope written by the Python benchmark harness",
+ "description": "Identical envelope shape to the native engine's result for the same capability, plus one JSON artifact holding the result object and an info diagnostic with the self-reported in-process timing.",
+ "type": "object",
+ "required": [
+  "schema_version",
+  "job_id",
+  "capability",
+  "status",
+  "result",
+  "artifacts",
+  "provenance",
+  "diagnostics"
+ ],
+ "properties": {
+  "schema_version": {
+   "const": "2"
+  },
+  "job_id": {
+   "type": "string",
+   "minLength": 1
+  },
+  "capability": {
+   "enum": [
+    "sequence.stats.v1",
+    "expression.pca.v1",
+    "set.venn.v1",
+    "structure.pdb.summary.v1",
+    "fastq.qc.v1"
+   ]
+  },
+  "status": {
+   "enum": [
+    "ok",
+    "error"
+   ]
+  },
+  "result": {
+   "type": "object"
+  },
+  "artifacts": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "artifact_id",
+     "role",
+     "kind",
+     "path",
+     "format",
+     "media_type",
+     "size_bytes",
+     "sha256"
+    ],
+    "properties": {
+     "artifact_id": {
+      "const": "benchmark-result"
+     },
+     "role": {
+      "const": "benchmark-result"
+     },
+     "kind": {
+      "const": "report"
+     },
+     "path": {
       "type": "string",
       "minLength": 1
+     },
+     "format": {
+      "const": "json"
+     },
+     "media_type": {
+      "const": "application/json"
+     },
+     "size_bytes": {
+      "type": "integer",
+      "minimum": 0
+     },
+     "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+     }
     },
-    "capability": {
-      "enum": [
-        "sequence.stats.v1",
-        "expression.pca.v1",
-        "set.venn.v1",
-        "structure.pdb.summary.v1"
-      ]
+    "additionalProperties": false
+   }
+  },
+  "provenance": {
+   "type": "object",
+   "required": [
+    "engine_version",
+    "execution_mode",
+    "core_version",
+    "started_at",
+    "finished_at"
+   ],
+   "properties": {
+    "engine_version": {
+     "type": "string",
+     "minLength": 1
     },
-    "status": {
-      "enum": [
-        "ok",
-        "error"
-      ]
+    "execution_mode": {
+     "const": "local-cpu"
     },
-    "result": {
-      "type": "object"
+    "core_version": {
+     "type": "string",
+     "minLength": 1
     },
-    "artifacts": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": [
-          "artifact_id",
-          "role",
-          "kind",
-          "path",
-          "format",
-          "media_type",
-          "size_bytes",
-          "sha256"
-        ],
-        "properties": {
-          "artifact_id": {
-            "const": "benchmark-result"
-          },
-          "role": {
-            "const": "benchmark-result"
-          },
-          "kind": {
-            "const": "report"
-          },
-          "path": {
-            "type": "string",
-            "minLength": 1
-          },
-          "format": {
-            "const": "json"
-          },
-          "media_type": {
-            "const": "application/json"
-          },
-          "size_bytes": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "sha256": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          }
-        },
-        "additionalProperties": false
-      }
+    "started_at": {
+     "type": "string",
+     "minLength": 1
     },
-    "provenance": {
+    "finished_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "software": {
+     "type": "array",
+     "items": {
       "type": "object",
       "required": [
-        "engine_version",
-        "execution_mode",
-        "core_version",
-        "started_at",
-        "finished_at"
+       "name",
+       "version"
       ],
       "properties": {
-        "engine_version": {
-          "type": "string",
-          "minLength": 1
-        },
-        "execution_mode": {
-          "const": "local-cpu"
-        },
-        "core_version": {
-          "type": "string",
-          "minLength": 1
-        },
-        "started_at": {
-          "type": "string",
-          "minLength": 1
-        },
-        "finished_at": {
-          "type": "string",
-          "minLength": 1
-        },
-        "software": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": [
-              "name",
-              "version"
-            ],
-            "properties": {
-              "name": {
-                "type": "string",
-                "minLength": 1
-              },
-              "version": {
-                "type": "string",
-                "minLength": 1
-              },
-              "package_id": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "input_sha256": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          }
-        },
-        "command": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "dependency_lock_sha256": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        }
+       "name": {
+        "type": "string",
+        "minLength": 1
+       },
+       "version": {
+        "type": "string",
+        "minLength": 1
+       },
+       "package_id": {
+        "type": "string",
+        "minLength": 1
+       }
       },
       "additionalProperties": false
+     }
     },
-    "diagnostics": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": [
-          "code",
-          "severity",
-          "message"
-        ],
-        "properties": {
-          "code": {
-            "type": "string",
-            "minLength": 1
-          },
-          "severity": {
-            "enum": [
-              "info",
-              "warning",
-              "error"
-            ]
-          },
-          "message": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "additionalProperties": false
-      }
+    "input_sha256": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+     }
+    },
+    "command": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "dependency_lock_sha256": {
+     "type": "string",
+     "pattern": "^[a-f0-9]{64}$"
     }
+   },
+   "additionalProperties": false
   },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "status": {
-            "const": "ok"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "then": {
-        "properties": {
-          "result": {
-            "minProperties": 1
-          },
-          "artifacts": {
-            "minItems": 1,
-            "maxItems": 1
-          },
-          "provenance": {
-            "required": [
-              "software",
-              "input_sha256",
-              "dependency_lock_sha256"
-            ]
-          },
-          "diagnostics": {
-            "contains": {
-              "properties": {
-                "code": {
-                  "const": "benchmark.self_reported"
-                },
-                "severity": {
-                  "const": "info"
-                }
-              }
-            },
-            "items": {
-              "properties": {
-                "severity": {
-                  "enum": [
-                    "info",
-                    "warning"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      },
-      "else": {
-        "properties": {
-          "result": {
-            "maxProperties": 0
-          },
-          "artifacts": {
-            "maxItems": 0
-          },
-          "diagnostics": {
-            "minItems": 1,
-            "contains": {
-              "properties": {
-                "severity": {
-                  "const": "error"
-                }
-              }
-            }
-          }
-        }
-      }
+  "diagnostics": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "code",
+     "severity",
+     "message"
+    ],
+    "properties": {
+     "code": {
+      "type": "string",
+      "minLength": 1
+     },
+     "severity": {
+      "enum": [
+       "info",
+       "warning",
+       "error"
+      ]
+     },
+     "message": {
+      "type": "string",
+      "minLength": 1
+     }
     },
-    {
-      "if": {
-        "properties": {
-          "capability": {
-            "const": "sequence.stats.v1"
-          },
-          "status": {
-            "const": "ok"
-          }
-        },
-        "required": [
-          "capability",
-          "status"
-        ]
-      },
-      "then": {
-        "properties": {
-          "result": {
-            "required": [
-              "sequence_count",
-              "total_bases",
-              "min_length",
-              "max_length",
-              "mean_length",
-              "n50",
-              "l50",
-              "au_n",
-              "gc_percent",
-              "n_count",
-              "n_percent"
-            ],
-            "properties": {
-              "sequence_count": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "total_bases": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "min_length": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "max_length": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "mean_length": {
-                "type": "number",
-                "minimum": 0
-              },
-              "n50": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "l50": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "au_n": {
-                "type": "number",
-                "minimum": 0
-              },
-              "gc_percent": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 100
-              },
-              "n_count": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "n_percent": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 100
-              }
-            },
-            "additionalProperties": false
-          }
-        }
-      }
+    "additionalProperties": false
+   }
+  }
+ },
+ "allOf": [
+  {
+   "if": {
+    "properties": {
+     "status": {
+      "const": "ok"
+     }
     },
-    {
-      "if": {
-        "properties": {
-          "capability": {
-            "const": "expression.pca.v1"
-          },
-          "status": {
-            "const": "ok"
-          }
+    "required": [
+     "status"
+    ]
+   },
+   "then": {
+    "properties": {
+     "result": {
+      "minProperties": 1
+     },
+     "artifacts": {
+      "minItems": 1,
+      "maxItems": 1
+     },
+     "provenance": {
+      "required": [
+       "software",
+       "input_sha256",
+       "dependency_lock_sha256"
+      ]
+     },
+     "diagnostics": {
+      "contains": {
+       "properties": {
+        "code": {
+         "const": "benchmark.self_reported"
         },
-        "required": [
-          "capability",
-          "status"
-        ]
-      },
-      "then": {
-        "properties": {
-          "result": {
-            "required": [
-              "feature_count",
-              "sample_count",
-              "scaled_features",
-              "total_variance",
-              "components",
-              "samples",
-              "warnings"
-            ],
-            "properties": {
-              "feature_count": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "sample_count": {
-                "type": "integer",
-                "minimum": 2
-              },
-              "scaled_features": {
-                "type": "boolean"
-              },
-              "total_variance": {
-                "type": "number",
-                "minimum": 0
-              },
-              "components": {
-                "type": "array",
-                "minItems": 1
-              },
-              "samples": {
-                "type": "array",
-                "minItems": 2
-              },
-              "warnings": {
-                "type": "array"
-              }
-            },
-            "additionalProperties": false
-          }
+        "severity": {
+         "const": "info"
         }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "capability": {
-            "const": "set.venn.v1"
-          },
-          "status": {
-            "const": "ok"
-          }
-        },
-        "required": [
-          "capability",
-          "status"
-        ]
+       }
       },
-      "then": {
-        "properties": {
-          "result": {
-            "required": [
-              "set_count",
-              "union_size",
-              "set_sizes",
-              "intersections"
-            ],
-            "properties": {
-              "set_count": {
-                "type": "integer",
-                "minimum": 2,
-                "maximum": 6
-              },
-              "union_size": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "set_sizes": {
-                "type": "array"
-              },
-              "intersections": {
-                "type": "array"
-              }
-            },
-            "additionalProperties": false
-          }
+      "items": {
+       "properties": {
+        "severity": {
+         "enum": [
+          "info",
+          "warning"
+         ]
         }
+       }
       }
-    },
-    {
-      "if": {
-        "properties": {
-          "capability": {
-            "const": "structure.pdb.summary.v1"
-          },
-          "status": {
-            "const": "ok"
-          }
-        },
-        "required": [
-          "capability",
-          "status"
-        ]
-      },
-      "then": {
-        "properties": {
-          "result": {
-            "required": [
-              "format",
-              "coordinate_units",
-              "model_count",
-              "chain_count",
-              "residue_count",
-              "atom_count",
-              "polymer_atom_count",
-              "hetero_atom_count",
-              "element_counts",
-              "bounds",
-              "b_factor_summary",
-              "alphafold_confidence",
-              "models",
-              "residues",
-              "atoms",
-              "warnings"
-            ],
-            "properties": {
-              "format": {
-                "const": "pdb"
-              },
-              "coordinate_units": {
-                "const": "angstrom"
-              },
-              "model_count": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "chain_count": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "residue_count": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "atom_count": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "polymer_atom_count": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "hetero_atom_count": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "element_counts": {
-                "type": "object"
-              },
-              "bounds": {
-                "type": "object"
-              },
-              "b_factor_summary": {
-                "type": [
-                  "object",
-                  "null"
-                ]
-              },
-              "alphafold_confidence": {
-                "type": [
-                  "object",
-                  "null"
-                ]
-              },
-              "models": {
-                "type": "array"
-              },
-              "residues": {
-                "type": "array"
-              },
-              "atoms": {
-                "type": "array"
-              },
-              "warnings": {
-                "type": "array"
-              }
-            },
-            "additionalProperties": false
-          }
-        }
-      }
+     }
     }
-  ],
-  "additionalProperties": false
+   },
+   "else": {
+    "properties": {
+     "result": {
+      "maxProperties": 0
+     },
+     "artifacts": {
+      "maxItems": 0
+     },
+     "diagnostics": {
+      "minItems": 1,
+      "contains": {
+       "properties": {
+        "severity": {
+         "const": "error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "capability": {
+      "const": "sequence.stats.v1"
+     },
+     "status": {
+      "const": "ok"
+     }
+    },
+    "required": [
+     "capability",
+     "status"
+    ]
+   },
+   "then": {
+    "properties": {
+     "result": {
+      "required": [
+       "sequence_count",
+       "total_bases",
+       "min_length",
+       "max_length",
+       "mean_length",
+       "n50",
+       "l50",
+       "au_n",
+       "gc_percent",
+       "n_count",
+       "n_percent"
+      ],
+      "properties": {
+       "sequence_count": {
+        "type": "integer",
+        "minimum": 1
+       },
+       "total_bases": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "min_length": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "max_length": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "mean_length": {
+        "type": "number",
+        "minimum": 0
+       },
+       "n50": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "l50": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "au_n": {
+        "type": "number",
+        "minimum": 0
+       },
+       "gc_percent": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100
+       },
+       "n_count": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "n_percent": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100
+       }
+      },
+      "additionalProperties": false
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "capability": {
+      "const": "expression.pca.v1"
+     },
+     "status": {
+      "const": "ok"
+     }
+    },
+    "required": [
+     "capability",
+     "status"
+    ]
+   },
+   "then": {
+    "properties": {
+     "result": {
+      "required": [
+       "feature_count",
+       "sample_count",
+       "scaled_features",
+       "total_variance",
+       "components",
+       "samples",
+       "warnings"
+      ],
+      "properties": {
+       "feature_count": {
+        "type": "integer",
+        "minimum": 1
+       },
+       "sample_count": {
+        "type": "integer",
+        "minimum": 2
+       },
+       "scaled_features": {
+        "type": "boolean"
+       },
+       "total_variance": {
+        "type": "number",
+        "minimum": 0
+       },
+       "components": {
+        "type": "array",
+        "minItems": 1
+       },
+       "samples": {
+        "type": "array",
+        "minItems": 2
+       },
+       "warnings": {
+        "type": "array"
+       }
+      },
+      "additionalProperties": false
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "capability": {
+      "const": "set.venn.v1"
+     },
+     "status": {
+      "const": "ok"
+     }
+    },
+    "required": [
+     "capability",
+     "status"
+    ]
+   },
+   "then": {
+    "properties": {
+     "result": {
+      "required": [
+       "set_count",
+       "union_size",
+       "set_sizes",
+       "intersections"
+      ],
+      "properties": {
+       "set_count": {
+        "type": "integer",
+        "minimum": 2,
+        "maximum": 6
+       },
+       "union_size": {
+        "type": "integer",
+        "minimum": 1
+       },
+       "set_sizes": {
+        "type": "array"
+       },
+       "intersections": {
+        "type": "array"
+       }
+      },
+      "additionalProperties": false
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "capability": {
+      "const": "structure.pdb.summary.v1"
+     },
+     "status": {
+      "const": "ok"
+     }
+    },
+    "required": [
+     "capability",
+     "status"
+    ]
+   },
+   "then": {
+    "properties": {
+     "result": {
+      "required": [
+       "format",
+       "coordinate_units",
+       "model_count",
+       "chain_count",
+       "residue_count",
+       "atom_count",
+       "polymer_atom_count",
+       "hetero_atom_count",
+       "element_counts",
+       "bounds",
+       "b_factor_summary",
+       "alphafold_confidence",
+       "models",
+       "residues",
+       "atoms",
+       "warnings"
+      ],
+      "properties": {
+       "format": {
+        "const": "pdb"
+       },
+       "coordinate_units": {
+        "const": "angstrom"
+       },
+       "model_count": {
+        "type": "integer",
+        "minimum": 1
+       },
+       "chain_count": {
+        "type": "integer",
+        "minimum": 1
+       },
+       "residue_count": {
+        "type": "integer",
+        "minimum": 1
+       },
+       "atom_count": {
+        "type": "integer",
+        "minimum": 1
+       },
+       "polymer_atom_count": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "hetero_atom_count": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "element_counts": {
+        "type": "object"
+       },
+       "bounds": {
+        "type": "object"
+       },
+       "b_factor_summary": {
+        "type": [
+         "object",
+         "null"
+        ]
+       },
+       "alphafold_confidence": {
+        "type": [
+         "object",
+         "null"
+        ]
+       },
+       "models": {
+        "type": "array"
+       },
+       "residues": {
+        "type": "array"
+       },
+       "atoms": {
+        "type": "array"
+       },
+       "warnings": {
+        "type": "array"
+       }
+      },
+      "additionalProperties": false
+     }
+    }
+   }
+  }
+ ],
+ "additionalProperties": false
 }

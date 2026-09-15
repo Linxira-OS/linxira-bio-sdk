@@ -62,6 +62,7 @@ worker 在请求携带 `execution.backend = "python"` 时把整个请求交给�
 | Capability | Library | Notes / 说明 |
 | --- | --- | --- |
 | `sequence.stats.v1` | Biopython `SimpleFastaParser` | length/N50/L50/auN/GC%/N% identical to the Rust `fasta_stats`; gzip detected by magic bytes; the engine's error cases (empty identifier, sequence before header, no records) are reproduced. 长度/N50/L50/auN/GC%/N% 定义与 Rust 一致，按魔数识别 gzip，复刻三类报错。 |
+| `fastq.qc.v1` | Python stdlib (`gzip`, byte-level parser) | per-file and per-cycle QC counters identical to the Rust engine: GC/N case-insensitive, Q20/Q30 tracked for both Phred+33 and Phred+64, encoding auto-detection (minimum byte < 59 → Phred+33, else `ambiguous` with the engine's warning), per-cycle cap at `max_cycles`; the engine's line-level error cases (truncated record/quality, length mismatch, separator mismatch, no records) are reproduced with the same messages. 逐文件与逐循环 QC 计数与 Rust 引擎一致：GC/N 大小写不敏感，双编码 Q20/Q30，编码自动判别（最小字节 < 59 判 Phred+33，否则 `ambiguous` 并给出同款警告），逐循环按 `max_cycles` 截断；复刻全部行级报错且文案一致。 |
 
 Adding a capability: drop a module into `src/implementations/`, register it in
 `implementations/__init__.py`, extend `schemas/`, list the files in

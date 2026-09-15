@@ -461,5 +461,136 @@ class EnrichmentOverrepresentationParityTests(ParityCompareMixin, unittest.TestC
                 self.implementation.run({"genes": query, "associations": self.associations}, {})
 
 
+
+FASTQ_FIXTURES = REPOSITORY_ROOT / "tests" / "fixtures" / "fastq-qc"
+VALID_FASTQ = FASTQ_FIXTURES / "valid.fastq"
+
+# `linxira-bio fastq qc tests/fixtures/fastq-qc/valid.fastq --json`
+# (Rust engine 1.0.3); the Python implementation must agree exactly (all
+# values are exact counter arithmetic) and within 1e-6 relative for floats.
+RUST_VALID_FASTQ_RESULT = {
+    "read_count": 2,
+    "total_bases": 9,
+    "min_length": 4,
+    "max_length": 5,
+    "mean_length": 4.5,
+    "gc_percent": 66.66666666666666,
+    "n_percent": 11.11111111111111,
+    "mean_quality": 31.111111111111114,
+    "q20_percent": 100.0,
+    "q30_percent": 55.55555555555556,
+    "quality_encoding": "phred+33",
+    "applied_quality_offset": 33,
+    "per_cycle": [
+        {"cycle": 1, "base_count": 2, "gc_percent": 50.0, "n_percent": 0.0,
+         "mean_quality": 30.0, "q20_percent": 100.0, "q30_percent": 50.0},
+        {"cycle": 2, "base_count": 2, "gc_percent": 100.0, "n_percent": 0.0,
+         "mean_quality": 30.0, "q20_percent": 100.0, "q30_percent": 50.0},
+        {"cycle": 3, "base_count": 2, "gc_percent": 100.0, "n_percent": 0.0,
+         "mean_quality": 30.0, "q20_percent": 100.0, "q30_percent": 50.0},
+        {"cycle": 4, "base_count": 2, "gc_percent": 50.0, "n_percent": 0.0,
+         "mean_quality": 30.0, "q20_percent": 100.0, "q30_percent": 50.0},
+        {"cycle": 5, "base_count": 1, "gc_percent": 0.0, "n_percent": 100.0,
+         "mean_quality": 40.0, "q20_percent": 100.0, "q30_percent": 100.0},
+    ],
+    "warnings": [],
+}
+
+
+class FastqQcTests(unittest.TestCase):
+    """M3 tier-1 three-way expansion: stdlib port of the engine's FASTQ QC."""
+
+    def setUp(self):
+        self.implementation = MODULE.IMPLEMENTATIONS["fastq.qc.v1"]
+
+    def test_registry_exposes_the_rust_contract(self):
+        self.assertEqual(self.implementation.INPUT_ROLES, ("fastq",))
+        self.assertEqual(self.implementation.PARAMETERS, ("max_cycles", "quality_encoding"))
+
+    def test_valid_fixture_matches_the_rust_engine(self):
+        result = self.implementation.run({"fastq": VALID_FASTQ}, {})
+        for field, expected in RUST_VALID_FASTQ_RESULT.items():
+            if field == "per_cycle":
+                self.assertEqual(len(result[field]), len(expected), field)
+                for actual_cycle, expected_cycle in zip(result[field], expected):
+                    for key, value in expected_cycle.items():
+                        if isinstance(value, float):
+                            assert_close(self, value, actual_cycle[key], f"per_cycle.{key}")
+                        else:
+                            self.assertEqual(actual_cycle[key], value, f"per_cycle.{key}")
+            elif isinstance(expected, float):
+                assert_close(self, expected, result[field], field)
+            else:
+                self.assertEqual(result[field], expected, field)
+
+    def test_gzip_input_is_read_by_magic_bytes(self):
+        import gzip
+
+        with tempfile.TemporaryDirectory() as directory:
+            compressed = Path(directory) / "reads.data"
+            with gzip.open(compressed, "wb") as handle:
+                handle.write(VALID_FASTQ.read_bytes())
+            result = self.implementation.run({"fastq": compressed}, {})
+        self.assertEqual(result["read_count"], 2)
+        self.assertEqual(result["total_bases"], 9)
+        self.assertEqual(result["quality_encoding"], "phred+33")
+
+    def test_ambiguous_encoding_reports_a_warning_and_keeps_phred33(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "reads.fastq"
+            path.write_bytes(b"@r\nACGT\n+\nIIII\n")
+            result = self.implementation.run({"fastq": path}, {})
+        self.assertEqual(result["quality_encoding"], "ambiguous")
+        self.assertEqual(result["applied_quality_offset"], 33)
+        self.assertEqual(result["mean_quality"], 40.0)
+        self.assertEqual(len(result["warnings"]), 1)
+        self.assertIn("compatible with both Phred+33", result["warnings"][0])
+
+    def test_explicit_phred64_selects_the_legacy_counters(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "reads.fastq"
+            path.write_bytes(b"@r\nACGT\n+\nIIII\n")
+            result = self.implementation.run(
+                {"fastq": path}, {"quality_encoding": "phred+64"}
+            )
+        self.assertEqual(result["quality_encoding"], "phred+64")
+        self.assertEqual(result["applied_quality_offset"], 64)
+        self.assertEqual(result["q20_percent"], 0.0)
+        self.assertEqual(result["q30_percent"], 0.0)
+        self.assertEqual(result["warnings"], [])
+
+    def test_per_cycle_cycles_are_capped_at_max_cycles(self):
+        result = self.implementation.run({"fastq": VALID_FASTQ}, {"max_cycles": 3})
+        self.assertEqual(len(result["per_cycle"]), 3)
+        self.assertEqual(
+            result["warnings"],
+            ["per-cycle metrics are capped at 3 cycle(s)"],
+        )
+
+    def test_truncated_quality_fails_like_the_engine(self):
+        with self.assertRaises(ValueError) as context:
+            self.implementation.run({"fastq": FASTQ_FIXTURES / "truncated.fastq"}, {})
+        self.assertEqual(
+            str(context.exception),
+            "truncated FASTQ record 1 at line 5: sequence length is 4, "
+            "but only 3 quality values were present",
+        )
+
+    def test_sequence_quality_length_mismatch_fails_like_the_engine(self):
+        with self.assertRaises(ValueError) as context:
+            self.implementation.run({"fastq": FASTQ_FIXTURES / "length-mismatch.fastq"}, {})
+        self.assertEqual(
+            str(context.exception),
+            "malformed FASTQ record 1 at line 4: sequence length is 2, "
+            "but quality length is 3",
+        )
+
+    def test_rejects_unknown_quality_encoding(self):
+        with self.assertRaises(ValueError) as context:
+            self.implementation.run({"fastq": VALID_FASTQ}, {"quality_encoding": "phred+9"})
+        self.assertIn("unsupported quality encoding", str(context.exception))
+
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,62 @@
+{
+ "read_count": 2,
+ "total_bases": 9,
+ "min_length": 4,
+ "max_length": 5,
+ "mean_length": 4.5,
+ "gc_percent": 66.66666666666666,
+ "n_percent": 11.11111111111111,
+ "mean_quality": 31.111111111111114,
+ "q20_percent": 100.0,
+ "q30_percent": 55.55555555555556,
+ "quality_encoding": "phred+33",
+ "applied_quality_offset": 33,
+ "per_cycle": [
+  {
+   "cycle": 1,
+   "base_count": 2,
+   "gc_percent": 50.0,
+   "n_percent": 0.0,
+   "mean_quality": 30.0,
+   "q20_percent": 100.0,
+   "q30_percent": 50.0
+  },
+  {
+   "cycle": 2,
+   "base_count": 2,
+   "gc_percent": 100.0,
+   "n_percent": 0.0,
+   "mean_quality": 30.0,
+   "q20_percent": 100.0,
+   "q30_percent": 50.0
+  },
+  {
+   "cycle": 3,
+   "base_count": 2,
+   "gc_percent": 100.0,
+   "n_percent": 0.0,
+   "mean_quality": 30.0,
+   "q20_percent": 100.0,
+   "q30_percent": 50.0
+  },
+  {
+   "cycle": 4,
+   "base_count": 2,
+   "gc_percent": 50.0,
+   "n_percent": 0.0,
+   "mean_quality": 30.0,
+   "q20_percent": 100.0,
+   "q30_percent": 50.0
+  },
+  {
+   "cycle": 5,
+   "base_count": 1,
+   "gc_percent": 0.0,
+   "n_percent": 100.0,
+   "mean_quality": 40.0,
+   "q20_percent": 100.0,
+   "q30_percent": 100.0
+  }
+ ],
+ "warnings": []
+}
