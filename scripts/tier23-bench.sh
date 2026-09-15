@@ -9,17 +9,32 @@
 # model, the pinned core set, and the salmon thread count, so CPU utilization
 # is reconstructible: util = (user+sys)/wall.
 #
+# Input modes:
+#   default    SRA files: pulled/copy from --pull-source or taken from
+#              --sra-dir, unpacked with fasterq-dump. Files may carry the
+#              ".sra" extension or none; pulled remote names must use ".sra".
+#   --single   single-end libraries: fasterq-dump output <run>.fastq (or
+#              <run>_1.fastq) is quantified with one read file (salmon -r).
+#   --fastq-dir  reads are already unpacked gzip FASTQ in DIR:
+#              paired DIR/<run>_1.fastq.gz + DIR/<run>_2.fastq.gz, or with
+#              --single a single DIR/<run>.fastq.gz; quantified directly
+#              (salmon reads .gz natively), unpack wall = 0, source files
+#              are never modified.
+#   --keep-sra keep the local SRA after a successful quant (use when
+#              --sra-dir holds authoritative copies rather than a stash).
+#
 # Usage:
-#   tier23-bench --cli PATH --index DIR --sra-dir DIR --reference-dir DIR \
-#                --output-dir DIR --tmp-dir DIR --runs RUN [RUN ...] \
-#                [--csv PATH] [--pin "taskset -c 8-15 nice -n 10"] \
-#                [--cores 8] [--threads 8] [--pull-source DIR|HOST:DIR] \
-#                [--scp-identity FILE] [--fasterq PATH]
+#   tier23-bench --cli PATH --index DIR --output-dir DIR --runs RUN [RUN ...] \
+#                (--sra-dir DIR | --fastq-dir DIR) \
+#                [--csv PATH] [--reference-dir DIR] [--single] [--keep-sra] \
+#                [--pin "taskset -c 8-15 nice -n 10"] [--cores 8] [--threads 8] \
+#                [--pull-source DIR|HOST:DIR] [--scp-identity FILE] [--fasterq PATH]
 set -euo pipefail
 
-CLI=""; INDEX=""; SRA_DIR=""; REFERENCE_DIR=""; OUTPUT_DIR=""; TMP_DIR=""
-CSV=""; PIN=""; PULL_SOURCE=""; SCP_IDENTITY=""; FASTERQ="fasterq-dump"
+CLI=""; INDEX=""; SRA_DIR=""; FASTQ_DIR=""; REFERENCE_DIR=""; OUTPUT_DIR=""
+TMP_DIR=""; CSV=""; PIN=""; PULL_SOURCE=""; SCP_IDENTITY=""; FASTERQ="fasterq-dump"
 CORES=8; THREADS=8; CPU_MODEL=""
+SINGLE=0; KEEP_SRA=0
 RUNS=()
 
 while [ $# -gt 0 ]; do
@@ -27,6 +42,7 @@ while [ $# -gt 0 ]; do
     --cli) CLI="$2"; shift 2 ;;
     --index) INDEX="$2"; shift 2 ;;
     --sra-dir) SRA_DIR="$2"; shift 2 ;;
+    --fastq-dir) FASTQ_DIR="$2"; shift 2 ;;
     --reference-dir) REFERENCE_DIR="$2"; shift 2 ;;
     --output-dir) OUTPUT_DIR="$2"; shift 2 ;;
     --tmp-dir) TMP_DIR="$2"; shift 2 ;;
@@ -37,19 +53,26 @@ while [ $# -gt 0 ]; do
     --pull-source) PULL_SOURCE="$2"; shift 2 ;;
     --scp-identity) SCP_IDENTITY="$2"; shift 2 ;;
     --fasterq) FASTERQ="$2"; shift 2 ;;
+    --single) SINGLE=1; shift ;;
+    --keep-sra) KEEP_SRA=1; shift ;;
     --runs) shift; while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do RUNS+=("$1"); shift; done ;;
-    -h|--help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,42p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
 
 [ -x "$CLI" ] || { echo "CLI not executable: $CLI" >&2; exit 4; }
 [ -d "$INDEX" ] || { echo "index missing: $INDEX" >&2; exit 4; }
+if [ -z "$FASTQ_DIR" ]; then
+  [ -d "$SRA_DIR" ] || { echo "sra dir missing: $SRA_DIR" >&2; exit 4; }
+else
+  [ -d "$FASTQ_DIR" ] || { echo "fastq dir missing: $FASTQ_DIR" >&2; exit 4; }
+fi
 [ ${#RUNS[@]} -gt 0 ] || { echo "no --runs given" >&2; exit 4; }
 read -ra PIN_WORDS <<< "$PIN"
 CPU_MODEL=$(lscpu 2>/dev/null | awk '/Model name/ {$1="";$2=""; sub(/^  +/,""); print; exit}')
 CSV="${CSV:-$OUTPUT_DIR/benchmark.csv}"
-mkdir -p "$OUTPUT_DIR" "$TMP_DIR" "$(dirname "$CSV")"
+mkdir -p "$OUTPUT_DIR" "${TMP_DIR:-.}" "$(dirname "$CSV")"
 [ -f "$CSV" ] || echo "run,unpack_wall_s,quant_wall_s,quant_user_s,quant_sys_s,cpu_util_pct,cpu_model,cores_pinned,threads,quant_lines,tpm_pearson_r,numreads_diff,verdict" > "$CSV"
 
 validate() { # validate <ours.sf> <reference.sf> -> "r numdiff verdict"
@@ -87,44 +110,69 @@ PY
 for run in "${RUNS[@]}"; do
   outdir="$OUTPUT_DIR/$run"
   if [ -f "$outdir/quant.sf" ]; then echo "SKIP $run"; continue; fi
-  mkdir -p "$outdir" "$TMP_DIR/$run"
-  sra="$SRA_DIR/$run.sra"
-  fq="$TMP_DIR/$run-fq"
+  mkdir -p "$outdir"
 
-  if [ -s "$sra" ]; then
-    echo "== $run: sra present =="
-  elif [ -n "$PULL_SOURCE" ]; then
-    echo "== $run: pulling =="
-    if [[ "$PULL_SOURCE" == *:* ]]; then
-      scp_args=(-q)
-      [ -n "$SCP_IDENTITY" ] && scp_args+=(-i "$SCP_IDENTITY")
-      scp "${scp_args[@]}" "$PULL_SOURCE/$run.sra" "$sra"
+  if [ -n "$FASTQ_DIR" ]; then
+    # Reads are already unpacked gzip FASTQ; quantify them in place.
+    if [ "$SINGLE" -eq 1 ]; then
+      reads=("$FASTQ_DIR/$run.fastq.gz")
     else
-      cp "$PULL_SOURCE/$run.sra" "$sra"
+      reads=("$FASTQ_DIR/${run}_1.fastq.gz" "$FASTQ_DIR/${run}_2.fastq.gz")
     fi
+    if [ ! -s "${reads[0]}" ] || { [ ${#reads[@]} -eq 2 ] && [ ! -s "${reads[1]}" ]; }; then
+      echo "MISS $run (no fastq.gz pair in $FASTQ_DIR)" >&2
+      continue
+    fi
+    unpack_wall=0
   else
-    echo "MISS $run (no local SRA and no --pull-source)" >&2
-    rm -rf "$TMP_DIR/$run"
-    continue
-  fi
+    reads=()
+    TMP_DIR="${TMP_DIR:-$OUTPUT_DIR/tmp}"
+    mkdir -p "$TMP_DIR/$run"
+    sra="$SRA_DIR/$run.sra"
+    [ -s "$sra" ] || sra="$SRA_DIR/$run"
+    if [ -s "$sra" ]; then
+      echo "== $run: sra present =="
+    elif [ -n "$PULL_SOURCE" ]; then
+      echo "== $run: pulling =="
+      if [[ "$PULL_SOURCE" == *:* ]]; then
+        scp_args=(-q)
+        [ -n "$SCP_IDENTITY" ] && scp_args+=(-i "$SCP_IDENTITY")
+        scp "${scp_args[@]}" "$PULL_SOURCE/$run.sra" "$sra"
+      else
+        cp "$PULL_SOURCE/$run.sra" "$sra"
+      fi
+    else
+      echo "MISS $run (no local SRA and no --pull-source)" >&2
+      rm -rf "$TMP_DIR/$run"
+      continue
+    fi
 
-  start=$(date +%s)
-  if ! "${PIN_WORDS[@]}" "$FASTERQ" -e 8 --force -O "$fq" "$sra" \
-      > "$outdir/unpack.log" 2>&1; then
+    start=$(date +%s)
+    if ! "${PIN_WORDS[@]}" "$FASTERQ" -e 8 --force -O "$fq" "$sra" \
+        > "$outdir/unpack.log" 2>&1; then
+      end=$(date +%s)
+      echo "$run,$((end-start)),0,0,0,0,$CPU_MODEL,$CORES,$THREADS,0,0,0,UNPACK-FAILED" >> "$CSV"
+      echo "UNPACK-FAIL $run: $(tail -1 "$outdir/unpack.log")"
+      rm -rf "$fq" "$TMP_DIR/$run"
+      continue
+    fi
     end=$(date +%s)
-    echo "$run,$((end-start)),0,0,0,0,$CPU_MODEL,$CORES,$THREADS,0,0,0,UNPACK-FAILED" >> "$CSV"
-    echo "UNPACK-FAIL $run: $(tail -1 "$outdir/unpack.log")"
-    rm -rf "$fq" "$TMP_DIR/$run"
-    continue
+    unpack_wall=$((end-start))
+    [ "$KEEP_SRA" -eq 1 ] || rm -f "$sra"
+
+    if [ "$SINGLE" -eq 1 ]; then
+      reads=("$fq/$run.fastq")
+      [ -s "${reads[0]}" ] || reads=("$fq/${run}_1.fastq")
+    else
+      reads=("$fq/${run}_1.fastq" "$fq/${run}_2.fastq")
+    fi
   fi
-  end=$(date +%s)
-  unpack_wall=$((end-start))
 
   start=$(date +%s)
   set +e
   TIMEFORMAT='%3R %3U %3S'
   { time "${PIN_WORDS[@]}" "$CLI" expression quantify \
-      "$fq/${run}_1.fastq" "$fq/${run}_2.fastq" \
+      "${reads[@]}" \
       --index "$INDEX" --threads "$THREADS" --seq-bias --gc-bias \
       --output "$outdir/quant.sf" --json \
       > "$outdir/quantify.json" 2> "$outdir/quantify.log"; } 2> "$outdir/cpu.time"
@@ -132,16 +180,18 @@ for run in "${RUNS[@]}"; do
   set -e
   end=$(date +%s)
   read -r q_wall q_user q_sys < "$outdir/cpu.time"
-  rm -rf "$fq" "$TMP_DIR/$run"
+  case "${q_wall}${q_user}${q_sys}" in
+    ''|*[!0-9.]*)
+      echo "cpu accounting unparsable for $run: $(cat "$outdir/cpu.time")" >&2
+      exit 5 ;;
+  esac
+  [ -n "$FASTQ_DIR" ] || rm -rf "$fq" "$TMP_DIR/$run"
   if [ $rc -ne 0 ]; then
     echo "$run,$unpack_wall,$((end-start)),${q_user},${q_sys},0,$CPU_MODEL,$CORES,$THREADS,0,0,0,QUANT-FAILED" >> "$CSV"
     echo "QUANT-FAIL $run: $(tail -1 "$outdir/quantify.log")"
     continue
   fi
   quant_wall=$((end-start))
-  # Our own downloaded SRA copy is disposable once quant succeeds; only the
-  # authoritative source archive on the storage host is kept.
-  rm -f "$sra"
   util=$(python3 -c "print(f'{100*($q_user+$q_sys)/max($quant_wall,1):.1f}')")
   lines=$(($(wc -l < "$outdir/quant.sf") - 1))
 
