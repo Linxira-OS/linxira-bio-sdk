@@ -1,0 +1,89 @@
+{
+  "schema_version": "1",
+  "report_id": "bench-20260915-001",
+  "generated_at": "2026-09-15",
+  "purpose": "Deep-library RNA-seq quantification completion for a Tartary buckwheat transcriptomics study: 26 public SRA runs (SRR19049440/41/43/44/45, SRR22699505-516, SRR24322339-353 subset) that the study's legacy pipeline had not computed were quantified end-to-end through the public CLI (SRA pull, fasterq-dump, salmon 2.7.0 with the study's exact parameters). Every quant.sf carries the full 33,955-transcript ID set. The batch also validated production resilience: a scheduled host reboot mid-batch triggered an automatic resume 20 seconds after boot, and the batch finished without manual intervention.",
+  "methodology": {
+    "backends_flag": "rust-orchestrated upstream salmon 2.7.0 (bioconda), -l A, -p 8, --validateMappings, --seqBias --gcBias",
+    "repeat_flag": "1 per run, serial batch, completed runs skipped on resume",
+    "warmup": "none",
+    "page_cache": "warm",
+    "disclosure": "no legacy output exists for these runs by construction (they are the runs the legacy pipeline had not computed); correctness rests on the bit-exact parity established in bench-20260914-003/004 plus full ID-set checks; the first four runs shared the HDD data volume with a concurrent analysis workload"
+  },
+  "engine": "1.0.3",
+  "environment": {
+    "os": "linux",
+    "kernel": "7.2.3-1-cachyos",
+    "cpu_model": "Intel Xeon E5-2676 v3 @ 2.40GHz (24 threads; runs pinned to cores 8-15, nice 10)",
+    "total_memory_mb": 31744,
+    "distro": "CachyOS (arch-based)",
+    "gpu": "AMD Radeon RX 580 2048SP (Polaris 20, amdgpu kernel driver; unused by these workloads)",
+    "memory": "32 GiB DDR3-1600 MT/s (2x16 GiB DIMM_B1/D1, 72-bit width)",
+    "storage": "system/log: Kingston SA400S37 120 GB SSD; benchmark I/O data volume: WDC WD5000AZLX 500 GB 7200rpm HDD; bulk reference data: Seagate ST3000DM001 3 TB HDD",
+    "engine_version": "1.0.3",
+    "python_version": "Python 3.14 (system)",
+    "r_version": null,
+    "code_revision": "v1.0.3 release binary (workstation deployment, built 2026-09-14) + post-release ops scripts",
+    "in_container": false,
+    "page_cache": "warm",
+    "precision": "second-resolution wall clock per run"
+  },
+  "data_sources": [
+    {
+      "id": "salmon-index-pinku1",
+      "origin": "private-server",
+      "reference": "workstation salmon index, Pinku1 CDS (33,955 transcripts), read-only",
+      "note": "same index as every quantification in this study"
+    },
+    {
+      "id": "deep-library-sra-runs",
+      "origin": "public-download",
+      "reference": "NCBI SRA runs SRR19049440-45, SRR22699505-516, SRR24322339-353 (subset), Tartary buckwheat transcriptomics; staged from the study's NAS authoritative copies",
+      "note": "per-run CPU model, pinned cores, thread count and utilization recorded in the ledger"
+    }
+  ],
+  "entries": [
+    {
+      "id": "deep-library-26runs-unpack",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "fasterq-dump 3.4.1 unpack, 26 runs, median per run",
+      "data_source_id": "deep-library-sra-runs",
+      "status": "ok",
+      "consistency": "26/26 runs unpacked; scratch FASTQ removed after each quant",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 209000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 26,
+          "repeats": 26
+        }
+      }
+    },
+    {
+      "id": "deep-library-26runs-quant",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "salmon quantification, 26 runs, median per run; every quant.sf = 33,955 transcript rows",
+      "data_source_id": "deep-library-sra-runs",
+      "status": "ok",
+      "consistency": "26/26 quant.sf carry the full 33,955-transcript ID set; runs without a legacy counterpart are no-reference by construction",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 95500.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 26,
+          "repeats": 26
+        }
+      }
+    }
+  ]
+}

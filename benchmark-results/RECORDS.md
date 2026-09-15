@@ -95,7 +95,66 @@ NumReads relative difference mean 0 σ 0, quant wall 602.9 ± 94.4 s
 **zero 3σ outliers on every metric**. Archived as
 `bench-20260914-004.summary.json`.
 
-## 5. Honest-claims summary (what the website may say)
+## 5. Quantification completion — deep libraries (26 SRA runs, Linux workstation)
+
+**Report `bench-20260915-001`** · Xeon E5-2676 v3, 8 threads pinned · salmon
+2.7.0 (upstream), `-l A -p 8 --validateMappings --seqBias --gcBias` · code
+v1.0.3 deployment
+
+The study's 26 not-yet-computed deep/public runs (SRR19049440/41/43/44/45,
+SRR22699505-516, SRR24322339-353 subset) quantified end-to-end through the
+public CLI. Every quant.sf: **33,955 transcript rows**. Per-run medians:
+unpack 219 s, quant 97 s; CPU utilization median 681%. **Production
+resilience proven**: a scheduled 06:50 host reboot hit mid-batch; a
+user-level oneshot resumed the batch **20 seconds after boot**, skipped the
+4 finished runs, and completed the remaining 22 with zero manual
+intervention. No-reference by construction (these are the runs the legacy
+pipeline had not computed); correctness rests on the 003/004 parity line.
+Honest note: wall times vary 15× with workload contention while CPU-seconds
+stay comparable — the ledger records utilization per run.
+
+## 6. Quantification completion — mixed library types (31 SRA runs)
+
+**Report `bench-20260915-002`** · same host · code v1.0.3 deployment
+
+| group | runs | median quant wall (s) |
+|---|---|---|
+| single-end SRA (SRR11592354-61, SRR30067602-09, SRR30415358-63) | 22 | 15 |
+| paired deep SRA, 2.1-2.9 GB (SRR15219542-47) | 6 | 78 |
+| paired fastq.gz direct (SRR8759198-200) | 3 | 82 |
+
+31/31 quant.sf: full 33,955-transcript ID set; authoritative inputs
+consumed read-only; batch wall clock 2 h 18 min on an idle workstation.
+
+## 7. Small-RNA runs against miRBase mature (14 SRA runs)
+
+**Report `bench-20260915-003`** · same host · salmon 2.7.0, k=19,
+`--keepDuplicates`, no bias correction · code v1.0.3 deployment
+
+14 public runs that map near-zero against the mRNA reference
+(SRR28573920-25, SRR8205656-63) quantified against miRBase mature
+(69,020 entries → 69,019 indexable targets; the one exclusion is a 20 nt
+poly-A entry salmon cannot index). The eight 50 nt raw reads were
+3' adapter-trimmed with the SDK first. Every quant.sf: **69,019 rows**.
+Documented data-property findings: siRNA-dominant composition (~1.6%
+miRNA exact-substring) and inserts longer than the mature targets (10.7%
+exact-substring, ~0% end-to-end) — the library-type interpretation
+belongs to the study.
+
+## 8. GO/KEGG/KO over-representation + WGCNA module enrichment (26 runs)
+
+**Report `bench-20260915-004`** · same host · `enrichment custom`
+(hypergeometric + BH, Rust engine) · code v1.0.3 deployment
+
+Three DEG contrasts (blue-light vs dark; young fruit vs leaf; mature fruit
+vs leaf — 3,577/9,630/12,875 significant genes reproduced exactly,
+direction-split) and 13 WGCNA modules, tested for GO, KEGG pathway and KO
+terms. Universe = ID-bridge-mapped annotated genes (GO 14,944 / KO 13,912
+/ KEGG 8,929); bridge 27,908/33,955, zero duplicate tails; term names from
+go-basic.obo and rest.kegg.jp. **26/26 runs in 17.2 s total engine wall**;
+every output CSV carries the universe in its header comment.
+
+## 9. Honest-claims summary (what the website may say)
 
 1. **Three-backend consistency**: proven, 1e-6, several capabilities
    bit-exact across Rust/Python/R.

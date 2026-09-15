@@ -1,0 +1,68 @@
+{
+  "schema_version": "1",
+  "report_id": "bench-20260915-002",
+  "generated_at": "2026-09-15",
+  "purpose": "RNA-seq quantification completion for the same Tartary buckwheat study, 31 further public SRA runs across three library shapes: 22 single-end SRA archives (SRR11592354-61, SRR30067602-09, SRR30415358-63), 6 paired-end deep SRA archives (SRR15219542-47, 2.1-2.9 GB each), and 3 paired-end runs quantified directly from delivered fastq.gz without unpacking (SRR8759198-200). Every quant.sf carries the full 33,955-transcript ID set. Authoritative SRA files were consumed read-only and left in place.",
+  "methodology": {
+    "backends_flag": "rust-orchestrated upstream salmon 2.7.0 (bioconda), -l A, -p 8, --validateMappings, --seqBias --gcBias; single-end runs use salmon -r; gz inputs are streamed in place",
+    "repeat_flag": "1 per run, serial batch, completed runs skipped on resume",
+    "warmup": "none",
+    "page_cache": "warm",
+    "disclosure": "no legacy output exists for these runs by construction; correctness rests on the parity established in bench-20260914-003/004 plus full ID-set checks; the workstation was otherwise idle during this batch"
+  },
+  "engine": "1.0.3",
+  "environment": {
+    "os": "linux",
+    "kernel": "7.2.3-1-cachyos",
+    "cpu_model": "Intel Xeon E5-2676 v3 @ 2.40GHz (24 threads; runs pinned to cores 8-15, nice 10)",
+    "total_memory_mb": 31744,
+    "distro": "CachyOS (arch-based)",
+    "gpu": "AMD Radeon RX 580 2048SP (Polaris 20, amdgpu kernel driver; unused by these workloads)",
+    "memory": "32 GiB DDR3-1600 MT/s (2x16 GiB DIMM_B1/D1, 72-bit width)",
+    "storage": "system/log: Kingston SA400S37 120 GB SSD; benchmark I/O data volume: WDC WD5000AZLX 500 GB 7200rpm HDD; bulk reference data: Seagate ST3000DM001 3 TB HDD",
+    "engine_version": "1.0.3",
+    "python_version": "Python 3.14 (system)",
+    "r_version": null,
+    "code_revision": "v1.0.3 release binary (workstation deployment, built 2026-09-14) + post-release ops scripts",
+    "in_container": false,
+    "page_cache": "warm",
+    "precision": "second-resolution wall clock per run"
+  },
+  "data_sources": [
+    {
+      "id": "salmon-index-pinku1",
+      "origin": "private-server",
+      "reference": "workstation salmon index, Pinku1 CDS (33,955 transcripts), read-only",
+      "note": "same index as every quantification in this study"
+    },
+    {
+      "id": "mixed-library-sra-runs",
+      "origin": "public-download",
+      "reference": "NCBI SRA runs SRR11592354-61, SRR30067602-09, SRR30415358-63, SRR15219542-47, SRR8759198-200 (Tartary buckwheat); local authoritative copies, read-only",
+      "note": "SRR8759198-200 quantified in place from fastq.gz; files unmodified"
+    }
+  ],
+  "entries": [
+    {
+      "id": "mixed-31runs-quant",
+      "capability": "expression.quantify.v1",
+      "dataset_class": "srr",
+      "dataset": "31 runs: 20 single-end SRA (median quant 16 s), 6 paired deep SRA (median 172 s), 2 paired gz-direct (median 86 s)",
+      "data_source_id": "mixed-library-sra-runs",
+      "status": "ok",
+      "consistency": "31/31 quant.sf carry the full 33,955-transcript ID set; no-reference by construction",
+      "speedup": null,
+      "memory_saving": null,
+      "precision": "second-resolution wall clock",
+      "report": null,
+      "backends": {
+        "rust": {
+          "median_wall_ms": 40000.0,
+          "median_peak_rss_mb": null,
+          "ok_runs": 31,
+          "repeats": 31
+        }
+      }
+    }
+  ]
+}
