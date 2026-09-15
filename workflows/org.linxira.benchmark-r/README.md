@@ -63,6 +63,7 @@ worker 在请求携带 `execution.backend = "r"` 时把整个请求交给本包�
 | Capability | Packages | Notes / 说明 |
 | --- | --- | --- |
 | `sequence.stats.v1` | Biostrings (`readBStringSet`, `letterFrequency`, `width`) | length/N50/L50/auN/GC%/N% identical to the Rust `fasta_stats`; `BStringSet` so protein/RNA/IUPAC letters are accepted like the engine; gzip handled by Biostrings; the engine's error cases (no records, header without identifier, sequence before header) are reproduced. 统计定义与 Rust 一致；用 `BStringSet` 以接受蛋白/RNA/IUPAC 字母；gzip 由 Biostrings 处理；复刻三类报错。 |
+| `fastq.qc.v1` | base R (`gzfile`, `charToRaw` byte parser) | per-file and per-cycle QC counters identical to the Rust engine: GC/N case-insensitive, Q20/Q30 tracked for both Phred+33 and Phred+64, encoding auto-detection (minimum byte < 59 → Phred+33, else `ambiguous` with the engine's warning), per-cycle cap at `max_cycles`; the engine's line-level error cases are reproduced with the same messages. Reader/accumulator state lives in environments so helpers mutate one shared accumulator, mirroring the engine's single `QcAccumulator`. 逐文件与逐循环 QC 计数与 Rust 引擎一致：GC/N 大小写不敏感、双编码 Q20/Q30、编码自动判别与同款警告、逐循环按 `max_cycles` 截断；复刻全部行级报错。读取器与计数器用 environment 传递（引用语义），对应引擎的单一 `QcAccumulator`。 |
 
 Adding a capability: add `src/implementations/<capability>.R` defining an
 `IMPLEMENTATION` list (`capability`, `input_roles`, `parameters`, `packages`,
