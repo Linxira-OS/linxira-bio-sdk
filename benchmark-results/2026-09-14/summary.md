@@ -95,7 +95,7 @@ already-computed set — see §3b below.
 
 ## 3b. Fair same-parameter cross-check (SRR1460477, normally covering)
 
-The mainline's own pipeline script discloses its exact salmon invocation for
+The upstream analysis pipeline discloses its exact salmon invocation for
 paired-end runs: `-l A -p 8 --validateMappings --seqBias --gcBias`. The
 first SDK pass missed the two bias flags (TPM r = 0.981 with NumReads totals
 identical to 2.1e-9) — a parameter mismatch, not an implementation defect;
@@ -110,7 +110,7 @@ SRA 3.68 GB → 2×9.07 GB FASTQ):
 | quant, defaults (no bias) | 791 s |
 | quant, `--seq-bias --gc-bias` | 669 s |
 
-Acceptance vs the mainline's stored quant.sf, with bias flags:
+Acceptance vs the upstream stored quant.sf, with bias flags:
 
 | line | result |
 |---|---|
