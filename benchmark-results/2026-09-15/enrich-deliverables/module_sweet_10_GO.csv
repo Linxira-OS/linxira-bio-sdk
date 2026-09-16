@@ -1,0 +1,8 @@
+# universe=14944 query_mapped=28 kind=GO label=module_sweet_10 method=hypergeometric+BH bridge=M0 tool=linxira-bio enrichment.custom
+term,description,cnt_in_set,set_size,bg_cnt,universe,p,padj
+GO:0043562,cellular response to nitrogen levels,3,28,45,14944,7.930010092323005e-05,0.022150134743501793
+GO:0006208,pyrimidine nucleobase catabolic process,2,28,10,14944,0.00015093788581602586,0.022150134743501793
+GO:0006212,uracil catabolic process,2,28,10,14944,0.00015093788581602586,0.022150134743501793
+GO:0019860,uracil metabolic process,2,28,10,14944,0.00015093788581602586,0.022150134743501793
+GO:0072529,pyrimidine-containing compound catabolic process,2,28,15,14944,0.0003501523067957988,0.04110788081782678
+GO:0046113,nucleobase catabolic process,2,28,17,14944,0.0004524803425871696,0.04426766018311142
