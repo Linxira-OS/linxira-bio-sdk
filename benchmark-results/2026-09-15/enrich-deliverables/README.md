@@ -13,7 +13,7 @@
   1:1 unique tails; 27908/33955 mapped
 - universes (mapped and annotated): GO 14944, KO 13912,
   KEGG pathway 8929
-- significance: padj < 0.05 and |lfc| > 1 (mainline DEG sets, direction
+- significance: padj < 0.05 and |lfc| > 1 (source-study DEG sets, direction
   split by lfc sign); reported terms filtered at padj < 0.05
 - CSV columns: term, description, cnt_in_set (query genes in term),
   set_size (mapped query size), bg_cnt (universe genes in term),
