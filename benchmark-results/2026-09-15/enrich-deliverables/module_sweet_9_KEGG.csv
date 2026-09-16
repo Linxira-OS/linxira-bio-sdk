@@ -1,0 +1,8 @@
+# universe=8929 query_mapped=33 kind=KEGG label=module_sweet_9 method=hypergeometric+BH bridge=M0 tool=linxira-bio enrichment.custom
+term,description,cnt_in_set,set_size,bg_cnt,universe,p,padj
+ko04141,Protein processing in endoplasmic reticulum,17,33,298,8929,3.627415742570337e-17,1.777433713859465e-15
+ko04612,Antigen processing and presentation,5,33,95,8929,2.2992124631776897e-05,0.0005556130909460523
+ko04213,Longevity regulating pathway - multiple species,5,33,103,8929,3.401712801710524e-05,0.0005556130909460523
+ko04915,Estrogen signaling pathway,4,33,79,8929,0.00019112528548271732,0.0023412847471632873
+ko04657,IL-17 signaling pathway,3,33,34,8929,0.000254575137119146,0.002494836343767631
+ko04659,Th17 cell differentiation,2,33,29,8929,0.00505275963059004,0.041264203649818657

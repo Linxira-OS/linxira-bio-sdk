@@ -1,0 +1,2 @@
+# universe=8929 query_mapped=18 kind=KEGG label=module_sweet_8 method=hypergeometric+BH bridge=M0 tool=linxira-bio enrichment.custom
+term,description,cnt_in_set,set_size,bg_cnt,universe,p,padj

@@ -1,0 +1,5 @@
+# universe=13912 query_mapped=4711 kind=KO label=maturefruit_UP method=hypergeometric+BH bridge=M0 tool=linxira-bio enrichment.custom
+term,description,cnt_in_set,set_size,bg_cnt,universe,p,padj
+ko:K04733,,106,4711,214,13912,1.375839839851073e-06,0.0030268476476723607
+ko:K05387,,16,4711,19,13912,9.055203357455541e-06,0.009960723693201095
+ko:K15032,,20,4711,28,13912,5.414915649715022e-05,0.039709381431243494

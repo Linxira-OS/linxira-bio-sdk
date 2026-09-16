@@ -1,0 +1,6 @@
+# universe=8929 query_mapped=128 kind=KEGG label=module_sweet_4 method=hypergeometric+BH bridge=M0 tool=linxira-bio enrichment.custom
+term,description,cnt_in_set,set_size,bg_cnt,universe,p,padj
+ko03040,Spliceosome,20,128,233,8929,9.344091218266543e-11,1.691280510506244e-08
+ko03015,mRNA surveillance pathway,13,128,159,8929,4.0025075987649884e-07,3.6222693768823145e-05
+ko03050,Proteasome,7,128,74,8929,8.55792731595597e-05,0.0051632828139601015
+ko05169,Epstein-Barr virus infection,13,128,280,8929,0.00018039723983371121,0.008162975102475432

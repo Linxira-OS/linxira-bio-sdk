@@ -1,0 +1,6 @@
+# universe=8929 query_mapped=1096 kind=KEGG label=maturefruit_DOWN method=hypergeometric+BH bridge=M0 tool=linxira-bio enrichment.custom
+term,description,cnt_in_set,set_size,bg_cnt,universe,p,padj
+ko03040,Spliceosome,73,1096,233,8929,5.7186395678242635e-15,1.9900865696028437e-12
+ko03008,Ribosome biogenesis in eukaryotes,43,1096,136,8929,1.7784241470159594e-09,3.0944580158077695e-07
+ko03010,Ribosome,98,1096,447,8929,2.992589923795745e-09,3.471404311603064e-07
+ko03013,Nucleocytoplasmic transport,58,1096,248,8929,6.195969492055424e-07,5.390493458088219e-05

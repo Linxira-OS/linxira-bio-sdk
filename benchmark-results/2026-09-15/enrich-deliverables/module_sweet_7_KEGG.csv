@@ -1,0 +1,6 @@
+# universe=8929 query_mapped=50 kind=KEGG label=module_sweet_7 method=hypergeometric+BH bridge=M0 tool=linxira-bio enrichment.custom
+term,description,cnt_in_set,set_size,bg_cnt,universe,p,padj
+ko03013,Nucleocytoplasmic transport,10,50,248,8929,8.807932378168397e-07,6.605949283626298e-05
+ko03008,Ribosome biogenesis in eukaryotes,7,50,136,8929,9.425647139654652e-06,0.00035346176773704945
+ko03040,Spliceosome,8,50,233,8929,3.972429510026865e-05,0.0009931073775067162
+ko05168,Herpes simplex virus 1 infection,5,50,131,8929,0.000785932855357719,0.014736241037957232

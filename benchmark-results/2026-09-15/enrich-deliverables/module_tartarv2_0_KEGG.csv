@@ -1,0 +1,5 @@
+# universe=8929 query_mapped=6 kind=KEGG label=module_tartarv2_0 method=hypergeometric+BH bridge=M0 tool=linxira-bio enrichment.custom
+term,description,cnt_in_set,set_size,bg_cnt,universe,p,padj
+ko04614,Renin-angiotensin system,2,6,24,8929,0.00010318519778636635,0.0006351745047539714
+ko04974,Protein digestion and absorption,2,6,28,8929,0.00014114988994532699,0.0006351745047539714
+ko00940,Phenylpropanoid biosynthesis,2,6,289,8929,0.01436609216836419,0.04309827650509257
