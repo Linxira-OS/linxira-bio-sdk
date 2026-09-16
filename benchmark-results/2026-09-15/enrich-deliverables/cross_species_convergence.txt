@@ -1,0 +1,5 @@
+sweet_1 top20 GO terms: 20
+tartarv2_1 top20 GO terms: 20
+shared top20 GO terms: 0
+shared terms: 
+Fisher exact p (k=0, n=K=20, N=11570 GO terms tested): 1.000e+00

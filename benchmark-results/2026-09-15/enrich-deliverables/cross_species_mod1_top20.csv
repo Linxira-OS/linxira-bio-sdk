@@ -1,0 +1,41 @@
+net,term,description,padj
+tartarv2_1,GO:0004175,endopeptidase activity,9.184755250891945e-11
+tartarv2_1,GO:0004252,serine-type endopeptidase activity,2.852343388322083e-22
+sweet_1,GO:0005507,copper ion binding,2.511678549129076e-09
+tartarv2_1,GO:0005618,cell wall,7.587826456930079e-16
+sweet_1,GO:0005737,cytoplasm,2.627574002239113e-22
+sweet_1,GO:0005746,obsolete mitochondrial respirasome,9.360793942825477e-09
+sweet_1,GO:0005773,vacuole,1.0769790627347425e-09
+sweet_1,GO:0005774,vacuolar membrane,1.0769790627347425e-09
+sweet_1,GO:0005829,cytosol,4.980855059168408e-09
+tartarv2_1,GO:0006897,endocytosis,3.1192582336738478e-12
+tartarv2_1,GO:0006898,receptor-mediated endocytosis,4.8747089584992787e-14
+tartarv2_1,GO:0008233,peptidase activity,1.0481723523218929e-08
+tartarv2_1,GO:0008236,serine-type peptidase activity,2.2497828043665578e-19
+tartarv2_1,GO:0009504,cell plate,1.0292197807770697e-11
+tartarv2_1,GO:0009505,plant-type cell wall,9.184755250891945e-11
+sweet_1,GO:0010035,obsolete response to inorganic substance,7.39108458817617e-11
+sweet_1,GO:0010038,response to metal ion,2.4415796586946448e-09
+sweet_1,GO:0012505,endomembrane system,2.225223028400551e-10
+sweet_1,GO:0016020,membrane,7.764571486362707e-10
+tartarv2_1,GO:0017171,serine hydrolase activity,2.2497828043665578e-19
+tartarv2_1,GO:0019172,glyoxalase III activity,5.8213743855453883e-05
+tartarv2_1,GO:0030312,external encapsulating structure,7.587826456930079e-16
+tartarv2_1,GO:0030599,pectinesterase activity,1.0473934636450745e-11
+sweet_1,GO:0031090,organelle membrane,9.894164329573137e-10
+sweet_1,GO:0043167,ion binding,7.930876736757599e-10
+sweet_1,GO:0043169,cation binding,7.39108458817617e-11
+sweet_1,GO:0044437,obsolete vacuolar part,1.3427425257950197e-09
+sweet_1,GO:0044444,obsolete cytoplasmic part,7.542980212665523e-20
+sweet_1,GO:0046686,response to cadmium ion,7.39108458817617e-11
+sweet_1,GO:0046872,metal ion binding,3.566047418301009e-10
+tartarv2_1,GO:0046910,pectinesterase inhibitor activity,1.7319845186096807e-09
+sweet_1,GO:0046914,transition metal ion binding,1.7071887137460136e-09
+tartarv2_1,GO:0048235,pollen sperm cell differentiation,6.00026906078132e-07
+tartarv2_1,GO:0070011,,8.925773814388379e-07
+tartarv2_1,GO:0071012,catalytic step 1 spliceosome,6.518536185988202e-12
+tartarv2_1,GO:0071944,cell periphery,1.0165515063634902e-18
+tartarv2_1,GO:0072583,clathrin-dependent endocytosis,7.587826456930079e-16
+tartarv2_1,GO:0098657,import into cell,5.247359040921744e-13
+sweet_1,GO:0098796,membrane protein complex,2.694614974610858e-10
+sweet_1,GO:1990204,oxidoreductase complex,1.7344011209055561e-09
