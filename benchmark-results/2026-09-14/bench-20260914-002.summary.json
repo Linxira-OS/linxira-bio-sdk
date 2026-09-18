@@ -2,7 +2,7 @@
   "schema_version": "1",
   "report_id": "bench-20260914-002",
   "generated_at": "2026-09-14",
-  "purpose": "tier1_v2 cross-check batch on bio-lab: quantify 14 single-end samples through the public CLI (expression.quantify.v1) with the mainline's own salmon 2.7.0 index and parameters, and compare against the mainline's stored quant.sf. Row parity and NumReads totals pass on all 14. POST-HOC CORRECTION (mainline verified): the reference is upstream salmon 2.7.0 (official ELF binary, not a re-implementation); the near-zero mapping (both implementations independently measure ~0-0.0019%) is a property of the DATA - these 14 runs are small-RNA/special libraries with nothing to map against an mRNA CDS index. They are excluded: non-mRNA library, and belong to the miRNA pipeline once a miRBase reference is available.",
+  "purpose": "tier1_v2 cross-check batch on bio-lab: quantify 14 single-end samples through the public CLI (expression.quantify.v1) with the upstream salmon 2.7.0 index and parameters, and compare against the upstream's stored quant.sf. Row parity and NumReads totals pass on all 14. POST-HOC CORRECTION (upstream verified): the reference is upstream salmon 2.7.0 (official ELF binary, not a re-implementation); the near-zero mapping (both implementations independently measure ~0-0.0019%) is a property of the DATA - these 14 runs are small-RNA/special libraries with nothing to map against an mRNA CDS index. They are excluded: non-mRNA library, and belong to the miRNA pipeline once a miRBase reference is available.",
   "methodology": {
     "backends_flag": "rust-orchestrated salmon (LINXIRA_BIO_SALMON=salmon 2.7.0, bioconda, upstream binaries)",
     "repeat_flag": "1 (cross-check batch)",
@@ -32,8 +32,8 @@
     {
       "id": "v2-quant-inputs",
       "origin": "private-server",
-      "reference": "lab-workstation:<lab-data>/analysis/04_v2_quant/fastq/ (14 single-end gzip FASTQ, the mainline's own quant inputs, read-only)",
-      "note": "SRR28573920-25, SRR8205656-63; NCBI SRA accessions; staged by the mainline on 2026-09-10"
+      "reference": "lab-workstation:<lab-data>/analysis/04_v2_quant/fastq/ (14 single-end gzip FASTQ, the upstream quant inputs, read-only)",
+      "note": "SRR28573920-25, SRR8205656-63; NCBI SRA accessions; staged beforehand on 2026-09-10"
     },
     {
       "id": "salmon-index-pinku1",
@@ -45,7 +45,7 @@
       "id": "v2-quant-references",
       "origin": "private-server",
       "reference": "lab-workstation:<lab-data>/analysis/04_v2_quant/quant/<run>/quant.sf (read-only comparison targets)",
-      "note": "produced by the mainline with upstream salmon 2.7.0 (official ELF binary, verified); near-zero mapping on these 14 runs is a data property (small-RNA libraries), not an implementation artifact"
+      "note": "produced by the upstream pipeline with upstream salmon 2.7.0 (official ELF binary, verified); near-zero mapping on these 14 runs is a data property (small-RNA libraries), not an implementation artifact"
     }
   ],
   "entries": [

@@ -37,8 +37,8 @@
     {
       "id": "srr26171873",
       "origin": "private-server",
-      "reference": "lab-workstation:<lab-data>/sra_missing/SRR26171873_{1,2}.fastq.gz (~1.1 GB + mate, staged from prior thesis pipeline)",
-      "note": "SRR26171873; paired-end gzip; original SRA accession on NCBI (PRJNA listed in /mnt/F/thesis_inbox/final_census.tsv); staged read-only, no files modified"
+      "reference": "lab-workstation:<lab-data>/sra_missing/SRR26171873_{1,2}.fastq.gz (~1.1 GB + mate, staged from prior analysis pipeline)",
+      "note": "SRR26171873; paired-end gzip; original SRA accession on NCBI (PRJNA listed in <project census file>); staged read-only, no files modified"
     },
     {
       "id": "salmon-index-pinku1",

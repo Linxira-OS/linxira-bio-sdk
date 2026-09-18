@@ -2,7 +2,7 @@
   "schema_version": "1",
   "report_id": "bench-20260914-003",
   "generated_at": "2026-09-14",
-  "purpose": "Fair same-parameter cross-check on a normally-covering tier23 sample (SRR1460477, 67-71% mapping class): full pipeline SRA-to-quant.sf through the public CLI with the mainline's exact salmon parameters (--seqBias --gcBias included after the first pass revealed the parameter gap), then transcript-level comparison against the mainline's stored quant.sf. Result: NumReads identical (relative difference 0) and TPM Pearson r = 1.000000 - the SDK reproduces the reference pipeline bit-for-bit when parameters match.",
+  "purpose": "Fair same-parameter cross-check on a normally-covering tier23 sample (SRR1460477, 67-71% mapping class): full pipeline SRA-to-quant.sf through the public CLI with the upstream's exact salmon parameters (--seqBias --gcBias included after the first pass revealed the parameter gap), then transcript-level comparison against the upstream's stored quant.sf. Result: NumReads identical (relative difference 0) and TPM Pearson r = 1.000000 - the SDK reproduces the reference pipeline bit-for-bit when parameters match.",
   "methodology": {
     "backends_flag": "rust-orchestrated upstream salmon 2.7.0 (bioconda), -l A, -p 8, --validateMappings, --seqBias --gcBias",
     "repeat_flag": "1 per segment (unpack / quantify), cold cache",
@@ -95,7 +95,7 @@
       "id": "srr1460477-quant-biased",
       "capability": "expression.quantify.v1",
       "dataset_class": "srr",
-      "dataset": "SDK quantify with the mainline's exact parameters (--seq-bias --gc-bias), compared transcript-by-transcript against the mainline quant.sf",
+      "dataset": "SDK quantify with the upstream's exact parameters (--seq-bias --gc-bias), compared transcript-by-transcript against the upstream pipeline quant.sf",
       "data_source_id": "srr1460477-sra",
       "status": "ok",
       "consistency": "NumReads identical per transcript (total 16,670,537 both, relative difference 0); TPM Pearson r = 1.000000 - PASS on the 0.995 acceptance line",
