@@ -39,7 +39,7 @@
       "id": "salmon-index-pinku1",
       "origin": "private-server",
       "reference": "lab-workstation:<lab-data>/analysis/02_tier1/salmon_idx (Pinku1 CDS index, 33,955 transcripts, read-only)",
-      "note": "same index as every mainline quant"
+      "note": "same index as every reference run"
     },
     {
       "id": "v2-quant-references",

@@ -33,18 +33,18 @@
       "id": "srr1460477-sra",
       "origin": "public-download",
       "reference": "NCBI SRA SRR1460477 (PRJNA253089, buckwheat transcriptomics); staged from the lab NAS archive copy (3,678,896,677 bytes, byte-identical) to the SDK workspace",
-      "note": "normally-covering paired-end sample; mainline quant exists and maps 16,670,536 reads"
+      "note": "normally-covering paired-end sample; a reference quant.sf exists and maps 16,670,536 reads"
     },
     {
       "id": "salmon-index-pinku1",
       "origin": "private-server",
       "reference": "lab-workstation salmon index, Pinku1 CDS (33,955 transcripts), read-only",
-      "note": "same index as every mainline quant"
+      "note": "same index as every reference run"
     },
     {
       "id": "legacy-quant-srr1460477",
       "origin": "private-server",
-      "reference": "lab-workstation mainline quant output for SRR1460477 (quant.sf + cmd_info.json), read-only",
+      "reference": "workstation reference quant.sf for SRR1460477 (quant.sf + cmd_info.json), read-only",
       "note": "cmd_info discloses upstream salmon 2.7.0 with -l A -p 8 --validateMappings --seqBias --gcBias on paired-end runs"
     }
   ],
