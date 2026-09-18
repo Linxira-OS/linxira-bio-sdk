@@ -178,3 +178,6 @@ every output CSV carries the universe in its header comment.
    确认近零映射）。
 4. **诚实边界**：不宣称"打败 salmon/fasterq-dump 本体"（同引擎编排）；
    机械硬盘上的耗时标注为存储受限；零映射样本保留为边界用例。
+
+## 2026-09-18 — r=1.000000 live re-verification (SRR1460477)
+Fresh-pull SRA + fasterq + SDK quantify (bias-matched) vs reference quant.sf: byte-identical (SHA256 9b6a4cca…), r=1.000000000, NumReads 33955/33955. Control (no bias flags): r=0.980896. Files + hashes + reproduce script in 2026-09-18/r-verification/.
