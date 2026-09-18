@@ -69,7 +69,7 @@
           "repeats": 14
         }
       },
-      "reference_implementation": "upstream salmon 2.7.0 (official ELF binary; earlier rust-port attribution retracted after mainline verification with file output)"
+      "reference_implementation": "upstream salmon 2.7.0 (official ELF binary; earlier rust-port attribution retracted after upstream verification with file output)"
     }
   ]
 }
