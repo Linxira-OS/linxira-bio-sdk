@@ -181,3 +181,6 @@ every output CSV carries the universe in its header comment.
 
 ## 2026-09-18 — r=1.000000 live re-verification (SRR1460477)
 Fresh-pull SRA + fasterq + SDK quantify (bias-matched) vs reference quant.sf: byte-identical (SHA256 9b6a4cca…), r=1.000000000, NumReads 33955/33955. Control (no bias flags): r=0.980896. Files + hashes + reproduce script in 2026-09-18/r-verification/.
+
+## 2026-09-18 — blog mirror
+Snapshot of the live bilingual post (zh/en markdown + SHA256SUMS) after the 2026-09-18 structural reorganization; kept in-repo next to the verification artifacts the post references. See 2026-09-18/blog-mirror/.
