@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -uo pipefail
-WS=/mnt/fs-a/<sdk-workspace>
+WS=<sdk-workspace>
 SDK=$WS/engine/target/release/linxira-bio
 FD=$WS/tools-env/bin/fasterq-dump
 KEY=<user-home>/<storage-key>
 W=$WS/tmp/r-demo
-export LINXIRA_BIO_SALMON=/mnt/fs-a/<sdk-workspace>/tools-env/bin/salmon
+export LINXIRA_BIO_SALMON=<sdk-workspace>/tools-env/bin/salmon
 mkdir -p "$W"
 echo "$(date +%T) pull" >> $WS/bench/r-demo.log
 scp -q -B -i "$KEY" -r <user>@<lan-host>:/mnt/storage-1/tier23/SRR1460477 "$W/" || echo PULL_FAIL
@@ -16,7 +16,7 @@ echo "$(date +%T) fasterq" >> $WS/bench/r-demo.log
 gzip -f "$W"/*_1.fastq "$W"/*_2.fastq
 echo "$(date +%T) quantify with bias flags" >> $WS/bench/r-demo.log
 nice -n 10 "$SDK" expression quantify "$W"/SRR1460477_1.fastq.gz "$W"/SRR1460477_2.fastq.gz \
-  --index /mnt/fs-b/<study-data>/analysis/02_tier1/salmon_idx --threads 6 \
+  --index <study-data>/analysis/02_tier1/salmon_idx --threads 6 \
   --seq-bias --gc-bias --output "$W/quant_bias.sf" --json > "$W/quant_summary.json" 2>&1
 echo "$(date +%T) compare" >> $WS/bench/r-demo.log
 python3 - <<'PYEOF'
@@ -29,8 +29,8 @@ def load(p):
             n, _, _, tpm, nr = line.rstrip("\n").split("\t")
             t[n] = float(tpm); q[n] = float(nr)
     return t, q
-a, aq = load("/mnt/fs-a/<sdk-workspace>/tmp/r-demo/quant_bias.sf")
-b, bq = load("/mnt/fs-b/<study-data>/analysis/15_tier23_quant/SRR1460477/quant.sf")
+a, aq = load("<sdk-workspace>/tmp/r-demo/quant_bias.sf")
+b, bq = load("<study-data>/analysis/15_tier23_quant/SRR1460477/quant.sf")
 common = sorted(set(a) & set(b))
 va = np.array([a[k] for k in common]); vb = np.array([b[k] for k in common])
 print("LIVE_R=%.9f" % np.corrcoef(va, vb)[0, 1])
