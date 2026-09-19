@@ -1903,6 +1903,44 @@ fn create_temporary_directory(output: &Path, purpose: &str) -> Result<PathBuf, N
     ))
 }
 
+/// Plan the WGCNA CLI workspace without creating anything. The R harness
+/// contract requires `parameters.output_directory` to not exist (it commits
+/// its own staging directory by rename), so the glue may only name the
+/// target. The artifact directory keeps the documented module CSVs after
+/// the run; the request/result scratch files live beside the requested
+/// output and are removed once the result JSON is copied.
+fn plan_wgcna_workspace(output: &Path) -> Result<(PathBuf, PathBuf, PathBuf), NativeToolError> {
+    let parent = output.parent().unwrap_or_else(|| Path::new("."));
+    let stem = output
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "wgcna".to_owned());
+    let artifact_directory = parent.join(format!("{stem}-wgcna-output"));
+    if artifact_directory.exists() {
+        return Err(NativeToolError::InvalidOption(format!(
+            "WGCNA artifact directory already exists: {}; remove it or choose another output name",
+            artifact_directory.display()
+        )));
+    }
+    for _ in 0..100 {
+        let ordinal = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let request = parent.join(format!(
+            ".linxira-wgcna-request-{}-{ordinal}.json",
+            std::process::id()
+        ));
+        let result = parent.join(format!(
+            ".linxira-wgcna-result-{}-{ordinal}.json",
+            std::process::id()
+        ));
+        if !request.exists() && !result.exists() {
+            return Ok((artifact_directory, request, result));
+        }
+    }
+    Err(NativeToolError::InvalidOption(
+        "could not allocate WGCNA scratch paths".to_owned(),
+    ))
+}
+
 fn remove_incomplete_output(output: &Path) {
     if output.is_file() {
         let _ = fs::remove_file(output);
@@ -1944,11 +1982,10 @@ pub fn run_wgcna_path(
     let expression = expression.as_ref();
     let output = output.as_ref();
     validate_paths(&[expression], output)?;
-    let temporary = create_temporary_directory(output, "wgcna")?;
+    let (artifact_directory, request_path, result_path) = plan_wgcna_workspace(output)?;
     let result = (|| {
         let executable = configured_program("LINXIRA_BIO_RSCRIPT", "Rscript");
         let wgcna_script = find_wgcna_script()?;
-        let request_path = temporary.join("request.json");
         let request = serde_json::json!({
             "schema_version": "2",
             "job_id": "linxira-wgcna-cli",
@@ -1967,7 +2004,7 @@ pub fn run_wgcna_path(
             }],
             "execution": { "mode": "local-cpu" },
             "parameters": {
-                "output_directory": temporary.to_string_lossy(),
+                "output_directory": artifact_directory.to_string_lossy(),
                 "min_expression": options.min_expression,
                 "min_samples": options.min_samples,
                 "min_module_size": options.min_module_size,
@@ -1984,34 +2021,34 @@ pub fn run_wgcna_path(
                 NativeToolError::InvalidOption(format!("JSON serialization failed: {e}"))
             })?,
         )?;
-        let result_path = temporary.join("result.json");
         let arguments: Vec<OsString> = vec![
             wgcna_script.into(),
             OsString::from("--request"),
-            request_path.into(),
+            request_path.clone().into(),
             OsString::from("--result"),
-            result_path.into(),
+            result_path.clone().into(),
         ];
         let output_result = run_native_command(&executable, &arguments, false)?;
-        let result_json = temporary.join("result.json");
-        if !result_json.exists() {
+        if !result_path.exists() {
             let stderr = String::from_utf8_lossy(&output_result.stderr);
             return Err(NativeToolError::InvalidOption(format!(
                 "WGCNA workflow did not produce result.json: {}",
                 stderr.trim()
             )));
         }
-        fs::copy(&result_json, output)?;
-        finish_result("wgcna", "co-expression-network", output, options.threads, 1)
+        fs::copy(&result_path, output)?;
+        let finished = finish_result("wgcna", "co-expression-network", output, options.threads, 1)?;
+        // The harness commits its staging directory to `artifact_directory`
+        // by rename; the module CSVs there are documented CLI outputs and are
+        // referenced by artifact paths inside the result JSON, so they stay.
+        fs::remove_file(&request_path)?;
+        fs::remove_file(&result_path)?;
+        Ok(finished)
     })();
-    let cleanup = fs::remove_dir_all(&temporary);
-    if let Err(error) = cleanup
-        && result.is_ok()
-    {
-        return Err(NativeToolError::Io(error));
-    }
     if result.is_err() {
         remove_incomplete_output(output);
+        let _ = fs::remove_file(&request_path);
+        let _ = fs::remove_file(&result_path);
     }
     result
 }
@@ -2064,6 +2101,31 @@ mod tests {
     };
     use std::ffi::OsString;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn plans_wgcna_workspace_without_creating_it() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let base =
+            std::env::temp_dir().join(format!("linxira-wgcna-plan-{}-{nanos}", std::process::id()));
+        std::fs::create_dir_all(&base).unwrap();
+        let output = base.join("run.json");
+        let (artifacts, request, result) = super::plan_wgcna_workspace(&output).unwrap();
+        assert!(!artifacts.exists());
+        assert!(!request.exists());
+        assert!(!result.exists());
+        assert_eq!(artifacts, base.join("run-wgcna-output"));
+        assert_eq!(request.parent().unwrap(), base.as_path());
+        assert_eq!(result.parent().unwrap(), base.as_path());
+        // A leftover artifact directory from a prior run must be rejected
+        // instead of silently overwritten (the R harness refuses it too).
+        std::fs::create_dir_all(&artifacts).unwrap();
+        let error = super::plan_wgcna_workspace(&output).unwrap_err();
+        assert!(error.to_string().contains("already exists"));
+        std::fs::remove_dir_all(&base).unwrap();
+    }
 
     #[test]
     fn builds_shell_free_native_tool_arguments() {
