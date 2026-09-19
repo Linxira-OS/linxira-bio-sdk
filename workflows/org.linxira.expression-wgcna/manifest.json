@@ -72,7 +72,7 @@
     },
     {
       "path": "src/run_wgcna.R",
-      "sha256": "0ab8df2350addd407bee940be9656c02be5bd0b8e7b432e1434a57ca0aef925e"
+      "sha256": "e3ae09f16f14907437c8033382448bf0581ee4a69ee613703c44af26ec762467"
     },
     {
       "path": "tests/test_validation.R",
