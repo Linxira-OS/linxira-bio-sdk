@@ -18,6 +18,13 @@ swept (3 backends x 3 repeats = 54 runs, 54 ok):
 | set.venn.v1 | 2 ms | 281 ms | 468 ms |
 | structure.pdb.summary.v1 | 2 ms | 280 ms | 492 ms |
 
+A seventh capability, variant.stats.v1, gained python/r pack
+implementations on 2026-09-19 (same fixtures methodology): local
+Windows E2E shows rust 42 ms / python 301 ms / consistent (7.2x, warm
+cache, 1 repeat); the Linux 3-repeat sweep row will be appended when the
+benchmark host is reachable again. Reference outputs and pack tests are
+in the repository (workflows/*/implementations/variant_stats_v1.*).
+
 Every other capability in the catalog is rust-native only by design
 (salmon orchestration, alignment, annotation, variant, structure-view,
 plot rendering, ...); those are covered by the real-data benchmarks below.

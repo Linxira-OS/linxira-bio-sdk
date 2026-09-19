@@ -36,6 +36,8 @@ INPUT_SCHEMA = PACK_ROOT / "schemas" / "input.schema.json"
 OUTPUT_SCHEMA = PACK_ROOT / "schemas" / "output.schema.json"
 REPOSITORY_ROOT = PACK_ROOT.parents[1]
 TINY_FASTA = REPOSITORY_ROOT / "tests" / "fixtures" / "sequences" / "tiny.fa"
+MIXED_VCF = REPOSITORY_ROOT / "tests" / "fixtures" / "variant-stats" / "mixed.vcf"
+EMPTY_VCF = REPOSITORY_ROOT / "tests" / "fixtures" / "variant-stats" / "empty.vcf"
 
 SPEC = importlib.util.spec_from_file_location("benchmark_harness", SCRIPT)
 assert SPEC and SPEC.loader
@@ -113,6 +115,12 @@ def assert_close(test: unittest.TestCase, expected: float, actual: float, field:
 
 
 class RegistryTests(unittest.TestCase):
+    def test_registry_exposes_variant_stats_with_the_rust_contract(self):
+        implementation = MODULE.IMPLEMENTATIONS["variant.stats.v1"]
+        self.assertEqual(implementation.INPUT_ROLES, ("vcf",))
+        self.assertEqual(implementation.PARAMETERS, ())
+        self.assertEqual(implementation.INPUT_COMPRESSION["vcf"], ("none", "gzip"))
+
     def test_registry_exposes_sequence_stats_with_the_rust_contract(self):
         implementation = MODULE.IMPLEMENTATIONS["sequence.stats.v1"]
         self.assertEqual(implementation.INPUT_ROLES, ("fasta",))
@@ -641,6 +649,60 @@ class FastqQcTests(unittest.TestCase):
             self.implementation.run({"fastq": VALID_FASTQ}, {"quality_encoding": "phred+9"})
         self.assertIn("unsupported quality encoding", str(context.exception))
 
+
+
+class VariantStatsParityTests(ParityCompareMixin, unittest.TestCase):
+    REFERENCE_DIR = PACK_ROOT / "tests" / "reference"
+
+    def test_mixed_fixture_matches_the_rust_engine(self):
+        import json
+
+        implementation = MODULE.IMPLEMENTATIONS["variant.stats.v1"]
+        result = implementation.run({"vcf": MIXED_VCF}, {})
+        reference = json.loads(
+            (self.REFERENCE_DIR / "variant.stats.v1.default.json").read_text(encoding="utf-8")
+        )
+        self.compare_with_reference(reference, result)
+
+    def test_sites_only_vcf_reports_no_samples_warning(self):
+        implementation = MODULE.IMPLEMENTATIONS["variant.stats.v1"]
+        result = implementation.run({"vcf": EMPTY_VCF}, {})
+        self.assertEqual(result["record_count"], 0)
+        self.assertEqual(
+            result["warnings"],
+            [
+                "VCF header declares no samples; genotype metrics are unavailable",
+                "VCF contains no variant records",
+            ],
+        )
+        self.assertIsNone(result["ti_tv_ratio"])
+        self.assertIsNone(result["missing_genotype_rate"])
+
+    def test_engine_error_cases_are_reproduced(self):
+        implementation = MODULE.IMPLEMENTATIONS["variant.stats.v1"]
+        cases = {
+            "missing fileformat": (
+                "##contig=<ID=chr1>\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+            ),
+            "record before header": (
+                "##fileformat=VCFv4.2\nchr1\t10\t.\tA\tG\t.\tPASS\t.\n"
+            ),
+            "short record": (
+                "##fileformat=VCFv4.2\n"
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\nchr1\t10\t.\tA\n"
+            ),
+            "gt index beyond alt": (
+                "##fileformat=VCFv4.2\n"
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\ts1\n"
+                "chr1\t10\t.\tA\tG\t.\tPASS\t.\tGT\t2/2\n"
+            ),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            for name, content in cases.items():
+                path = Path(directory) / "case.vcf"
+                path.write_text(content, encoding="utf-8", newline="")
+                with self.assertRaises(ValueError, msg=name):
+                    implementation.run({"vcf": path}, {})
 
 
 if __name__ == "__main__":

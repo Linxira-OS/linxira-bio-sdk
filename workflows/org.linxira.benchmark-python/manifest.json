@@ -76,7 +76,7 @@
     },
     {
       "path": "src/implementations/__init__.py",
-      "sha256": "0dee5472720df969d761d02107673a938e5421f4a78df7460ddb87c07d192bbf"
+      "sha256": "6a61fb94ebde4ce56fab7b899b7736267802265c91f239704b44b32148809c1b"
     },
     {
       "path": "src/implementations/sequence_stats_v1.py",
@@ -84,7 +84,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.py",
-      "sha256": "75ca507348a7484f625781f81db096b267d6d1258b8a714fa17a3c407571c2ab"
+      "sha256": "e221e7d47df6130c63a3606c65ff9f0983cf1f06e7540297128567a27618a87c"
     },
     {
       "path": "src/implementations/expression_pca_v1.py",
@@ -145,6 +145,14 @@
     {
       "path": "tests/reference/fastq.qc.v1.default.json",
       "sha256": "0e03e465e398ba65c133f353f30ec05e6885926b7844d9dcca43fc39943a29e9"
+    },
+    {
+      "path": "src/implementations/variant_stats_v1.py",
+      "sha256": "715bf7c8405a57aae1e407be433ea941c7662ad4fd530c2a404f2a13d080edf2"
+    },
+    {
+      "path": "tests/reference/variant.stats.v1.default.json",
+      "sha256": "08048726a122bad5029adbd7983ca575eb573de1d37469415c47d05524dce7c3"
     }
   ],
   "contract": {
@@ -199,6 +207,12 @@
         "compression": [
           "none",
           "gzip"
+        ]
+      },
+      {
+        "role": "vcf",
+        "formats": [
+          "vcf"
         ]
       }
     ],
