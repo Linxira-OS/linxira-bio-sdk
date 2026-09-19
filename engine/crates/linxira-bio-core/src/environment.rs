@@ -1005,11 +1005,39 @@ fn current_platform() -> PlatformInfo {
 
 fn linux_family() -> String {
     let release = fs::read_to_string("/etc/os-release").unwrap_or_default();
-    release
-        .lines()
-        .find_map(|line| line.strip_prefix("ID="))
-        .map(|value| value.trim_matches('"').to_owned())
-        .unwrap_or_else(|| "linux".to_owned())
+    linux_family_from(&release)
+}
+
+/// Map an os-release body to the support family. Derivative distributions
+/// declare their base through `ID_LIKE` (CachyOS, EndeavourOS and Manjaro
+/// set `ID_LIKE=arch`), so the like-list is the authoritative signal; a
+/// short explicit table covers derivatives that omit it. An unrecognized
+/// id stays itself and is reported as unsupported rather than being
+/// silently forced into a family whose install strategy may not apply.
+fn linux_family_from(release: &str) -> String {
+    fn field(release: &str, key: &str) -> Option<String> {
+        release
+            .split('\n')
+            .find_map(|line| line.strip_prefix(key))
+            .map(|value| value.trim().trim_matches('"').to_owned())
+            .filter(|value| !value.is_empty())
+    }
+    let id = field(release, "ID=").unwrap_or_else(|| "linux".to_owned());
+    if id == "arch" || id == "debian" {
+        return id;
+    }
+    let id_like = field(release, "ID_LIKE=").unwrap_or_default();
+    if let Some(base) = id_like
+        .split_whitespace()
+        .find(|like| *like == "arch" || *like == "debian")
+    {
+        return base.to_owned();
+    }
+    match id.as_str() {
+        "cachyos" | "endeavouros" | "manjaro" | "artix" | "garuda" => "arch".to_owned(),
+        "ubuntu" | "linuxmint" | "pop" | "deepin" | "kali" => "debian".to_owned(),
+        _ => id,
+    }
 }
 
 fn probe_tool(
@@ -1399,6 +1427,29 @@ fn decode_output(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::linux_family_from;
+
+    #[test]
+    fn linux_family_maps_derivatives_to_their_base() {
+        let cachyos = "NAME=\"CachyOS\"\nID=cachyos\nID_LIKE=arch\n";
+        assert_eq!(linux_family_from(cachyos), "arch");
+        assert_eq!(linux_family_from("ID=endeavouros\nID_LIKE=arch\n"), "arch");
+        assert_eq!(linux_family_from("ID=ubuntu\nID_LIKE=debian\n"), "debian");
+    }
+
+    #[test]
+    fn linux_family_table_fallbacks_and_unknowns_stay_honest() {
+        assert_eq!(linux_family_from("ID=manjaro\n"), "arch");
+        assert_eq!(linux_family_from("ID=linuxmint\n"), "debian");
+        assert_eq!(linux_family_from("ID=arch\n"), "arch");
+        assert_eq!(
+            linux_family_from("ID=\"cachyos\"\nID_LIKE=\"arch\"\n"),
+            "arch"
+        );
+        assert_eq!(linux_family_from("ID=someos\n"), "someos");
+        assert_eq!(linux_family_from(""), "linux");
+    }
+
     use super::{
         AuditSummary, EnvironmentAudit, EnvironmentMode, EnvironmentPlanOptions,
         ExecutionBackendAudit, PlanActionState, PlatformInfo, ToolCheck, apply_github_proxy,
