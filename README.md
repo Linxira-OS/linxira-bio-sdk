@@ -28,7 +28,10 @@ browser, and delivery workflows.
 - `skill-pack.json`: import boundary for agent runtimes and `linxira-skills`
 - `linxira-bio-ui`: native Rust desktop application without a WebView
 - Python SDK: planned after the CLI contract stabilizes
-- MCP server: planned after the capability and result schemas stabilize
+- `linxira-bio-mcp`: stdio JSON-RPC MCP server (initialize / tools list /
+  tools call / resources list+read; tool calls execute worker jobs). Point an
+  MCP client at the binary; capability ids from `capabilities/catalog.json`
+  are the tool names
 
 ## Current Capabilities
 

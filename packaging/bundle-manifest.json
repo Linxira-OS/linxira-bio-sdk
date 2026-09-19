@@ -29,24 +29,28 @@
     "windows": [
       "linxira-bio.exe",
       "linxira-bio-worker.exe",
-      "linxira-bio-ui.exe"
+      "linxira-bio-ui.exe",
+      "linxira-bio-mcp.exe"
     ],
     "debian": [
       "linxira-bio",
       "linxira-bio-worker",
-      "linxira-bio-ui"
+      "linxira-bio-ui",
+      "linxira-bio-mcp"
     ],
     "arch": [
       "linxira-bio",
       "linxira-bio-worker",
-      "linxira-bio-ui"
+      "linxira-bio-ui",
+      "linxira-bio-mcp"
     ]
   },
   "dependency_notices": {
     "roots": [
       "linxira-bio-cli",
       "linxira-bio-worker",
-      "linxira-bio-ui"
+      "linxira-bio-ui",
+      "linxira-bio-mcp"
     ],
     "targets": {
       "windows": "x86_64-pc-windows-gnu",
