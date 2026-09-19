@@ -20,10 +20,10 @@ eframe = { version = "0.35.0", default-features = false, features = [
     "x11",
 ] }
 flate2 = "1.1"
-linxira-bio-core = { version = "1.0.3", path = "../../engine/crates/linxira-bio-core" }
-linxira-bio-protocol = { version = "1.0.3", path = "../../engine/crates/linxira-bio-protocol" }
-linxira-bio-export = { version = "1.0.3", path = "../../engine/crates/linxira-bio-export" }
-linxira-bio-worker = { version = "1.0.3", path = "../../engine/crates/linxira-bio-worker" }
+linxira-bio-core = { version = "1.1.0", path = "../../engine/crates/linxira-bio-core" }
+linxira-bio-protocol = { version = "1.1.0", path = "../../engine/crates/linxira-bio-protocol" }
+linxira-bio-export = { version = "1.1.0", path = "../../engine/crates/linxira-bio-export" }
+linxira-bio-worker = { version = "1.1.0", path = "../../engine/crates/linxira-bio-worker" }
 png = "0.18.1"
 rfd = { version = "0.15.4", default-features = false, features = [
     "async-std",
