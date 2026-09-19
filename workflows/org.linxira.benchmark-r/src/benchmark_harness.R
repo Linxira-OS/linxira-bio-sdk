@@ -181,8 +181,9 @@ validate_request <- function(document, result_path, registry) {
     path <- require_string(file$path, sprintf("inputs[%d].files[0].path", index - 1L))
     if (!file.exists(path) || dir.exists(path)) request_error(sprintf("input file does not exist: %s", path))
     compression <- if (is.null(file$compression)) "none" else file$compression
-    if (!identical(compression, "none")) {
-      request_error("the benchmark harness reads uncompressed inputs only")
+    allowed <- if (is.null(implementation$input_compression[[role]])) character(0) else implementation$input_compression[[role]]
+    if (!identical(compression, "none") && !(compression %in% allowed)) {
+      request_error(sprintf("input role %s does not accept %s compressed inputs", role, compression))
     }
     sha <- file$sha256
     if (!is.null(sha) && (!is.character(sha) || length(sha) != 1L || nchar(sha) != 64L)) {

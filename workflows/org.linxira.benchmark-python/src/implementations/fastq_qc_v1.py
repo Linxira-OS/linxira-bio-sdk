@@ -32,6 +32,9 @@ from typing import Any
 
 CAPABILITY = "fastq.qc.v1"
 INPUT_ROLES = ("fastq",)
+# The reader dispatches on gzip magic bytes; declared gzip inputs are part
+# of the contract (mirrors the rust engine's transparent decompression).
+INPUT_COMPRESSION = {"fastq": ("none", "gzip")}
 PARAMETERS: tuple[str, ...] = ("max_cycles", "quality_encoding")
 GZIP_MAGIC = b"\x1f\x8b"
 DEFAULT_MAX_CYCLES = 500
