@@ -21,6 +21,9 @@
 IMPLEMENTATION <- list(
   capability = "fastq.qc.v1",
   input_roles = c("fastq"),
+  # The reader opens through gzfile (magic-byte dispatch); declared gzip
+  # inputs are part of the contract.
+  input_compression = list(fastq = c("none", "gzip")),
   parameters = c("max_cycles", "quality_encoding"),
   packages = character(0),
   software = function() list(),

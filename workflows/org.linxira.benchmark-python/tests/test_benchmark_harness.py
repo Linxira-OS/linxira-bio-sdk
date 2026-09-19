@@ -184,6 +184,57 @@ class ParityTests(unittest.TestCase):
             else:
                 assert_close(self, expected, result[field], field)
 
+    def test_fastq_qc_accepts_declared_gzip_and_other_roles_reject_it(self):
+        import gzip as gzip_module
+
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            fastq_gz = workspace / "reads.fastq.gz"
+            with gzip_module.open(fastq_gz, "wb") as handle:
+                handle.write(b"@r1\nACGTACGT\n+\nIIIIIIII\n@r2\nGGCCTTAA\n+\nIIIIIIII\n")
+            fastq_request = {
+                "schema_version": "2",
+                "job_id": "benchmark-fastq-qc-v1",
+                "capability": "fastq.qc.v1",
+                "inputs": [
+                    {
+                        "artifact_id": "input-fastq",
+                        "role": "fastq",
+                        "cardinality": "single",
+                        "files": [
+                            {
+                                "file_id": "input-fastq-1",
+                                "path": str(fastq_gz),
+                                "format": "fastq",
+                                "compression": "gzip",
+                                "size_bytes": fastq_gz.stat().st_size,
+                                "sha256": sha256_of(fastq_gz),
+                            }
+                        ],
+                    }
+                ],
+                "execution": {"mode": "local-cpu", "backend": "python"},
+                "parameters": {"output_directory": str(workspace / "out")},
+            }
+            code, envelope, stderr = run_harness(fastq_request, workspace)
+        self.assertEqual(code, 0, stderr)
+        self.assertEqual(envelope["status"], "ok")
+        self.assertEqual(envelope["result"]["read_count"], 2)
+        self.assertEqual(envelope["result"]["total_bases"], 16)
+
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            fasta_gz = workspace / "reads.fa.gz"
+            with gzip_module.open(fasta_gz, "wb") as handle:
+                handle.write(b">one\nACGT\n")
+            request = make_request(fasta_gz, workspace / "out")
+            request["inputs"][0]["files"][0]["compression"] = "gzip"
+            request["inputs"][0]["files"][0]["sha256"] = sha256_of(fasta_gz)
+            request["inputs"][0]["files"][0]["size_bytes"] = fasta_gz.stat().st_size
+            code, envelope, stderr = run_harness(request, workspace)
+        self.assertEqual(code, 2)
+        self.assertIn("does not accept gzip", stderr)
+
     def test_gzip_input_is_read_by_magic_bytes(self):
         import gzip
 

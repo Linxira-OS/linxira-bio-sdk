@@ -751,6 +751,10 @@ pub struct DependencyLock {
 pub struct WorkflowInputContract {
     pub role: String,
     pub formats: Vec<BioDataFormat>,
+    /// Compression formats this role accepts. Absent or empty means the
+    /// role reads uncompressed inputs only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub compression: Vec<CompressionFormat>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

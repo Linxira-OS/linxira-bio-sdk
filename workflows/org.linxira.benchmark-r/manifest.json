@@ -64,7 +64,7 @@
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "cd874996781ec59e26012d55b5ee0e0cb21cf34bbb5fe007331d6460ec4dcc20"
+      "sha256": "b838830cdabfff55b28b879381cb2163bae6ef4996f58222a1ee7f6205e73340"
     },
     {
       "path": "schemas/output.schema.json",
@@ -72,7 +72,7 @@
     },
     {
       "path": "src/benchmark_harness.R",
-      "sha256": "478f25a8145310307fae95d505e59b86b8f2522b9eed4c08ce96fea56ae04727"
+      "sha256": "d8490cfc89519325ccbf977b83e6d81de386db18ee3ed5fc2b274d3d05df1cd2"
     },
     {
       "path": "src/implementations/sequence_stats_v1.R",
@@ -80,7 +80,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.R",
-      "sha256": "01214f64e4c62698522dcae43057fe6326b9394e60670ad7315b264a612a2ba3"
+      "sha256": "ee697375ef48db8bf830b23a66427e35b5e583bcb3476aacd970cd8533aacc55"
     },
     {
       "path": "src/implementations/expression_pca_v1.R",
@@ -136,7 +136,7 @@
     },
     {
       "path": "src/implementations/fastq_qc_v1.R",
-      "sha256": "7ae5227e4d438a7446efc9bd50f1365dede720b0c11d7305fb33a1e35dd67ddc"
+      "sha256": "7d8af92653c3f9e6c6c4e9fc05f4501963c0d9321ad5bc31e0a3c20b65ec1c2c"
     },
     {
       "path": "tests/reference/fastq.qc.v1.default.json",
@@ -191,6 +191,10 @@
         "role": "fastq",
         "formats": [
           "fastq"
+        ],
+        "compression": [
+          "none",
+          "gzip"
         ]
       }
     ],

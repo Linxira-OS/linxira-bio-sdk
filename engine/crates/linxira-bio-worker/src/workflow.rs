@@ -35,6 +35,7 @@ struct WorkflowContract {
     pack_directory: String,
     roles: Vec<String>,
     input_formats: Vec<BioDataFormat>,
+    input_compression: std::collections::HashMap<String, Vec<CompressionFormat>>,
     parameters: Vec<String>,
     artifact_count: usize,
     artifact_roles: Vec<String>,
@@ -58,6 +59,7 @@ fn bulk_expression_fallback_contract() -> WorkflowContract {
         pack_directory: BULK_EXPRESSION_PACK.to_owned(),
         roles: vec!["counts".to_owned(), "sample_metadata".to_owned()],
         input_formats: vec![BioDataFormat::Csv, BioDataFormat::Tsv],
+        input_compression: std::collections::HashMap::new(),
         parameters: vec![
             "output_directory".to_owned(),
             "feature_id_column".to_owned(),
@@ -92,6 +94,7 @@ fn sequence_convert_fallback_contract() -> WorkflowContract {
             BioDataFormat::Genbank,
             BioDataFormat::Embl,
         ],
+        input_compression: std::collections::HashMap::new(),
         parameters: vec![
             "output_directory".to_owned(),
             "output_filename".to_owned(),
@@ -180,6 +183,7 @@ fn contract_for(
     }
     let mut roles = Vec::with_capacity(declared.inputs.len());
     let mut input_formats = Vec::new();
+    let mut input_compression = std::collections::HashMap::new();
     for input in &declared.inputs {
         if roles.contains(&input.role) {
             return Err(
@@ -192,6 +196,9 @@ fn contract_for(
                 input_formats.push(*format);
             }
         }
+        if !input.compression.is_empty() {
+            input_compression.insert(input.role.clone(), input.compression.clone());
+        }
     }
     Ok(WorkflowContract {
         capabilities: capabilities_for_pack(pack_id)?,
@@ -199,6 +206,7 @@ fn contract_for(
         pack_directory: pack_directory.to_owned(),
         roles,
         input_formats,
+        input_compression,
         parameters: declared.parameters.clone(),
         artifact_count: declared.outputs.roles.len(),
         artifact_roles: declared.outputs.roles.clone(),
@@ -250,6 +258,33 @@ struct WorkflowResumeState {
     input_sha256: BTreeMap<String, String>,
     dependency_lock_sha256: String,
     result: AnalysisResultV2<serde_json::Value>,
+}
+
+fn compression_allowed(
+    contract: &WorkflowContract,
+    role: &str,
+    compression: &CompressionFormat,
+) -> bool {
+    if *compression == CompressionFormat::None {
+        return true;
+    }
+    contract
+        .input_compression
+        .get(role)
+        .is_some_and(|allowed| allowed.contains(compression))
+}
+
+fn compression_name(compression: &CompressionFormat) -> &'static str {
+    match compression {
+        CompressionFormat::None => "none",
+        CompressionFormat::Gzip => "gzip",
+        CompressionFormat::Bgzip => "bgzip",
+        CompressionFormat::Bzip2 => "bzip2",
+        CompressionFormat::Xz => "xz",
+        CompressionFormat::Zstd => "zstd",
+        CompressionFormat::Zip => "zip",
+        CompressionFormat::Unknown => "unknown",
+    }
 }
 
 struct PreparedInput {
@@ -610,8 +645,13 @@ fn prepare_v2_request(
         if !contract.input_formats.contains(&file.format) {
             return Err(format!("input role {} has unsupported format", artifact.role).into());
         }
-        if file.compression != CompressionFormat::None {
-            return Err("workflow does not support compressed inputs".into());
+        if !compression_allowed(contract, &artifact.role, &file.compression) {
+            return Err(format!(
+                "input role {} does not accept {} compressed inputs",
+                artifact.role,
+                compression_name(&file.compression)
+            )
+            .into());
         }
         let path = canonical_existing_input(base_directory, &file.path)?;
         let actual_sha256 = sha256_file(&path)?;

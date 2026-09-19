@@ -80,6 +80,52 @@ with_workspace <- function(body) {
   body(normalizePath(workspace, winslash = "/", mustWork = TRUE))
 }
 
+# --- declared gzip inputs: fastq.qc accepts them, other roles reject --------
+with_workspace(function(workspace) {
+  fastq_gz <- file.path(workspace, "reads.fastq.gz")
+  con <- gzfile(fastq_gz, "wb")
+  writeLines(c("@r1", "ACGTACGT", "+", "IIIIIIII", "@r2", "GGCCTTAA", "+", "IIIIIIII"), con)
+  close(con)
+  request <- list(
+    schema_version = "2",
+    job_id = "benchmark-fastq-qc-v1",
+    capability = "fastq.qc.v1",
+    inputs = list(list(
+      artifact_id = "input-fastq",
+      role = "fastq",
+      cardinality = "single",
+      files = list(list(
+        file_id = "input-fastq-1",
+        path = fastq_gz,
+        format = "fastq",
+        compression = "gzip",
+        size_bytes = as.numeric(file.info(fastq_gz)$size),
+        sha256 = sha256_file(fastq_gz)
+      ))
+    )),
+    execution = list(mode = "local-cpu", backend = "r"),
+    parameters = list(output_directory = file.path(workspace, "out"))
+  )
+  outcome <- run_harness(request, workspace)
+  stopifnot(outcome$code == 0)
+  stopifnot(identical(outcome$envelope$status, "ok"))
+  stopifnot(outcome$envelope$result$read_count == 2)
+  stopifnot(outcome$envelope$result$total_bases == 16)
+})
+
+with_workspace(function(workspace) {
+  fasta_gz <- file.path(workspace, "reads.fa.gz")
+  con <- gzfile(fasta_gz, "wb")
+  writeLines(c(">one", "ACGT"), con)
+  close(con)
+  request <- make_request(fasta_gz, file.path(workspace, "out"))
+  request$inputs[[1]]$files[[1]]$compression <- "gzip"
+  request$inputs[[1]]$files[[1]]$sha256 <- sha256_file(fasta_gz)
+  request$inputs[[1]]$files[[1]]$size_bytes <- as.numeric(file.info(fasta_gz)$size)
+  outcome <- run_harness(request, workspace)
+  stopifnot(outcome$code == 2)
+})
+
 # --- argument parsing -------------------------------------------------------
 stopifnot(inherits(try(parse_arguments(c("--request", "a")), silent = TRUE), "try-error"))
 stopifnot(inherits(try(parse_arguments(c("--request", "a", "--request", "b")), silent = TRUE), "try-error"))

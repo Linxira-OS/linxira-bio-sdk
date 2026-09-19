@@ -122,8 +122,12 @@ def validate_request(document: Any, result_path: Path) -> dict[str, Any]:
         path = Path(require_string(file.get("path"), f"inputs[{index}].files[0].path"))
         if not path.is_file():
             raise RequestError(f"input file does not exist: {path}")
-        if file.get("compression", "none") != "none":
-            raise RequestError("the benchmark harness reads uncompressed inputs only")
+        compression = file.get("compression", "none")
+        allowed = getattr(implementation, "INPUT_COMPRESSION", {}).get(role, ())
+        if compression != "none" and compression not in allowed:
+            raise RequestError(
+                f"input role {role} does not accept {compression} compressed inputs"
+            )
         sha = file.get("sha256")
         if sha is not None and (type(sha) is not str or len(sha) != 64):
             raise RequestError(f"inputs[{index}].files[0].sha256 must be a 64-character hex string")

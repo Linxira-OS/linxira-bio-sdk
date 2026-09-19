@@ -100,7 +100,7 @@
          ]
         },
         "compression": {
-         "const": "none"
+         "enum": ["none", "gzip"]
         },
         "size_bytes": {
          "type": "integer",
