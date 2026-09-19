@@ -160,6 +160,23 @@
                     "unknown"
                   ]
                 }
+              },
+              "compression": {
+                "description": "Compression formats this input role accepts; absent or empty means uncompressed only",
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "none",
+                    "gzip",
+                    "bgzip",
+                    "bzip2",
+                    "xz",
+                    "zstd",
+                    "zip"
+                  ]
+                }
               }
             },
             "additionalProperties": false
