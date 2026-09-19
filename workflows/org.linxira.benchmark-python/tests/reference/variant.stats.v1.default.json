@@ -1,0 +1,25 @@
+{
+  "record_count": 7,
+  "sample_count": 2,
+  "pass_record_count": 4,
+  "filtered_record_count": 2,
+  "snp_count": 4,
+  "indel_count": 1,
+  "mnv_count": 1,
+  "symbolic_count": 2,
+  "multiallelic_record_count": 1,
+  "transition_count": 1,
+  "transversion_count": 1,
+  "ti_tv_ratio": 1.0,
+  "missing_genotype_count": 3,
+  "called_genotype_count": 11,
+  "carrier_genotype_count": 8,
+  "alternate_allele_count": 10,
+  "missing_genotype_rate": 0.21428571428571427,
+  "contig_counts": {
+    "chr1": 2,
+    "chr2": 2,
+    "chrX": 3
+  },
+  "warnings": []
+}

@@ -409,4 +409,35 @@ with_workspace(function(workspace) {
   cat("PCA/Venn/PDB/ORA parity OK; max relative error:", format(parity_max_rel), "\n")
 })
 
+# --- variant.stats.v1 parity (base R only) ---------------------------------
+vs_registry <- load_implementations(file.path(SCRIPT_DIRECTORY, "implementations"))
+stopifnot("variant.stats.v1" %in% names(vs_registry))
+stopifnot(identical(vs_registry[["variant.stats.v1"]]$input_roles, "vcf"))
+stopifnot(identical(vs_registry[["variant.stats.v1"]]$input_compression$vcf, c("none", "gzip")))
+
+vs_impl <- vs_registry[["variant.stats.v1"]]
+vs_result <- vs_impl$run(list(vcf = file.path(repository_root, "tests",
+                                               "fixtures", "variant-stats", "mixed.vcf")), list())
+vs_reference <- read_reference("variant.stats.v1.default.json")
+parity_compare("variant.stats", vs_reference, roundtrip(vs_result))
+
+vs_empty <- vs_impl$run(list(vcf = file.path(repository_root, "tests",
+                                             "fixtures", "variant-stats", "empty.vcf")), list())
+stopifnot(vs_empty$record_count == 0)
+stopifnot(length(vs_empty$warnings) == 2L)
+stopifnot(is.na(vs_empty$ti_tv_ratio), is.na(vs_empty$missing_genotype_rate))
+
+with_workspace(function(workspace) {
+  bad <- file.path(workspace, "bad.vcf")
+  writeLines(c(
+    "##fileformat=VCFv4.2",
+    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\ts1",
+    "chr1\t10\t.\tA\tG\t.\tPASS\t.\tGT\t2/2"
+  ), bad)
+  outcome <- tryCatch(vs_impl$run(list(vcf = bad), list()), error = function(e) e)
+  stopifnot(inherits(outcome, "error"))
+  stopifnot(grepl("GT allele index 2 exceeds the 1 alternate alleles",
+                  conditionMessage(outcome), fixed = TRUE))
+})
+
 cat("benchmark-r harness tests passed", if (have_biostrings) "(with Biostrings parity)" else "(validation only)", "\n")
