@@ -64,7 +64,7 @@
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "b36d1ab78d4515bacef81b8017e163cbe06f560539ff5e2914b220ac79c68f09"
+      "sha256": "f319c2ac55cc94ecfddd2653b647cae76a8e19b870995346da7f1bdcef4a5a32"
     },
     {
       "path": "schemas/output.schema.json",
@@ -72,7 +72,7 @@
     },
     {
       "path": "src/benchmark_harness.py",
-      "sha256": "405eb36a1df3f9e027d4876f74e76986032f186a2739821c69a9d383e84038f7"
+      "sha256": "769ed71a018be909176edf43c7d512504f4037f5748aa771357bcf135e503f05"
     },
     {
       "path": "src/implementations/__init__.py",
@@ -84,7 +84,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.py",
-      "sha256": "875ac5202b213b9d99b63981e436a047232ffe93c2cc4c743c5383bee561e26b"
+      "sha256": "75ca507348a7484f625781f81db096b267d6d1258b8a714fa17a3c407571c2ab"
     },
     {
       "path": "src/implementations/expression_pca_v1.py",
@@ -140,7 +140,7 @@
     },
     {
       "path": "src/implementations/fastq_qc_v1.py",
-      "sha256": "4d63ee94341b9d2bb5939acc8720ceffd80bf6ed5eb67f24732be3a6b9a5700a"
+      "sha256": "6d28925ebe0c3ab4251b8568f71f8a3dd6c0e840c2c5e3d6a10b42e65252d749"
     },
     {
       "path": "tests/reference/fastq.qc.v1.default.json",
@@ -195,6 +195,10 @@
         "role": "fastq",
         "formats": [
           "fastq"
+        ],
+        "compression": [
+          "none",
+          "gzip"
         ]
       }
     ],
