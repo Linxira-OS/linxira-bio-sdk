@@ -184,3 +184,6 @@ Fresh-pull SRA + fasterq + SDK quantify (bias-matched) vs reference quant.sf: by
 
 ## 2026-09-18 — blog mirror
 Snapshot of the live bilingual post (zh/en markdown + SHA256SUMS) after the 2026-09-18 structural reorganization; kept in-repo next to the verification artifacts the post references. See 2026-09-18/blog-mirror/.
+
+## 2026-09-19 — variant.stats.v1 joins the three-way benchmark set
+Python (stdlib) and base-R implementations with exact engine parity (mixed.vcf reference, error-message parity, gzip magic-byte support). Local E2E rust 42ms / python 301ms / consistent; R validated via the pack test suite.
