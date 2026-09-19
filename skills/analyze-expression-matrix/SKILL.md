@@ -55,6 +55,9 @@ Output artifacts:
 - `module-summary.csv`: module sizes
 - `scale-free-fit.csv`: power selection fit indices
 
+Artifacts land in `<output-stem>-wgcna-output/` next to the requested
+result JSON; the result JSON references them by path.
+
 ## Validate And Interpret
 
 - Check feature and sample counts against the experimental design.

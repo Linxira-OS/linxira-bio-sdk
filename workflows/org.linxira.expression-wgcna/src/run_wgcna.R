@@ -263,7 +263,10 @@ run_analysis <- function(config, started_at, project_library) {
     t(filtered), power = best_power, networkType = config$network_type,
     minModuleSize = config$min_module_size, mergeCutHeight = config$merge_cut_height,
     numericLabels = TRUE, pamRespectsDendro = FALSE, verbose = 0L,
-    maxBlockSize = ncol(filtered) + 1L
+    # blockwiseModules blocks over genes (rows of the transposed input);
+    # the +1 margin keeps every gene in a single block. Using ncol here
+    # chunked wide matrices into sample-count-sized micro-blocks.
+    maxBlockSize = nrow(filtered) + 1L
   )
 
   module_labels <- net$colors
