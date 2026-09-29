@@ -1049,8 +1049,8 @@
     },
     {
       "id": "salmon",
-      "display_name": "Kraken2",
-      "category": "taxonomic-classification",
+      "display_name": "Salmon",
+      "category": "transcriptomic-quantification",
       "probes": [
         {
           "program": "salmon",
@@ -1063,20 +1063,20 @@
         "windows": {
           "strategy": "conda",
           "package": "salmon",
-          "source_url": "https://anaconda.org/bioconda/kraken2",
+          "source_url": "https://anaconda.org/bioconda/salmon",
           "requires_admin": false
         },
         "debian": {
           "strategy": "conda",
           "package": "salmon",
-          "source_url": "https://anaconda.org/bioconda/kraken2",
+          "source_url": "https://anaconda.org/bioconda/salmon",
           "requires_admin": false
         },
         "arch": {
-          "strategy": "pacman",
+          "strategy": "conda",
           "package": "salmon",
-          "source_url": "https://archlinux.org/packages/extra/x86_64/kraken2/",
-          "requires_admin": true
+          "source_url": "https://anaconda.org/bioconda/salmon",
+          "requires_admin": false
         }
       }
     }
