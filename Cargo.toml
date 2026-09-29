@@ -9,6 +9,7 @@ members = [
     "engine/crates/linxira-bio-output",
     "engine/crates/linxira-bio-worker",
 ]
+exclude = ["gpu-lab"]
 resolver = "3"
 
 [workspace.package]
