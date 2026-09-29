@@ -3,7 +3,7 @@ set -uo pipefail
 WS=<sdk-workspace>
 SDK=$WS/engine/target/release/linxira-bio
 FD=$WS/tools-env/bin/fasterq-dump
-KEY=<user-home>/<storage-key>
+KEY=<storage-key>
 W=$WS/tmp/r-demo
 export LINXIRA_BIO_SALMON=<sdk-workspace>/tools-env/bin/salmon
 mkdir -p "$W"
