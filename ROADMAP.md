@@ -431,7 +431,7 @@ async fn main() -> std::io::Result<()> {
 
 | 能力                                 | 生态对标                 | 实现(Rust/Py/R)             | 数据类别        | 绘图       | 状态    |
 | ---------------------------------- | -------------------- | ------------------------- | ----------- | -------- | ----- |
-| 转录定量 featureCounts/salmon/kallisto | HTSeq/salmon         | Rust 编排+原生 quant / Py / R | SRR+BAM     | —        | 排期 M4 |
+| 转录定量 featureCounts/salmon/kallisto | HTSeq/salmon         | Rust 编排+原生 quant / Py / R | SRR+BAM     | —        | [x] 2026-09-14 salmon 已发布（expression.quantify.v1）；featureCounts/kallisto 未做 |
 | 单细胞 RNA：质控/降维/聚类/marker            | Seurat(R)/Scanpy(Py) | **R + Py 双实现**            | 矩阵(H5ad)    | ✅UMAP/散点 | 排期 M4 |
 | peaks calling + ChIP/ATAC 富集       | MACS2/SEACR          | 原生 MACS2                  | SRR+BAM     | ✅峰型图     | 排期 M4 |
 | 甲基化 BS-seq / DMR 检测                | Bismark/MethylKit    | Py + R                    | SRR(BS-seq) | ✅DMR图    | 排期 M4 |
@@ -452,23 +452,23 @@ async fn main() -> std::io::Result<()> {
 | GWAS + 曼哈顿/QQ图         | plink/GAPIT              | **R**           | 变异+样本表    | ✅曼哈顿    | 未开始 |
 | Hi-C 接触矩阵/TAD 检测       | HiC-Pro/HiCExplorer      | Py              | SRR(Hi-C) | ✅热图/染色质 | 未开始 |
 | 蛋白信号肽/跨膜/亚细胞           | Phobius/TMHMM/DeepLoc    | Py              | 序列        | ✅拓扑图    | 未开始 |
-| 蛋白家族/结构域功能注释           | InterProScan/Pfam        | 原生              | 序列/结构     | ✅域图     | 未开始 |
+| 蛋白家族/结构域功能注释           | InterProScan/Pfam        | 原生              | 序列/结构     | ✅域图     | 部分：结果解析已发布（InterProScan TSV / HMMER domtblout，2026-07-26）；完整注释流程未做 |
 | 通路图叠加(富集映射)            | pathview/KEGG            | **R**           | 富集结果      | ✅通路图    | 未开始 |
 
 ### 🟡 三批
 
 | 能力                    | 生态对标                   | 实现(Rust/Py/R)  | 数据类别         | 绘图     | 状态  |
 | --------------------- | ---------------------- | -------------- | ------------ | ------ | --- |
-| 引物设计(Tm/GC/二级结构)      | Primer3                | Rust + Primer3 | 序列           | —      | 未开始 |
+| 引物设计(Tm/GC/二级结构)      | Primer3                | Rust + Primer3 | 序列           | —      | 未开始（相邻：引物 ePCR 验证已发布 primer.epcr.v1） |
 | 密码子使用/偏好              | EMBOSS cusp            | Rust           | 序列           | ✅bar   | 未开始 |
 | 两两序列比对(SW/NW/贪心)      | parasail/EMBOSS        | Rust           | 序列           | ✅点图    | 未开始 |
 | 通用统计检验(t/卡方/ANOVA/相关) | scipy.stats            | Py             | 样本表/矩阵       | —      | 未开始 |
-| 基因集富集(超几何/卡方)补充       | clusterProfiler        | **R**          | 富集           | ✅bar   | 未开始 |
-| 生存分析/COX/Lasso 蛋白组学   | survival/glmnet        | **R**          | 样本表          | ✅KM曲线  | 未开始 |
-| 代谢组学归一化/差异代谢物         | XCMS/MetaboAnalyst     | R/Py           | 矩阵(质谱)       | ✅火山/箱线 | 未开始 |
+| 基因集富集(超几何/卡方)补充       | clusterProfiler        | **R**          | 富集           | ✅bar   | [x] 2026-07-26 已发布（GO/KEGG ORA + preranked GSEA） |
+| 生存分析/COX/Lasso 蛋白组学   | survival/glmnet        | **R**          | 样本表          | ✅KM曲线  | [x] 2026-08-15 Cox 已发布（medical.survival.v1）；Lasso 蛋白组学未做 |
+| 代谢组学归一化/差异代谢物         | XCMS/MetaboAnalyst     | R/Py           | 矩阵(质谱)       | ✅火山/箱线 | 未开始（相邻：mzML 峰检测已发布 medical.metabolomics.v1，2026-08-15） |
 | 质谱肽段鉴定/定量             | MaxQuant/DIANN         | 原生             | 其他(RAW/mzML) | ✅色谱    | 未开始 |
-| 药物基因组注释(星等位基因)        | PharmGKB               | Py/R           | 变异           | —      | 未开始 |
-| 空间转录组聚类/去卷积           | Seurat spatial/Squidpy | Py/R           | 矩阵(img)      | ✅空间图   | 未开始 |
+| 药物基因组注释(星等位基因)        | PharmGKB               | Py/R           | 变异           | —      | [x] 2026-08-15 已发布（medical.pharmacogenomics.v1） |
+| 空间转录组聚类/去卷积           | Seurat spatial/Squidpy | Py/R           | 矩阵(img)      | ✅空间图   | 部分：计数矩阵摘要已发布（medical.spatial-transcriptomics.v1，2026-08-15）；聚类/去卷积未做 |
 | 三维基因组 A/B 区室/TAD      | HiCExplorer/cooler     | Py             | SRR(Hi-C)    | ✅染色质图  | 未开始 |
 | RNA 编辑/修饰检测           | REDItools/JACUSA2      | 原生             | SRR          | ✅位点图   | 未开始 |
 
