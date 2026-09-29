@@ -73,6 +73,8 @@ pub fn embedded_document(capability: &str, locale: &str) -> Option<&'static str>
         ("expression.matrix.qc.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/expression.matrix.qc.v1/zh-CN.md")),
         ("expression.normalize.v1", "en-US") => Some(include_str!("../../../docs/capabilities/expression.normalize.v1/en-US.md")),
         ("expression.normalize.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/expression.normalize.v1/zh-CN.md")),
+        ("expression.normalize.v2", "en-US") => Some(include_str!("../../../docs/capabilities/expression.normalize.v2/en-US.md")),
+        ("expression.normalize.v2", "zh-CN") => Some(include_str!("../../../docs/capabilities/expression.normalize.v2/zh-CN.md")),
         ("expression.pca.v1", "en-US") => Some(include_str!("../../../docs/capabilities/expression.pca.v1/en-US.md")),
         ("expression.pca.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/expression.pca.v1/zh-CN.md")),
         ("expression.quantify.v1", "en-US") => Some(include_str!("../../../docs/capabilities/expression.quantify.v1/en-US.md")),

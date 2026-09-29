@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/expression-normalization.v2.json",
+  "title": "Linxira Bio expression length normalization result",
+  "type": "object",
+  "required": [
+    "method",
+    "feature_count",
+    "sample_count",
+    "length_unit",
+    "length_statistics",
+    "samples",
+    "warnings"
+  ],
+  "properties": {
+    "method": {"enum": ["tpm", "fpkm", "rpkm"]},
+    "feature_count": {"type": "integer", "minimum": 1},
+    "sample_count": {"type": "integer", "minimum": 1},
+    "length_unit": {"enum": ["bp"]},
+    "length_statistics": {
+      "type": "object",
+      "required": [
+        "minimum_bp",
+        "median_bp",
+        "maximum_bp",
+        "zero_count_feature_count"
+      ],
+      "properties": {
+        "minimum_bp": {"type": "number", "exclusiveMinimum": 0},
+        "median_bp": {"type": "number", "exclusiveMinimum": 0},
+        "maximum_bp": {"type": "number", "exclusiveMinimum": 0},
+        "zero_count_feature_count": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sample", "input_total", "scale_factor", "output_total"],
+        "properties": {
+          "sample": {"type": "string", "minLength": 1},
+          "input_total": {"type": "number", "minimum": 0},
+          "scale_factor": {"type": "number", "exclusiveMinimum": 0},
+          "output_total": {"type": "number"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

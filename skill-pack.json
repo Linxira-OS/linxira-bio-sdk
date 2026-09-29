@@ -152,6 +152,7 @@
       "capabilities": [
         "expression.matrix.qc.v1",
         "expression.normalize.v1",
+        "expression.normalize.v2",
         "expression.pca.v1",
         "expression.cluster.v1",
         "expression.heatmap.v1"

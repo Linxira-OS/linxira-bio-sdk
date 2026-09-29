@@ -1,7 +1,7 @@
 use csv::{ReaderBuilder, Trim, WriterBuilder};
 use flate2::read::MultiGzDecoder;
 use serde::Serialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
@@ -84,6 +84,63 @@ pub struct ExpressionNormalizationSummary {
     pub feature_count: u64,
     pub sample_count: u64,
     pub pseudocount: Option<f64>,
+    pub samples: Vec<ExpressionNormalizationSample>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExpressionLengthNormalizationMethod {
+    Tpm,
+    Fpkm,
+    Rpkm,
+}
+
+impl ExpressionLengthNormalizationMethod {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Tpm => "tpm",
+            Self::Fpkm => "fpkm",
+            Self::Rpkm => "rpkm",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExpressionLengthNormalizeOptions {
+    pub method: ExpressionLengthNormalizationMethod,
+}
+
+impl Default for ExpressionLengthNormalizeOptions {
+    fn default() -> Self {
+        Self {
+            method: ExpressionLengthNormalizationMethod::Tpm,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FeatureLengthTable {
+    pub feature_id_column: String,
+    pub length_column: String,
+    pub lengths: BTreeMap<String, f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct FeatureLengthStatistics {
+    pub minimum_bp: f64,
+    pub median_bp: f64,
+    pub maximum_bp: f64,
+    pub zero_count_feature_count: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ExpressionLengthNormalizationSummary {
+    pub method: String,
+    pub feature_count: u64,
+    pub sample_count: u64,
+    pub length_unit: String,
+    pub length_statistics: FeatureLengthStatistics,
     pub samples: Vec<ExpressionNormalizationSample>,
     pub warnings: Vec<String>,
 }
@@ -545,6 +602,251 @@ pub fn normalize_expression_matrix_path(
         sample_count: sample_count as u64,
         pseudocount: (options.method == ExpressionNormalizationMethod::Log2Cpm)
             .then_some(options.pseudocount),
+        samples,
+        warnings,
+    })
+}
+
+pub fn parse_expression_length_normalization_method(
+    value: &str,
+) -> Result<ExpressionLengthNormalizationMethod, ExpressionMatrixError> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "tpm" => Ok(ExpressionLengthNormalizationMethod::Tpm),
+        "fpkm" => Ok(ExpressionLengthNormalizationMethod::Fpkm),
+        "rpkm" => Ok(ExpressionLengthNormalizationMethod::Rpkm),
+        _ => Err(ExpressionMatrixError::InvalidOptions(format!(
+            "unsupported length normalization method {value:?}; expected tpm, fpkm, or rpkm"
+        ))),
+    }
+}
+
+pub fn read_feature_lengths_path(
+    path: impl AsRef<Path>,
+) -> Result<FeatureLengthTable, ExpressionMatrixError> {
+    let input = open_expression_input(path.as_ref())?;
+    read_feature_lengths(BufReader::new(input))
+}
+
+fn read_feature_lengths(
+    mut input: impl BufRead,
+) -> Result<FeatureLengthTable, ExpressionMatrixError> {
+    let delimiter = infer_delimiter(input.fill_buf()?)?;
+    let mut reader = ReaderBuilder::new()
+        .delimiter(delimiter)
+        .has_headers(true)
+        .flexible(false)
+        .trim(Trim::All)
+        .from_reader(input);
+    let headers = reader.headers()?.clone();
+    if headers.len() != 2 || headers[0].is_empty() || headers[1].is_empty() {
+        return Err(ExpressionMatrixError::InvalidHeader(
+            "expected exactly two named columns: feature identifier and length in bp".to_owned(),
+        ));
+    }
+    let mut lengths = BTreeMap::new();
+    for (record_index, record) in reader.records().enumerate() {
+        let record = record?;
+        let feature_id = record[0].trim();
+        let length =
+            record[1]
+                .parse::<f64>()
+                .map_err(|_| ExpressionMatrixError::InvalidRecord {
+                    record: record_index as u64 + 1,
+                    message: format!("length for {feature_id:?} is not a number"),
+                })?;
+        if !length.is_finite() || length <= 0.0 {
+            return Err(ExpressionMatrixError::InvalidRecord {
+                record: record_index as u64 + 1,
+                message: format!("length for {feature_id:?} must be finite and positive"),
+            });
+        }
+        if lengths.insert(feature_id.to_owned(), length).is_some() {
+            return Err(ExpressionMatrixError::InvalidRecord {
+                record: record_index as u64 + 1,
+                message: format!("feature identifier {feature_id:?} is duplicated"),
+            });
+        }
+    }
+    if lengths.is_empty() {
+        return Err(ExpressionMatrixError::Analysis(
+            "feature length table contains no rows".to_owned(),
+        ));
+    }
+    Ok(FeatureLengthTable {
+        feature_id_column: headers[0].to_owned(),
+        length_column: headers[1].to_owned(),
+        lengths,
+    })
+}
+
+pub fn normalize_expression_by_feature_length_path(
+    input_path: impl AsRef<Path>,
+    lengths_path: impl AsRef<Path>,
+    output_path: impl AsRef<Path>,
+    options: &ExpressionLengthNormalizeOptions,
+) -> Result<ExpressionLengthNormalizationSummary, ExpressionMatrixError> {
+    let input_path = input_path.as_ref();
+    let lengths_path = lengths_path.as_ref();
+    let output_path = output_path.as_ref();
+    if input_path == output_path || lengths_path == output_path {
+        return Err(ExpressionMatrixError::InvalidOptions(
+            "input and output paths must differ".to_owned(),
+        ));
+    }
+    let matrix = read_numeric_expression_matrix_path(input_path)?;
+    validate_nonnegative_matrix(&matrix)?;
+    let table = read_feature_lengths_path(lengths_path)?;
+
+    let mut lengths = Vec::with_capacity(matrix.feature_ids.len());
+    let mut missing: Vec<&str> = Vec::new();
+    for feature_id in &matrix.feature_ids {
+        match table.lengths.get(feature_id) {
+            Some(length) => lengths.push(*length),
+            None => missing.push(feature_id),
+        }
+    }
+    if !missing.is_empty() {
+        let preview = missing
+            .iter()
+            .take(5)
+            .map(|id| format!("{id:?}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(ExpressionMatrixError::Analysis(format!(
+            "feature length table is missing {} matrix feature(s), first: {preview}",
+            missing.len()
+        )));
+    }
+
+    let sample_count = matrix.sample_names.len();
+    let feature_count = matrix.feature_ids.len();
+    let input_totals = column_totals(&matrix.values, sample_count);
+    // Per-kilobase rates: count / (length_bp / 1000), computed as count * 1000 / length.
+    let rates: Vec<Vec<f64>> = matrix
+        .values
+        .iter()
+        .zip(&lengths)
+        .map(|(row, length)| {
+            row.iter()
+                .map(|value| value * 1000.0 / length)
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    let rate_totals = column_totals(&rates, sample_count);
+
+    let scale_factors = match options.method {
+        ExpressionLengthNormalizationMethod::Tpm => rate_totals
+            .iter()
+            .enumerate()
+            .map(|(index, total)| {
+                if *total <= 0.0 {
+                    Err(ExpressionMatrixError::Analysis(format!(
+                        "sample {:?} has no positive per-kilobase rate; TPM is undefined",
+                        matrix.sample_names[index]
+                    )))
+                } else {
+                    Ok(1_000_000.0 / total)
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        ExpressionLengthNormalizationMethod::Fpkm | ExpressionLengthNormalizationMethod::Rpkm => {
+            input_totals
+                .iter()
+                .enumerate()
+                .map(|(index, total)| {
+                    if *total <= 0.0 {
+                        Err(ExpressionMatrixError::Analysis(format!(
+                            "sample {:?} has zero library size",
+                            matrix.sample_names[index]
+                        )))
+                    } else {
+                        Ok(1_000_000.0 / total)
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        }
+    };
+
+    let mut writer = WriterBuilder::new()
+        .delimiter(b'\t')
+        .from_path(output_path)?;
+    let mut header = Vec::with_capacity(sample_count + 1);
+    header.push(matrix.feature_id_column.as_str());
+    header.extend(matrix.sample_names.iter().map(String::as_str));
+    writer.write_record(header)?;
+    let mut output_totals = vec![0.0; sample_count];
+    for (feature_id, row) in matrix.feature_ids.iter().zip(&rates) {
+        let mut record = Vec::with_capacity(sample_count + 1);
+        record.push(feature_id.clone());
+        for (sample_index, rate) in row.iter().enumerate() {
+            let normalized = rate * scale_factors[sample_index];
+            output_totals[sample_index] += normalized;
+            record.push(normalized.to_string());
+        }
+        writer.write_record(record)?;
+    }
+    writer.flush()?;
+
+    let samples = matrix
+        .sample_names
+        .iter()
+        .enumerate()
+        .map(|(index, sample)| ExpressionNormalizationSample {
+            sample: sample.clone(),
+            input_total: input_totals[index],
+            scale_factor: scale_factors[index],
+            output_total: output_totals[index],
+        })
+        .collect();
+
+    let mut sorted_lengths = lengths.clone();
+    sorted_lengths.sort_by(|a, b| a.total_cmp(b));
+    let middle = sorted_lengths.len() / 2;
+    let median_bp = if sorted_lengths.len() % 2 == 0 {
+        (sorted_lengths[middle - 1] + sorted_lengths[middle]) / 2.0
+    } else {
+        sorted_lengths[middle]
+    };
+    let zero_count_feature_count = matrix
+        .values
+        .iter()
+        .filter(|row| row.iter().all(|value| *value == 0.0))
+        .count() as u64;
+
+    let mut warnings = vec![match options.method {
+        ExpressionLengthNormalizationMethod::Tpm => {
+            "TPM values are length-normalized rates whose columns sum to one million; do not feed them to count-based models".to_owned()
+        }
+        ExpressionLengthNormalizationMethod::Fpkm | ExpressionLengthNormalizationMethod::Rpkm => {
+            "FPKM/RPKM values are length- and library-normalized rates, not counts; do not feed them to count-based models".to_owned()
+        }
+    }];
+    if let Some(method) =
+        (options.method == ExpressionLengthNormalizationMethod::Rpkm).then_some(options.method)
+    {
+        warnings.push(format!(
+            "{} is reported under its historical single-end name and is numerically identical to fpkm",
+            method.as_str()
+        ));
+    }
+    if table.lengths.len() > feature_count {
+        warnings.push(format!(
+            "feature length table contains {} identifier(s) not present in the matrix",
+            table.lengths.len() - feature_count
+        ));
+    }
+
+    Ok(ExpressionLengthNormalizationSummary {
+        method: options.method.as_str().to_owned(),
+        feature_count: feature_count as u64,
+        sample_count: sample_count as u64,
+        length_unit: "bp".to_owned(),
+        length_statistics: FeatureLengthStatistics {
+            minimum_bp: sorted_lengths[0],
+            median_bp,
+            maximum_bp: sorted_lengths[sorted_lengths.len() - 1],
+            zero_count_feature_count,
+        },
         samples,
         warnings,
     })
@@ -1635,11 +1937,12 @@ pub fn expression_quantify_path(
 #[cfg(test)]
 mod tests {
     use super::{
-        ExpressionClusterOptions, ExpressionHeatmapOptions, ExpressionMatrixError,
-        ExpressionNormalizationMethod, ExpressionNormalizeOptions, ExpressionPcaOptions,
-        expression_cluster_path, expression_heatmap_path, expression_matrix_qc,
-        expression_pca_path, normalize_expression_matrix_path,
-        parse_expression_normalization_method,
+        ExpressionClusterOptions, ExpressionHeatmapOptions, ExpressionLengthNormalizationMethod,
+        ExpressionLengthNormalizeOptions, ExpressionMatrixError, ExpressionNormalizationMethod,
+        ExpressionNormalizeOptions, ExpressionPcaOptions, expression_cluster_path,
+        expression_heatmap_path, expression_matrix_qc, expression_pca_path,
+        normalize_expression_by_feature_length_path, normalize_expression_matrix_path,
+        parse_expression_length_normalization_method, parse_expression_normalization_method,
     };
     use std::fs;
     use std::io::Cursor;
@@ -1808,6 +2111,158 @@ mod tests {
             ExpressionNormalizationMethod::MedianRatio
         );
         assert!(parse_expression_normalization_method("quantile").is_err());
+    }
+
+    #[test]
+    fn normalizes_counts_to_tpm_with_feature_lengths() {
+        let input = write_matrix("gene\ts1\ts2\nA\t10\t30\nB\t10\t10\nC\t0\t20\n");
+        let lengths = write_matrix("gene\tlength_bp\nA\t1000\nB\t500\nC\t2000\n");
+        let output = temporary_path("tpm.tsv");
+        let summary = normalize_expression_by_feature_length_path(
+            &input,
+            &lengths,
+            &output,
+            &ExpressionLengthNormalizeOptions::default(),
+        )
+        .expect("normalize to tpm");
+
+        assert_eq!(summary.method, "tpm");
+        assert_eq!(summary.feature_count, 3);
+        assert_eq!(summary.length_unit, "bp");
+        assert_eq!(summary.length_statistics.minimum_bp, 500.0);
+        assert_eq!(summary.length_statistics.median_bp, 1000.0);
+        assert_eq!(summary.length_statistics.maximum_bp, 2000.0);
+        assert_eq!(summary.length_statistics.zero_count_feature_count, 0);
+        for sample in &summary.samples {
+            assert!((sample.output_total - 1_000_000.0).abs() < 1e-6);
+        }
+        assert!((summary.samples[0].input_total - 20.0).abs() < 1e-9);
+        assert!((summary.samples[1].input_total - 60.0).abs() < 1e-9);
+        let written = fs::read_to_string(&output).expect("read tpm matrix");
+        let s1_a = tpm_cell(&written, "A", 1);
+        let s1_b = tpm_cell(&written, "B", 1);
+        assert!((s1_a - 10.0 / 30.0 * 1_000_000.0).abs() < 1e-6);
+        assert!((s1_b - 20.0 / 30.0 * 1_000_000.0).abs() < 1e-6);
+        let s2_c = tpm_cell(&written, "C", 2);
+        assert!((s2_c - 10.0 / 60.0 * 1_000_000.0).abs() < 1e-6);
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(lengths);
+        let _ = fs::remove_file(output);
+    }
+
+    #[test]
+    fn normalizes_counts_to_fpkm_and_rpkm_identically() {
+        let input = write_matrix("gene\ts1\nA\t10\nB\t10\n");
+        let lengths = write_matrix("gene\tbp\nA\t1000\nB\t500\n");
+        let fpkm_output = temporary_path("fpkm.tsv");
+        let summary = normalize_expression_by_feature_length_path(
+            &input,
+            &lengths,
+            &fpkm_output,
+            &ExpressionLengthNormalizeOptions {
+                method: ExpressionLengthNormalizationMethod::Fpkm,
+            },
+        )
+        .expect("normalize to fpkm");
+
+        assert_eq!(summary.method, "fpkm");
+        assert!((summary.samples[0].scale_factor - 1_000_000.0 / 20.0).abs() < 1e-9);
+        let written = fs::read_to_string(&fpkm_output).expect("read fpkm matrix");
+        // s1: A rate 10/kb * 50,000 = 500,000; B rate 20/kb * 50,000 = 1,000,000.
+        let a = tpm_cell(&written, "A", 1);
+        let b = tpm_cell(&written, "B", 1);
+        assert!((a - 500_000.0).abs() < 1e-6);
+        assert!((b - 1_000_000.0).abs() < 1e-6);
+
+        let rpkm_output = temporary_path("rpkm.tsv");
+        let rpkm_summary = normalize_expression_by_feature_length_path(
+            &input,
+            &lengths,
+            &rpkm_output,
+            &ExpressionLengthNormalizeOptions {
+                method: ExpressionLengthNormalizationMethod::Rpkm,
+            },
+        )
+        .expect("normalize to rpkm");
+        assert_eq!(rpkm_summary.method, "rpkm");
+        let rpkm_written = fs::read_to_string(&rpkm_output).expect("read rpkm matrix");
+        assert_eq!(tpm_cell(&rpkm_written, "A", 1), tpm_cell(&written, "A", 1));
+        assert!(
+            rpkm_summary
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("numerically identical to fpkm"))
+        );
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(lengths);
+        let _ = fs::remove_file(fpkm_output);
+        let _ = fs::remove_file(rpkm_output);
+    }
+
+    #[test]
+    fn rejects_incomplete_feature_length_tables() {
+        let input = write_matrix("gene\ts1\nA\t10\nB\t10\n");
+        let lengths = write_matrix("gene\tbp\nA\t1000\nD\t250\n");
+        let output = temporary_path("tpm.tsv");
+        let error = normalize_expression_by_feature_length_path(
+            &input,
+            &lengths,
+            &output,
+            &ExpressionLengthNormalizeOptions::default(),
+        )
+        .expect_err("missing feature length must fail");
+        assert!(error.to_string().contains("missing 1 matrix feature"));
+
+        let zero_lengths = write_matrix("gene\tbp\nA\t0\nB\t100\n");
+        let error = normalize_expression_by_feature_length_path(
+            &input,
+            &zero_lengths,
+            &output,
+            &ExpressionLengthNormalizeOptions::default(),
+        )
+        .expect_err("zero length must fail");
+        assert!(error.to_string().contains("must be finite and positive"));
+
+        let valid_lengths = write_matrix("gene\tbp\nA\t1000\nB\t500\nD\t250\n");
+        let summary = normalize_expression_by_feature_length_path(
+            &input,
+            &valid_lengths,
+            &output,
+            &ExpressionLengthNormalizeOptions::default(),
+        )
+        .expect("extra identifiers only warn");
+        assert!(
+            summary
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("1 identifier(s) not present in the matrix"))
+        );
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(lengths);
+        let _ = fs::remove_file(zero_lengths);
+        let _ = fs::remove_file(valid_lengths);
+        let _ = fs::remove_file(output);
+    }
+
+    #[test]
+    fn parses_length_normalization_methods_strictly() {
+        assert_eq!(
+            parse_expression_length_normalization_method("rpkm").expect("method"),
+            ExpressionLengthNormalizationMethod::Rpkm
+        );
+        assert!(parse_expression_length_normalization_method("tmm").is_err());
+        assert!(parse_expression_normalization_method("tpm").is_err());
+    }
+
+    fn tpm_cell(matrix: &str, feature: &str, sample_index: usize) -> f64 {
+        let line = matrix
+            .lines()
+            .find(|line| line.starts_with(feature))
+            .unwrap_or_else(|| panic!("feature {feature} missing from matrix"));
+        line.split('\t')
+            .nth(sample_index)
+            .and_then(|cell| cell.parse::<f64>().ok())
+            .unwrap_or_else(|| panic!("missing numeric cell for {feature}"))
     }
 
     fn quant_sf_fixture() -> &'static str {

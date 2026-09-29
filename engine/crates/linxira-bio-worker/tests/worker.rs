@@ -1103,6 +1103,41 @@ fn executes_coordinate_structure_analysis_jobs() {
 }
 
 #[test]
+fn executes_v2_expression_length_normalization_fixture() {
+    let root = workspace_root();
+    let output_path = root.join("target/test-results/expression-normalize-tpm-v2.tsv");
+    std::fs::create_dir_all(output_path.parent().expect("output parent"))
+        .expect("create expression result directory");
+    if output_path.exists() {
+        std::fs::remove_file(&output_path).expect("remove stale normalized matrix");
+    }
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio-worker"))
+        .arg(root.join("tests/fixtures/jobs/expression-normalize-tpm-v2.json"))
+        .output()
+        .expect("run length-normalization worker");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("valid expression result");
+    assert_eq!(result["schema_version"], "2");
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["capability"], "expression.normalize.v2");
+    assert_eq!(result["result"]["method"], "tpm");
+    assert_eq!(result["result"]["length_unit"], "bp");
+    assert_eq!(
+        result["provenance"]["input_sha256"]
+            .as_object()
+            .map(|hashes| hashes.len()),
+        Some(2)
+    );
+    assert!(output_path.exists());
+    std::fs::remove_file(output_path).expect("remove normalized expression output");
+}
+
+#[test]
 fn executes_v2_expression_analysis_fixtures() {
     let root = workspace_root();
     let output_path = root.join("target/test-results/expression-normalize-v2.tsv");

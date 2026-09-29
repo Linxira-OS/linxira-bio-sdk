@@ -27,10 +27,11 @@ use linxira_bio_core::environment::{
     parse_environment_mode, plan_environment_with_options,
 };
 use linxira_bio_core::expression::{
-    ExpressionClusterOptions, ExpressionHeatmapOptions, ExpressionNormalizeOptions,
-    ExpressionPcaOptions, expression_cluster_path, expression_heatmap_path,
-    expression_matrix_qc_path, expression_pca_path, normalize_expression_matrix_path,
-    parse_expression_normalization_method,
+    ExpressionClusterOptions, ExpressionHeatmapOptions, ExpressionLengthNormalizeOptions,
+    ExpressionNormalizeOptions, ExpressionPcaOptions, expression_cluster_path,
+    expression_heatmap_path, expression_matrix_qc_path, expression_pca_path,
+    normalize_expression_by_feature_length_path, normalize_expression_matrix_path,
+    parse_expression_length_normalization_method, parse_expression_normalization_method,
 };
 use linxira_bio_core::fastq::{
     DEFAULT_MAX_CYCLES, FastqQcOptions, QualityEncodingMode, fastq_qc_path,
@@ -1123,6 +1124,33 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
             ensure_distinct_input_output(&input, &output)?;
             let options = expression_normalize_options(&request.parameters)?;
             let summary = normalize_expression_matrix_path(&input, &output, &options)?;
+            serialize_v2_file_artifact_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                summary,
+                FileArtifactSpec {
+                    artifact_id: "normalized-expression-matrix",
+                    role: "matrix",
+                    kind: OutputArtifactKind::DomainFile,
+                    path: output,
+                    format: Some(BioDataFormat::Tsv),
+                    media_type: Some("text/tab-separated-values"),
+                },
+            )
+        }
+        "expression.normalize.v2" => {
+            let input = resolve_v2_single_input(base_directory, &request, "matrix")?;
+            let lengths = resolve_v2_single_input(base_directory, &request, "lengths")?;
+            let output = resolve_input(
+                base_directory,
+                required_sequence_output(&request.parameters, &request.capability)?,
+            );
+            ensure_distinct_input_output(&input, &output)?;
+            ensure_distinct_input_output(&lengths, &output)?;
+            let options = expression_normalize_v2_options(&request.parameters)?;
+            let summary =
+                normalize_expression_by_feature_length_path(input, lengths, &output, &options)?;
             serialize_v2_file_artifact_result(
                 &request,
                 base_directory,
@@ -2422,6 +2450,7 @@ pub fn v2_contract(
         "medical.cohort-table.qc.v1" => (&["cohort"], &[]),
         "medical.single-cell-qc.v1" => (&["matrix"], &[]),
         "expression.normalize.v1" => (&["matrix"], &["output", "method", "pseudocount"]),
+        "expression.normalize.v2" => (&["matrix", "lengths"], &["output", "method"]),
         "expression.pca.v1" => (&["matrix"], &["components", "scale_features"]),
         "expression.cluster.v1" => (
             &["matrix"],
@@ -5539,6 +5568,16 @@ fn expression_normalize_options(
             return Err("pseudocount must be non-negative".into());
         }
         options.pseudocount = pseudocount;
+    }
+    Ok(options)
+}
+
+fn expression_normalize_v2_options(
+    parameters: &serde_json::Value,
+) -> WorkerResult<ExpressionLengthNormalizeOptions> {
+    let mut options = ExpressionLengthNormalizeOptions::default();
+    if let Some(method) = optional_parameter_string(parameters, "method")? {
+        options.method = parse_expression_length_normalization_method(method)?;
     }
     Ok(options)
 }

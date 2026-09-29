@@ -1,0 +1,18 @@
+{
+  "method": "tpm",
+  "feature_count": 4,
+  "sample_count": 3,
+  "length_unit": "bp",
+  "length_statistics": {
+    "minimum_bp": 500.0,
+    "median_bp": 1500.0,
+    "maximum_bp": 2000.0,
+    "zero_count_feature_count": 1
+  },
+  "samples": [
+    {"sample": "wt_1", "input_total": 50.0, "scale_factor": 22222.222222222223, "output_total": 1000000.0},
+    {"sample": "wt_2", "input_total": 70.0, "scale_factor": 16666.666666666668, "output_total": 1000000.0},
+    {"sample": "ko_1", "input_total": 90.0, "scale_factor": 11111.111111111111, "output_total": 1000000.0}
+  ],
+  "warnings": ["TPM values are length-normalized rates whose columns sum to one million; do not feed them to count-based models"]
+}

@@ -73,6 +73,7 @@ SCHEMA_FILES = (
     "schemas/expression-heatmap.schema.json",
     "schemas/expression-matrix-qc.schema.json",
     "schemas/expression-normalization.schema.json",
+    "schemas/expression-normalization-v2.schema.json",
     "schemas/expression-pca.schema.json",
     "schemas/gene-density.schema.json",
     "schemas/gsea.schema.json",
@@ -183,6 +184,10 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/expression-normalization.json",
         "schemas/expression-normalization.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/expression-normalization-v2.json",
+        "schemas/expression-normalization-v2.schema.json",
     ),
     (
         "tests/fixtures/capability-results/enrichment-custom.json",
