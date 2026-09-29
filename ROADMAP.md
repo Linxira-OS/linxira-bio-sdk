@@ -390,30 +390,59 @@ async fn main() -> std::io::Result<()> {
 - **架构事实**：国产卡 CUDA 兼容全部为**源码级**（musify/cu-bridge 重编译），PTX/cubin 二进制
   不通用——跨厂商可复用的是 host 侧 driver FFI 与 WGSL，不是内核二进制。
 
-**硬件与叙事策略**（2026-09-29 拍板）：**Linux 先行，以旧卡档位为兼容基线**——GTX 750 Ti
-（Maxwell sm_50，与新 CUDA 栈断代，仅剩 Vulkan 1.1 路径）与 RX 580（Polaris gfx803，
-ROCm 官方不支持，走 Vulkan）为最低兼容档，**最低档能跑则向上皆稳**（向下兼容策略，符合国情
-设备现状）。**AMD 双层路径**：Vulkan 为广泛覆盖基线与回退层（旧卡靠它），ROCm/HIP 官方栈
-在新卡（云租 RX 9060/9070 XT）并行验证。云租：RTX 4090（sm_89，cutile-rs 可用）、昇腾
-910B。**"旧卡与核显上跑出性能"是核心宣传叙事**；生信负载大量数据驻留内存（相关矩阵、
-k-mer 表、质量直方图），Rust 内存安全对照 C++ 内核的内存泄露/任务中断问题为第二条叙事主线；
-CPU 型任务（如 Vina 对接编排的 Rust 多核加速）同轨发声。不让 NVIDIA 一家独大：
-**wgpu/Vulkan 通用层为基线**（本机 Intel 核显开发 + RX 580/750 Ti 验证）；**国产顺序摩尔
-线程优先**（S80 民用零售个人可购 + KUAE 云租好租，cudarc-musa 首批窗口）＞华为昇腾
-（云租好租，社区 cann-rs，后置）。
+**硬件与叙事策略**（2026-09-30 定案，含本机实测）：**Linux 先行，以旧卡档位为兼容基线**——
+GTX 750 Ti（Maxwell sm_50，与新 CUDA 栈断代，仅剩 Vulkan 1.1）与 RX 580（Polaris gfx803，
+ROCm 官方不支持）为最低兼容档，**最低档能跑则向上皆稳**。**AMD 双层路径**：Vulkan 为覆盖
+基线与回退层（旧卡靠它），ROCm/HIP 官方栈在新卡（云租 RX 9060/9070 XT）并行验证。
+**本机核显不是 Vulkan 档**：主机 A = Core Ultra 5 225H（Arrow Lake-H，14 核）+ Arc 130T
+（**Xe-LPG+，含 DPAS 矩阵指令**）+ 31.4GB 内存，**oneAPI 2025.3 完整套件已装、Level Zero
+loader 与 OpenCL 运行时均在**——核显走 **oneAPI/SYCL/sycl-rs 主开发栈**（Vulkan 仅回退；
+sycl-rs 官方仅测 Linux，Windows 实测反馈即上游贡献点）；FP64 经 cl_khr_fp64 暴露但比率低
+（~1/16-1/32），GPU 侧 f64 内核仍采 f32/double-single 策略；CPU 侧实测未暴露 AVX-512（H2
+留云租）。云租：RTX 4090（sm_89，cutile-rs）、昇腾 910B。**"旧卡与核显上跑出性能"是核心
+宣传叙事**；Rust 内存安全对照 C++ 内核的内存泄露/任务中断为第二条叙事主线；CPU 型任务
+（如 Vina 编排的多核/AVX 加速，AVX2 实测 2.55×）同轨发声。**国产顺序摩尔线程优先**（cudarc-musa
+首批窗口，S80/S90 民用可购）＞华为昇腾（云租好租，cann-rs，后置）。
 
 | 任务       | 内容                                                                                                   | 验收                                                                |
 | -------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | M5-G0    | 本地三卡环境审计：nvidia-smi 探测已有，补厂商中立 Vulkan（vulkaninfo，覆盖 AMD/Intel）探测入 tools/catalog；wgpu adapter 枚举 + hello-compute 冒烟（Intel 核显 / RX 580 / 750 Ti Vulkan 逐卡记录可用性，`gpu-lab/` 独立探针已就绪） | 硬件台账（型号/显存/驱动/枚举结果）入 `docs/engine-evals/gpu-hardware-<date>.md`；750 Ti 与 RX 580 的 wgpu 可用性有明确结论 |
 | M5-G1    | 首批内核选型与 CPU 基线：① 大矩阵 Pearson/Spearman 相关 + PCA（f64、内存驻留，与 expression.pca/cluster CPU 实现直接对照）；② k-mer 计数与质量直方图（u32，wgpu 友善） | benchmark.run.v1 产出 CPU 基线（wall/RSS/一致性），入 benchmark-results        |
-| M5-G2    | wgpu 跨厂商实现（Vulkan/DX12）：以 Intel 核显为主开发目标（"最弱硬件跑出性能"叙事），RX 580 验证，750 Ti 若 G0 判可用则作最弱档；WGSL 无 f64——相关系数以 f32 或 double-single 评估并记录精度结论 | 与 CPU 基线同输入对照：wall/RSS/数值一致性（相关系数容差单独定义）三表齐；逐卡结果入台账      |
-| M5-G3    | 厂商切入（**摩尔线程最优先**）：**cudarc-musa**（S80 真机民用可购或 KUAE 云租，首批窗口）+ **cutile-rs**（云租 RTX 4090，sm_89）+ **sycl-rs**（本机核显，Linux 配置）+ **AMD ROCm/HIP**（云租 RX 9060/9070 XT 跑官方栈与 cubecl-hip 对照；Vulkan 为旧卡回退层）同内核实现与对照；各向上游提 issue/PR | 对照数据 + `docs/engine-evals/` 分厂商页；**每家至少 1 个上游 issue/PR**        |
+| M5-G2    | wgpu/WGSL 实现（Vulkan/DX12）：目标为**旧卡档**（750 Ti、RX 580）与各卡回退路径；核显仅作交叉验证（主栈走 G3 sycl-rs）；WGSL 无 f64——相关系数以 f32 或 double-single 评估并记录精度结论 | 与 CPU 基线同输入对照：wall/RSS/数值一致性（相关系数容差单独定义）三表齐；逐卡结果入台账      |
+| M5-G3    | 厂商切入（**摩尔线程最优先**）：**cudarc-musa**（S80 真机民用可购或 KUAE 云租，首批窗口）+ **cutile-rs**（云租 RTX 4090，sm_89）+ **sycl-rs**（本机 Arc 130T，oneAPI 2025.3 已装，Windows 非官方测试配置——实测反馈即上游贡献）+ **AMD ROCm/HIP**（云租 RX 9060/9070 XT；Vulkan 为旧卡回退层）同内核实现与对照；各向上游提 issue/PR | 对照数据 + `docs/engine-evals/` 分厂商页；**每家至少 1 个上游 issue/PR**        |
 | M5-G4    | 昇腾（云租 910B + 社区 cann-rs，好租、后置）；砺算等其公开 SDK（观察档）；沐曦/壁仞/天数/燧原只记录结论不动工 | `docs/engine-evals/` 各一页结论                                       |
 | M5-G5    | 发声：双语技术文章（旧卡/核显跑出性能 + Rust 内存安全叙事 + 五厂商覆盖实测），走 benchmark-results 博客镜像管道            | 文章入镜像目录且数值可复现                                                   |
 
 > M5-G 红线：GPU 内核与 M5 同样受 benchmark 门控（G1 基线先行，无基线不写内核）；
 > 数值一致性判据沿 §7.1；`LINXIRA_BIO_GPU` 环境披露字段已在 benchmark 契约中预留；
 > 内核二进制不跨厂商复用（PTX ≠ MUSA ≠ Ascend），共享层为 host driver FFI 与 WGSL。
+
+### 9.6 硬件档位模型（能力资源声明与路由的锚点，2026-09-30 定案）
+
+CPU（x86-64 only，**无 ARM**；AMD/Intel 以运行时特性检测统一覆盖）：
+
+| 档 | 定义 | 跑什么 |
+| --- | --- | --- |
+| H0 基线标量 | 任何 x86-64 | 一切能力"能跑"的底线（拒绝时须带提示） |
+| H1 AVX2+FMA | 2013+ | 浮点 SIMD 主力档（实测 Pearson 2.55×） |
+| H2 AVX-512F | 可选加速，永不必须 | f64 密集内核（本机实测未暴露，云租验证） |
+
+内存（与指令集正交；能力声明加 `minimum_ram_gb`，与 `minimum_vram_mb` 对称）：
+**M0 8GB / M1 16GB / M2 32GB+**——内存驻留型负载（k-mer/WGCNA/人群矩阵）的第一道门。
+
+GPU/NPU：
+
+| 档 | 实例 | 主栈 | 精度 |
+| --- | --- | --- | --- |
+| G-I 现代核显 | Arc 130T（Xe-LPG+，DPAS） | **oneAPI/SYCL/sycl-rs**（L0 原生；Vulkan 仅回退） | f64 低比率→f32/double-single |
+| G-L 旧卡 | 750 Ti（Maxwell）、RX 580（Polaris） | **wgpu/WGSL 唯一路径** | f32/u32 |
+| G1 现代消费卡 | RTX 40 系、RX 9060/9070（云租） | wgpu + CUDA/ROCm 官方栈 | f64 可用 |
+| G2 数据中心 | 4090/A100 级、MTT X300、昇腾 910B | cutile-rs / cudarc-musa / cann-rs / ROCm | 全精度 |
+
+计算类别（能力声明的粒度）：**C1 轻量确定性 / C2 浮点 SIMD / C3 内存驻留 /
+C4 带宽并行 / C5 重型原生编排 / C6 DL 推理 / C7 仅云**。
+路由原则：**最低档能跑则向上皆稳；双探测（环境审计+特性检测）一回退（结果 JSON 标注实际档）**；
+`select-bio-execution` 按"类别 × 档位"映射在 M6 L1 落地时机器可执行化。
 
 ## 10. M6 —— CLI 契约加固 · 安装器与环境变量 · Agent 打通
 
@@ -561,10 +590,20 @@ CPU 型任务（如 Vina 对接编排的 Rust 多核加速）同轨发声。不�
 | 微生物分型套件（AMR/毒力/MLST/质粒）    | AMRFinderPlus/ResFinder（Apache） | Rust 编排+原生 | reads/装配  | ✅存在-缺失热图 | 排期 |
 | 参考基因组管理（accession 拉取+校验+索引） | genomepy/refgenie 对照   | **纯 Rust**          | 网络        | —      | 排期 |
 | SSR/微卫星标记挖掘               | MISA/TRF 对照           | **纯 Rust**          | 序列        | ✅位点图   | 排期 |
+| 长读长套件（QC/比对/组装/纠错/SV）  | NanoPlot/minimap2/hifiasm/Sniffles2 | Rust 编排+原生（minimap2 已白名单，C5 档） | ONT/PacBio | ✅覆盖度图 | 排期 |
+| ONT 碱基识别编排（仅编排不打包）    | Dorado（NVIDIA 专用二进制） | Rust 编排 gpu:required（C6 档） | POD5 | —      | 排期 |
+| CRISPR 向导设计+脱靶扫描           | Cas-OFFinder 模式/CRISPOR 流程 | Rust 编排；脱靶扫描 GPU 可选（C2/C4） | 参考基因组 | ✅脱靶表 | 排期 |
 
 > 盲区 Tier2 择要（升 Tier1 前不排期）：peak 注释（纯 Rust）、ECFP/MACCS 指纹（RDKit pack）、
 > SRA/ENA 远程下载（纯 Rust 编排）、STAR/HISAT2 剪接比对（rMATS 前置）、GSVA/ssGSEA、
 > MAFFT（MSA 第二引擎）、功效/样本量分析、ROH+单倍型分型（bcftools/whatshap）。
+
+### 🧰 工作台工具层（非分析能力，2026-09-30 定案）
+
+| 项 | 定位 | 状态 |
+| --- | --- | --- |
+| 模拟器层（序列/读段/群体遗传合成数据+黄金真值） | M2 benchmark 与 GPU 一致性对照的燃料：先构思设计（数据模型/种子契约/输出格式），验收后再动工 | **构思中** |
+| 可复现报告层（capability 结果 → 带 manifest 的分析报告） | 高级工作台体验胶水：独立小步推进（先 manifest 汇编，再模板渲染），不绑里程碑 | **独立小步** |
 
 > 约束重申：§11 是**封闭清单**——任何新能力先入表、标排期，再动工；动工即触发四同步 + `benchmark-datasets.json` 登记。
 
