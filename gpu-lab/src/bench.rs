@@ -9,9 +9,8 @@
 
 use serde::Serialize;
 use std::arch::x86_64::{
-    __m256d, __m512d, _mm256_add_pd, _mm256_extractf128_pd, _mm256_fmadd_pd, _mm256_loadu_pd,
-    _mm512_add_pd, _mm512_fmadd_pd, _mm512_loadu_pd, _mm512_reduce_add_pd, _mm_add_pd,
-    
+    __m256d, __m512d, _mm256_extractf128_pd, _mm256_fmadd_pd, _mm256_loadu_pd, _mm512_fmadd_pd,
+    _mm512_loadu_pd, _mm512_reduce_add_pd, _mm_add_pd,
 };
 use std::collections::HashMap;
 use std::time::Instant;
@@ -64,7 +63,7 @@ pub struct BenchReport {
 pub fn run_benchmarks() -> BenchReport {
     let seed = 0x5EED_5EED_5EED_5EEDu64;
     let mut kernels = Vec::new();
-    kernels.push(bench_pearson(seed));
+    kernels.push(run_pearson_bench(&pearson_input(seed)));
     kernels.push(bench_kmer(seed));
     kernels.push(bench_quality_histogram(seed));
     BenchReport {
@@ -75,17 +74,39 @@ pub fn run_benchmarks() -> BenchReport {
 }
 
 // ---------------------------------------------------------------------------
-// Pearson column-pair correlations (f64, high-precision SIMD target)
+// Pearson column-pair correlations (f64 reference + SIMD tiers)
 // ---------------------------------------------------------------------------
 
-fn bench_pearson(seed: u64) -> KernelBaseline {
+/// Fixed-seed Pearson input (column-major, pre-centered) shared by CPU tiers
+/// and the GPU comparison so every implementation consumes identical data.
+pub struct PearsonInput {
+    pub rows: usize,
+    pub cols: usize,
+    pub columns: Vec<Vec<f64>>,
+    pub squares: Vec<f64>,
+}
+
+pub fn pearson_input(seed: u64) -> PearsonInput {
     let rows = 2000usize;
     let cols = 500usize;
     let mut rng = SplitMix64(seed ^ 0x01);
+    let columns = pearson_columns(rows, cols, &mut rng);
+    let squares: Vec<f64> = columns
+        .iter()
+        .map(|column| column.iter().map(|value| value * value).sum())
+        .collect();
+    PearsonInput {
+        rows,
+        cols,
+        columns,
+        squares,
+    }
+}
 
+fn pearson_columns(rows: usize, cols: usize, rng: &mut SplitMix64) -> Vec<Vec<f64>> {
     // Column-major layout with per-column pre-centering: every implementation
-    // (scalar, AVX2, AVX-512) consumes the exact same contiguous input, so the
-    // comparison isolates instruction-set effects rather than memory layout.
+    // (scalar, AVX2, AVX-512, GPU) consumes the exact same contiguous input,
+    // so the comparison isolates instruction-set effects, not memory layout.
     let mut columns: Vec<Vec<f64>> = Vec::with_capacity(cols);
     for _ in 0..cols {
         let mut column = Vec::with_capacity(rows);
@@ -101,16 +122,42 @@ fn bench_pearson(seed: u64) -> KernelBaseline {
         }
         columns.push(column);
     }
-    // Per-column sum of squares, sequential reduction (reference numerics).
-    let squares: Vec<f64> = columns
-        .iter()
-        .map(|column| column.iter().map(|value| value * value).sum())
-        .collect();
+    columns
+}
+
+/// (a, b) pair list in the same nested-loop order as the CPU implementations.
+pub fn pearson_pairs(cols: usize) -> Vec<(u32, u32)> {
+    let mut pairs = Vec::with_capacity(cols * (cols - 1) / 2);
+    for a in 0..cols {
+        for b in (a + 1)..cols {
+            pairs.push((a as u32, b as u32));
+        }
+    }
+    pairs
+}
+
+/// Fixed-seed synthetic qualities shared with the GPU histogram kernel.
+pub fn quality_values(seed: u64) -> Vec<u8> {
+    let total = 2_000_000usize * 150usize;
+    let mut rng = SplitMix64(seed ^ 0x03);
+    (0..total)
+        .map(|_| {
+            let value = 20.0 + 20.0 * rng.next_f64();
+            value.clamp(0.0, 93.0) as u8
+        })
+        .collect()
+}
+
+pub fn run_pearson_bench(input: &PearsonInput) -> KernelBaseline {
+    let rows = input.rows;
+    let cols = input.cols;
+    let columns = &input.columns;
+    let squares = &input.squares;
 
     let mut implementations = Vec::new();
     let mut selected = String::new();
 
-    let scalar = timed(|| pearson_pairs_scalar(&columns, &squares));
+    let scalar = timed(|| pearson_pairs_scalar(columns, squares));
     implementations.push(ImplResult {
         name: "scalar".to_owned(),
         wall_ms: scalar.0,
@@ -119,7 +166,7 @@ fn bench_pearson(seed: u64) -> KernelBaseline {
 
     let (tier, has_avx2_fma, has_avx512) = simd_tier();
     if has_avx2_fma {
-        let avx2 = timed(|| unsafe { pearson_pairs_avx2(&columns, &squares) });
+        let avx2 = timed(|| unsafe { pearson_pairs_avx2(columns, squares) });
         implementations.push(ImplResult {
             name: "avx2+fma".to_owned(),
             wall_ms: avx2.0,
@@ -127,7 +174,7 @@ fn bench_pearson(seed: u64) -> KernelBaseline {
         });
     }
     if has_avx512 {
-        let avx512 = timed(|| unsafe { pearson_pairs_avx512(&columns, &squares) });
+        let avx512 = timed(|| unsafe { pearson_pairs_avx512(columns, squares) });
         implementations.push(ImplResult {
             name: "avx512f".to_owned(),
             wall_ms: avx512.0,
@@ -156,7 +203,8 @@ fn bench_pearson(seed: u64) -> KernelBaseline {
     }
 }
 
-fn pearson_pairs_scalar(columns: &[Vec<f64>], squares: &[f64]) -> f64 {
+/// f64 sequential reference (the audit tier for GPU f32 comparison).
+pub fn pearson_pairs_scalar(columns: &[Vec<f64>], squares: &[f64]) -> f64 {
     let cols = columns.len();
     let rows = columns.first().map(Vec::len).unwrap_or(0);
     let mut sum_r = 0.0;
@@ -203,7 +251,7 @@ unsafe fn pearson_pairs_avx2(columns: &[Vec<f64>], squares: &[f64]) -> f64 {
                 tail += column_a[row] * column_b[row];
                 row += 1;
             }
-            let mut partial = horizontal_add_256(num);
+            let mut partial = unsafe { horizontal_add_256(num) };
             partial += tail;
             let denominator = (squares[a] * squares[b]).sqrt();
             if denominator > 0.0 {
