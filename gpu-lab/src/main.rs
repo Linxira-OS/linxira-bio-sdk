@@ -3,6 +3,7 @@
 //! - `bench`: M5-G1 deterministic CPU baseline kernels (fixed-seed synthetic data).
 
 mod bench;
+mod gpu_bench;
 
 use serde::Serialize;
 use std::borrow::Cow;
@@ -64,8 +65,20 @@ fn main() {
             );
         }
         "probe" | "" => run_probe(),
+        "gpu-bench" => match gpu_bench::run_gpu_benchmarks() {
+            Ok(report) => {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&report).expect("serialize gpu bench report")
+                );
+            }
+            Err(error) => {
+                eprintln!("gpu-bench failed: {error}");
+                std::process::exit(1);
+            }
+        },
         other => {
-            eprintln!("unknown subcommand {other:?}; expected `probe` or `bench`");
+            eprintln!("unknown subcommand {other:?}; expected `probe`, `bench`, or `gpu-bench`");
             std::process::exit(2);
         }
     }
