@@ -364,25 +364,45 @@ async fn main() -> std::io::Result<()> {
 > **DETERMINISM 红线**：所有 benchmark 数值比较用同一输入、同一线程数、同一分块顺序；多线程归约
 > 若产生非确定性位移，必须固定 reduce 顺序，否则按 §7.1 一致性判据会误报 `inconsistent`。
 
-### 9.5 M5-G —— Rust GPU 内核首批开发者轨（2026-09-29 增补）
+### 9.5 M5-G —— Rust GPU 内核首批开发者轨（2026-09-29 增补；同日按厂商一手资料修订）
 
-**定位**：三大厂 Rust GPU 栈（NVIDIA cutile-rs/cuda-oxide、AMD ROCm、Intel oneAPI）均处
-alpha——此刻入场即首批开发者：上游 issue/PR 响应快、可实测发声（benchmark-results + 双语博客
-管道现成）、在"Rust 内存安全替代 C++ 内核"叙事上抢占先机。生信负载大量数据驻留内存（相关矩阵、
-k-mer 表、质量直方图），正是 Rust 内存安全收益最直观的场景。**本轨 Linux 先行（lab CachyOS 为主
-战场），产品线跨平台定位不变**；Windows 路径仅覆盖 wgpu/cudarc 两条可行线。
+**厂商官方一手结论**（2026-09-29 核验，来源均为官方博客/官方 GitHub/官方文档）：
+- **NVIDIA**：2026-09-08 官宣 CUDA Rust 双轨——cutile-rs（瓦片 DSL，**stable Rust 1.89+**，
+  CUDA 13.3 推荐，**仅 Linux（Ubuntu 24.04 测试），sm_80+，官方明文"sm_70/75 及以下不支持"**，
+  "reach for Tile first"）与 cuda-oxide（SIMT，nightly，Linux）。官方自认"both early-stage,
+  neither production-ready"，承诺"maturing CUDA Rust into 2027 and beyond"；NVIDIA 已成
+  Rust Foundation Platinum 会员。已获 HF Grout、mistral.rs 采用——**首批开发者窗口正开**。
+- **Intel**：官方 oneapi-src/oneapi-rs（`sycl-rs` v0.1.0，"experimental…not ready for
+  production"，**仅 Linux 测试配置**）。**iGPU（11 代酷睿+）是完整官方 oneAPI 目标**——本机核显
+  即为合法开发环境；Gen9-11 走 legacy 包。
+- **AMD**：**官方零 Rust 计算路径**（仅 amdsmi 管理类绑定）；hip-rs 为社区停更项目；Polaris
+  级老卡官方全栈不支持。AMD 卡走 wgpu/Vulkan 覆盖。
+- **摩尔线程**：**2026-09-23 官方发布 cudarc-musa**（cudarc 官方 fork，MUSA 5.2 driver ABI，
+  crates.io 发布准备中）——国产厂商第一个官方 Rust GPU 工件，此刻入场即绝对首批；S80 零售可购，
+  官方 Vulkan 1.3 驱动（Vulkan compute 已被 ollama-musa 实用）。
+- **华为昇腾**：官方零 Rust；社区 cann-rs（2026-08 活跃）、ruda-driver-cann；云租 910B 可行。
+- **架构事实**：国产卡 CUDA 兼容全部为**源码级**（musify/cu-bridge 重编译），PTX/cubin 二进制
+  不通用——跨厂商可复用的是 host 侧 driver FFI 与 WGSL，不是内核二进制。
+
+**硬件与叙事策略**：本地测试卡为旧卡与核显（NVIDIA GTX 750 Ti / AMD 卡 / Intel 核显）——
+**"旧卡与核显上跑出性能"是核心宣传叙事**（CUDA Rust 官方路径需 sm_80+，750 Ti 与新 CUDA 栈
+已断代，只能走 wgpu/Vulkan 待验证；新卡验证以**云租**解决：sm_80+ CUDA、昇腾 910B、KUAE）。
+生信负载大量数据驻留内存（相关矩阵、k-mer 表、质量直方图），Rust 内存安全对照 C++ 内核的
+内存泄露/任务中断问题为第二条叙事主线；CPU 型任务（如 Vina 对接编排的 Rust 多核加速）同轨
+发声。不让 NVIDIA 一家独大：**wgpu/Vulkan 通用层为基线**，各厂官方 alpha 窗口并行切入。
 
 | 任务       | 内容                                                                                                   | 验收                                                                |
 | -------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| M5-G0    | lab GPU 环境审计：跑 environment audit（tools/catalog 已有 nvidia-smi 探测），确认 GPU 型号/显存/驱动，写入环境台账      | 台账记录 GPU 型号与显存档位；无卡则明确记录并降级为纯 CPU 对照基线                          |
+| M5-G0    | 本地三卡环境审计：nvidia-smi 探测已有，补 AMD（rocm-smi/amdgpu）与 Intel（level-zero/vulkaninfo）探测入 tools/catalog；wgpu adapter 枚举 + hello-compute 冒烟（Intel 核显 / AMD 卡 / 750 Ti Vulkan 1.1 逐卡记录可用性） | 硬件台账（型号/显存/驱动/枚举结果）入 `docs/engine-evals/gpu-hardware-<date>.md`；750 Ti 可用性有明确结论 |
 | M5-G1    | 首批内核选型与 CPU 基线：① 大矩阵 Pearson/Spearman 相关 + PCA（f64、内存驻留，与 expression.pca/cluster CPU 实现直接对照）；② k-mer 计数与质量直方图（u32，wgpu 友善） | benchmark.run.v1 产出 CPU 基线（wall/RSS/一致性），入 benchmark-results        |
-| M5-G2    | wgpu 跨厂商实现（Vulkan/DX12，无需 toolkit，windows-gnu 亦可用；WGSL 无 f64——相关系数以 f32 或 double-single 评估并记录精度结论） | 与 CPU 基线同输入对照：wall/RSS/数值一致性（相关系数容差单独定义）三表齐                  |
-| M5-G3    | cutile-rs（NVlabs，stable Rust，CUDA 13.2+，sm_80+）同内核实现与对照；过程中向上游提 issue/PR，记录采用反馈                   | 对照数据 + `docs/engine-evals/gpu-<date>.md`；至少 1 个上游 issue/PR           |
-| M5-G4    | AMD（cubecl-hip-sys）/Intel（oneAPI sycl-rs）跟进评估，只记录结论不动工                                        | `docs/engine-evals/` 各一页结论                                       |
-| M5-G5    | 发声：双语技术文章（Rust GPU vs CPU 生信内核实测，含内存安全/任务中断对照叙事），走 benchmark-results 博客镜像管道          | 文章入镜像目录且数值可复现                                                   |
+| M5-G2    | wgpu 跨厂商实现（Vulkan/DX12）：以 Intel 核显为主开发目标（"最弱硬件跑出性能"叙事），AMD 卡验证，750 Ti 若 G0 判可用则作最弱档；WGSL 无 f64——相关系数以 f32 或 double-single 评估并记录精度结论 | 与 CPU 基线同输入对照：wall/RSS/数值一致性（相关系数容差单独定义）三表齐；逐卡结果入台账      |
+| M5-G3    | 厂商官方 alpha 并行切入：**cutile-rs**（云租 sm_80+ 卡）+ **sycl-rs**（本机核显，Linux 配置）+ **cudarc-musa**（摩尔线程，真机或 KUAE 云）同内核实现与对照；各向上游提 issue/PR | 对照数据 + `docs/engine-evals/` 分厂商页；**每家至少 1 个上游 issue/PR**        |
+| M5-G4    | 昇腾（云租 910B + 社区 cann-rs）评估；沐曦/壁仞/天数/燧原只记录结论不动工                                             | `docs/engine-evals/` 各一页结论                                       |
+| M5-G5    | 发声：双语技术文章（旧卡/核显跑出性能 + Rust 内存安全叙事 + 五厂商覆盖实测），走 benchmark-results 博客镜像管道            | 文章入镜像目录且数值可复现                                                   |
 
 > M5-G 红线：GPU 内核与 M5 同样受 benchmark 门控（G1 基线先行，无基线不写内核）；
-> 数值一致性判据沿 §7.1；`LINXIRA_BIO_GPU` 环境披露字段已在 benchmark 契约中预留。
+> 数值一致性判据沿 §7.1；`LINXIRA_BIO_GPU` 环境披露字段已在 benchmark 契约中预留；
+> 内核二进制不跨厂商复用（PTX ≠ MUSA ≠ Ascend），共享层为 host driver FFI 与 WGSL。
 
 ## 10. M6 —— CLI 契约加固 · 安装器与环境变量 · Agent 打通
 
