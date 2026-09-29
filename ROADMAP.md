@@ -437,7 +437,7 @@ async fn main() -> std::io::Result<()> {
 | 甲基化 BS-seq / DMR 检测                | Bismark/MethylKit    | Py + R                    | SRR(BS-seq) | ✅DMR图    | 排期 M4 |
 | 从头组装 de novo                       | SPAdes/miniasm       | 原生 SPAdes                 | SRR         | —        | 排期 M4 |
 | 组装质控 N50/完整性/污染                    | QUAST/CheckM/BUSCO   | Rust 或 Py                 | SRR组装       | ✅统计条图    | 未开始   |
-| 表达定量归一化(TPM/FPKM/RPKM)             | 自研                   | Rust / Py / R             | 矩阵          | —        | 未开始   |
+| 表达定量归一化(TPM/FPKM/RPKM)             | 自研                   | Rust / Py / R             | 矩阵          | —        | [x] 2026-09-29 Rust 已发布（expression.normalize.v2）；Py/R 双实现排期 |
 | 差异可变剪接/异构体                         | DEXSeq/rmats         | **R**                     | SRR+BAM     | ✅剪接图     | 未开始   |
 
 ### 🟠 二批

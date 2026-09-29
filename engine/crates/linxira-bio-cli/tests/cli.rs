@@ -476,6 +476,40 @@ fn exposes_available_and_planned_capabilities() {
 }
 
 #[test]
+fn normalizes_expression_to_tpm_with_feature_lengths() {
+    let root = workspace_root();
+    let output_path = root.join("target/test-results/cli-expression-normalize-tpm.tsv");
+    std::fs::create_dir_all(output_path.parent().expect("output parent"))
+        .expect("create result directory");
+    if output_path.exists() {
+        std::fs::remove_file(&output_path).expect("remove stale output");
+    }
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["expression", "normalize"])
+        .arg(root.join("tests/fixtures/expression-matrix/length-normalization-counts.tsv"))
+        .arg(&output_path)
+        .args(["--method", "tpm", "--lengths"])
+        .arg(root.join("tests/fixtures/expression-matrix/feature-lengths.tsv"))
+        .arg("--json")
+        .output()
+        .expect("run expression normalize");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("UTF-8 output");
+    let result: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON result");
+    assert_eq!(result["capability"], "expression.normalize.v2");
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["result"]["method"], "tpm");
+    assert_eq!(result["result"]["length_unit"], "bp");
+    let written = std::fs::read_to_string(&output_path).expect("read normalized matrix");
+    assert!(written.starts_with("gene_id\t"));
+    std::fs::remove_file(output_path).expect("remove normalized output");
+}
+
+#[test]
 fn inspects_a_dataset_as_json() {
     let fixture = workspace_root().join("tests/fixtures/data-inspection/variants.vcf");
     let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))

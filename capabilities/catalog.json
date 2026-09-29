@@ -898,6 +898,21 @@
       ]
     },
     {
+      "id": "expression.normalize.v2",
+      "status": "available",
+      "category": "expression",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio expression normalize <matrix.csv|tsv> <output.tsv> --method tpm --lengths <lengths.csv|tsv> --json",
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "json",
+        "tsv"
+      ]
+    },
+    {
       "id": "expression.pca.v1",
       "status": "available",
       "category": "expression",

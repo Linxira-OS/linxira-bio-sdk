@@ -1,0 +1,44 @@
+{
+  "schema_version": "2",
+  "job_id": "fixture-expression-normalize-tpm-v2",
+  "capability": "expression.normalize.v2",
+  "inputs": [
+    {
+      "artifact_id": "input-matrix",
+      "role": "matrix",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-matrix-1",
+          "path": "../expression-matrix/length-normalization-counts.tsv",
+          "format": "tsv",
+          "compression": "none",
+          "size_bytes": 83,
+          "sha256": "7bb3d0a6970c574592985b86dcd5c56861ff8c79c25c9cf6322c8b49977a4e0a"
+        }
+      ]
+    },
+    {
+      "artifact_id": "input-lengths",
+      "role": "lengths",
+      "cardinality": "single",
+      "files": [
+        {
+          "file_id": "input-lengths-1",
+          "path": "../expression-matrix/feature-lengths.tsv",
+          "format": "tsv",
+          "compression": "none",
+          "size_bytes": 65,
+          "sha256": "c0558abc5bdc59872a1adb69a89bf552dc37ce2d3a31613ea4eef5e5f56d79f6"
+        }
+      ]
+    }
+  ],
+  "execution": {
+    "mode": "local-cpu"
+  },
+  "parameters": {
+    "output": "../../../target/test-results/expression-normalize-tpm-v2.tsv",
+    "method": "tpm"
+  }
+}

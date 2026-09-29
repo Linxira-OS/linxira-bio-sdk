@@ -1,6 +1,6 @@
 ---
 name: analyze-expression-matrix
-description: Validate, normalize, reduce, cluster, prepare native heatmaps, and run WGCNA co-expression network analysis for local rectangular CSV or TSV bulk-expression matrices with expression.matrix.qc.v1, expression.normalize.v1, expression.pca.v1, expression.cluster.v1, expression.heatmap.v1, and expression.wgcna.v1. Use for matrix QC, CPM or median-ratio normalization, exploratory PCA, deterministic sample or feature clustering, clustered heatmap preparation, and weighted gene co-expression network analysis.
+description: Validate, normalize, reduce, cluster, prepare native heatmaps, and run WGCNA co-expression network analysis for local rectangular CSV or TSV bulk-expression matrices with expression.matrix.qc.v1, expression.normalize.v1, expression.normalize.v2, expression.pca.v1, expression.cluster.v1, expression.heatmap.v1, and expression.wgcna.v1. Use for matrix QC, CPM, median-ratio, or feature-length TPM/FPKM/RPKM normalization, exploratory PCA, deterministic sample or feature clustering, clustered heatmap preparation, and weighted gene co-expression network analysis.
 ---
 
 # Analyze Expression Matrix
@@ -19,6 +19,9 @@ differential-expression workflow or co-expression network analysis.
 5. Select one operation:
    - normalize: `linxira-bio expression normalize <matrix> <output.tsv>
      --method cpm|log2-cpm|median-ratio --json`;
+   - length normalization: `linxira-bio expression normalize <matrix>
+     <output.tsv> --method tpm|fpkm|rpkm --lengths <lengths.csv|tsv> --json`
+     (the length table has two columns: feature identifier, length in bp);
    - PCA: `linxira-bio expression pca <matrix> --components 2 [--scale]
      --json`;
    - clustering: `linxira-bio expression cluster <matrix>
@@ -34,6 +37,8 @@ For an artifact-aware agent job, invoke the selected capability with one input
 whose role is `matrix` (for QC, PCA, clustering, heatmap) or `expression` (for
 WGCNA), format is `csv` or `tsv`, and execution mode is `local-cpu`.
 Normalization also requires `parameters.output` and emits a TSV artifact.
+`expression.normalize.v2` additionally requires a `lengths` input role carrying
+the two-column feature length table.
 
 ### WGCNA Co-Expression Network
 
@@ -71,6 +76,9 @@ result JSON; the result JSON references them by path.
   sample-quality outliers without assigning significance thresholds silently.
 - Use CPM only for library-size adjustment. Use log2-CPM for exploration and
   retain raw counts for count-based models.
+- Use TPM/FPKM/RPKM (`expression.normalize.v2`) only when trustworthy feature
+  lengths in bp are available for every feature. These values are normalized
+  rates, not counts; do not feed them to count-based models.
 - Treat PCA, clustering, and heatmaps as exploratory. Do not infer biological
   groups or statistical significance from them alone.
 - For WGCNA, validate the scale-free topology fit (R^2 > 0.8 recommended) and

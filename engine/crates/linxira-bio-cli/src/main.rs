@@ -30,10 +30,12 @@ use linxira_bio_core::environment::{
 };
 use linxira_bio_core::expression::{
     ExpressionClusterOptions, ExpressionClusterResult, ExpressionHeatmapOptions,
-    ExpressionHeatmapResult, ExpressionMatrixQc, ExpressionNormalizeOptions, ExpressionPcaOptions,
-    ExpressionPcaResult, expression_cluster_path, expression_heatmap_path,
-    expression_matrix_qc_path, expression_pca_path, expression_quantify_path,
-    normalize_expression_matrix_path, parse_expression_normalization_method,
+    ExpressionHeatmapResult, ExpressionLengthNormalizeOptions, ExpressionMatrixQc,
+    ExpressionNormalizeOptions, ExpressionPcaOptions, ExpressionPcaResult, expression_cluster_path,
+    expression_heatmap_path, expression_matrix_qc_path, expression_pca_path,
+    expression_quantify_path, normalize_expression_by_feature_length_path,
+    normalize_expression_matrix_path, parse_expression_length_normalization_method,
+    parse_expression_normalization_method,
 };
 use linxira_bio_core::fastq::{FastqQcMetrics, FastqQcOptions, QualityEncodingMode, fastq_qc_path};
 use linxira_bio_core::fastq_transform::{
@@ -4590,20 +4592,37 @@ fn print_expression_normalize(arguments: &[String]) -> Result<(), Box<dyn Error>
     let mut input = None;
     let mut output = None;
     let mut options = ExpressionNormalizeOptions::default();
+    let mut length_method = None;
+    let mut lengths: Option<&str> = None;
+    let mut explicit_pseudocount = false;
     let mut json = false;
     let mut index = 0;
     while index < arguments.len() {
         match arguments[index].as_str() {
             "--method" => {
                 index += 1;
-                options.method = parse_expression_normalization_method(
-                    arguments.get(index).ok_or("--method requires a value")?,
-                )?;
+                let value = arguments.get(index).ok_or("--method requires a value")?;
+                match parse_expression_normalization_method(value) {
+                    Ok(method) => options.method = method,
+                    Err(_) => match parse_expression_length_normalization_method(value) {
+                        Ok(method) => length_method = Some(method),
+                        Err(_) => {
+                            return Err(
+                                format!("unsupported normalization method {value:?}; expected cpm, log2-cpm, median-ratio, tpm, fpkm, or rpkm").into(),
+                            );
+                        }
+                    },
+                }
+            }
+            "--lengths" => {
+                index += 1;
+                lengths = Some(arguments.get(index).ok_or("--lengths requires a value")?);
             }
             "--pseudocount" => {
                 index += 1;
                 options.pseudocount =
                     parse_finite_f64(arguments.get(index), "--pseudocount", Some(0.0))?;
+                explicit_pseudocount = true;
             }
             "--json" => json = true,
             value if value.starts_with('-') => {
@@ -4616,6 +4635,30 @@ fn print_expression_normalize(arguments: &[String]) -> Result<(), Box<dyn Error>
     let input = input.ok_or("expression normalize requires an input matrix path")?;
     let output = output.ok_or("expression normalize requires an output TSV path")?;
     let output = Path::new(output);
+    if let Some(method) = length_method {
+        if explicit_pseudocount {
+            return Err("--pseudocount applies to log2-cpm only; tpm/fpkm/rpkm ignore it".into());
+        }
+        let lengths = lengths.ok_or(
+            "normalization methods tpm, fpkm, and rpkm require a --lengths feature length table (two columns: feature identifier, length in bp)",
+        )?;
+        let summary = normalize_expression_by_feature_length_path(
+            Path::new(input),
+            Path::new(lengths),
+            output,
+            &ExpressionLengthNormalizeOptions { method },
+        )?;
+        return print_sequence_transform_result(
+            "expression-normalize",
+            "expression.normalize.v2",
+            output,
+            summary,
+            json,
+        );
+    }
+    if lengths.is_some() {
+        return Err("--lengths applies to the tpm, fpkm, and rpkm methods only".into());
+    }
     let summary = normalize_expression_matrix_path(Path::new(input), output, &options)?;
     print_sequence_transform_result(
         "expression-normalize",
@@ -7875,6 +7918,7 @@ fn usage() -> &'static str {
         "  linxira-bio medical pharmacogenomics <input.vcf[.gz]> <output.tsv> [--json]\n",
         "  linxira-bio medical spatial-transcriptomics <matrix.mtx[.gz]> <features.tsv[.gz]> <barcodes.tsv[.gz]> <output.tsv> [--json]\n",
         "  linxira-bio expression normalize <matrix.csv|tsv[.gz]> <output.tsv> [--method cpm|log2-cpm|median-ratio] [--pseudocount X] [--json]\n",
+        "  linxira-bio expression normalize <matrix.csv|tsv[.gz]> <output.tsv> --method tpm|fpkm|rpkm --lengths <lengths.csv|tsv> [--json]\n",
         "  linxira-bio expression pca <matrix.csv|tsv[.gz]> [--components N] [--scale] [--json]\n",
         "  linxira-bio expression cluster <matrix.csv|tsv[.gz]> [--sample-clusters N] [--feature-clusters N] [--max-iterations N] [--no-scale] [--json]\n",
         "  linxira-bio expression heatmap <matrix.csv|tsv[.gz]> [--top-features N] [--no-scale] [--json]\n",

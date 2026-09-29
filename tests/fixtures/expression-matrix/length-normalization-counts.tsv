@@ -1,0 +1,5 @@
+gene_id	wt_1	wt_2	ko_1
+gene_a	10	20	0
+gene_b	10	10	30
+gene_c	0	0	0
+gene_d	30	40	60
