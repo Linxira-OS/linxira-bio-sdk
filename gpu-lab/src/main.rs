@@ -1,7 +1,8 @@
-//! M5-G0 hardware audit: enumerate wgpu adapters on this host, then run a
-//! minimal compute-shader smoke test on the first non-CPU adapter.
-//! Output is a single JSON report (adapters + compute smoke result) suitable
-//! for the `docs/engine-evals/gpu-hardware-*.md` ledger.
+//! gpu-lab: M5-G experiment carrier.
+//! - `probe`: hardware audit — enumerate wgpu adapters + compute smoke test.
+//! - `bench`: M5-G1 deterministic CPU baseline kernels (fixed-seed synthetic data).
+
+mod bench;
 
 use serde::Serialize;
 use std::borrow::Cow;
@@ -53,6 +54,24 @@ struct Report {
 }
 
 fn main() {
+    let first = std::env::args().nth(1).unwrap_or_default();
+    match first.as_str() {
+        "bench" => {
+            let report = bench::run_benchmarks();
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report).expect("serialize bench report")
+            );
+        }
+        "probe" | "" => run_probe(),
+        other => {
+            eprintln!("unknown subcommand {other:?}; expected `probe` or `bench`");
+            std::process::exit(2);
+        }
+    }
+}
+
+fn run_probe() {
     let host = std::env::var("COMPUTERNAME")
         .or_else(|_| std::env::var("HOSTNAME"))
         .unwrap_or_else(|_| "unknown".to_owned());
@@ -141,7 +160,9 @@ async fn try_compute_smoke(adapter: &wgpu::Adapter) -> Result<(usize, usize), St
     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("gpu-lab-smoke"),
         size: (COUNT * std::mem::size_of::<f32>()) as u64,
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+        usage: wgpu::BufferUsages::STORAGE
+            | wgpu::BufferUsages::COPY_SRC
+            | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
     queue.write_buffer(&buffer, 0, bytemuck::cast_slice(&input));

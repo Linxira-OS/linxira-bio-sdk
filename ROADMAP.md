@@ -408,7 +408,7 @@ CPU 型任务（如 Vina 对接编排的 Rust 多核加速）同轨发声。不�
 | M5-G1    | 首批内核选型与 CPU 基线：① 大矩阵 Pearson/Spearman 相关 + PCA（f64、内存驻留，与 expression.pca/cluster CPU 实现直接对照）；② k-mer 计数与质量直方图（u32，wgpu 友善） | benchmark.run.v1 产出 CPU 基线（wall/RSS/一致性），入 benchmark-results        |
 | M5-G2    | wgpu 跨厂商实现（Vulkan/DX12）：以 Intel 核显为主开发目标（"最弱硬件跑出性能"叙事），RX 580 验证，750 Ti 若 G0 判可用则作最弱档；WGSL 无 f64——相关系数以 f32 或 double-single 评估并记录精度结论 | 与 CPU 基线同输入对照：wall/RSS/数值一致性（相关系数容差单独定义）三表齐；逐卡结果入台账      |
 | M5-G3    | 厂商切入（**摩尔线程最优先**）：**cudarc-musa**（S80 真机民用可购或 KUAE 云租，首批窗口）+ **cutile-rs**（云租 RTX 4090，sm_89）+ **sycl-rs**（本机核显，Linux 配置）+ **AMD ROCm/HIP**（云租 RX 9060/9070 XT 跑官方栈与 cubecl-hip 对照；Vulkan 为旧卡回退层）同内核实现与对照；各向上游提 issue/PR | 对照数据 + `docs/engine-evals/` 分厂商页；**每家至少 1 个上游 issue/PR**        |
-| M5-G4    | 昇腾（云租 910B + 社区 cann-rs，好租、后置）；沐曦/壁仞/天数/燧原只记录结论不动工                                         | `docs/engine-evals/` 各一页结论                                       |
+| M5-G4    | 昇腾（云租 910B + 社区 cann-rs，好租、后置）；砺算等其公开 SDK（观察档）；沐曦/壁仞/天数/燧原只记录结论不动工 | `docs/engine-evals/` 各一页结论                                       |
 | M5-G5    | 发声：双语技术文章（旧卡/核显跑出性能 + Rust 内存安全叙事 + 五厂商覆盖实测），走 benchmark-results 博客镜像管道            | 文章入镜像目录且数值可复现                                                   |
 
 > M5-G 红线：GPU 内核与 M5 同样受 benchmark 门控（G1 基线先行，无基线不写内核）；
