@@ -364,6 +364,26 @@ async fn main() -> std::io::Result<()> {
 > **DETERMINISM 红线**：所有 benchmark 数值比较用同一输入、同一线程数、同一分块顺序；多线程归约
 > 若产生非确定性位移，必须固定 reduce 顺序，否则按 §7.1 一致性判据会误报 `inconsistent`。
 
+### 9.5 M5-G —— Rust GPU 内核首批开发者轨（2026-09-29 增补）
+
+**定位**：三大厂 Rust GPU 栈（NVIDIA cutile-rs/cuda-oxide、AMD ROCm、Intel oneAPI）均处
+alpha——此刻入场即首批开发者：上游 issue/PR 响应快、可实测发声（benchmark-results + 双语博客
+管道现成）、在"Rust 内存安全替代 C++ 内核"叙事上抢占先机。生信负载大量数据驻留内存（相关矩阵、
+k-mer 表、质量直方图），正是 Rust 内存安全收益最直观的场景。**本轨 Linux 先行（lab CachyOS 为主
+战场），产品线跨平台定位不变**；Windows 路径仅覆盖 wgpu/cudarc 两条可行线。
+
+| 任务       | 内容                                                                                                   | 验收                                                                |
+| -------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| M5-G0    | lab GPU 环境审计：跑 environment audit（tools/catalog 已有 nvidia-smi 探测），确认 GPU 型号/显存/驱动，写入环境台账      | 台账记录 GPU 型号与显存档位；无卡则明确记录并降级为纯 CPU 对照基线                          |
+| M5-G1    | 首批内核选型与 CPU 基线：① 大矩阵 Pearson/Spearman 相关 + PCA（f64、内存驻留，与 expression.pca/cluster CPU 实现直接对照）；② k-mer 计数与质量直方图（u32，wgpu 友善） | benchmark.run.v1 产出 CPU 基线（wall/RSS/一致性），入 benchmark-results        |
+| M5-G2    | wgpu 跨厂商实现（Vulkan/DX12，无需 toolkit，windows-gnu 亦可用；WGSL 无 f64——相关系数以 f32 或 double-single 评估并记录精度结论） | 与 CPU 基线同输入对照：wall/RSS/数值一致性（相关系数容差单独定义）三表齐                  |
+| M5-G3    | cutile-rs（NVlabs，stable Rust，CUDA 13.2+，sm_80+）同内核实现与对照；过程中向上游提 issue/PR，记录采用反馈                   | 对照数据 + `docs/engine-evals/gpu-<date>.md`；至少 1 个上游 issue/PR           |
+| M5-G4    | AMD（cubecl-hip-sys）/Intel（oneAPI sycl-rs）跟进评估，只记录结论不动工                                        | `docs/engine-evals/` 各一页结论                                       |
+| M5-G5    | 发声：双语技术文章（Rust GPU vs CPU 生信内核实测，含内存安全/任务中断对照叙事），走 benchmark-results 博客镜像管道          | 文章入镜像目录且数值可复现                                                   |
+
+> M5-G 红线：GPU 内核与 M5 同样受 benchmark 门控（G1 基线先行，无基线不写内核）；
+> 数值一致性判据沿 §7.1；`LINXIRA_BIO_GPU` 环境披露字段已在 benchmark 契约中预留。
+
 ## 10. M6 —— CLI 契约加固 · 安装器与环境变量 · Agent 打通
 
 **目标**：让「**装完即用**」（安装器 + PATH 注册，Windows 首位、Debian/Arch 同步）与
@@ -471,6 +491,49 @@ async fn main() -> std::io::Result<()> {
 | 空间转录组聚类/去卷积           | Seurat spatial/Squidpy | Py/R           | 矩阵(img)      | ✅空间图   | 部分：计数矩阵摘要已发布（medical.spatial-transcriptomics.v1，2026-08-15）；聚类/去卷积未做 |
 | 三维基因组 A/B 区室/TAD      | HiCExplorer/cooler     | Py             | SRR(Hi-C)    | ✅染色质图  | 未开始 |
 | RNA 编辑/修饰检测           | REDItools/JACUSA2      | 原生             | SRR          | ✅位点图   | 未开始 |
+
+### 🧪 计算化学/分子模拟批次（2026-09-29 增补；许可证已逐项核验）
+
+| 能力                        | 生态对标                  | 实现(Rust/Py/R)          | 数据类别     | 绘图      | 状态  |
+| ------------------------- | --------------------- | ---------------------- | --------- | ------- | --- |
+| 分子对接（蛋白-配体）              | AutoDock Vina + Meeko | Rust 编排+原生 Vina（Apache/MIT） | 结构+化学(PDB/SDF) | ✅打分分布 | 排期 |
+| 虚拟筛选（库级批量对接+聚合排名）         | Vina `--batch`/VSflow  | Rust 编排+原生 Vina          | 化学库       | ✅排名图    | 排期 |
+| 构象生成+力场最小化               | RDKit ETKDGv3+MMFF94   | Py pack（复用 descriptors-rdkit） | 化学(SMILES/SDF) | —     | 排期 |
+| 半经验量子（能量/梯度/Hessian）       | xtb(LGPL 仅调用)/MOPAC(公有域) | Rust 编排+原生             | 化学        | —      | 排期 |
+| MD 轨迹分析（RMSD/RMSF/RDF/回转半径） | MDTraj/MDAnalysis 对照   | **纯 Rust**（chemfiles.rs, BSD） | 轨迹(DCD/XTC/netCDF) | ✅轨迹图 | 排期 |
+| MM-PB/GBSA 结合能           | gmx_MMPBSA（GPL 仅调用）    | Rust 编排+原生             | 拓扑+轨迹     | ✅能量分解图 | 二期 |
+
+### ⚡ GPU 前沿批次（2026-09-29 增补；只包装开放权重、不写内核）
+
+| 能力                        | 生态对标                  | 实现                | 数据类别     | 绘图      | 状态  |
+| ------------------------- | --------------------- | ----------------- | --------- | ------- | --- |
+| 显微图像分割                   | cellpose 4.x（BSD-3）    | Py pack gpu:required ≥8GB | 图像(TIFF/OME) | ✅掩码叠加 | 排期 |
+| 蛋白质从头设计+反向折叠              | RFdiffusion+ProteinMPNN（BSD/MIT，含权重） | Py pack gpu:required | 结构        | ✅设计示例图 | 排期 |
+| 基因组基础模型打分（变异/元件）           | Evo 2 1B/7B（Apache 含权重） | Py pack gpu:optional | 序列        | —      | 排期 |
+| 调控预测+非编码变异效应              | Borzoi/Flashzoi（Apache/MIT） | Py pack gpu:required | 序列        | ✅轨道图   | 排期 |
+| 单细胞深度整合                  | scvi-tools（BSD-3）      | Py pack gpu:optional（≤10万细胞 CPU 可用） | 矩阵(H5ad) | ✅UMAP | 排期（与 🔴 单细胞行合流） |
+| 复合物预测+亲和力                 | Boltz-2/Protenix（MIT/Apache 含权重） | Py pack gpu:required | 序列        | ✅结构图   | 排期（与 planned AF2 并轨） |
+
+> GPU 批次**永久排除**（权重非商用，AGPL 二进制不可分发）：AlphaMissense、SpliceAI 模型、
+> PrimateAI-3D、Chroma 权重、Nucleotide Transformer v2、病理 WSI 基础模型层
+> （UNI/Virchow2/GigaPath/Phikon）、TargetDiff（无许可证）、cryoSPARC。
+> 执行模式走 workflow-pack 的 `gpu: required|optional + minimum_vram_mb` 契约。
+
+### 🕳️ 流水线盲区批次（2026-09-29 增补；Tier1 高优）
+
+| 能力                        | 生态对标                  | 实现(Rust/Py/R)      | 数据类别      | 绘图      | 状态  |
+| ------------------------- | --------------------- | ------------------ | --------- | ------- | --- |
+| 小变异检测+联合分型（补断链：FASTQ→BAM→VCF） | bcftools mpileup/call（MIT） | Rust 编排+原生     | BAM+参考    | —      | 排期（最高优） |
+| BAM 去重标记+窗口深度/插入片段指标      | samtools markdup/mosdepth | Rust 编排+原生      | BAM       | ✅深度分布图 | 排期 |
+| 批次效应校正                    | ComBat/limma           | R+Py 双 pack         | 矩阵        | ✅校正前后图 | 排期 |
+| QTL 定位+混合模型（BLUP/BLUE）      | qtl2/lme4/rrBLUP       | R pack              | 基因型+表型    | ✅LOD 曲线 | 排期 |
+| 微生物分型套件（AMR/毒力/MLST/质粒）    | AMRFinderPlus/ResFinder（Apache） | Rust 编排+原生 | reads/装配  | ✅存在-缺失热图 | 排期 |
+| 参考基因组管理（accession 拉取+校验+索引） | genomepy/refgenie 对照   | **纯 Rust**          | 网络        | —      | 排期 |
+| SSR/微卫星标记挖掘               | MISA/TRF 对照           | **纯 Rust**          | 序列        | ✅位点图   | 排期 |
+
+> 盲区 Tier2 择要（升 Tier1 前不排期）：peak 注释（纯 Rust）、ECFP/MACCS 指纹（RDKit pack）、
+> SRA/ENA 远程下载（纯 Rust 编排）、STAR/HISAT2 剪接比对（rMATS 前置）、GSVA/ssGSEA、
+> MAFFT（MSA 第二引擎）、功效/样本量分析、ROH+单倍型分型（bcftools/whatshap）。
 
 > 约束重申：§11 是**封闭清单**——任何新能力先入表、标排期，再动工；动工即触发四同步 + `benchmark-datasets.json` 登记。
 
