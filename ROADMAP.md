@@ -463,6 +463,10 @@ C4 带宽并行 / C5 重型原生编排 / C6 DL 推理 / C7 仅云**。
   工具结果直接可比），**推荐值 = 本策略档位**（f32 + 补偿归一，文档与 CLI help 显式标注
   "recommended"）；结果 JSON 必须记录实际 `precision` 与执行档位（cpu-scalar/cpu-simd/
   gpu 等），同输入的 f64 audit 与 f32 推荐档输出共存、可对账，用户自行选择信任级别。
+- **双实现硬规则**（同日定案）：凡涉及精度且 GPU 可加速的计算（C2/C4 类），**CPU 与
+  GPU 实现均为必须交付项**——CPU（scalar+SIMD）是传统方法与 f64 audit 档，GPU（wgpu
+  通用层 + G3 厂商栈）是强制加速项；**只交 CPU 版不算完成**。哈希等 WGSL 不适配的结构
+  （k-mer）其 GPU 化同为必须项，落点为 G3 厂商栈（CUDA/MUSA 有动态内存），不得豁免。
 
 ## 10. M6 —— CLI 契约加固 · 安装器与环境变量 · Agent 打通
 
