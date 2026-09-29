@@ -16,6 +16,7 @@ __pycache__/
 *.profraw
 *.profdata
 CAPABILITY_TRACKING.md
+HANDOFF.md
 logo.html
 scripts/bench-tier1v2-biolab.sh
 scripts/*-biolab.sh
