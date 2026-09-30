@@ -123,7 +123,8 @@
       "path": "skills/analyze-molecular-descriptors",
       "kind": "executable",
       "capabilities": [
-        "chemistry.descriptors.v1"
+        "chemistry.descriptors.v1",
+        "chemistry.conformers.v1"
       ]
     },
     {

@@ -1,0 +1,113 @@
+{
+  "schema_version": "2",
+  "id": "org.linxira.chemistry-conformers-rdkit",
+  "version": "0.1.0",
+  "publisher": {
+    "name": "Linxira OS",
+    "url": "https://github.com/Linxira-OS"
+  },
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
+  "entrypoint": {
+    "path": "src/conformers.py",
+    "arguments": [
+      "--request",
+      "{request}",
+      "--result",
+      "{result}"
+    ]
+  },
+  "runtime": {
+    "kind": "python",
+    "version": "3.12.x",
+    "core_compatibility": ">=0.1.0,<2.0.0",
+    "dependency_lock": {
+      "path": "requirements.lock",
+      "sha256": "07445ad9d7b2b304bc96d4be805b0e2bc84b1ecba8ac13d78a41c9c92b4c7478"
+    }
+  },
+  "resume": {
+    "enabled": true,
+    "state_file": "resume-state.json"
+  },
+  "contract": {
+    "inputs": [
+      {
+        "role": "molecules",
+        "formats": [
+          "sdf"
+        ]
+      }
+    ],
+    "outputs": {
+      "roles": [
+        "conformers"
+      ],
+      "kind": "domain-file",
+      "formats": [
+        "sdf"
+      ],
+      "media_type": "chemical/x-mdl-sdfile"
+    },
+    "parameters": [
+      "output_directory",
+      "output_filename",
+      "num_conformers",
+      "seed",
+      "rms_prune_threshold"
+    ]
+  },
+  "input_schema": {
+    "type": "object",
+    "$ref": "schemas/input.schema.json"
+  },
+  "output_schema": {
+    "type": "object",
+    "$ref": "schemas/output.schema.json"
+  },
+  "platforms": [
+    "windows-gnu",
+    "debian",
+    "arch"
+  ],
+  "network": {
+    "access": "none",
+    "allowed_hosts": []
+  },
+  "resources": {
+    "minimum_memory_mb": 512,
+    "minimum_disk_mb": 256,
+    "recommended_threads": 1,
+    "gpu": "none"
+  },
+  "files": [
+    {
+      "path": "NOTICE.md",
+      "sha256": "f4b558ead44a8f597f1e8e041b16b08afca1dce7a0d60503a4e7cedc9032cf45"
+    },
+    {
+      "path": "README.md",
+      "sha256": "69bd52cb4e63f40f98a0c2e9731b854f0b0e479cbc62eb80324a922c572e7bea"
+    },
+    {
+      "path": "requirements.lock",
+      "sha256": "07445ad9d7b2b304bc96d4be805b0e2bc84b1ecba8ac13d78a41c9c92b4c7478"
+    },
+    {
+      "path": "schemas/input.schema.json",
+      "sha256": "842bf57a33784e48e96da98a934c8c0f47fc5926f9f2f54f34e9a4df2a12d094"
+    },
+    {
+      "path": "schemas/output.schema.json",
+      "sha256": "6c798df5fe5a41bf9db6e0fc7298c2db4d4263489ec526a01e715359bf7611e9"
+    },
+    {
+      "path": "src/conformers.py",
+      "sha256": "33288cc9d88248d197604c1c7728665a19f9e5ab4c976aed5af948a1e3448eac"
+    },
+    {
+      "path": "tests/test_conformers.py",
+      "sha256": "9dd6c672abba0a5cb2a7ca39ce5041d8f855d1ef4c5ddef0803138f2c84beee3"
+    }
+  ]
+}

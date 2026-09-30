@@ -23,6 +23,7 @@ const BULK_EXPRESSION_PACK: &str = "org.linxira.bulk-expression-deseq2";
 const SEQUENCE_CONVERT_PACK: &str = "org.linxira.sequence-conversion-biopython";
 const MEDICAL_SURVIVAL_PACK: &str = "org.linxira.medical-survival";
 const CHEMISTRY_DESCRIPTORS_PACK: &str = "org.linxira.chemistry-descriptors-rdkit";
+const CHEMISTRY_CONFORMERS_PACK: &str = "org.linxira.chemistry-conformers-rdkit";
 /// M2-T3 benchmark packs: one harness per language that hosts the independent
 /// Python/R implementations of native capabilities and self-reports timing.
 const BENCHMARK_PYTHON_PACK: &str = "org.linxira.benchmark-python";
@@ -470,6 +471,31 @@ pub(super) fn execute_chemistry_descriptors_v1(
         WorkflowRuntimeKind::Python,
     )?;
     execute_workflow_v1(&contract, base_directory, request)
+}
+
+pub(super) fn execute_chemistry_conformers_v1(
+    base_directory: &Path,
+    request: JobRequest,
+) -> WorkerResult<String> {
+    let contract = contract_for(
+        CHEMISTRY_CONFORMERS_PACK,
+        CHEMISTRY_CONFORMERS_PACK,
+        WorkflowRuntimeKind::Python,
+    )?;
+    execute_workflow_v1(&contract, base_directory, request)
+}
+
+pub(super) fn execute_chemistry_conformers_v2(
+    base_directory: &Path,
+    request: JobRequestV2,
+    verified_inputs: &BTreeMap<String, String>,
+) -> WorkerResult<String> {
+    let contract = contract_for(
+        CHEMISTRY_CONFORMERS_PACK,
+        CHEMISTRY_CONFORMERS_PACK,
+        WorkflowRuntimeKind::Python,
+    )?;
+    execute_workflow_v2(&contract, base_directory, request, verified_inputs)
 }
 
 pub(super) fn execute_chemistry_descriptors_v2(

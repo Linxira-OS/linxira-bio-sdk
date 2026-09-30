@@ -110,6 +110,14 @@
       "trust": "official",
       "runtime": "r",
       "manifest": "workflows/org.linxira.visualization-ggplot2/manifest.json"
+    },
+    {
+      "id": "org.linxira.chemistry-conformers-rdkit",
+      "capability": "chemistry.conformers.v1",
+      "status": "cataloged",
+      "trust": "official",
+      "runtime": "python",
+      "manifest": "workflows/org.linxira.chemistry-conformers-rdkit/manifest.json"
     }
   ]
 }

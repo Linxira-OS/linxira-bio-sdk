@@ -234,6 +234,9 @@ pub fn execute_request(request: JobRequest, base_directory: &Path) -> WorkerResu
         "chemistry.descriptors.v1" => {
             workflow::execute_chemistry_descriptors_v1(base_directory, request)
         }
+        "chemistry.conformers.v1" => {
+            workflow::execute_chemistry_conformers_v1(base_directory, request)
+        }
         "interval.intersect.v1" => run_interval_intersect(base_directory, request),
         "interval.merge.v1" => run_interval_merge(base_directory, request),
         "interval.subtract.v1" => run_interval_subtract(base_directory, request),
@@ -1194,6 +1197,9 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
         }
         "chemistry.descriptors.v1" => {
             workflow::execute_chemistry_descriptors_v2(base_directory, request, &verified_inputs)
+        }
+        "chemistry.conformers.v1" => {
+            workflow::execute_chemistry_conformers_v2(base_directory, request, &verified_inputs)
         }
         "metagenomics.classify.v1" => {
             let input = resolve_v2_single_input(base_directory, &request, "reads")?;
@@ -2490,6 +2496,16 @@ pub fn v2_contract(
             ],
         ),
         "chemistry.descriptors.v1" => (&["molecules"], &["output_directory", "output_filename"]),
+        "chemistry.conformers.v1" => (
+            &["molecules"],
+            &[
+                "output_directory",
+                "output_filename",
+                "num_conformers",
+                "seed",
+                "rms_prune_threshold",
+            ],
+        ),
         "metagenomics.classify.v1" => (
             &["reads"],
             &[

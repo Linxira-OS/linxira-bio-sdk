@@ -77,7 +77,7 @@ M0 统一输出框架 ──┬──> M1 双后端绘图（依赖 OutputSpec/Pl
 | 批次 | 内容 | 状态 |
 | --- | --- | --- |
 | A 变异检测断链 | variant.call.v1（bcftools）→ 长读排序/BAM 补全 → BAM 去重+窗口深度 | 已完成（2026-09-30：variant.call.v1、long-read --bam、alignment.markdup.v1、alignment.window-depth.v1） |
-| B 化学轨首发 | chemistry.dock.v1（Vina+Meeko）→ chemistry.conformers.v1（RDKit pack） | 进行中（dock 已发布 2026-09-30） |
+| B 化学轨首发 | chemistry.dock.v1（Vina+Meeko）→ chemistry.conformers.v1（RDKit pack） | 已完成（2026-09-30：dock + conformers） |
 | C 纯 Rust+模拟器 | SSR 挖掘 → peak 注释 → 模拟器一期（序列/读段合成） | 未开始 |
 | D GPU 内核推进 | Pearson v3（subgroup 归约）→ 厂商栈 host 抽象层 → sycl-rs 本机尝试 | 未开始 |
 | E 常规轨二 | 批次效应校正（ComBat/limma 双 pack）→ QTL+混合模型（R pack） | 未开始 |
@@ -605,7 +605,7 @@ C4 带宽并行 / C5 重型原生编排 / C6 DL 推理 / C7 仅云**。
 | ------------------------- | --------------------- | ---------------------- | --------- | ------- | --- |
 | 分子对接（蛋白-配体）              | AutoDock Vina + Meeko | Rust 编排+原生 Vina（Apache/MIT） | 结构+化学(PDB/SDF) | ✅打分分布 | [x] 2026-09-30：单配体对接已发布（chemistry.dock.v1，含 stdout pose 表解析与 Meeko/Vina 工具探测） |
 | 虚拟筛选（库级批量对接+聚合排名）         | Vina `--batch`/VSflow  | Rust 编排+原生 Vina          | 化学库       | ✅排名图    | 排期 |
-| 构象生成+力场最小化               | RDKit ETKDGv3+MMFF94   | Py pack（复用 descriptors-rdkit） | 化学(SMILES/SDF) | —     | 排期 |
+| 构象生成+力场最小化 | RDKit ETKDGv3+MMFF94 | Py pack（复用 descriptors-rdkit） | 化学(SMILES/SDF) | — | [x] 2026-09-30：ETKDGv3+MMFF94 pack 已发布（chemistry.conformers.v1，固定种子可复现） |
 | 半经验量子（能量/梯度/Hessian）       | xtb(LGPL 仅调用)/MOPAC(公有域) | Rust 编排+原生             | 化学        | —      | 排期 |
 | MD 轨迹分析（RMSD/RMSF/RDF/回转半径） | MDTraj/MDAnalysis 对照   | **纯 Rust**（chemfiles.rs, BSD） | 轨迹(DCD/XTC/netCDF) | ✅轨迹图 | 排期 |
 | MM-PB/GBSA 结合能           | gmx_MMPBSA（GPL 仅调用）    | Rust 编排+原生             | 拓扑+轨迹     | ✅能量分解图 | 二期 |

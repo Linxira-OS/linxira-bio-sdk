@@ -530,6 +530,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         [chemistry, dock, arguments @ ..] if chemistry == "chemistry" && dock == "dock" => {
             print_chemistry_dock(arguments)
         }
+        [chemistry, conformers, arguments @ ..]
+            if chemistry == "chemistry" && conformers == "conformers" =>
+        {
+            print_chemistry_conformers(arguments)
+        }
         [medical, survival, arguments @ ..] if medical == "medical" && survival == "survival" => {
             print_medical_survival(arguments)
         }
@@ -2765,6 +2770,167 @@ fn print_chemistry_descriptors(arguments: &[String]) -> Result<(), Box<dyn Error
     fs::write(&request_path, serde_json::to_vec(&request)?)?;
     run_workflow_pack(
         "org.linxira.chemistry-descriptors-rdkit",
+        &request_path,
+        &result_path,
+    )
+}
+
+fn print_chemistry_conformers(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input = None;
+    let mut output = None;
+    let mut num_conformers = 10_u64;
+    let mut seed = 42_u64;
+    let mut rms_prune: Option<f64> = None;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--num-conformers" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--num-conformers requires a value")?;
+                num_conformers = value.parse::<u64>().map_err(|_| {
+                    format!("--num-conformers must be an integer between 1 and 1000: {value}")
+                })?;
+                if !(1..=1000).contains(&num_conformers) {
+                    return Err("--num-conformers must be between 1 and 1000".into());
+                }
+            }
+            "--seed" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--seed requires a value")?;
+                seed = value
+                    .parse::<u64>()
+                    .map_err(|_| format!("--seed must be a non-negative integer: {value}"))?;
+            }
+            "--rms-prune" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--rms-prune requires a value")?;
+                let threshold = value
+                    .parse::<f64>()
+                    .map_err(|_| format!("--rms-prune requires a number, got {value:?}"))?;
+                if !threshold.is_finite() || threshold <= 0.0 {
+                    return Err("--rms-prune must be a positive number".into());
+                }
+                rms_prune = Some(threshold);
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown chemistry conformers option: {value}").into());
+            }
+            value if input.is_none() => input = Some(value.to_owned()),
+            value if output.is_none() => output = Some(value.to_owned()),
+            value => {
+                return Err(format!("unexpected chemistry conformers argument: {value}").into());
+            }
+        }
+        index += 1;
+    }
+    let input_path = Path::new(
+        input
+            .as_deref()
+            .ok_or("chemistry conformers requires <input.sdf> <output.sdf>")?,
+    );
+    let output_path = Path::new(
+        output
+            .as_deref()
+            .ok_or("chemistry conformers requires <input.sdf> <output.sdf>")?,
+    );
+    if !input_path.is_file() {
+        return Err(format!(
+            "chemistry conformers input does not exist: {}",
+            input_path.display()
+        )
+        .into());
+    }
+    if output_path.exists() {
+        return Err(format!(
+            "refusing to overwrite chemistry conformers output: {}",
+            output_path.display()
+        )
+        .into());
+    }
+    let input_path = fs::canonicalize(input_path)?;
+    let output_directory = output_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let containing = output_directory
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(output_directory);
+    if !containing.is_dir() {
+        return Err(format!(
+            "chemistry conformers output parent directory does not exist: {}",
+            containing.display()
+        )
+        .into());
+    }
+    if output_directory.exists() {
+        return Err(format!(
+            "chemistry conformers output directory must not already exist: {}",
+            output_directory.display()
+        )
+        .into());
+    }
+    let output_directory = fs::canonicalize(containing)?
+        .join(
+            output_directory
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+        )
+        .to_string_lossy()
+        .into_owned();
+    let output_filename = output_path
+        .file_name()
+        .ok_or("chemistry conformers output has no file name")?
+        .to_string_lossy()
+        .into_owned();
+    let size_bytes = fs::metadata(&input_path)?.len();
+    let mut parameters = serde_json::json!({
+        "output_directory": output_directory,
+        "output_filename": output_filename,
+        "num_conformers": num_conformers,
+        "seed": seed,
+    });
+    if let Some(threshold) = rms_prune {
+        parameters["rms_prune_threshold"] = serde_json::json!(threshold);
+    }
+    let _ = json;
+    let request = serde_json::json!({
+        "schema_version": "2",
+        "job_id": "cli",
+        "capability": "chemistry.conformers.v1",
+        "inputs": [{
+            "artifact_id": "molecules",
+            "role": "molecules",
+            "cardinality": "single",
+            "files": [{
+                "file_id": "input-molecules-1",
+                "path": input_path.to_string_lossy(),
+                "format": "sdf",
+                "compression": "none",
+                "size_bytes": size_bytes,
+            }],
+        }],
+        "execution": {"mode": "local-cpu"},
+        "parameters": parameters,
+    });
+    let temporary = tempfile::Builder::new()
+        .prefix("linxira-bio-conformers-")
+        .tempdir()?;
+    let request_path = temporary.path().join("request.json");
+    let result_path = Path::new(
+        parameters["output_directory"]
+            .as_str()
+            .ok_or("output_directory must be a string")?,
+    )
+    .join("result.json");
+    fs::write(&request_path, serde_json::to_vec(&request)?)?;
+    run_workflow_pack(
+        "org.linxira.chemistry-conformers-rdkit",
         &request_path,
         &result_path,
     )
@@ -8224,6 +8390,8 @@ fn usage() -> &'static str {
         "  linxira-bio sequence shuffle <input.fasta[.gz]> <output.fasta> [--seed N] [--json]\n",
         "  linxira-bio sequence convert <input> <output> [--input-format fasta|fastq|genbank|embl] [--output-format fasta|fastq|genbank|embl]\n",
         "  linxira-bio chemistry descriptors <input.sdf> <output.tsv> [--json]\n",
+        "  linxira-bio chemistry conformers <input.sdf> <output.sdf> [--num-conformers N] [--seed N] [--rms-prune F] [--json]
+",
         "  linxira-bio chemistry dock <receptor.pdbqt> <ligand.pdbqt> <output.pdbqt> --center-x F --center-y F --center-z F --size-x F --size-y F --size-z F [--seed N] [--exhaustiveness 8] [--num-modes 9] [--cpu N] [--json]\n",
         "  linxira-bio medical survival <cohort.csv|tsv> <output-directory> --time-column COLUMN --event-column COLUMN --group-column COLUMN --reference-level LEVEL [--json]\n",
         "  linxira-bio primer epcr <reference.fasta[.gz]> <primers.tsv> <output.tsv> [--min-amplicon N] [--max-amplicon N] [--max-hits N] [--json]\n",
