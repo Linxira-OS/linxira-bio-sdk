@@ -1,0 +1,4 @@
+interface:
+  display_name: "Simulate Bio Data"
+  short_description: "Generate seeded synthetic FASTA sequences and FASTQ reads"
+  default_prompt: "Use $simulate-bio-data to generate a seeded synthetic reference and read set for benchmarking."

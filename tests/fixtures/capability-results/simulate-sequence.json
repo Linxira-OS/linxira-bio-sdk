@@ -1,0 +1,10 @@
+{
+  "seed": 42,
+  "sequence_count": 4,
+  "total_bases": 2000,
+  "min_length": 500,
+  "max_length": 500,
+  "mean_length": 500.0,
+  "gc_percent": 50.02,
+  "n_count": 20
+}

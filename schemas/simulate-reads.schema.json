@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/simulate-reads.v1.json",
+  "title": "Linxira Bio seeded read simulation summary",
+  "type": "object",
+  "required": [
+    "seed",
+    "paired",
+    "reference_sequence_count",
+    "reference_bases",
+    "read_count",
+    "read_length",
+    "requested_coverage_percent_x100",
+    "realized_coverage_percent_x100",
+    "error_rate_percent_x100"
+  ],
+  "properties": {
+    "seed": {"type": "integer", "minimum": 0},
+    "paired": {"type": "boolean"},
+    "reference_sequence_count": {"type": "integer", "minimum": 0},
+    "reference_bases": {"type": "integer", "minimum": 0},
+    "read_count": {"type": "integer", "minimum": 0},
+    "read_length": {"type": "integer", "minimum": 1},
+    "requested_coverage_percent_x100": {"type": ["integer", "null"], "minimum": 0},
+    "realized_coverage_percent_x100": {"type": "integer", "minimum": 0},
+    "error_rate_percent_x100": {"type": "integer", "minimum": 0, "maximum": 10000}
+  },
+  "additionalProperties": false
+}
