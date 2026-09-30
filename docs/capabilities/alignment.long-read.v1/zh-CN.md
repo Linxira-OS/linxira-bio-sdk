@@ -11,11 +11,13 @@ FASTA 格式的参考基因组和 FASTQ 格式的长读长 reads。
 ## 参数
 
 `--preset` 选择比对预设：`map-ont`、`map-pb` 或 `map-hifi`（默认 `map-ont`）。
-`--threads` 设置线程数（默认 1）。
+`--threads` 设置线程数（默认 1）。`--bam` 输出按坐标排序的 BAM（经 `samtools sort`，
+要求 `.bam` 输出路径），代替普通 SAM。
 
 ## 输出
 
-包含比对 reads 的 SAM 文件。JSON 结果包裹原生工具执行元数据，包括已比对和未比对 reads 数量。
+包含比对 reads 的 SAM 文件；使用 `--bam` 时为按坐标排序的 BAM。JSON 结果包裹原生工具执行
+元数据，包括已比对和未比对 reads 数量。
 
 ## 示例
 

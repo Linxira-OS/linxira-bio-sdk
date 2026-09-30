@@ -4351,6 +4351,7 @@ fn print_long_read_alignment(arguments: &[String]) -> Result<(), Box<dyn Error>>
                 )?;
             }
             "--secondary" => options.secondary = true,
+            "--bam" => options.sorted_bam = true,
             "--max-secondary" => {
                 index += 1;
                 options.max_secondary =
@@ -4366,8 +4367,17 @@ fn print_long_read_alignment(arguments: &[String]) -> Result<(), Box<dyn Error>>
     }
     if paths.len() != 3 {
         return Err(
-            "alignment long-read requires <reference.fasta> <reads.fastq> <output.sam>".into(),
+            "alignment long-read requires <reference.fasta> <reads.fastq> <output.sam|bam>".into(),
         );
+    }
+    if options.sorted_bam {
+        let extension = paths[2]
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .unwrap_or("");
+        if !extension.eq_ignore_ascii_case("bam") {
+            return Err("alignment long-read --bam requires an .bam output path".into());
+        }
     }
     let result = run_minimap2_long_read_path(&paths[0], &paths[1], &paths[2], &options)?;
     print_native_tool_result(

@@ -19,11 +19,13 @@ linxira-bio alignment long-read REFERENCE.fa READS.fastq OUTPUT.sam --preset map
 
 Presets: `map-ont` (default), `map-pb`, `map-hifi`, `splice`, `asm5`, `asm10`,
 `asm20`, `sr`. Use `--secondary` to output secondary alignments, and
-`--max-secondary N` to limit them.
+`--max-secondary N` to limit them. Pass `--bam` (with an `.bam` output path) to
+emit a coordinate-sorted BAM via `samtools sort` — the form variant calling
+requires.
 
 For worker v1, provide `inputs.reference`, `inputs.reads`, and
 `parameters.output`. Optional parameters: `preset`, `threads`, `secondary`,
-`max_secondary`. The capability is `alignment.long-read.v1`.
+`max_secondary`, `sorted_bam`. The capability is `alignment.long-read.v1`.
 
 ## Short-Read Alignment
 

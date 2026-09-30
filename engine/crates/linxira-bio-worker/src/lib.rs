@@ -4885,7 +4885,14 @@ fn run_long_read_alignment(base_directory: &Path, request: JobRequest) -> Worker
     validate_v1_multi_input_contract(
         &request,
         &["reference", "reads"],
-        &["output", "threads", "preset", "secondary"],
+        &[
+            "output",
+            "threads",
+            "preset",
+            "secondary",
+            "max_secondary",
+            "sorted_bam",
+        ],
     )?;
     let reference = request
         .inputs
@@ -4925,6 +4932,11 @@ fn run_long_read_alignment(base_directory: &Path, request: JobRequest) -> Worker
                 .unwrap_or(false),
             max_secondary: optional_parameter_usize(&request.parameters, "max_secondary")?
                 .unwrap_or(0),
+            sorted_bam: request
+                .parameters
+                .get("sorted_bam")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
         },
     )?;
     serialize_v1_native_tool_result(request, analysis)

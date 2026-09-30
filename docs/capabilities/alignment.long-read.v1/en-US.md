@@ -13,11 +13,14 @@ A reference genome in FASTA format and long reads in FASTQ format.
 
 `--preset` selects the alignment preset: `map-ont`, `map-pb`, or `map-hifi`
 (default `map-ont`). `--threads` sets the number of threads (default 1).
+`--bam` emits a coordinate-sorted BAM (via `samtools sort`, requires an `.bam`
+output path) instead of plain SAM.
 
 ## Outputs
 
-A SAM file with aligned reads. JSON result wraps the native tool execution
-metadata including aligned and unaligned read counts.
+A SAM file with aligned reads, or a coordinate-sorted BAM with `--bam`. JSON
+result wraps the native tool execution metadata including aligned and
+unaligned read counts.
 
 ## Examples
 
