@@ -1,6 +1,6 @@
 ---
 name: analyze-sam-quality
-description: Validate local SAM alignment files and run controlled local BAM/CRAM quality, coverage, or short-read alignment workflows. Use for mapping-rate, flag, duplicate, MAPQ, reference-count, BAM/CRAM samtools reports, coverage summaries, or minimap2 short-read reference alignment.
+description: Validate local SAM alignment files and run controlled local BAM/CRAM quality, coverage, duplicate-marking, or short-read alignment workflows. Use for mapping-rate, flag, duplicate, MAPQ, reference-count, BAM/CRAM samtools reports, coverage summaries, samtools markdup duplicate flagging, or minimap2 short-read reference alignment.
 ---
 
 # Analyze SAM Quality
@@ -8,6 +8,10 @@ description: Validate local SAM alignment files and run controlled local BAM/CRA
 Run deterministic SAM text QC or a controlled maintained native tool locally.
 
 ## Run
+1. Flag PCR/optical duplicates: `linxira-bio alignment markdup <input.bam>
+   <output.bam> --stats --json` (four-step samtools chain; duplicates flagged,
+   never removed; feeds variant calling).
+
 
 1. Inspect the input with `linxira-bio dataset inspect <input.sam> --json`.
 2. For SAM, require detected format `sam`; do not pass BAM or CRAM to this capability.

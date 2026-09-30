@@ -163,7 +163,8 @@
       "path": "skills/analyze-sam-quality",
       "kind": "executable",
       "capabilities": [
-        "alignment.qc.v1"
+        "alignment.qc.v1",
+        "alignment.markdup.v1"
       ]
     },
     {

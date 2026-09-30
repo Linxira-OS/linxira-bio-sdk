@@ -652,6 +652,20 @@
       ]
     },
     {
+      "id": "alignment.markdup.v1",
+      "status": "available",
+      "category": "read-alignment",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio alignment markdup <input.bam> <output.bam> --stats --json",
+      "input_formats": [
+        "bam"
+      ],
+      "output_formats": [
+        "bam",
+        "json"
+      ]
+    },
+    {
       "id": "variant.stats.v1",
       "status": "available",
       "category": "variant-calling",

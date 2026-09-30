@@ -11,6 +11,8 @@ pub fn embedded_document(capability: &str, locale: &str) -> Option<&'static str>
         ("alignment.coverage.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/alignment.coverage.v1/zh-CN.md")),
         ("alignment.long-read.v1", "en-US") => Some(include_str!("../../../docs/capabilities/alignment.long-read.v1/en-US.md")),
         ("alignment.long-read.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/alignment.long-read.v1/zh-CN.md")),
+        ("alignment.markdup.v1", "en-US") => Some(include_str!("../../../docs/capabilities/alignment.markdup.v1/en-US.md")),
+        ("alignment.markdup.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/alignment.markdup.v1/zh-CN.md")),
         ("alignment.qc.v1", "en-US") => Some(include_str!("../../../docs/capabilities/alignment.qc.v1/en-US.md")),
         ("alignment.qc.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/alignment.qc.v1/zh-CN.md")),
         ("alignment.short-read.v1", "en-US") => Some(include_str!("../../../docs/capabilities/alignment.short-read.v1/en-US.md")),

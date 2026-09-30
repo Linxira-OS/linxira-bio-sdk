@@ -631,7 +631,7 @@ C4 带宽并行 / C5 重型原生编排 / C6 DL 推理 / C7 仅云**。
 | 能力                        | 生态对标                  | 实现(Rust/Py/R)      | 数据类别      | 绘图      | 状态  |
 | ------------------------- | --------------------- | ------------------ | --------- | ------- | --- |
 | 小变异检测+联合分型（补断链：FASTQ→BAM→VCF） | bcftools mpileup/call（MIT） | Rust 编排+原生     | BAM+参考    | —      | [x] 2026-09-30 单样本已发布（variant.call.v1）；联合分型排期 |
-| BAM 去重标记+窗口深度/插入片段指标      | samtools markdup/mosdepth | Rust 编排+原生      | BAM       | ✅深度分布图 | 排期 |
+| BAM 去重标记+窗口深度/插入片段指标      | samtools markdup/mosdepth | Rust 编排+原生      | BAM       | ✅深度分布图 | 部分：去重标记已发布（alignment.markdup.v1，2026-09-30）；窗口深度排期 |
 | 批次效应校正                    | ComBat/limma           | R+Py 双 pack         | 矩阵        | ✅校正前后图 | 排期 |
 | QTL 定位+混合模型（BLUP/BLUE）      | qtl2/lme4/rrBLUP       | R pack              | 基因型+表型    | ✅LOD 曲线 | 排期 |
 | 微生物分型套件（AMR/毒力/MLST/质粒）    | AMRFinderPlus/ResFinder（Apache） | Rust 编排+原生 | reads/装配  | ✅存在-缺失热图 | 排期 |
