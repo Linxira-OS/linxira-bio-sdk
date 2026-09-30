@@ -1,0 +1,4 @@
+interface:
+  display_name: "Import Npz Matrix"
+  short_description: "Convert NumPy .npz arrays into CSV/TSV matrices"
+  default_prompt: "Use $import-npz-matrix to convert this .npz array into a delimited analysis matrix."

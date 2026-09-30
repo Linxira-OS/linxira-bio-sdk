@@ -1,0 +1,4 @@
+interface:
+  display_name: "Render Bio Plots"
+  short_description: "Render deterministic matplotlib or ggplot2 figures from a PlotSpec"
+  default_prompt: "Use $render-bio-plots to render this PlotSpec into a publication-ready figure."

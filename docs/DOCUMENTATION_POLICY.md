@@ -45,8 +45,8 @@ updating both locales in the same change.
 ## Experiment Records
 
 - Intermediate development reports (kernel experiments, hardware ledgers,
-  vendor trials) stay LOCAL in `docs/engine-evals/` and are not committed
-  (the directory is gitignored; files already tracked remain as history).
+  vendor trials) live in `docs/engine-evals/` and are committed alongside the
+  code that produced them — they are engineering records, not publications.
 - Measurement discipline: median of at least 3 repeated runs (or state a
   single run plus observed spread); GPU timings split into
   upload/compute/readback; overturned conclusions are corrected explicitly.

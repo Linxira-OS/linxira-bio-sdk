@@ -1,0 +1,4 @@
+interface:
+  display_name: "Quantify Expression"
+  short_description: "Run native salmon quantification with cross-check summaries"
+  default_prompt: "Use $quantify-expression to quantify transcript abundance from local FASTQ reads against a prebuilt index."

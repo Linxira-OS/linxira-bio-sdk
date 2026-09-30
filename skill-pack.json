@@ -8,14 +8,227 @@
   "capability_catalog": "capabilities/catalog.json",
   "skills": [
     {
-      "id": "route-bio-analysis",
-      "path": "skills/route-bio-analysis",
-      "kind": "router"
+      "id": "align-biological-sequences",
+      "path": "skills/align-biological-sequences",
+      "kind": "executable",
+      "capabilities": [
+        "msa.muscle.v1",
+        "msa.trimal.v1"
+      ]
     },
     {
-      "id": "select-bio-execution",
-      "path": "skills/select-bio-execution",
-      "kind": "policy"
+      "id": "analyze-comparative-genomics",
+      "path": "skills/analyze-comparative-genomics",
+      "kind": "executable",
+      "capabilities": [
+        "comparative.mcscanx.v1",
+        "comparative.kaks.v1",
+        "comparative.synteny.visualize.v1"
+      ]
+    },
+    {
+      "id": "analyze-coordinate-structures",
+      "path": "skills/analyze-coordinate-structures",
+      "kind": "executable",
+      "capabilities": [
+        "structure.mmcif.summary.v1",
+        "structure.sequence.extract.v1",
+        "structure.contact-map.v1",
+        "structure.geometry.v1",
+        "structure.superpose.v1",
+        "protein.secondary-structure.v1"
+      ]
+    },
+    {
+      "id": "analyze-differential-expression",
+      "path": "skills/analyze-differential-expression",
+      "kind": "executable",
+      "capabilities": [
+        "expression.differential.v1",
+        "medical.bulk-rnaseq.v1"
+      ]
+    },
+    {
+      "id": "analyze-expression-matrix",
+      "path": "skills/analyze-expression-matrix",
+      "kind": "executable",
+      "capabilities": [
+        "expression.matrix.qc.v1",
+        "expression.normalize.v1",
+        "expression.normalize.v2",
+        "expression.pca.v1",
+        "expression.cluster.v1",
+        "expression.heatmap.v1"
+      ]
+    },
+    {
+      "id": "analyze-fastq-quality",
+      "path": "skills/analyze-fastq-quality",
+      "kind": "executable",
+      "capabilities": [
+        "fastq.qc.v1"
+      ]
+    },
+    {
+      "id": "analyze-functional-enrichment",
+      "path": "skills/analyze-functional-enrichment",
+      "kind": "executable",
+      "capabilities": [
+        "annotation.go.normalize.v1",
+        "annotation.eggnog.normalize.v1",
+        "enrichment.overrepresentation.v1",
+        "enrichment.go.v1",
+        "enrichment.kegg.v1",
+        "enrichment.gsea.v1"
+      ]
+    },
+    {
+      "id": "analyze-genome-annotations",
+      "path": "skills/analyze-genome-annotations",
+      "kind": "executable",
+      "capabilities": [
+        "annotation.gxf.stats.v1",
+        "annotation.gxf.normalize.v1",
+        "annotation.gene-position.v1",
+        "annotation.sequence.extract.v1",
+        "genome.gene-density.v1"
+      ]
+    },
+    {
+      "id": "analyze-metabolomics-peaks",
+      "path": "skills/analyze-metabolomics-peaks",
+      "kind": "executable",
+      "capabilities": [
+        "medical.metabolomics.v1"
+      ]
+    },
+    {
+      "id": "analyze-metagenomics",
+      "path": "skills/analyze-metagenomics",
+      "kind": "executable",
+      "capabilities": [
+        "metagenomics.classify.v1"
+      ]
+    },
+    {
+      "id": "analyze-microbiome-diversity",
+      "path": "skills/analyze-microbiome-diversity",
+      "kind": "executable",
+      "capabilities": [
+        "medical.microbiome.v1"
+      ]
+    },
+    {
+      "id": "analyze-molecular-descriptors",
+      "path": "skills/analyze-molecular-descriptors",
+      "kind": "executable",
+      "capabilities": [
+        "chemistry.descriptors.v1"
+      ]
+    },
+    {
+      "id": "analyze-pdb-structure",
+      "path": "skills/analyze-pdb-structure",
+      "kind": "executable",
+      "capabilities": [
+        "structure.pdb.summary.v1"
+      ]
+    },
+    {
+      "id": "analyze-pharmacogenomics",
+      "path": "skills/analyze-pharmacogenomics",
+      "kind": "executable",
+      "capabilities": [
+        "medical.pharmacogenomics.v1"
+      ]
+    },
+    {
+      "id": "analyze-protein-domains",
+      "path": "skills/analyze-protein-domains",
+      "kind": "executable",
+      "capabilities": [
+        "protein.domain.parse.v1"
+      ]
+    },
+    {
+      "id": "analyze-protein-properties",
+      "path": "skills/analyze-protein-properties",
+      "kind": "executable",
+      "capabilities": [
+        "protein.properties.v1"
+      ]
+    },
+    {
+      "id": "analyze-sam-quality",
+      "path": "skills/analyze-sam-quality",
+      "kind": "executable",
+      "capabilities": [
+        "alignment.qc.v1"
+      ]
+    },
+    {
+      "id": "analyze-sequence-motifs",
+      "path": "skills/analyze-sequence-motifs",
+      "kind": "executable",
+      "capabilities": [
+        "motif.meme.v1"
+      ]
+    },
+    {
+      "id": "analyze-sequence-similarity",
+      "path": "skills/analyze-sequence-similarity",
+      "kind": "executable",
+      "capabilities": [
+        "similarity.blast.local.v1",
+        "similarity.diamond.v1",
+        "similarity.hmmer.v1",
+        "similarity.blast.parse.v1",
+        "similarity.reciprocal.v1"
+      ]
+    },
+    {
+      "id": "analyze-sequence-statistics",
+      "path": "skills/analyze-sequence-statistics",
+      "kind": "executable",
+      "capabilities": [
+        "sequence.stats.v1"
+      ]
+    },
+    {
+      "id": "analyze-set-overlaps",
+      "path": "skills/analyze-set-overlaps",
+      "kind": "executable",
+      "capabilities": [
+        "set.venn.v1",
+        "set.upset.v1"
+      ]
+    },
+    {
+      "id": "analyze-spatial-transcriptomics",
+      "path": "skills/analyze-spatial-transcriptomics",
+      "kind": "executable",
+      "capabilities": [
+        "medical.spatial-transcriptomics.v1"
+      ]
+    },
+    {
+      "id": "analyze-survival-data",
+      "path": "skills/analyze-survival-data",
+      "kind": "executable",
+      "capabilities": [
+        "medical.survival.v1"
+      ]
+    },
+    {
+      "id": "analyze-variant-statistics",
+      "path": "skills/analyze-variant-statistics",
+      "kind": "executable",
+      "capabilities": [
+        "variant.stats.v1",
+        "variant.filter.v1",
+        "variant.normalize.v1",
+        "variant.compare.v1"
+      ]
     },
     {
       "id": "configure-bio-environment",
@@ -28,11 +241,54 @@
       ]
     },
     {
-      "id": "analyze-sequence-statistics",
-      "path": "skills/analyze-sequence-statistics",
+      "id": "export-bio-table",
+      "path": "skills/export-bio-table",
       "kind": "executable",
       "capabilities": [
-        "sequence.stats.v1"
+        "table.export.v1"
+      ]
+    },
+    {
+      "id": "fit-dose-response-curves",
+      "path": "skills/fit-dose-response-curves",
+      "kind": "executable",
+      "capabilities": [
+        "curve.fit.v1"
+      ]
+    },
+    {
+      "id": "import-npz-matrix",
+      "path": "skills/import-npz-matrix",
+      "kind": "executable",
+      "capabilities": [
+        "matrix.from-npz.v1"
+      ]
+    },
+    {
+      "id": "inspect-bio-dataset",
+      "path": "skills/inspect-bio-dataset",
+      "kind": "executable",
+      "capabilities": [
+        "dataset.inspect.v1"
+      ]
+    },
+    {
+      "id": "intersect-genomic-intervals",
+      "path": "skills/intersect-genomic-intervals",
+      "kind": "executable",
+      "capabilities": [
+        "interval.intersect.v1",
+        "interval.merge.v1",
+        "interval.subtract.v1",
+        "interval.closest.v1"
+      ]
+    },
+    {
+      "id": "manipulate-bio-tables",
+      "path": "skills/manipulate-bio-tables",
+      "kind": "executable",
+      "capabilities": [
+        "table.manipulate.v1"
       ]
     },
     {
@@ -55,14 +311,6 @@
       ]
     },
     {
-      "id": "analyze-fastq-quality",
-      "path": "skills/analyze-fastq-quality",
-      "kind": "executable",
-      "capabilities": [
-        "fastq.qc.v1"
-      ]
-    },
-    {
       "id": "process-fastq-reads",
       "path": "skills/process-fastq-reads",
       "kind": "executable",
@@ -73,134 +321,38 @@
       ]
     },
     {
-      "id": "analyze-sam-quality",
-      "path": "skills/analyze-sam-quality",
+      "id": "quantify-expression",
+      "path": "skills/quantify-expression",
       "kind": "executable",
       "capabilities": [
-        "alignment.qc.v1"
+        "expression.quantify.v1"
       ]
     },
     {
-      "id": "analyze-genome-annotations",
-      "path": "skills/analyze-genome-annotations",
+      "id": "render-bio-plots",
+      "path": "skills/render-bio-plots",
       "kind": "executable",
       "capabilities": [
-        "annotation.gxf.stats.v1",
-        "annotation.gxf.normalize.v1",
-        "annotation.gene-position.v1",
-        "annotation.sequence.extract.v1",
-        "genome.gene-density.v1"
+        "plot.render.v1"
       ]
     },
     {
-      "id": "analyze-sequence-similarity",
-      "path": "skills/analyze-sequence-similarity",
+      "id": "route-bio-analysis",
+      "path": "skills/route-bio-analysis",
+      "kind": "router"
+    },
+    {
+      "id": "run-bio-benchmark",
+      "path": "skills/run-bio-benchmark",
       "kind": "executable",
       "capabilities": [
-        "similarity.blast.local.v1",
-        "similarity.diamond.v1",
-        "similarity.hmmer.v1",
-        "similarity.blast.parse.v1",
-        "similarity.reciprocal.v1"
+        "benchmark.run.v1"
       ]
     },
     {
-      "id": "align-biological-sequences",
-      "path": "skills/align-biological-sequences",
-      "kind": "executable",
-      "capabilities": [
-        "msa.muscle.v1",
-        "msa.trimal.v1"
-      ]
-    },
-    {
-      "id": "analyze-sequence-motifs",
-      "path": "skills/analyze-sequence-motifs",
-      "kind": "executable",
-      "capabilities": [
-        "motif.meme.v1"
-      ]
-    },
-    {
-      "id": "analyze-functional-enrichment",
-      "path": "skills/analyze-functional-enrichment",
-      "kind": "executable",
-      "capabilities": [
-        "annotation.go.normalize.v1",
-        "annotation.eggnog.normalize.v1",
-        "enrichment.overrepresentation.v1",
-        "enrichment.go.v1",
-        "enrichment.kegg.v1",
-        "enrichment.gsea.v1"
-      ]
-    },
-    {
-      "id": "intersect-genomic-intervals",
-      "path": "skills/intersect-genomic-intervals",
-      "kind": "executable",
-      "capabilities": [
-        "interval.intersect.v1",
-        "interval.merge.v1",
-        "interval.subtract.v1",
-        "interval.closest.v1"
-      ]
-    },
-    {
-      "id": "analyze-expression-matrix",
-      "path": "skills/analyze-expression-matrix",
-      "kind": "executable",
-      "capabilities": [
-        "expression.matrix.qc.v1",
-        "expression.normalize.v1",
-        "expression.normalize.v2",
-        "expression.pca.v1",
-        "expression.cluster.v1",
-        "expression.heatmap.v1"
-      ]
-    },
-    {
-      "id": "analyze-differential-expression",
-      "path": "skills/analyze-differential-expression",
-      "kind": "executable",
-      "capabilities": [
-        "expression.differential.v1",
-        "medical.bulk-rnaseq.v1"
-      ]
-    },
-    {
-      "id": "analyze-comparative-genomics",
-      "path": "skills/analyze-comparative-genomics",
-      "kind": "executable",
-      "capabilities": [
-        "comparative.mcscanx.v1",
-        "comparative.kaks.v1",
-        "comparative.synteny.visualize.v1"
-      ]
-    },
-    {
-      "id": "analyze-set-overlaps",
-      "path": "skills/analyze-set-overlaps",
-      "kind": "executable",
-      "capabilities": [
-        "set.venn.v1",
-        "set.upset.v1"
-      ]
-    },
-    {
-      "id": "analyze-protein-properties",
-      "path": "skills/analyze-protein-properties",
-      "kind": "executable",
-      "capabilities": [
-        "protein.properties.v1"
-      ]
-    },
-    {
-      "id": "analyze-protein-domains",
-      "path": "skills/analyze-protein-domains",
-      "kind": "executable",
-      "capabilities": [
-        "protein.domain.parse.v1"
-      ]
+      "id": "select-bio-execution",
+      "path": "skills/select-bio-execution",
+      "kind": "policy"
     },
     {
       "id": "transform-phylogenetic-trees",
@@ -212,54 +364,6 @@
       ]
     },
     {
-      "id": "manipulate-bio-tables",
-      "path": "skills/manipulate-bio-tables",
-      "kind": "executable",
-      "capabilities": [
-        "table.manipulate.v1"
-      ]
-    },
-    {
-      "id": "analyze-variant-statistics",
-      "path": "skills/analyze-variant-statistics",
-      "kind": "executable",
-      "capabilities": [
-        "variant.stats.v1",
-        "variant.filter.v1",
-        "variant.normalize.v1",
-        "variant.compare.v1"
-      ]
-    },
-    {
-      "id": "analyze-pdb-structure",
-      "path": "skills/analyze-pdb-structure",
-      "kind": "executable",
-      "capabilities": [
-        "structure.pdb.summary.v1"
-      ]
-    },
-    {
-      "id": "analyze-coordinate-structures",
-      "path": "skills/analyze-coordinate-structures",
-      "kind": "executable",
-      "capabilities": [
-        "structure.mmcif.summary.v1",
-        "structure.sequence.extract.v1",
-        "structure.contact-map.v1",
-        "structure.geometry.v1",
-        "structure.superpose.v1",
-        "protein.secondary-structure.v1"
-      ]
-    },
-    {
-      "id": "inspect-bio-dataset",
-      "path": "skills/inspect-bio-dataset",
-      "kind": "executable",
-      "capabilities": [
-        "dataset.inspect.v1"
-      ]
-    },
-    {
       "id": "visualize-bio-results",
       "path": "skills/visualize-bio-results",
       "kind": "executable",
@@ -268,78 +372,6 @@
         "enrichment.visualize.v1",
         "protein.domain.visualize.v1",
         "structure.viewer.v1"
-      ]
-    },
-    {
-      "id": "export-bio-table",
-      "path": "skills/export-bio-table",
-      "kind": "executable",
-      "capabilities": [
-        "table.export.v1"
-      ]
-    },
-    {
-      "id": "analyze-metagenomics",
-      "path": "skills/analyze-metagenomics",
-      "kind": "executable",
-      "capabilities": [
-        "metagenomics.classify.v1"
-      ]
-    },
-    {
-      "id": "analyze-pharmacogenomics",
-      "path": "skills/analyze-pharmacogenomics",
-      "kind": "executable",
-      "capabilities": [
-        "medical.pharmacogenomics.v1"
-      ]
-    },
-    {
-      "id": "analyze-spatial-transcriptomics",
-      "path": "skills/analyze-spatial-transcriptomics",
-      "kind": "executable",
-      "capabilities": [
-        "medical.spatial-transcriptomics.v1"
-      ]
-    },
-    {
-      "id": "analyze-microbiome-diversity",
-      "path": "skills/analyze-microbiome-diversity",
-      "kind": "executable",
-      "capabilities": [
-        "medical.microbiome.v1"
-      ]
-    },
-    {
-      "id": "analyze-survival-data",
-      "path": "skills/analyze-survival-data",
-      "kind": "executable",
-      "capabilities": [
-        "medical.survival.v1"
-      ]
-    },
-    {
-      "id": "analyze-molecular-descriptors",
-      "path": "skills/analyze-molecular-descriptors",
-      "kind": "executable",
-      "capabilities": [
-        "chemistry.descriptors.v1"
-      ]
-    },
-    {
-      "id": "analyze-metabolomics-peaks",
-      "path": "skills/analyze-metabolomics-peaks",
-      "kind": "executable",
-      "capabilities": [
-        "medical.metabolomics.v1"
-      ]
-    },
-    {
-      "id": "run-bio-benchmark",
-      "path": "skills/run-bio-benchmark",
-      "kind": "executable",
-      "capabilities": [
-        "benchmark.run.v1"
       ]
     }
   ]
