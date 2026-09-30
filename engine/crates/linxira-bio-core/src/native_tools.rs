@@ -233,6 +233,8 @@ pub struct Minimap2LongReadOptions {
     pub threads: usize,
     pub secondary: bool,
     pub max_secondary: usize,
+    /// Emit a coordinate-sorted BAM via `samtools sort` instead of plain SAM.
+    pub sorted_bam: bool,
 }
 
 impl Default for Minimap2LongReadOptions {
@@ -242,6 +244,7 @@ impl Default for Minimap2LongReadOptions {
             threads: 1,
             secondary: false,
             max_secondary: 0,
+            sorted_bam: false,
         }
     }
 }
@@ -864,6 +867,38 @@ pub fn run_minimap2_long_read_path(
     let reads = reads.as_ref();
     let output = output.as_ref();
     validate_paths(&[reference, reads], output)?;
+    if options.sorted_bam {
+        let temporary = create_temporary_directory(output, "long-read-alignment")?;
+        let sam = temporary.join("alignment.sam");
+        let result = (|| {
+            let minimap2 = configured_program("LINXIRA_BIO_MINIMAP2", "minimap2");
+            run_native_command(
+                &minimap2,
+                &minimap2_long_read_arguments(reference, reads, &sam, options),
+                false,
+            )?;
+            let samtools = configured_program("LINXIRA_BIO_SAMTOOLS", "samtools");
+            let sort_options = ShortReadAlignmentOptions {
+                threads: options.threads,
+            };
+            run_native_command(
+                &samtools,
+                &samtools_sort_arguments(&sam, output, &sort_options),
+                false,
+            )?;
+            finish_result("minimap2-samtools", "long-read", output, options.threads, 2)
+        })();
+        let cleanup = fs::remove_dir_all(&temporary);
+        if let Err(error) = cleanup
+            && result.is_ok()
+        {
+            return Err(NativeToolError::Io(error));
+        }
+        if result.is_err() {
+            remove_incomplete_output(output);
+        }
+        return result;
+    }
     let executable = configured_program("LINXIRA_BIO_MINIMAP2", "minimap2");
     let arguments = minimap2_long_read_arguments(reference, reads, output, options);
     let result = run_native_command(&executable, &arguments, false)
