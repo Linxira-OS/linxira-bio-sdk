@@ -341,9 +341,14 @@ fn run_histogram_gpu(context: &GpuContext, seed: u64) -> GpuKernelReport {
         context,
         |queue| {
             queue.write_buffer(&word_buffer, 0, bytemuck::cast_slice(&words));
-            queue.write_buffer(&histogram_buffer, 0, &[0u8; 1024]);
         },
         |encoder| {
+            // The kernel atomically accumulates, so each repeated run must
+            // start from a zeroed table (the staged write precedes this
+            // submit's commands on the queue timeline).
+            context
+                .queue
+                .write_buffer(&histogram_buffer, 0, &[0u8; 1024]);
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: None,
                 timestamp_writes: None,
@@ -588,59 +593,74 @@ struct PhaseOutput<T> {
 fn timed_phases<T: bytemuck::Pod>(
     context: &GpuContext,
     upload: impl FnOnce(&wgpu::Queue),
-    encode: impl FnOnce(&mut wgpu::CommandEncoder),
+    encode: impl Fn(&mut wgpu::CommandEncoder),
     output_buffer: &wgpu::Buffer,
     output_bytes: u64,
 ) -> PhaseOutput<T> {
-    let start = Instant::now();
+    // Upload is timed once (data is identical across runs); compute and
+    // readback repeat 3 times and report the median per the ledger policy.
+    let upload_start = Instant::now();
     upload(&context.queue);
-    let mut encoder = context
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-    encode(&mut encoder);
-    let readback = context.device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("gpu-lab-readback"),
-        size: output_bytes,
-        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-        mapped_at_creation: false,
-    });
-    encoder.copy_buffer_to_buffer(output_buffer, 0, &readback, 0, output_bytes);
-    let submit_start = Instant::now();
-    context.queue.submit(Some(encoder.finish()));
-    context
-        .device
-        .poll(wgpu::PollType::Wait {
-            submission_index: None,
-            timeout: None,
-        })
-        .expect("device poll");
-    let compute_ms = submit_start.elapsed().as_secs_f64() * 1000.0;
+    let upload_ms = upload_start.elapsed().as_secs_f64() * 1000.0;
 
-    let readback_start = Instant::now();
-    let slice = readback.slice(..);
-    let (sender, receiver) = std::sync::mpsc::channel();
-    slice.map_async(wgpu::MapMode::Read, move |result| {
-        let _ = sender.send(result);
-    });
-    context
-        .device
-        .poll(wgpu::PollType::Wait {
-            submission_index: None,
-            timeout: None,
-        })
-        .expect("device poll for map");
-    receiver.recv().expect("map callback").expect("buffer map");
-    let view = slice.get_mapped_range().expect("mapped range");
-    let output: Vec<T> = bytemuck::cast_slice(&view).to_vec();
-    drop(view);
-    readback.unmap();
-    let readback_ms = readback_start.elapsed().as_secs_f64() * 1000.0;
-    let total_ms = start.elapsed().as_secs_f64() * 1000.0;
+    let mut compute_walls = [0.0f64; 3];
+    let mut readback_walls = [0.0f64; 3];
+    let mut output: Vec<T> = Vec::new();
+    for run in 0..3 {
+        let mut encoder = context
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        encode(&mut encoder);
+        let readback = context.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("gpu-lab-readback"),
+            size: output_bytes,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        encoder.copy_buffer_to_buffer(output_buffer, 0, &readback, 0, output_bytes);
+        let submit_start = Instant::now();
+        context.queue.submit(Some(encoder.finish()));
+        context
+            .device
+            .poll(wgpu::PollType::Wait {
+                submission_index: None,
+                timeout: None,
+            })
+            .expect("device poll");
+        compute_walls[run] = submit_start.elapsed().as_secs_f64() * 1000.0;
+
+        let readback_start = Instant::now();
+        let slice = readback.slice(..);
+        let (sender, receiver) = std::sync::mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |result| {
+            let _ = sender.send(result);
+        });
+        context
+            .device
+            .poll(wgpu::PollType::Wait {
+                submission_index: None,
+                timeout: None,
+            })
+            .expect("device poll for map");
+        receiver.recv().expect("map callback").expect("buffer map");
+        let view = slice.get_mapped_range().expect("mapped range");
+        output = bytemuck::cast_slice(&view).to_vec();
+        drop(view);
+        readback.unmap();
+        readback_walls[run] = readback_start.elapsed().as_secs_f64() * 1000.0;
+    }
+    compute_walls.sort_by(|a, b| a.total_cmp(b));
+    readback_walls.sort_by(|a, b| a.total_cmp(b));
+    let compute_ms = compute_walls[1];
+    let readback_ms = readback_walls[1];
+    // upload_ms = staged write_buffer enqueue time; the actual device copy
+    // rides the first submit (folded into run 0's compute, whose median
+    // therefore reflects steady-state dispatch).
     PhaseOutput {
-        upload_ms: total_ms - compute_ms - readback_ms,
+        upload_ms,
         compute_ms,
         readback_ms,
-        total_ms,
+        total_ms: upload_ms + compute_ms + readback_ms,
         output,
     }
 }
