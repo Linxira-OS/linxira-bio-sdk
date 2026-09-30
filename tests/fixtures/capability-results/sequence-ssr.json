@@ -1,0 +1,10 @@
+{
+  "sequence_count": 1,
+  "total_bases": 22,
+  "ssr_count": 2,
+  "compound_group_count": 1,
+  "motif_length_counts": {"1": 1, "2": 1},
+  "sequences": [
+    {"sequence_id": "chr1", "length": 22, "ssr_count": 2}
+  ]
+}

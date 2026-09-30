@@ -107,6 +107,7 @@ use linxira_bio_core::similarity::{
 use linxira_bio_core::spatial_transcriptomics::{
     render_barcode_rank_table, spatial_transcriptomics_path,
 };
+use linxira_bio_core::ssr::{SsrParameters, SsrSummary, ssr_scan_fasta_path, write_ssr_tsv};
 use linxira_bio_core::structure::{PdbStructureSummary, PdbSummaryOptions, pdb_summary_path};
 use linxira_bio_core::table::{
     TableDelimiter, TableFilter, TableManipulateOptions, manipulate_table_path,
@@ -465,6 +466,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         [sequence, stats, arguments @ ..] if sequence == "sequence" && stats == "stats" => {
             run_sequence_stats_command(arguments)
+        }
+        [sequence, ssr, arguments @ ..] if sequence == "sequence" && ssr == "ssr" => {
+            run_sequence_ssr_command(arguments)
         }
         [sequence, extract, arguments @ ..] if sequence == "sequence" && extract == "extract" => {
             print_sequence_extract(arguments)
@@ -1826,6 +1830,261 @@ fn run_sequence_stats_via_worker(
     })();
     let _ = std::fs::remove_dir_all(&output_directory);
     printed
+}
+
+/// `--backend auto|rust|python|r` mirrors sequence stats: `auto` consults
+/// runtime-preferences.json; python/r route through the worker to the
+/// benchmark packs (pytrf / Biostrings C kernels), rust runs the native scan.
+fn run_sequence_ssr_command(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    const CAPABILITY: &str = "sequence.ssr.v1";
+    let mut paths = Vec::new();
+    let mut parameters = SsrParameters::default();
+    let mut min_repeats_overridden = false;
+    let mut json = false;
+    let mut backend = None;
+    let mut index = 0;
+    while index < arguments.len() {
+        let argument = &arguments[index];
+        let (flag, inline_value) = split_cli_flag(argument);
+        match flag.as_str() {
+            "--json" => json = true,
+            "--min-repeats" => {
+                let value = cli_flag_value(inline_value, arguments, &mut index, "--min-repeats")?;
+                parameters = linxira_bio_core::ssr::parse_min_repeats(&value)
+                    .map_err(|error| CliError::usage(error.to_string()))?;
+                min_repeats_overridden = true;
+            }
+            "--compound-distance" => {
+                let value =
+                    cli_flag_value(inline_value, arguments, &mut index, "--compound-distance")?;
+                parameters.compound_max_distance = value.parse::<u64>().map_err(|_| {
+                    CliError::usage(format!(
+                        "--compound-distance must be a non-negative integer: {value}"
+                    ))
+                })?;
+            }
+            "--backend" => {
+                let value = cli_flag_value(inline_value, arguments, &mut index, "--backend")?;
+                match ExecutionBackend::parse(&value) {
+                    Some(parsed) => backend = Some(parsed),
+                    None if value.eq_ignore_ascii_case("auto") => backend = None,
+                    None => {
+                        return Err(CliError::usage(format!(
+                            "unknown --backend value {value:?}; expected auto, rust, python, or r"
+                        )));
+                    }
+                }
+            }
+            other if other.starts_with('-') => {
+                return Err(CliError::usage(format!(
+                    "unknown sequence ssr option: {other}"
+                )));
+            }
+            other => paths.push(other.to_owned()),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err(CliError::usage(
+            "sequence ssr requires <input.fasta[.gz]> <output.tsv> [--min-repeats 1:10,2:6,3:5,4:5,5:5,6:5] [--compound-distance 100] [--backend auto|rust|python|r] [--json]",
+        ));
+    }
+    let effective = match backend {
+        Some(parsed) => Some(parsed),
+        None => RuntimePreferences::load()?.default_backend_for(CAPABILITY),
+    };
+    match effective {
+        None | Some(ExecutionBackend::Rust) => {
+            print_sequence_ssr(&paths[0], &paths[1], &parameters, json)
+        }
+        Some(pack_backend) => run_sequence_ssr_via_worker(
+            &paths,
+            if min_repeats_overridden {
+                Some(&parameters)
+            } else {
+                None
+            },
+            json,
+            CAPABILITY,
+            pack_backend,
+        ),
+    }
+}
+
+fn print_sequence_ssr(
+    input: &str,
+    output: &str,
+    parameters: &SsrParameters,
+    json: bool,
+) -> Result<(), Box<dyn Error>> {
+    let output_path = Path::new(output);
+    if output_path.exists() {
+        return Err(CliError::usage(format!(
+            "refusing to overwrite existing output: {}",
+            output_path.display()
+        )));
+    }
+    let (records, summary) = ssr_scan_fasta_path(input, parameters)
+        .map_err(|error| CliError::execution(error.to_string()))?;
+    let file = fs::File::create(output_path)?;
+    let mut writer = std::io::BufWriter::new(file);
+    write_ssr_tsv(&mut writer, &records)?;
+    use std::io::Write as _;
+    writer.flush()?;
+    if json {
+        print_analysis_json("sequence-ssr", "sequence.ssr.v1", &summary)?;
+    } else {
+        print_ssr_text(&summary, output);
+    }
+    Ok(())
+}
+
+fn print_ssr_text(summary: &SsrSummary, output: &str) {
+    println!("output_path	{output}");
+    println!("sequence_count	{}", summary.sequence_count);
+    println!("total_bases	{}", summary.total_bases);
+    println!("ssr_count	{}", summary.ssr_count);
+    println!("compound_group_count	{}", summary.compound_group_count);
+    for (motif_length, count) in &summary.motif_length_counts {
+        println!("motif_length_{motif_length}	{count}");
+    }
+    for sequence in &summary.sequences {
+        println!(
+            "sequence_summary	{}	{}	{}",
+            sequence.sequence_id, sequence.length, sequence.ssr_count
+        );
+    }
+}
+
+/// Executes `sequence.ssr.v1` through the worker on a benchmark-pack backend
+/// (pytrf / Biostrings C kernels). The pack returns the records and summary
+/// in its result object; the CLI writes the TSV so all backends produce the
+/// same output file.
+fn run_sequence_ssr_via_worker(
+    paths: &[String],
+    parameters: Option<&SsrParameters>,
+    json: bool,
+    capability: &str,
+    backend: ExecutionBackend,
+) -> Result<(), Box<dyn Error>> {
+    let unique = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or_default();
+    let output_directory =
+        std::env::temp_dir().join(format!("linxira-bio-ssr-{}-{unique}", std::process::id()));
+    let mut inputs = BTreeMap::new();
+    inputs.insert("fasta".to_owned(), paths[0].clone());
+    let mut request_parameters = serde_json::json!({
+        "output_directory": output_directory.display().to_string(),
+    });
+    if let Some(parameters) = parameters {
+        request_parameters["compound_max_distance"] =
+            serde_json::json!(parameters.compound_max_distance);
+        let mut entries = Vec::new();
+        for length in 1..=6 {
+            entries.push(format!("{}:{}", length, parameters.min_repeats[length]));
+        }
+        request_parameters["min_repeats"] = serde_json::json!(entries.join(","));
+    }
+    let request = JobRequest {
+        schema_version: SCHEMA_VERSION.to_owned(),
+        job_id: format!("sequence-ssr-cli-{unique}"),
+        capability: capability.to_owned(),
+        inputs,
+        execution: ExecutionRequest {
+            mode: ExecutionMode::LocalCpu,
+            backend: Some(backend),
+        },
+        parameters: request_parameters,
+    };
+    let outcome = execute_request(request, std::path::Path::new("."));
+    let result = (|| -> Result<(), Box<dyn Error>> {
+        let body = outcome.map_err(|error| CliError::execution(error.to_string()))?;
+        let envelope: serde_json::Value = serde_json::from_str(body.trim())?;
+        if envelope.get("status").and_then(|status| status.as_str()) != Some("ok") {
+            let message = envelope
+                .get("diagnostics")
+                .and_then(|diagnostics| diagnostics.as_array())
+                .map(|diagnostics| {
+                    diagnostics
+                        .iter()
+                        .filter_map(|diagnostic| {
+                            diagnostic
+                                .get("message")
+                                .and_then(|message| message.as_str())
+                        })
+                        .collect::<Vec<_>>()
+                        .join("; ")
+                })
+                .unwrap_or_else(|| "worker returned an error envelope".to_owned());
+            return Err(CliError::execution(message));
+        }
+        let output_path = Path::new(&paths[1]);
+        if output_path.exists() {
+            return Err(CliError::usage(format!(
+                "refusing to overwrite existing output: {}",
+                output_path.display()
+            )));
+        }
+        let records = envelope
+            .pointer("/result/records")
+            .cloned()
+            .unwrap_or(serde_json::Value::Array(Vec::new()));
+        let summary = envelope
+            .pointer("/result/summary")
+            .cloned()
+            .ok_or_else(|| CliError::execution("pack result is missing the summary object"))?;
+        let file = fs::File::create(output_path)?;
+        let mut writer = std::io::BufWriter::new(file);
+        write_ssr_tsv_json(&mut writer, &records)?;
+        use std::io::Write as _;
+        writer.flush()?;
+        if json {
+            let parsed: SsrSummary = serde_json::from_value(summary).map_err(|error| {
+                CliError::execution(format!("pack returned an incompatible summary: {error}"))
+            })?;
+            print_analysis_json("sequence-ssr", "sequence.ssr.v1", &parsed)?;
+        } else {
+            let parsed: SsrSummary = serde_json::from_value(summary).map_err(|error| {
+                CliError::execution(format!("pack returned an incompatible summary: {error}"))
+            })?;
+            print_ssr_text(&parsed, &paths[1]);
+        }
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&output_directory);
+    result
+}
+
+/// Render pack-produced records (JSON array of SsrRecord objects) as the same
+/// TSV the native backend writes.
+fn write_ssr_tsv_json(
+    mut writer: impl std::io::Write,
+    records: &serde_json::Value,
+) -> Result<(), Box<dyn Error>> {
+    writeln!(
+        writer,
+        "sequence_id\tmotif_length\tmotif\trepeats\tsize\tstart\tend\tcompound"
+    )?;
+    let Some(records) = records.as_array() else {
+        return Err(CliError::execution("pack records must be an array"));
+    };
+    for record in records {
+        writeln!(
+            writer,
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            record["sequence_id"].as_str().unwrap_or_default(),
+            record["motif_length"].as_u64().unwrap_or_default(),
+            record["motif"].as_str().unwrap_or_default(),
+            record["repeats"].as_u64().unwrap_or_default(),
+            record["size"].as_u64().unwrap_or_default(),
+            record["start"].as_u64().unwrap_or_default(),
+            record["end"].as_u64().unwrap_or_default(),
+            u8::from(record["compound"].as_bool().unwrap_or(false)),
+        )?;
+    }
+    Ok(())
 }
 
 fn print_sequence_stats(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
@@ -8375,6 +8634,7 @@ fn usage() -> &'static str {
         "  linxira-bio workflow run <pack-id> <request.json> <result.json>\n",
         "  linxira-bio dataset inspect <input> [--json]\n",
         "  linxira-bio sequence stats <input.fasta[.gz]> [--backend auto|rust|python|r] [--json]\n",
+        "  linxira-bio sequence ssr <input.fasta[.gz]> <output.tsv> [--min-repeats 1:10,2:6,3:5,4:5,5:5,6:5] [--compound-distance 100] [--backend auto|rust|python|r] [--json]\n",
         "  linxira-bio sequence extract <input.fasta[.gz]> <output.fasta> [--id ID ...] [--region ID:START-END[:+|-] ...] [--strict] [--json]\n",
         "  linxira-bio sequence filter <input.fasta[.gz]> <output.fasta> [--min-length N] [--max-length N] [--min-gc-percent P] [--max-gc-percent P] [--max-n-percent P] [--json]\n",
         "  linxira-bio sequence reverse-complement <input.fasta[.gz]> <output.fasta> [--json]\n",

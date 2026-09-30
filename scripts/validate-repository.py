@@ -94,6 +94,7 @@ SCHEMA_FILES = (
     "schemas/runtime-lock.schema.json",
     "schemas/set-upset.schema.json",
     "schemas/set-venn.schema.json",
+    "schemas/ssr.schema.json",
     "schemas/structure-contact-map.schema.json",
     "schemas/structure-geometry.schema.json",
     "schemas/structure-mmcif-summary.schema.json",
@@ -178,6 +179,10 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/chemistry-dock.json",
         "schemas/chemistry-dock.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/sequence-ssr.json",
+        "schemas/ssr.schema.json",
     ),
     (
         "tests/fixtures/capability-results/phylogeny-iqtree.json",

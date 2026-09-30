@@ -80,7 +80,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.R",
-      "sha256": "38fe048263db64d052bc278e0dbcb1de8c06f7f3cbde0230149ec9ef949963af"
+      "sha256": "c7f35d6b9b5b740bc0cfa0eabce43a9e43fca7a3d5833fac95ca3b67a2528f96"
     },
     {
       "path": "src/implementations/expression_pca_v1.R",
@@ -149,6 +149,10 @@
     {
       "path": "tests/reference/variant.stats.v1.default.json",
       "sha256": "08048726a122bad5029adbd7983ca575eb573de1d37469415c47d05524dce7c3"
+    },
+    {
+      "path": "src/implementations/sequence_ssr_v1.R",
+      "sha256": "5239fb2e77f03906eda3de66ec5f0f84e6bf6669dea44501b12d7e427912791e"
     }
   ],
   "contract": {
@@ -233,7 +237,9 @@
       "max_terms",
       "include_genes",
       "max_cycles",
-      "quality_encoding"
+      "quality_encoding",
+      "min_repeats",
+      "compound_max_distance"
     ]
   }
 }

@@ -206,6 +206,14 @@
       ]
     },
     {
+      "id": "find-sequence-repeats",
+      "path": "skills/find-sequence-repeats",
+      "kind": "executable",
+      "capabilities": [
+        "sequence.ssr.v1"
+      ]
+    },
+    {
       "id": "analyze-set-overlaps",
       "path": "skills/analyze-set-overlaps",
       "kind": "executable",

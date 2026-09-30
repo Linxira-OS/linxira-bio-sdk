@@ -1,0 +1,4 @@
+interface:
+  display_name: "Find Sequence Repeats"
+  short_description: "Detect SSR / microsatellite repeats in FASTA with MISA semantics"
+  default_prompt: "Use $find-sequence-repeats to mine simple sequence repeats from this FASTA file."

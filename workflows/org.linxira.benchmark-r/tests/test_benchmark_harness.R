@@ -140,6 +140,12 @@ registry <- load_implementations(file.path(SCRIPT_DIRECTORY, "implementations"))
 stopifnot("sequence.stats.v1" %in% names(registry))
 stopifnot(identical(registry[["sequence.stats.v1"]]$input_roles, "fasta"))
 stopifnot(length(registry[["sequence.stats.v1"]]$parameters) == 0L)
+stopifnot("sequence.ssr.v1" %in% names(registry))
+stopifnot(identical(registry[["sequence.ssr.v1"]]$input_roles, "fasta"))
+stopifnot(identical(
+  registry[["sequence.ssr.v1"]]$parameters,
+  c("min_repeats", "compound_max_distance")
+))
 
 # --- validation failures produce error envelopes ----------------------------
 with_workspace(function(workspace) {
@@ -439,5 +445,36 @@ with_workspace(function(workspace) {
   stopifnot(grepl("GT allele index 2 exceeds the 1 alternate alleles",
                   conditionMessage(outcome), fixed = TRUE))
 })
+
+# --- sequence.ssr.v1 parity (Biostrings C kernel vs Rust engine) -------------
+if (have_biostrings) {
+  ssr <- registry[["sequence.ssr.v1"]]
+  ssr_run <- function(sequence, parameters = list()) {
+    directory <- tempfile(pattern = "linxira-ssr-r-")
+    dir.create(directory)
+    path <- file.path(directory, "input.fa")
+    writeLines(c(">chr1", sequence), path, useBytes = TRUE)
+    on.exit(unlink(directory, recursive = TRUE), add = TRUE)
+    ssr$run(list(fasta = path), parameters)
+  }
+  result <- ssr_run("AAAAAAAAAATATATATATATAT")
+  stopifnot(result$summary$sequence_count == 1)
+  stopifnot(result$summary$total_bases == 22)
+  stopifnot(result$summary$ssr_count == 2)
+  stopifnot(result$summary$compound_group_count == 1)
+  stopifnot(identical(result$records[[1]]$motif, "A"), result$records[[1]]$repeats == 10L)
+  stopifnot(identical(result$records[[2]]$motif, "TA"), result$records[[2]]$repeats == 6L)
+  stopifnot(result$records[[1]]$compound, result$records[[2]]$compound)
+
+  tuned <- ssr_run("ATATATATATAT", list(min_repeats = "2:5", compound_max_distance = 0))
+  stopifnot(tuned$summary$ssr_count == 1)
+  stopifnot(identical(tuned$records[[1]]$motif, "AT"))
+  stopifnot(!tuned$records[[1]]$compound)
+
+  quiet <- ssr_run("ATATATA")
+  stopifnot(quiet$summary$ssr_count == 0)
+} else {
+  message("sequence.ssr.v1 parity skipped: Biostrings not installed")
+}
 
 cat("benchmark-r harness tests passed", if (have_biostrings) "(with Biostrings parity)" else "(validation only)", "\n")
