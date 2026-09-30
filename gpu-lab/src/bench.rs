@@ -9,8 +9,8 @@
 
 use serde::Serialize;
 use std::arch::x86_64::{
-    __m256d, __m512d, _mm256_extractf128_pd, _mm256_fmadd_pd, _mm256_loadu_pd, _mm512_fmadd_pd,
-    _mm512_loadu_pd, _mm512_reduce_add_pd, _mm_add_pd,
+    __m256d, __m512d, _mm_add_pd, _mm256_extractf128_pd, _mm256_fmadd_pd, _mm256_loadu_pd,
+    _mm512_fmadd_pd, _mm512_loadu_pd, _mm512_reduce_add_pd,
 };
 use std::collections::HashMap;
 use std::time::Instant;
@@ -155,7 +155,6 @@ pub fn run_pearson_bench(input: &PearsonInput) -> KernelBaseline {
     let squares = &input.squares;
 
     let mut implementations = Vec::new();
-    let mut selected = String::new();
 
     let scalar = timed(|| pearson_pairs_scalar(columns, squares));
     implementations.push(ImplResult {
@@ -182,7 +181,7 @@ pub fn run_pearson_bench(input: &PearsonInput) -> KernelBaseline {
         });
     }
 
-    selected = if has_avx512 {
+    let selected = if has_avx512 {
         "avx512f".to_owned()
     } else if has_avx2_fma {
         "avx2+fma".to_owned()
@@ -309,7 +308,8 @@ unsafe fn horizontal_add_256(value: __m256d) -> f64 {
 
 #[cfg(target_arch = "x86_64")]
 fn simd_tier() -> (String, bool, bool) {
-    let has_avx2_fma = std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma");
+    let has_avx2_fma =
+        std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma");
     let has_avx512 = std::arch::is_x86_feature_detected!("avx512f");
     let mut tier = String::from("x86-64:");
     if has_avx512 {
@@ -326,7 +326,11 @@ fn simd_tier() -> (String, bool, bool) {
 
 #[cfg(not(target_arch = "x86_64"))]
 fn simd_tier() -> (String, bool, bool) {
-    ("non-x86-64:scalar-only(no ARM adaptation)".to_owned(), false, false)
+    (
+        "non-x86-64:scalar-only(no ARM adaptation)".to_owned(),
+        false,
+        false,
+    )
 }
 
 fn timed(mut body: impl FnMut() -> f64) -> (f64, f64) {

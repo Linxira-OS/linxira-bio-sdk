@@ -135,7 +135,10 @@ fn run_probe() {
         adapters: adapter_reports,
         compute_smoke,
     };
-    println!("{}", serde_json::to_string_pretty(&report).expect("serialize report"));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&report).expect("serialize report")
+    );
 }
 
 fn run_compute_smoke(index: usize, adapter: &wgpu::Adapter) -> SmokeReport {
@@ -219,8 +222,8 @@ async fn try_compute_smoke(adapter: &wgpu::Adapter) -> Result<(usize, usize), St
         cache: None,
     });
 
-    let mut encoder = device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+    let mut encoder =
+        device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     {
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: None,
