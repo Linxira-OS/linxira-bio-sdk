@@ -164,6 +164,73 @@ fn main(
 }
 "#;
 
+const PEARSON_SHADER_MULTI: &str = r#"
+struct Params {
+    rows: u32,
+    pair_count: u32,
+    pairs_per_group: u32,
+    _pad0: u32,
+};
+
+@group(0) @binding(0) var<storage, read> matrix: array<f32>; // column-major
+@group(0) @binding(1) var<storage, read> pairs: array<u32>;  // pairs[2*i], pairs[2*i+1]
+@group(0) @binding(2) var<storage, read_write> numerators: array<f32>;
+@group(0) @binding(3) var<uniform> params: Params;
+
+// v3: 256 lanes per workgroup, split into 4 independent 64-lane subgroups,
+// each owning one column pair. The shared-memory tree reduction covers only
+// the subgroup's 64-slot window. Out-of-range pairs still run the full
+// barrier schedule (accumulate 0, skip the final store) so the workgroup
+// barrier stays valid for every lane.
+var<workgroup> partials_multi: array<f32, 256>;
+
+@compute
+@workgroup_size(256)
+fn main(
+    @builtin(local_invocation_index) local_index: u32,
+    @builtin(workgroup_id) group: vec3<u32>,
+    @builtin(num_workgroups) group_count: vec3<u32>,
+) {
+    let lanes_per_pair = 64u;
+    let subgroup = local_index / lanes_per_pair;
+    let lane = local_index % lanes_per_pair;
+    let flat_group = group.x + group.y * group_count.x;
+    let pair = flat_group * params.pairs_per_group + subgroup;
+    let in_range = pair < params.pair_count;
+
+    var acc = 0.0;
+    if (in_range) {
+        let a = pairs[pair * 2u];
+        let b = pairs[pair * 2u + 1u];
+        var row = lane;
+        loop {
+            if (row >= params.rows) {
+                break;
+            }
+            acc = fma(matrix[a * params.rows + row], matrix[b * params.rows + row], acc);
+            row = row + lanes_per_pair;
+        }
+    }
+    partials_multi[local_index] = acc;
+    workgroupBarrier();
+    var stride = 32u;
+    loop {
+        if (stride == 0u) {
+            break;
+        }
+        if (lane < stride) {
+            partials_multi[local_index] =
+                partials_multi[local_index] + partials_multi[local_index + stride];
+        }
+        workgroupBarrier();
+        stride = stride / 2u;
+    }
+    if (in_range && lane == 0u) {
+        numerators[pair] = partials_multi[local_index];
+    }
+}
+"#;
+
 #[derive(Serialize)]
 struct PhaseTiming {
     upload_ms: f64,
@@ -431,15 +498,6 @@ fn run_pearson_gpu(context: &GpuContext, seed: u64) -> Vec<GpuKernelReport> {
         usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
         mapped_at_creation: false,
     });
-    let mut params = Vec::with_capacity(16);
-    params.extend_from_slice(&(input.rows as u32).to_le_bytes());
-    params.extend_from_slice(&(pair_count as u32).to_le_bytes());
-    params.extend_from_slice(&[0u8; 8]);
-    let params_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("gpu-lab-pearson-params"),
-        contents: &params,
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
 
     let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("gpu-lab-pearson-layout"),
@@ -451,11 +509,21 @@ fn run_pearson_gpu(context: &GpuContext, seed: u64) -> Vec<GpuKernelReport> {
         ],
     });
 
-    let variants: [(&str, &str, u32, u32, &str); 2] = [
+    // Dispatch geometry per variant: a single dispatch dimension caps at
+    // 65536, so larger grids spread over y.
+    let groups_for = |pairs_per_group: u64| -> (u32, u32) {
+        let total = (pair_count as u64).div_ceil(pairs_per_group.max(1));
+        (
+            total.min(65_536) as u32,
+            total.div_ceil(65_536) as u32,
+        )
+    };
+    let variants: [(&str, &str, u32, u32, u32, &str); 3] = [
         (
             "pearson-column-pairs",
             PEARSON_SHADER,
             pair_count.div_ceil(64) as u32,
+            1,
             1,
             "v1: one invocation per pair, sequential 2000-iteration fma chain",
         ),
@@ -464,12 +532,33 @@ fn run_pearson_gpu(context: &GpuContext, seed: u64) -> Vec<GpuKernelReport> {
             PEARSON_SHADER_WG,
             65_536,
             pair_count.div_ceil(65_536) as u32,
+            1,
             "v2: one workgroup (64 lanes) per pair, shared-memory tree reduction",
+        ),
+        (
+            "pearson-column-pairs-multi",
+            PEARSON_SHADER_MULTI,
+            groups_for(4).0,
+            groups_for(4).1,
+            4,
+            "v3: four 64-lane subgroups per workgroup, one pair each (barrier-safe tail)",
         ),
     ];
 
     let mut reports = Vec::new();
-    for (name, shader_source, groups_x, groups_y, variant_note) in variants {
+    for (name, shader_source, groups_x, groups_y, pairs_per_group, variant_note) in variants {
+        // Field 3 is pairs_per_group for v3 and padding for v1/v2 — the two
+        // uniform layouts share the first two fields only.
+        let mut params = Vec::with_capacity(16);
+        params.extend_from_slice(&(input.rows as u32).to_le_bytes());
+        params.extend_from_slice(&(pair_count as u32).to_le_bytes());
+        params.extend_from_slice(&pairs_per_group.to_le_bytes());
+        params.extend_from_slice(&0u32.to_le_bytes());
+        let params_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("gpu-lab-pearson-params"),
+            contents: &params,
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("gpu-lab-pearson-shader"),
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(shader_source)),
@@ -568,6 +657,17 @@ fn run_pearson_gpu(context: &GpuContext, seed: u64) -> Vec<GpuKernelReport> {
     }
     reports
 }
+
+/// Alias consumed by `backends_wgpu` (one layout vocabulary across the
+/// gpu-bench harness and the backend abstraction).
+pub(crate) fn buffer_entry_shared(
+    binding: u32,
+    ty: wgpu::BufferBindingType,
+) -> wgpu::BindGroupLayoutEntry {
+    buffer_entry(binding, ty)
+}
+
+pub(crate) const HISTOGRAM_SHADER_SHARED: &str = HISTOGRAM_SHADER;
 
 fn buffer_entry(binding: u32, ty: wgpu::BufferBindingType) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
