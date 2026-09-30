@@ -48,6 +48,8 @@ the agent skills that select and validate them.
   research-use-only Cox survival-analysis workflow (`medical.survival.v1`).
 - Read `skills/analyze-molecular-descriptors/SKILL.md` for the implemented
   RDKit molecular-descriptor workflow (`chemistry.descriptors.v1`).
+- Read `skills/dock-molecules/SKILL.md` for the implemented local AutoDock
+  Vina ligand-receptor docking capability (`chemistry.dock.v1`).
 - Read `skills/analyze-metabolomics-peaks/SKILL.md` for the implemented
   local mzML parsing and centroid peak detection
   (`medical.metabolomics.v1`).

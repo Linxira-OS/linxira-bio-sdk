@@ -120,7 +120,11 @@
         "bcftools",
         "bedtools",
         "minimap2",
-        "snpeff"
+        "snpeff",
+        "kraken2",
+        "salmon",
+        "autodock-vina",
+        "meeko"
       ]
     }
   ],
@@ -1105,6 +1109,74 @@
           "strategy": "conda",
           "package": "salmon",
           "source_url": "https://anaconda.org/bioconda/salmon",
+          "requires_admin": false
+        }
+      }
+    },
+    {
+      "id": "autodock-vina",
+      "display_name": "AutoDock Vina",
+      "category": "molecular-docking",
+      "probes": [
+        {
+          "program": "vina",
+          "args": [
+            "--version"
+          ],
+          "output_contains": "Vina"
+        }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "conda",
+          "package": "autodock-vina",
+          "source_url": "https://anaconda.org/bioconda/autodock-vina",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "conda",
+          "package": "autodock-vina",
+          "source_url": "https://anaconda.org/bioconda/autodock-vina",
+          "requires_admin": false
+        },
+        "arch": {
+          "strategy": "conda",
+          "package": "autodock-vina",
+          "source_url": "https://anaconda.org/bioconda/autodock-vina",
+          "requires_admin": false
+        }
+      }
+    },
+    {
+      "id": "meeko",
+      "display_name": "Meeko",
+      "category": "molecular-docking",
+      "probes": [
+        {
+          "program": "mk_prepare_ligand.py",
+          "args": [
+            "--help"
+          ],
+          "output_contains": "mk_prepare_ligand"
+        }
+      ],
+      "install": {
+        "windows": {
+          "strategy": "conda",
+          "package": "meeko",
+          "source_url": "https://anaconda.org/bioconda/meeko",
+          "requires_admin": false
+        },
+        "debian": {
+          "strategy": "conda",
+          "package": "meeko",
+          "source_url": "https://anaconda.org/bioconda/meeko",
+          "requires_admin": false
+        },
+        "arch": {
+          "strategy": "conda",
+          "package": "meeko",
+          "source_url": "https://anaconda.org/bioconda/meeko",
           "requires_admin": false
         }
       }

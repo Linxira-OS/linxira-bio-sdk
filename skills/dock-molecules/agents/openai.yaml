@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dock Molecules"
+  short_description: "Dock a ligand into a receptor with local AutoDock Vina"
+  default_prompt: "Use $dock-molecules to dock this prepared PDBQT ligand into the receptor with a specified search box."

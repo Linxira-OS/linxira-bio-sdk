@@ -39,6 +39,8 @@ pub fn embedded_document(capability: &str, locale: &str) -> Option<&'static str>
         ("benchmark.run.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/benchmark.run.v1/zh-CN.md")),
         ("chemistry.descriptors.v1", "en-US") => Some(include_str!("../../../docs/capabilities/chemistry.descriptors.v1/en-US.md")),
         ("chemistry.descriptors.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/chemistry.descriptors.v1/zh-CN.md")),
+        ("chemistry.dock.v1", "en-US") => Some(include_str!("../../../docs/capabilities/chemistry.dock.v1/en-US.md")),
+        ("chemistry.dock.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/chemistry.dock.v1/zh-CN.md")),
         ("comparative.dotplot.v1", "en-US") => Some(include_str!("../../../docs/capabilities/comparative.dotplot.v1/en-US.md")),
         ("comparative.dotplot.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/comparative.dotplot.v1/zh-CN.md")),
         ("comparative.kaks.v1", "en-US") => Some(include_str!("../../../docs/capabilities/comparative.kaks.v1/en-US.md")),

@@ -127,6 +127,14 @@
       ]
     },
     {
+      "id": "dock-molecules",
+      "path": "skills/dock-molecules",
+      "kind": "executable",
+      "capabilities": [
+        "chemistry.dock.v1"
+      ]
+    },
+    {
       "id": "analyze-pdb-structure",
       "path": "skills/analyze-pdb-structure",
       "kind": "executable",

@@ -5,6 +5,7 @@
 pub mod alignment;
 pub mod annotation;
 pub mod benchmark;
+pub mod chemistry;
 pub mod cohort;
 pub mod coordinate;
 pub mod curve_fit;

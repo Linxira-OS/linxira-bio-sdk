@@ -1,4 +1,5 @@
 use crate::alignment::{WindowDepthSummary, aggregate_window_depth, write_window_depth_tsv};
+use crate::chemistry::{VinaDockSummary, parse_vina_pose_table};
 use serde::Serialize;
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
@@ -325,6 +326,42 @@ impl Default for SamtoolsDepthOptions {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct VinaDockOptions {
+    /// Search-box center in Angstroms (--center_x/--center_y/--center_z).
+    pub center_x: f64,
+    pub center_y: f64,
+    pub center_z: f64,
+    /// Search-box edge lengths in Angstroms; every edge must be positive.
+    pub size_x: f64,
+    pub size_y: f64,
+    pub size_z: f64,
+    /// Fixed random seed for reproducible docking (--seed).
+    pub seed: Option<u64>,
+    /// Search thoroughness (--exhaustiveness, default 8).
+    pub exhaustiveness: u32,
+    /// Maximum reported poses (--num_modes, default 9).
+    pub num_modes: u32,
+    /// Worker CPUs (--cpu, default 1).
+    pub cpu: usize,
+}
+
+impl Default for VinaDockOptions {
+    fn default() -> Self {
+        Self {
+            center_x: 0.0,
+            center_y: 0.0,
+            center_z: 0.0,
+            size_x: 0.0,
+            size_y: 0.0,
+            size_z: 0.0,
+            seed: None,
+            exhaustiveness: 8,
+            num_modes: 9,
+            cpu: 1,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MastOptions {
@@ -1134,6 +1171,119 @@ pub fn run_window_depth_path(
         remove_incomplete_output(output);
     }
     analysis
+}
+
+/// Dock a prepared ligand into a prepared receptor with native AutoDock
+/// Vina, writing the posed ligand PDBQT and parsing the stdout pose table
+/// (rank, affinity, RMSD bounds) into a structured summary.
+pub fn run_vina_dock_path(
+    receptor: impl AsRef<Path>,
+    ligand: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &VinaDockOptions,
+) -> Result<(NativeToolResult, VinaDockSummary), NativeToolError> {
+    validate_vina_options(options)?;
+    let receptor = receptor.as_ref();
+    let ligand = ligand.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[receptor, ligand], output)?;
+    let executable = configured_program("LINXIRA_BIO_VINA", "vina");
+    let arguments = vina_dock_arguments(receptor, ligand, output, options);
+    let analysis = (|| {
+        let native_output = run_native_command(&executable, &arguments, false)?;
+        let summary = parse_vina_pose_table(&String::from_utf8_lossy(&native_output.stdout));
+        let mut result = finish_result("autodock-vina", "dock", output, options.cpu, 1)?;
+        if summary.modes.is_empty() {
+            result.warnings.push(
+                "no pose table was parsed from the vina output; inspect the raw tool log"
+                    .to_owned(),
+            );
+        }
+        Ok((result, summary))
+    })();
+    if analysis.is_err() {
+        remove_incomplete_output(output);
+    }
+    analysis
+}
+
+fn validate_vina_options(options: &VinaDockOptions) -> Result<(), NativeToolError> {
+    validate_threads(options.cpu)?;
+    if options.exhaustiveness == 0 {
+        return Err(NativeToolError::InvalidOption(
+            "exhaustiveness must be at least 1".to_owned(),
+        ));
+    }
+    if options.num_modes == 0 {
+        return Err(NativeToolError::InvalidOption(
+            "num-modes must be at least 1".to_owned(),
+        ));
+    }
+    for (label, value) in [
+        ("center-x", options.center_x),
+        ("center-y", options.center_y),
+        ("center-z", options.center_z),
+    ] {
+        if !value.is_finite() {
+            return Err(NativeToolError::InvalidOption(format!(
+                "{label} must be a finite number"
+            )));
+        }
+    }
+    for (label, value) in [
+        ("size-x", options.size_x),
+        ("size-y", options.size_y),
+        ("size-z", options.size_z),
+    ] {
+        if !value.is_finite() || value <= 0.0 {
+            return Err(NativeToolError::InvalidOption(format!(
+                "{label} must be a positive number"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Arguments for a single AutoDock Vina docking run. Floats are rendered with
+/// Rust's shortest round-trip Display so the emitted command is exactly
+/// reproducible from the options struct.
+pub fn vina_dock_arguments(
+    receptor: &Path,
+    ligand: &Path,
+    output: &Path,
+    options: &VinaDockOptions,
+) -> Vec<OsString> {
+    let mut arguments = vec![
+        OsString::from("--receptor"),
+        receptor.as_os_str().to_owned(),
+        OsString::from("--ligand"),
+        ligand.as_os_str().to_owned(),
+        OsString::from("--out"),
+        output.as_os_str().to_owned(),
+        OsString::from("--center_x"),
+        OsString::from(options.center_x.to_string()),
+        OsString::from("--center_y"),
+        OsString::from(options.center_y.to_string()),
+        OsString::from("--center_z"),
+        OsString::from(options.center_z.to_string()),
+        OsString::from("--size_x"),
+        OsString::from(options.size_x.to_string()),
+        OsString::from("--size_y"),
+        OsString::from(options.size_y.to_string()),
+        OsString::from("--size_z"),
+        OsString::from(options.size_z.to_string()),
+        OsString::from("--exhaustiveness"),
+        OsString::from(options.exhaustiveness.to_string()),
+        OsString::from("--num_modes"),
+        OsString::from(options.num_modes.to_string()),
+        OsString::from("--cpu"),
+        OsString::from(options.cpu.to_string()),
+    ];
+    if let Some(seed) = options.seed {
+        arguments.push(OsString::from("--seed"));
+        arguments.push(OsString::from(seed.to_string()));
+    }
+    arguments
 }
 
 pub fn run_mast_path(
@@ -2464,16 +2614,64 @@ mod tests {
     use super::{
         BcftoolsCallOptions, BlastProgram, DiamondMode, HmmerOptions, IqtreeOptions, MemeAlphabet,
         MemeOptions, MuscleMode, MuscleOptions, SamtoolsDepthOptions, ShortReadAlignmentOptions,
-        SimilaritySearchOptions, TrimalMode, bam_coverage_arguments,
+        SimilaritySearchOptions, TrimalMode, VinaDockOptions, bam_coverage_arguments,
         bcftools_call_arguments, blast_arguments, diamond_arguments, dssp_arguments,
         hmmer_arguments, iqtree_arguments, kaks_arguments, mcscanx_arguments, meme_arguments,
         minimap2_short_read_arguments, muscle_arguments, parse_blast_program, parse_diamond_mode,
         parse_hmmer_mode, parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode,
         samtools_depth_arguments, samtools_report_arguments, samtools_sort_arguments,
-        trimal_arguments,
+        trimal_arguments, vina_dock_arguments,
     };
     use std::ffi::OsString;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn builds_vina_dock_arguments_with_box_and_optional_seed() {
+        let options = VinaDockOptions {
+            center_x: 11.7,
+            center_y: -4.5,
+            center_z: 0.25,
+            size_x: 20.0,
+            size_y: 20.0,
+            size_z: 20.0,
+            seed: Some(42),
+            exhaustiveness: 32,
+            num_modes: 5,
+            cpu: 8,
+        };
+        let arguments = vina_dock_arguments(
+            Path::new("receptor.pdbqt"),
+            Path::new("ligand.pdbqt"),
+            Path::new("docked.pdbqt"),
+            &options,
+        );
+        assert_eq!(arguments[0], OsString::from("--receptor"));
+        assert!(arguments.contains(&OsString::from("receptor.pdbqt")));
+        assert!(arguments.contains(&OsString::from("--center_x")));
+        assert!(arguments.contains(&OsString::from("11.7")));
+        assert!(arguments.contains(&OsString::from("--center_y")));
+        assert!(arguments.contains(&OsString::from("-4.5")));
+        assert!(arguments.contains(&OsString::from("--exhaustiveness")));
+        assert!(arguments.contains(&OsString::from("32")));
+        assert!(arguments.contains(&OsString::from("--num_modes")));
+        assert!(arguments.contains(&OsString::from("5")));
+        assert!(arguments.contains(&OsString::from("--cpu")));
+        assert!(arguments.contains(&OsString::from("8")));
+        assert!(arguments.contains(&OsString::from("--seed")));
+        assert!(arguments.contains(&OsString::from("42")));
+        assert_eq!(arguments.last().and_then(|last| last.to_str()), Some("42"),);
+
+        let unseeded = vina_dock_arguments(
+            Path::new("r.pdbqt"),
+            Path::new("l.pdbqt"),
+            Path::new("o.pdbqt"),
+            &VinaDockOptions {
+                seed: None,
+                ..options
+            },
+        );
+        assert!(!unseeded.contains(&OsString::from("--seed")));
+    }
 
     #[test]
     fn builds_samtools_depth_arguments_with_unambiguous_long_flags() {
