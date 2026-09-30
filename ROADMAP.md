@@ -76,7 +76,7 @@ M0 统一输出框架 ──┬──> M1 双后端绘图（依赖 OutputSpec/Pl
 
 | 批次 | 内容 | 状态 |
 | --- | --- | --- |
-| A 变异检测断链 | variant.call.v1（bcftools）→ 长读排序/BAM 补全 → BAM 去重+窗口深度 | 进行中 |
+| A 变异检测断链 | variant.call.v1（bcftools）→ 长读排序/BAM 补全 → BAM 去重+窗口深度 | 已完成（2026-09-30：variant.call.v1、long-read --bam、alignment.markdup.v1、alignment.window-depth.v1） |
 | B 化学轨首发 | chemistry.dock.v1（Vina+Meeko）→ chemistry.conformers.v1（RDKit pack） | 未开始 |
 | C 纯 Rust+模拟器 | SSR 挖掘 → peak 注释 → 模拟器一期（序列/读段合成） | 未开始 |
 | D GPU 内核推进 | Pearson v3（subgroup 归约）→ 厂商栈 host 抽象层 → sycl-rs 本机尝试 | 未开始 |
@@ -631,7 +631,7 @@ C4 带宽并行 / C5 重型原生编排 / C6 DL 推理 / C7 仅云**。
 | 能力                        | 生态对标                  | 实现(Rust/Py/R)      | 数据类别      | 绘图      | 状态  |
 | ------------------------- | --------------------- | ------------------ | --------- | ------- | --- |
 | 小变异检测+联合分型（补断链：FASTQ→BAM→VCF） | bcftools mpileup/call（MIT） | Rust 编排+原生     | BAM+参考    | —      | [x] 2026-09-30 单样本已发布（variant.call.v1）；联合分型排期 |
-| BAM 去重标记+窗口深度/插入片段指标      | samtools markdup/mosdepth | Rust 编排+原生      | BAM       | ✅深度分布图 | 部分：去重标记已发布（alignment.markdup.v1，2026-09-30）；窗口深度排期 |
+| BAM 去重标记+窗口深度/插入片段指标      | samtools markdup/mosdepth | Rust 编排+原生      | BAM       | ✅深度分布图 | [x] 2026-09-30：去重标记（alignment.markdup.v1）与窗口深度（alignment.window-depth.v1，samtools depth -aa 流式编排+纯 Rust 聚合）已发布；插入片段指标排期 |
 | 批次效应校正                    | ComBat/limma           | R+Py 双 pack         | 矩阵        | ✅校正前后图 | 排期 |
 | QTL 定位+混合模型（BLUP/BLUE）      | qtl2/lme4/rrBLUP       | R pack              | 基因型+表型    | ✅LOD 曲线 | 排期 |
 | 微生物分型套件（AMR/毒力/MLST/质粒）    | AMRFinderPlus/ResFinder（Apache） | Rust 编排+原生 | reads/装配  | ✅存在-缺失热图 | 排期 |

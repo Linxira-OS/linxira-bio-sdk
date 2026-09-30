@@ -1,0 +1,30 @@
+{
+  "tool": "samtools",
+  "mode": "window-depth",
+  "output_path": "tiny.windows.tsv",
+  "output_bytes": 175,
+  "thread_count": 1,
+  "command_count": 1,
+  "warnings": [],
+  "summary": {
+    "window_size": 4,
+    "reference_count": 1,
+    "window_count": 3,
+    "total_bases": 10,
+    "covered_bases": 5,
+    "breadth_percent": 50.0,
+    "mean_depth": 1.5,
+    "max_depth": 5,
+    "references": [
+      {
+        "reference": "chr1",
+        "length": 10,
+        "window_count": 3,
+        "covered_bases": 5,
+        "breadth_percent": 50.0,
+        "mean_depth": 1.5,
+        "max_depth": 5
+      }
+    ]
+  }
+}

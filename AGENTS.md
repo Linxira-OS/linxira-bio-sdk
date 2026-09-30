@@ -24,8 +24,9 @@ the agent skills that select and validate them.
   `fastq.trim.v1`, `fastq.adapter.v1`, and `fastq.deduplicate.v1`
   capabilities.
 - Read `skills/analyze-sam-quality/SKILL.md` for the implemented SAM-text
-  `alignment.qc.v1`, native BAM/CRAM quality, coverage, and short-read
-  alignment capabilities.
+  `alignment.qc.v1`, native BAM/CRAM quality, coverage, fixed-window depth
+  (`alignment.window-depth.v1`), duplicate marking (`alignment.markdup.v1`),
+  and short-read alignment capabilities.
 - Read `skills/analyze-genome-annotations/SKILL.md` for implemented GFF3/GTF
   statistics, normalization, position-table, gene-density, and
   reference-guided extraction.

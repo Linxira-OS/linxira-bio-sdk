@@ -1,6 +1,6 @@
 ---
 name: analyze-sam-quality
-description: Validate local SAM alignment files and run controlled local BAM/CRAM quality, coverage, duplicate-marking, or short-read alignment workflows. Use for mapping-rate, flag, duplicate, MAPQ, reference-count, BAM/CRAM samtools reports, coverage summaries, samtools markdup duplicate flagging, or minimap2 short-read reference alignment.
+description: Validate local SAM alignment files and run controlled local BAM/CRAM quality, coverage, window-depth, duplicate-marking, or short-read alignment workflows. Use for mapping-rate, flag, duplicate, MAPQ, reference-count, BAM/CRAM samtools reports, coverage summaries, fixed-window depth and breadth metrics, samtools markdup duplicate flagging, or minimap2 short-read reference alignment.
 ---
 
 # Analyze SAM Quality
@@ -8,11 +8,6 @@ description: Validate local SAM alignment files and run controlled local BAM/CRA
 Run deterministic SAM text QC or a controlled maintained native tool locally.
 
 ## Run
-1. Flag PCR/optical duplicates: `linxira-bio alignment markdup <input.bam>
-   <output.bam> --stats --json` (four-step samtools chain; duplicates flagged,
-   never removed; feeds variant calling).
-
-
 1. Inspect the input with `linxira-bio dataset inspect <input.sam> --json`.
 2. For SAM, require detected format `sam`; do not pass BAM or CRAM to this capability.
 3. Run `linxira-bio alignment qc <input.sam> --json`.
@@ -26,6 +21,18 @@ supports only self-contained inputs.
 
 For breadth and depth summary tables, run `linxira-bio alignment coverage
 <input.bam|cram> <output.tsv> --json`.
+
+For fixed-window depth and breadth metrics, run `linxira-bio alignment
+window-depth <input.bam|cram> <output.windows.tsv> --window-size 10000
+--min-mq 0 --min-bq 0 --threads N --json`. This streams `samtools depth -aa`
+output and aggregates mean/min/max depth, covered bases, and breadth percent
+per window plus per-reference and whole-file summaries in Rust; the window
+table lands in the TSV, the summaries in JSON. Requires samtools 1.13+ (long
+`--min-MQ`/`--min-BQ` flags).
+
+To flag PCR/optical duplicates before variant calling, run `linxira-bio
+alignment markdup <input.bam> <output.bam> --stats --json` (four-step
+samtools chain; duplicates are flagged, never removed).
 
 For one local short-read FASTQ file, run `linxira-bio alignment short-read
 <reference.fasta> <reads.fastq> <output.bam> --threads N --json`. This runs
@@ -44,6 +51,9 @@ role is `sam`, format is `sam`, and execution mode is `local-cpu`.
   mapped-record MAPQ, and per-reference counts together.
 - Treat MAPQ as aligner-specific confidence, not a universal probability.
 - Report a missing SAM header as reduced provenance, not automatic corruption.
+- For window depth, report mean depth together with breadth percent; mean
+  depth alone hides uncovered regions, and the final window of each reference
+  is partial by construction.
 
 Stop on malformed columns, flags, coordinates, or unequal sequence and quality
 lengths. Do not infer biological or clinical significance from alignment QC.

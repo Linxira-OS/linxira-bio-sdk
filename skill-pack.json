@@ -164,7 +164,8 @@
       "kind": "executable",
       "capabilities": [
         "alignment.qc.v1",
-        "alignment.markdup.v1"
+        "alignment.markdup.v1",
+        "alignment.window-depth.v1"
       ]
     },
     {
