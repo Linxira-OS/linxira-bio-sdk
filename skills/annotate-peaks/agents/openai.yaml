@@ -1,0 +1,4 @@
+interface:
+  display_name: "Annotate Peaks"
+  short_description: "Assign BED peaks their nearest annotated feature"
+  default_prompt: "Use $annotate-peaks to assign the nearest gene to each peak in this BED file."

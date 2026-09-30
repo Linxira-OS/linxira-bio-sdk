@@ -94,6 +94,9 @@ SCHEMA_FILES = (
     "schemas/runtime-lock.schema.json",
     "schemas/set-upset.schema.json",
     "schemas/set-venn.schema.json",
+    "schemas/peak-annotation.schema.json",
+    "schemas/simulate-reads.schema.json",
+    "schemas/simulate-sequence.schema.json",
     "schemas/ssr.schema.json",
     "schemas/structure-contact-map.schema.json",
     "schemas/structure-geometry.schema.json",
@@ -183,6 +186,18 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/sequence-ssr.json",
         "schemas/ssr.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/peak-annotation.json",
+        "schemas/peak-annotation.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/simulate-sequence.json",
+        "schemas/simulate-sequence.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/simulate-reads.json",
+        "schemas/simulate-reads.schema.json",
     ),
     (
         "tests/fixtures/capability-results/phylogeny-iqtree.json",

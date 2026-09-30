@@ -32,6 +32,7 @@ pub mod sequence_analysis;
 pub mod sequence_transform;
 pub mod set_analysis;
 pub mod similarity;
+pub mod simulation;
 pub mod spatial_transcriptomics;
 pub mod ssr;
 pub mod structure;

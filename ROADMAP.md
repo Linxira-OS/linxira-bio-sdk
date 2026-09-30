@@ -78,7 +78,7 @@ M0 统一输出框架 ──┬──> M1 双后端绘图（依赖 OutputSpec/Pl
 | --- | --- | --- |
 | A 变异检测断链 | variant.call.v1（bcftools）→ 长读排序/BAM 补全 → BAM 去重+窗口深度 | 已完成（2026-09-30：variant.call.v1、long-read --bam、alignment.markdup.v1、alignment.window-depth.v1） |
 | B 化学轨首发 | chemistry.dock.v1（Vina+Meeko）→ chemistry.conformers.v1（RDKit pack） | 已完成（2026-09-30：dock + conformers） |
-| C 纯 Rust+模拟器 | SSR 挖掘 → peak 注释 → 模拟器一期（序列/读段合成） | 进行中（SSR 2026-09-30） |
+| C 纯 Rust+模拟器 | SSR 挖掘 → peak 注释 → 模拟器一期（序列/读段合成） | 已完成（2026-09-30：sequence.ssr.v1、peak.annotate.v1、simulate.sequence.v1 / simulate.reads.v1） |
 | D GPU 内核推进 | Pearson v3（subgroup 归约）→ 厂商栈 host 抽象层 → sycl-rs 本机尝试 | 未开始 |
 | E 常规轨二 | 批次效应校正（ComBat/limma 双 pack）→ QTL+混合模型（R pack） | 未开始 |
 | F 化学二+长读长 | chemistry.screen.v1 → 长读 QC → quantum.semiempirical.v1 | 未开始 |
@@ -649,7 +649,7 @@ C4 带宽并行 / C5 重型原生编排 / C6 DL 推理 / C7 仅云**。
 
 | 项 | 定位 | 状态 |
 | --- | --- | --- |
-| 模拟器层（序列/读段/群体遗传合成数据+黄金真值） | M2 benchmark 与 GPU 一致性对照的燃料：先构思设计（数据模型/种子契约/输出格式），验收后再动工 | **构思中** |
+| 模拟器层（序列/读段/群体遗传合成数据+黄金真值） | M2 benchmark 与 GPU 一致性对照的燃料 | 一期 [x] 2026-09-30：序列+读段合成已发布（simulate.sequence.v1 / simulate.reads.v1，xoshiro256 种子、字节级可复现）；二期（群体遗传）构思中 |
 | 可复现报告层（capability 结果 → 带 manifest 的分析报告） | 高级工作台体验胶水：独立小步推进（先 manifest 汇编，再模板渲染），不绑里程碑 | **独立小步** |
 
 > 约束重申：§11 是**封闭清单**——任何新能力先入表、标排期，再动工；动工即触发四同步 + `benchmark-datasets.json` 登记。
