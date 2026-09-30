@@ -2,6 +2,16 @@
 //! - `probe`: hardware audit — enumerate wgpu adapters + compute smoke test.
 //! - `bench`: M5-G1 deterministic CPU baseline kernels (fixed-seed synthetic data).
 
+mod backend;
+mod backends_wgpu;
+#[cfg(feature = "gpu-cutile")]
+mod backends_cutile;
+#[cfg(feature = "gpu-musa")]
+mod backends_musa;
+#[cfg(feature = "gpu-sycl")]
+mod backends_sycl;
+#[cfg(feature = "gpu-sycl-attempt")]
+mod sycl_attempt;
 mod bench;
 mod gpu_bench;
 
@@ -65,6 +75,80 @@ fn main() {
             );
         }
         "probe" | "" => run_probe(),
+        "backend" => {
+            for (description, available) in backend::probe_chain() {
+                println!("{:>4}  {}", if available { "[x]" } else { "[ ]" }, description);
+            }
+            match backend::select_backend() {
+                Ok(selected) => println!("selected backend: {}", selected.name()),
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        "backend-smoke" => {
+            // One real kernel through the abstraction: 16 u32 words, every
+            // packed byte lane = 1, so the exact histogram must be {1: 64}.
+            let mut backend = backend::select_backend().unwrap_or_else(|error| {
+                eprintln!("error: {error}");
+                std::process::exit(1);
+            });
+            println!("backend: {}", backend.describe());
+            let words: Vec<u8> = [0x01_01_01_01u32; 16]
+                .iter()
+                .flat_map(|word| word.to_le_bytes())
+                .collect();
+            let mut params = Vec::new();
+            params.extend_from_slice(&16u32.to_le_bytes());
+            params.extend_from_slice(&[0u8; 12]);
+            let words_buf = backend.upload("smoke-words", &words, backend::BufferRole::Storage).unwrap_or_else(|error| {
+                eprintln!("error: {error}");
+                std::process::exit(1);
+            });
+            let params_buf = backend.upload("smoke-params", &params, backend::BufferRole::Uniform).unwrap_or_else(|error| {
+                eprintln!("error: {error}");
+                std::process::exit(1);
+            });
+            // slot order for the histogram kernel: words, histogram, params
+            let zeroed = vec![0u8; 256 * 4];
+            let hist_buf = backend.upload("smoke-histogram", &zeroed, backend::BufferRole::Storage).unwrap_or_else(|error| {
+                eprintln!("error: {error}");
+                std::process::exit(1);
+            });
+            backend
+                .dispatch(
+                    backend::KernelId::QualityHistogram,
+                    &[words_buf, hist_buf, params_buf],
+                    [1, 1, 1],
+                )
+                .unwrap_or_else(|error| {
+                    eprintln!("error: {error}");
+                    std::process::exit(1);
+                });
+            let mut out = vec![0u8; 256 * 4];
+            backend.readback(hist_buf, &mut out).unwrap_or_else(|error| {
+                eprintln!("error: {error}");
+                std::process::exit(1);
+            });
+            let histogram: Vec<u32> = out
+                .chunks_exact(4)
+                .map(|chunk| u32::from_le_bytes(chunk.try_into().expect("u32 chunk")))
+                .collect();
+            let expected_bin = histogram.get(1).copied().unwrap_or(0);
+            let pass = expected_bin == 64
+                && histogram.iter().enumerate().all(|(bin, count)| {
+                    bin == 1 || *count == 0
+                });
+            let phases = backend.phases();
+            println!(
+                "histogram[1]={expected_bin} (expect 64) pass={pass} phases=upload {:.3}ms compute {:.3}ms readback {:.3}ms",
+                phases.upload_ms, phases.compute_ms, phases.readback_ms
+            );
+            if !pass {
+                std::process::exit(1);
+            }
+        }
         "gpu-bench" => match gpu_bench::run_gpu_benchmarks() {
             Ok(report) => {
                 println!(
@@ -78,7 +162,7 @@ fn main() {
             }
         },
         other => {
-            eprintln!("unknown subcommand {other:?}; expected `probe`, `bench`, or `gpu-bench`");
+            eprintln!("unknown subcommand {other:?}; expected `probe`, `bench`, `backend`, `backend-smoke`, or `gpu-bench`");
             std::process::exit(2);
         }
     }
