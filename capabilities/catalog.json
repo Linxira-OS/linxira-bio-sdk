@@ -1667,6 +1667,20 @@
       ]
     },
     {
+      "id": "chemistry.dock.v1",
+      "status": "available",
+      "category": "chemistry",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio chemistry dock <receptor.pdbqt> <ligand.pdbqt> <output.pdbqt> --center-x F --center-y F --center-z F --size-x F --size-y F --size-z F --seed N --json",
+      "input_formats": [
+        "pdbqt"
+      ],
+      "output_formats": [
+        "pdbqt",
+        "json"
+      ]
+    },
+    {
       "id": "medical.metabolomics.v1",
       "status": "available",
       "category": "research-use-only",

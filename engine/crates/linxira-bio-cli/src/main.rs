@@ -10,6 +10,7 @@ use linxira_bio_core::annotation::{
 use linxira_bio_core::benchmark::{
     diff_result_envelopes, environment_snapshot, iqr, median, parse_time_verbose,
 };
+use linxira_bio_core::chemistry::VinaDockSummary;
 use linxira_bio_core::cohort::{CohortTableQc, cohort_table_qc_path};
 use linxira_bio_core::coordinate::{
     ContactMapOptions, MmcifStructureSummary, StructureContactMapResult, StructureGeometryResult,
@@ -58,14 +59,14 @@ use linxira_bio_core::native_tools::{
     BcftoolsCallOptions, HmmerOptions, IqtreeOptions, Kraken2Options, MastOptions, MemeOptions,
     Minimap2LongReadOptions, MuscleOptions, NativeToolResult, SalmonQuantOptions,
     SamtoolsDepthOptions, SamtoolsMarkdupOptions, ShortReadAlignmentOptions,
-    SimilaritySearchOptions, SnpEffOptions, WgcnaOptions, parse_blast_program, parse_diamond_mode,
-    parse_hmmer_mode, parse_meme_alphabet, parse_minimap2_preset, parse_muscle_mode,
-    parse_trimal_mode, run_bam_to_bigwig_path, run_bcftools_call_path, run_blast_fasta_path,
-    run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path, run_kaks_path,
-    run_kraken2_path, run_mast_path, run_mcscanx_path, run_meme_path, run_minimap2_long_read_path,
-    run_muscle_path, run_rnafold_path, run_samtools_markdup_path, run_samtools_report_path,
-    run_short_read_alignment_path, run_snpeff_path, run_trimal_path, run_wgcna_path,
-    run_window_depth_path,
+    SimilaritySearchOptions, SnpEffOptions, VinaDockOptions, WgcnaOptions, parse_blast_program,
+    parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet, parse_minimap2_preset,
+    parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path, run_bcftools_call_path,
+    run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path,
+    run_kaks_path, run_kraken2_path, run_mast_path, run_mcscanx_path, run_meme_path,
+    run_minimap2_long_read_path, run_muscle_path, run_rnafold_path, run_samtools_markdup_path,
+    run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path, run_trimal_path,
+    run_vina_dock_path, run_wgcna_path, run_window_depth_path,
 };
 use linxira_bio_core::npz::{NpzImportOptions, NpzImportResult, npz_to_matrix_path};
 use linxira_bio_core::pharmacogenomics::{pharmacogenomics_path, render_pgx_table};
@@ -525,6 +526,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if chemistry == "chemistry" && descriptors == "descriptors" =>
         {
             print_chemistry_descriptors(arguments)
+        }
+        [chemistry, dock, arguments @ ..] if chemistry == "chemistry" && dock == "dock" => {
+            print_chemistry_dock(arguments)
         }
         [medical, survival, arguments @ ..] if medical == "medical" && survival == "survival" => {
             print_medical_survival(arguments)
@@ -2764,6 +2768,152 @@ fn print_chemistry_descriptors(arguments: &[String]) -> Result<(), Box<dyn Error
         &request_path,
         &result_path,
     )
+}
+
+#[derive(serde::Serialize)]
+struct VinaDockPayload<'a> {
+    #[serde(flatten)]
+    native: &'a NativeToolResult,
+    docking: &'a VinaDockSummary,
+}
+
+fn parse_dock_float(value: Option<&String>, label: &str) -> Result<f64, Box<dyn Error>> {
+    let value = value.ok_or_else(|| format!("{label} requires a value"))?;
+    let parsed = value
+        .parse::<f64>()
+        .map_err(|_| format!("{label} requires a number, got {value:?}"))?;
+    if !parsed.is_finite() {
+        return Err(format!("{label} must be finite").into());
+    }
+    Ok(parsed)
+}
+
+fn print_chemistry_dock(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = VinaDockOptions::default();
+    let mut seen_center = [false; 3];
+    let mut seen_size = [false; 3];
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--center-x" => {
+                index += 1;
+                options.center_x = parse_dock_float(arguments.get(index), "--center-x")?;
+                seen_center[0] = true;
+            }
+            "--center-y" => {
+                index += 1;
+                options.center_y = parse_dock_float(arguments.get(index), "--center-y")?;
+                seen_center[1] = true;
+            }
+            "--center-z" => {
+                index += 1;
+                options.center_z = parse_dock_float(arguments.get(index), "--center-z")?;
+                seen_center[2] = true;
+            }
+            "--size-x" => {
+                index += 1;
+                options.size_x = parse_dock_float(arguments.get(index), "--size-x")?;
+                seen_size[0] = true;
+            }
+            "--size-y" => {
+                index += 1;
+                options.size_y = parse_dock_float(arguments.get(index), "--size-y")?;
+                seen_size[1] = true;
+            }
+            "--size-z" => {
+                index += 1;
+                options.size_z = parse_dock_float(arguments.get(index), "--size-z")?;
+                seen_size[2] = true;
+            }
+            "--seed" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--seed requires a value")?;
+                options.seed = Some(
+                    value
+                        .parse::<u64>()
+                        .map_err(|_| format!("--seed must be a non-negative integer: {value}"))?,
+                );
+            }
+            "--exhaustiveness" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--exhaustiveness requires a value")?;
+                options.exhaustiveness = value
+                    .parse::<u32>()
+                    .map_err(|_| format!("--exhaustiveness must be a positive integer: {value}"))?;
+            }
+            "--num-modes" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--num-modes requires a value")?;
+                options.num_modes = value
+                    .parse::<u32>()
+                    .map_err(|_| format!("--num-modes must be a positive integer: {value}"))?;
+            }
+            "--cpu" => {
+                index += 1;
+                options.cpu = parse_sequence_usize(arguments.get(index), "--cpu")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown chemistry dock option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err(
+            "chemistry dock requires <receptor.pdbqt> <ligand.pdbqt> <output.pdbqt>".into(),
+        );
+    }
+    if !seen_center.iter().all(|seen| *seen) {
+        return Err("chemistry dock requires --center-x, --center-y, and --center-z".into());
+    }
+    if !seen_size.iter().all(|seen| *seen) {
+        return Err("chemistry dock requires --size-x, --size-y, and --size-z".into());
+    }
+    let (result, docking) = run_vina_dock_path(&paths[0], &paths[1], &paths[2], &options)?;
+    if json {
+        print_analysis_json(
+            "chemistry-dock",
+            "chemistry.dock.v1",
+            VinaDockPayload {
+                native: &result,
+                docking: &docking,
+            },
+        )
+    } else {
+        println!("tool\t{}", result.tool);
+        println!("mode\t{}", result.mode);
+        println!("output_path\t{}", result.output_path);
+        println!("output_bytes\t{}", result.output_bytes);
+        println!("thread_count\t{}", result.thread_count);
+        println!("command_count\t{}", result.command_count);
+        if let Some(best) = docking.best_affinity_kcal_per_mol {
+            println!("best_affinity_kcal_per_mol\t{best:.4}");
+        }
+        println!("mode_count\t{}", docking.modes.len());
+        for mode in &docking.modes {
+            println!(
+                "pose\t{}\t{:.4}\t{}\t{}",
+                mode.rank,
+                mode.affinity_kcal_per_mol,
+                format_opt_float(mode.rmsd_lb),
+                format_opt_float(mode.rmsd_ub),
+            );
+        }
+        for warning in result.warnings {
+            println!("warning\t{warning}");
+        }
+        Ok(())
+    }
+}
+
+fn format_opt_float(value: Option<f64>) -> String {
+    value.map_or_else(|| "NA".to_owned(), |number| format!("{number:.4}"))
 }
 
 fn print_medical_survival(arguments: &[String]) -> Result<(), Box<dyn Error>> {
@@ -8074,6 +8224,7 @@ fn usage() -> &'static str {
         "  linxira-bio sequence shuffle <input.fasta[.gz]> <output.fasta> [--seed N] [--json]\n",
         "  linxira-bio sequence convert <input> <output> [--input-format fasta|fastq|genbank|embl] [--output-format fasta|fastq|genbank|embl]\n",
         "  linxira-bio chemistry descriptors <input.sdf> <output.tsv> [--json]\n",
+        "  linxira-bio chemistry dock <receptor.pdbqt> <ligand.pdbqt> <output.pdbqt> --center-x F --center-y F --center-z F --size-x F --size-y F --size-z F [--seed N] [--exhaustiveness 8] [--num-modes 9] [--cpu N] [--json]\n",
         "  linxira-bio medical survival <cohort.csv|tsv> <output-directory> --time-column COLUMN --event-column COLUMN --group-column COLUMN --reference-level LEVEL [--json]\n",
         "  linxira-bio primer epcr <reference.fasta[.gz]> <primers.tsv> <output.tsv> [--min-amplicon N] [--max-amplicon N] [--max-hits N] [--json]\n",
         "  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n",

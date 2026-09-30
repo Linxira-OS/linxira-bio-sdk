@@ -1,0 +1,18 @@
+{
+  "tool": "autodock-vina",
+  "mode": "dock",
+  "output_path": "ligand-docked.pdbqt",
+  "output_bytes": 28814,
+  "thread_count": 1,
+  "command_count": 1,
+  "warnings": [],
+  "docking": {
+    "best_affinity_kcal_per_mol": -6.750,
+    "modes": [
+      {"rank": 1, "affinity_kcal_per_mol": -6.750, "rmsd_lb": 0.000, "rmsd_ub": 0.000},
+      {"rank": 2, "affinity_kcal_per_mol": -6.412, "rmsd_lb": 1.679, "rmsd_ub": 2.524},
+      {"rank": 3, "affinity_kcal_per_mol": -6.288, "rmsd_lb": 1.992, "rmsd_ub": 2.907},
+      {"rank": 4, "affinity_kcal_per_mol": -6.204, "rmsd_lb": 2.311, "rmsd_ub": 3.412}
+    ]
+  }
+}

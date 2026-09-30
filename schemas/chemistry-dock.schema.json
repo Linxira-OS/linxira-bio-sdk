@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/chemistry-dock.v1.json",
+  "title": "Linxira Bio AutoDock Vina docking result",
+  "type": "object",
+  "required": [
+    "tool",
+    "mode",
+    "output_path",
+    "output_bytes",
+    "thread_count",
+    "command_count",
+    "warnings",
+    "docking"
+  ],
+  "properties": {
+    "tool": {"enum": ["autodock-vina"]},
+    "mode": {"enum": ["dock"]},
+    "output_path": {"type": "string", "minLength": 1},
+    "output_bytes": {"type": "integer", "minimum": 0},
+    "thread_count": {"type": "integer", "minimum": 1, "maximum": 1024},
+    "command_count": {"enum": [1]},
+    "warnings": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "docking": {
+      "type": "object",
+      "required": ["modes", "best_affinity_kcal_per_mol"],
+      "properties": {
+        "best_affinity_kcal_per_mol": {"type": ["number", "null"]},
+        "modes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["rank", "affinity_kcal_per_mol", "rmsd_lb", "rmsd_ub"],
+            "properties": {
+              "rank": {"type": "integer", "minimum": 1},
+              "affinity_kcal_per_mol": {"type": "number"},
+              "rmsd_lb": {"type": ["number", "null"], "minimum": 0},
+              "rmsd_ub": {"type": ["number", "null"], "minimum": 0}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

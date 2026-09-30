@@ -63,6 +63,7 @@ SCHEMA_FILES = (
     "schemas/runtime-preferences.schema.json",
     "schemas/bundle-manifest.schema.json",
     "schemas/curve-fit.schema.json",
+    "schemas/chemistry-dock.schema.json",
     "schemas/npz-import.schema.json",
     "schemas/capability.schema.json",
     "schemas/dataset-manifest.schema.json",
@@ -173,6 +174,10 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/alignment-window-depth.json",
         "schemas/window-depth.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/chemistry-dock.json",
+        "schemas/chemistry-dock.schema.json",
     ),
     (
         "tests/fixtures/capability-results/phylogeny-iqtree.json",
