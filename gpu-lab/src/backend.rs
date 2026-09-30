@@ -31,6 +31,31 @@ impl KernelId {
     }
 }
 
+/// Host/device memory relationship of the backend's device. This decides
+/// whether the upload/readback phases of the ledger contract are real copies
+/// or no-op mappings, and whether kernels compete with the host for the same
+/// physical bandwidth (bandwidth-bound analysis must state the model).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MemoryModel {
+    /// Discrete VRAM: upload/readback are real PCIe-style transfers; device
+    /// bandwidth is independent of host memory bandwidth.
+    Discrete,
+    /// Unified memory (Apple Silicon, AMD AI Max 395-class iGPU, NVIDIA
+    /// DGX/RTX Spark): zero-copy mapping is the intended fast path — upload
+    /// degrades to an address mapping, and host/device share one bandwidth
+    /// pool. Linux is the primary unified-memory work environment.
+    Unified,
+}
+
+impl MemoryModel {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Discrete => "discrete",
+            Self::Unified => "unified",
+        }
+    }
+}
+
 /// Intended binding role of an uploaded buffer; backends map it to their
 /// native usage flags (wgpu: STORAGE vs UNIFORM).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,6 +91,12 @@ pub trait GpuBackend {
 
     /// Device-visible description for ledger provenance.
     fn describe(&self) -> String;
+
+    /// Memory model of the probed device; backends may refine this after the
+    /// device is opened (the trait allows a cheap constant for stubs).
+    fn memory_model(&self) -> MemoryModel {
+        MemoryModel::Discrete
+    }
 
     /// Host -> device copy. Returns the backend-owned handle.
     fn upload(

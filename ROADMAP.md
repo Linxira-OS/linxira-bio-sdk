@@ -427,6 +427,19 @@ AVX-512（H2 留云租）。云租：RTX 4090（sm_89，cutile-rs）、昇腾 91
 CPU 型任务（如 Vina 编排的多核/AVX 加速，AVX2 实测 2.55×）同轨发声。**国产顺序摩尔线程
 优先**（cudarc-musa 首批窗口，S80/S90 民用可购）＞华为昇腾（云租好租，cann-rs，后置）。
 
+**统一内存与 ARM 策略（2026-10-01 增补）**：统一内存设备已大量进入民用/教育/企业采购
+——Apple Silicon（Mac mini/MacBook/Mac Studio）、AMD AI Max 395 级超级核显、Intel
+高性能轻薄本独显（4050 级，更高型号未发布）、NVIDIA DGX Spark / RTX Spark（Linux）。
+**Linux 是统一内存的优先工况**（Windows 下呈混合内存形态、需分配显存空间）；GPU 主机
+抽象层（§3.1 批次 D）携带 `MemoryModel::{Discrete, Unified}`：统一内存上 upload/readback
+退化为 zero-copy 地址映射，且 host/device 共享同一带宽池——**带宽受限是这类设备上内核
+优化的第一性约束**，基准台账必须声明内存模型（分相口径在 Unified 档按"映射/计算/映射"
+记录）。**ARM 只做代码适配、不发官方包**：CPU SIMD 档（H1/H2）为 x86-64 专属
+（AVX2/AVX-512 intrinsics 全部 `#[cfg(target_arch)]` 隔离），ARM（含联发科系 DGX
+Spark 与成熟度更高的 Apple ARM）统一回落 H0 scalar 档编译，Mac Studio / DGX Spark
+用户自行编译使用；GPU 侧能力差异按设备探测，代码不区分平台。gpu-lab 已按此实现并通过
+aarch64 交叉检查（2026-10-01）。
+
 | 任务       | 内容                                                                                                   | 验收                                                                |
 | -------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | M5-G0    | 本地三卡环境审计：nvidia-smi 探测已有，补厂商中立 Vulkan（vulkaninfo，覆盖 AMD/Intel）探测入 tools/catalog；wgpu adapter 枚举 + hello-compute 冒烟（Intel 核显 / RX 580 / 750 Ti Vulkan 逐卡记录可用性，`gpu-lab/` 独立探针已就绪） | 硬件台账（型号/显存/驱动/枚举结果）记入本地 `docs/engine-evals/`（**不入仓库**）；750 Ti 与 RX 580 的 wgpu 可用性有明确结论 |
