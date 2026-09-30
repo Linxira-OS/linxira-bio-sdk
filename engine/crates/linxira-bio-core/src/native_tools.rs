@@ -288,6 +288,22 @@ impl Default for BcftoolsCallOptions {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SamtoolsMarkdupOptions {
+    pub threads: usize,
+    /// Emit duplicate statistics while keeping duplicate-flagged reads (-s).
+    pub with_stats: bool,
+}
+
+impl Default for SamtoolsMarkdupOptions {
+    fn default() -> Self {
+        Self {
+            threads: 1,
+            with_stats: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MastOptions {
     pub threads: usize,
@@ -959,6 +975,48 @@ pub fn run_bcftools_call_path(
         run_native_command(&executable, &pileup_arguments, false)?;
         run_native_command(&executable, &call_arguments, false)?;
         finish_result("bcftools", "call", output, options.threads, 2)
+    })();
+    let cleanup = fs::remove_dir_all(&temporary);
+    if let Err(error) = cleanup
+        && result.is_ok()
+    {
+        return Err(NativeToolError::Io(error));
+    }
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
+/// Flag PCR/optical duplicates in a BAM with the four-step samtools chain
+/// (collate -> fixmate -m -> sort -> markdup). Duplicates are flagged in-place
+/// (`-s` adds per-file statistics) and never removed.
+pub fn run_samtools_markdup_path(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &SamtoolsMarkdupOptions,
+) -> Result<NativeToolResult, NativeToolError> {
+    validate_threads(options.threads)?;
+    let input = input.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[input], output)?;
+    let executable = configured_program("LINXIRA_BIO_SAMTOOLS", "samtools");
+    let temporary = create_temporary_directory(output, "samtools-markdup")?;
+    let name_sorted = temporary.join("name-sorted.bam");
+    let fixmate = temporary.join("fixmate.bam");
+    let coordinate_sorted = temporary.join("coordinate-sorted.bam");
+    let result = (|| {
+        for arguments in samtools_markdup_arguments(
+            input,
+            output,
+            &name_sorted,
+            &fixmate,
+            &coordinate_sorted,
+            options,
+        ) {
+            run_native_command(&executable, &arguments, false)?;
+        }
+        finish_result("samtools", "markdup", output, options.threads, 4)
     })();
     let cleanup = fs::remove_dir_all(&temporary);
     if let Err(error) = cleanup
@@ -1871,6 +1929,52 @@ pub fn samtools_sort_arguments(
         output.as_os_str().to_owned(),
         input.as_os_str().to_owned(),
     ]
+}
+
+/// Arguments for the four samtools steps (collate, fixmate -m, sort, markdup)
+/// that flag PCR/optical duplicates in a BAM. Intermediate files are staged by
+/// the caller in a scratch directory.
+pub fn samtools_markdup_arguments(
+    input: &Path,
+    output: &Path,
+    name_sorted: &Path,
+    fixmate: &Path,
+    coordinate_sorted: &Path,
+    options: &SamtoolsMarkdupOptions,
+) -> [Vec<OsString>; 4] {
+    let threads = OsString::from(options.threads.to_string());
+    let collate = vec![
+        OsString::from("collate"),
+        OsString::from("-@"),
+        threads.clone(),
+        OsString::from("-u"),
+        OsString::from("-o"),
+        name_sorted.as_os_str().to_owned(),
+        input.as_os_str().to_owned(),
+    ];
+    let fixmate_args = vec![
+        OsString::from("fixmate"),
+        OsString::from("-@"),
+        threads.clone(),
+        OsString::from("-m"),
+        name_sorted.as_os_str().to_owned(),
+        fixmate.as_os_str().to_owned(),
+    ];
+    let sort_args = vec![
+        OsString::from("sort"),
+        OsString::from("-@"),
+        threads.clone(),
+        OsString::from("-o"),
+        coordinate_sorted.as_os_str().to_owned(),
+        fixmate.as_os_str().to_owned(),
+    ];
+    let mut markdup = vec![OsString::from("markdup"), OsString::from("-@"), threads];
+    if options.with_stats {
+        markdup.push(OsString::from("-s"));
+    }
+    markdup.push(coordinate_sorted.as_os_str().to_owned());
+    markdup.push(output.as_os_str().to_owned());
+    [collate, fixmate_args, sort_args, markdup]
 }
 
 fn validate_similarity_options(options: &SimilaritySearchOptions) -> Result<(), NativeToolError> {

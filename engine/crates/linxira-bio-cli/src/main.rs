@@ -57,14 +57,14 @@ use linxira_bio_core::microbiome::microbiome_analysis_path;
 use linxira_bio_core::native_tools::{
     BcftoolsCallOptions, HmmerOptions, IqtreeOptions, Kraken2Options, MastOptions, MemeOptions,
     Minimap2LongReadOptions, MuscleOptions, NativeToolResult, SalmonQuantOptions,
-    ShortReadAlignmentOptions, SimilaritySearchOptions, SnpEffOptions, WgcnaOptions,
-    parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
+    SamtoolsMarkdupOptions, ShortReadAlignmentOptions, SimilaritySearchOptions, SnpEffOptions,
+    WgcnaOptions, parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
     parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
     run_bcftools_call_path, run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path,
     run_hmmer_path, run_iqtree_path, run_kaks_path, run_kraken2_path, run_mast_path,
     run_mcscanx_path, run_meme_path, run_minimap2_long_read_path, run_muscle_path,
-    run_rnafold_path, run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path,
-    run_trimal_path, run_wgcna_path,
+    run_rnafold_path, run_samtools_markdup_path, run_samtools_report_path,
+    run_short_read_alignment_path, run_snpeff_path, run_trimal_path, run_wgcna_path,
 };
 use linxira_bio_core::npz::{NpzImportOptions, NpzImportResult, npz_to_matrix_path};
 use linxira_bio_core::pharmacogenomics::{pharmacogenomics_path, render_pgx_table};
@@ -339,6 +339,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if alignment == "alignment" && coverage == "coverage" =>
         {
             print_samtools_report(arguments, "coverage", "alignment.coverage.v1")
+        }
+        [alignment, markdup, arguments @ ..]
+            if alignment == "alignment" && markdup == "markdup" =>
+        {
+            print_alignment_markdup(arguments)
         }
         [alignment, bam_to_bigwig, arguments @ ..]
             if alignment == "alignment" && bam_to_bigwig == "bam-to-bigwig" =>
@@ -4426,6 +4431,33 @@ fn print_variant_annotate(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     print_native_tool_result("variant-annotate", "variant.annotate.v1", result, json)
 }
 
+fn print_alignment_markdup(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = SamtoolsMarkdupOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--stats" => options.with_stats = true,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown alignment markdup option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("alignment markdup requires <input.bam> <output.bam>".into());
+    }
+    let result = run_samtools_markdup_path(&paths[0], &paths[1], &options)?;
+    print_native_tool_result("alignment-markdup", "alignment.markdup.v1", result, json)
+}
+
 fn print_variant_call(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     let mut paths = Vec::new();
     let mut options = BcftoolsCallOptions::default();
@@ -7954,6 +7986,8 @@ fn usage() -> &'static str {
         "  linxira-bio alignment long-read <reference.fasta> <reads.fastq> <output.sam> [--preset map-ont|map-pb|map-hifi|splice] [--threads N] [--secondary] [--json]\n",
         "  linxira-bio variant annotate <input.vcf> <output.vcf> [--database DB] [--upstream-downstream N] [--no-stats] [--json]\n",
         "  linxira-bio variant call <sorted.bam|cram> <reference.fa> <output.vcf> [--min-mq 20] [--min-bq 13] [--threads N] [--all-sites] [--json]
+",
+        "  linxira-bio alignment markdup <input.bam> <output.bam> [--threads N] [--stats] [--json]
 ",
         "  linxira-bio annotation stats <input.gff3|gtf[.gz]> [--json]\n",
         "  linxira-bio annotation normalize <input.gff3|gtf[.gz]> <output.gff3> [--sort] [--json]\n",
