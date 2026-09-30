@@ -23,7 +23,7 @@
     "core_compatibility": ">=0.1.0,<2.0.0",
     "dependency_lock": {
       "path": "requirements.lock",
-      "sha256": "d20c5726aa5d5e076be5d1d1fb652061d3ca473506a7f86ebc07f0145f3abe5b"
+      "sha256": "d447e7106408bc521ace63f4d636259ce9f781c6d896aea523640b0899ce10e9"
     }
   },
   "input_schema": {
@@ -60,7 +60,7 @@
     },
     {
       "path": "requirements.lock",
-      "sha256": "d20c5726aa5d5e076be5d1d1fb652061d3ca473506a7f86ebc07f0145f3abe5b"
+      "sha256": "d447e7106408bc521ace63f4d636259ce9f781c6d896aea523640b0899ce10e9"
     },
     {
       "path": "schemas/input.schema.json",
@@ -76,7 +76,7 @@
     },
     {
       "path": "src/implementations/__init__.py",
-      "sha256": "6a61fb94ebde4ce56fab7b899b7736267802265c91f239704b44b32148809c1b"
+      "sha256": "55931cb772f86b23e6731c947436b2b22643f1fb033773955d3a5e9e6a862f3a"
     },
     {
       "path": "src/implementations/sequence_stats_v1.py",
@@ -84,7 +84,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.py",
-      "sha256": "e221e7d47df6130c63a3606c65ff9f0983cf1f06e7540297128567a27618a87c"
+      "sha256": "e463c35012fd69a4cfb0c66117129ac0b8b895965c6b01bae327da81ea4e4acc"
     },
     {
       "path": "src/implementations/expression_pca_v1.py",
@@ -153,6 +153,10 @@
     {
       "path": "tests/reference/variant.stats.v1.default.json",
       "sha256": "08048726a122bad5029adbd7983ca575eb573de1d37469415c47d05524dce7c3"
+    },
+    {
+      "path": "src/implementations/sequence_ssr_v1.py",
+      "sha256": "4501b15e259930e4512a2dfd75967d7996cb4cf174f6f769010efb767478456a"
     }
   ],
   "contract": {
@@ -237,7 +241,9 @@
       "max_terms",
       "include_genes",
       "max_cycles",
-      "quality_encoding"
+      "quality_encoding",
+      "min_repeats",
+      "compound_max_distance"
     ]
   }
 }

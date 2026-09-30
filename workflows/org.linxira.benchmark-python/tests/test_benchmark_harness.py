@@ -24,6 +24,13 @@ except ImportError:
     HAVE_BIOPYTHON = False
 
 try:
+    import pytrf  # type: ignore  # noqa: F401
+
+    HAVE_PYTRF = True
+except ImportError:
+    HAVE_PYTRF = False
+
+try:
     from jsonschema import Draft202012Validator  # type: ignore
 
     HAVE_JSONSCHEMA = True
@@ -125,6 +132,13 @@ class RegistryTests(unittest.TestCase):
         implementation = MODULE.IMPLEMENTATIONS["sequence.stats.v1"]
         self.assertEqual(implementation.INPUT_ROLES, ("fasta",))
         self.assertEqual(implementation.PARAMETERS, ())
+
+    def test_registry_exposes_sequence_ssr_with_the_rust_contract(self):
+        implementation = MODULE.IMPLEMENTATIONS["sequence.ssr.v1"]
+        self.assertEqual(implementation.INPUT_ROLES, ("fasta",))
+        self.assertEqual(
+            implementation.PARAMETERS, ("min_repeats", "compound_max_distance")
+        )
 
     def test_input_schema_accepts_a_worker_style_request(self):
         if not HAVE_JSONSCHEMA:
@@ -703,6 +717,49 @@ class VariantStatsParityTests(ParityCompareMixin, unittest.TestCase):
                 path.write_text(content, encoding="utf-8", newline="")
                 with self.assertRaises(ValueError, msg=name):
                     implementation.run({"vcf": path}, {})
+
+
+@unittest.skipUnless(HAVE_PYTRF, "pytrf is not installed")
+class SequenceSsrParityTests(unittest.TestCase):
+    # `linxira-bio sequence ssr` (Rust engine) on the same input: shortest
+    # motif first, consumed intervals, compound group for interruptions
+    # within 100 bp.
+    def run_implementation(self, sequence: str, parameters: dict | None = None):
+        implementation = MODULE.IMPLEMENTATIONS["sequence.ssr.v1"]
+        with tempfile.TemporaryDirectory(prefix="linxira-ssr-parity-") as temporary:
+            path = Path(temporary) / "input.fa"
+            content = ">chr1" + chr(10) + sequence + chr(10)
+            path.write_text(content, encoding="utf-8", newline="")
+            return implementation.run({"fasta": path}, parameters or {})
+
+    def test_matches_the_rust_engine_on_mixed_repeats(self):
+        result = self.run_implementation("AAAAAAAAAATATATATATATAT")
+        self.assertEqual(result["summary"]["sequence_count"], 1)
+        self.assertEqual(result["summary"]["total_bases"], 22)
+        self.assertEqual(result["summary"]["ssr_count"], 2)
+        self.assertEqual(result["summary"]["compound_group_count"], 1)
+        self.assertEqual(result["summary"]["motif_length_counts"], {"1": 1, "2": 1})
+        first, second = result["records"]
+        self.assertEqual((first["motif"], first["repeats"], first["start"], first["end"]), ("A", 10, 1, 10))
+        self.assertEqual((second["motif"], second["repeats"], second["start"], second["end"]), ("TA", 6, 11, 22))
+        self.assertTrue(first["compound"] and second["compound"])
+
+    def test_respects_custom_thresholds_and_compound_distance(self):
+        result = self.run_implementation(
+            "ATATATATATAT", {"min_repeats": "2:5", "compound_max_distance": 0}
+        )
+        self.assertEqual(result["summary"]["ssr_count"], 1)
+        self.assertEqual(result["records"][0]["motif"], "AT")
+        self.assertFalse(result["records"][0]["compound"])
+
+    def test_below_threshold_repeats_are_not_reported(self):
+        result = self.run_implementation("ATATATA")
+        self.assertEqual(result["summary"]["ssr_count"], 0)
+
+    def test_n_breaks_repeats(self):
+        result = self.run_implementation("aaaaaaaaaNATATATATATATATAT")
+        self.assertEqual(result["summary"]["ssr_count"], 1)
+        self.assertEqual(result["records"][0]["motif"], "AT")
 
 
 if __name__ == "__main__":

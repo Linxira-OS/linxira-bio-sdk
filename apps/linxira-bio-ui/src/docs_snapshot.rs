@@ -193,6 +193,8 @@ pub fn embedded_document(capability: &str, locale: &str) -> Option<&'static str>
         ("sequence.shuffle.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/sequence.shuffle.v1/zh-CN.md")),
         ("sequence.split.v1", "en-US") => Some(include_str!("../../../docs/capabilities/sequence.split.v1/en-US.md")),
         ("sequence.split.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/sequence.split.v1/zh-CN.md")),
+        ("sequence.ssr.v1", "en-US") => Some(include_str!("../../../docs/capabilities/sequence.ssr.v1/en-US.md")),
+        ("sequence.ssr.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/sequence.ssr.v1/zh-CN.md")),
         ("sequence.stats.v1", "en-US") => Some(include_str!("../../../docs/capabilities/sequence.stats.v1/en-US.md")),
         ("sequence.stats.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/sequence.stats.v1/zh-CN.md")),
         ("sequence.to-table.v1", "en-US") => Some(include_str!("../../../docs/capabilities/sequence.to-table.v1/en-US.md")),

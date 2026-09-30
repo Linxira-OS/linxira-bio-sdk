@@ -1548,6 +1548,34 @@ fn execute_request_v2_inner(request: JobRequestV2, base_directory: &Path) -> Wor
                 fasta_stats_path(path)?,
             )
         }
+        "sequence.ssr.v1" => {
+            let path = resolve_v2_single_input(base_directory, &request, "fasta")?;
+            let mut parameters = linxira_bio_core::ssr::SsrParameters::default();
+            if let Some(spec) = request.parameters.get("min_repeats") {
+                let spec = spec
+                    .as_str()
+                    .ok_or("sequence.ssr.v1 min_repeats must be a string")?;
+                parameters = linxira_bio_core::ssr::parse_min_repeats(spec)
+                    .map_err(|error| error.to_string())?;
+            }
+            if let Some(distance) = request.parameters.get("compound_max_distance") {
+                let distance = distance.as_u64().ok_or(
+                    "sequence.ssr.v1 compound_max_distance must be a non-negative integer",
+                )?;
+                parameters.compound_max_distance = distance;
+            }
+            let (records, summary) = linxira_bio_core::ssr::ssr_scan_fasta_path(path, &parameters)
+                .map_err(|error| error.to_string())?;
+            serialize_v2_result(
+                &request,
+                base_directory,
+                &verified_inputs,
+                serde_json::json!({
+                    "records": records,
+                    "summary": summary,
+                }),
+            )
+        }
         "sequence.extract.v1" => {
             let options = sequence_extract_options(&request.parameters)?;
             execute_sequence_transform_v2(
@@ -2555,6 +2583,10 @@ pub fn v2_contract(
             ],
         ),
         "sequence.stats.v1" => (&["fasta"], &[]),
+        "sequence.ssr.v1" => (
+            &["fasta"],
+            &["output_directory", "min_repeats", "compound_max_distance"],
+        ),
         "sequence.extract.v1" => (&["fasta"], &["output", "identifiers", "regions", "strict"]),
         "sequence.filter.v1" => (
             &["fasta"],

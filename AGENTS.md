@@ -10,6 +10,9 @@ the agent skills that select and validate them.
   browser execution must be selected.
 - Read `skills/analyze-sequence-statistics/SKILL.md` for the implemented
   `sequence.stats.v1` capability.
+- Read `skills/find-sequence-repeats/SKILL.md` for the implemented
+  SSR/microsatellite mining capability (`sequence.ssr.v1`, rust/pytrf/
+  Biostrings backends).
 - Read `skills/manipulate-biological-sequences/SKILL.md` for the implemented
   `sequence.extract.v1`, `sequence.filter.v1`,
   `sequence.reverse-complement.v1`, `sequence.translate.v1`, and

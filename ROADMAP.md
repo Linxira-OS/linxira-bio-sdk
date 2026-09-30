@@ -78,7 +78,7 @@ M0 统一输出框架 ──┬──> M1 双后端绘图（依赖 OutputSpec/Pl
 | --- | --- | --- |
 | A 变异检测断链 | variant.call.v1（bcftools）→ 长读排序/BAM 补全 → BAM 去重+窗口深度 | 已完成（2026-09-30：variant.call.v1、long-read --bam、alignment.markdup.v1、alignment.window-depth.v1） |
 | B 化学轨首发 | chemistry.dock.v1（Vina+Meeko）→ chemistry.conformers.v1（RDKit pack） | 已完成（2026-09-30：dock + conformers） |
-| C 纯 Rust+模拟器 | SSR 挖掘 → peak 注释 → 模拟器一期（序列/读段合成） | 未开始 |
+| C 纯 Rust+模拟器 | SSR 挖掘 → peak 注释 → 模拟器一期（序列/读段合成） | 进行中（SSR 2026-09-30） |
 | D GPU 内核推进 | Pearson v3（subgroup 归约）→ 厂商栈 host 抽象层 → sycl-rs 本机尝试 | 未开始 |
 | E 常规轨二 | 批次效应校正（ComBat/limma 双 pack）→ QTL+混合模型（R pack） | 未开始 |
 | F 化学二+长读长 | chemistry.screen.v1 → 长读 QC → quantum.semiempirical.v1 | 未开始 |
@@ -636,7 +636,7 @@ C4 带宽并行 / C5 重型原生编排 / C6 DL 推理 / C7 仅云**。
 | QTL 定位+混合模型（BLUP/BLUE）      | qtl2/lme4/rrBLUP       | R pack              | 基因型+表型    | ✅LOD 曲线 | 排期 |
 | 微生物分型套件（AMR/毒力/MLST/质粒）    | AMRFinderPlus/ResFinder（Apache） | Rust 编排+原生 | reads/装配  | ✅存在-缺失热图 | 排期 |
 | 参考基因组管理（accession 拉取+校验+索引） | genomepy/refgenie 对照   | **纯 Rust**          | 网络        | —      | 排期 |
-| SSR/微卫星标记挖掘               | MISA/TRF 对照           | **纯 Rust**          | 序列        | ✅位点图   | 排期 |
+| SSR/微卫星标记挖掘               | MISA/TRF 对照           | **纯 Rust**+pytrf/Biostrings 三轨基准 | 序列        | ✅位点图   | [x] 2026-09-30：sequence.ssr.v1 发布（MISA 语义；pytrf C 内核与 Biostrings 作对照后端，量化我们与生态底层包差异；Linux 正式测量待实测机） |
 | 长读长套件（QC/比对/组装/纠错/SV）  | NanoPlot/minimap2/hifiasm/Sniffles2 | Rust 编排+原生（minimap2 已白名单，C5 档） | ONT/PacBio | ✅覆盖度图 | 排期 |
 | ONT 碱基识别编排（仅编排不打包）    | Dorado（NVIDIA 专用二进制） | Rust 编排 gpu:required（C6 档） | POD5 | —      | 排期 |
 | CRISPR 向导设计+脱靶扫描           | Cas-OFFinder 模式/CRISPOR 流程 | Rust 编排；脱靶扫描 GPU 可选（C2/C4） | 参考基因组 | ✅脱靶表 | 排期 |

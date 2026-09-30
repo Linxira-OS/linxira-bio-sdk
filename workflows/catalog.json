@@ -76,7 +76,8 @@
         "fastq.qc.v1",
         "set.venn.v1",
         "structure.pdb.summary.v1",
-        "variant.stats.v1"
+        "variant.stats.v1",
+        "sequence.ssr.v1"
       ]
     },
     {
@@ -92,7 +93,8 @@
         "fastq.qc.v1",
         "set.venn.v1",
         "structure.pdb.summary.v1",
-        "variant.stats.v1"
+        "variant.stats.v1",
+        "sequence.ssr.v1"
       ]
     },
     {

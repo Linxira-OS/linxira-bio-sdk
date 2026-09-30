@@ -46,6 +46,20 @@
       "command": "linxira-bio sequence stats <input.fasta> --json"
     },
     {
+      "id": "sequence.ssr.v1",
+      "status": "available",
+      "category": "sequence-algorithms",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio sequence ssr <input.fasta[.gz]> <output.tsv> --min-repeats 1:10,2:6,3:5,4:5,5:5,6:5 --backend rust --json",
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
+    },
+    {
       "id": "sequence.extract.v1",
       "status": "available",
       "category": "sequence-io",
