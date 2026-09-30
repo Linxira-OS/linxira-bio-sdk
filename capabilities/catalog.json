@@ -721,6 +721,22 @@
       ]
     },
     {
+      "id": "variant.call.v1",
+      "status": "available",
+      "category": "variant-calling",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio variant call <sorted.bam|cram> <reference.fa> <output.vcf> --min-mq 20 --min-bq 13 --json",
+      "input_formats": [
+        "bam",
+        "cram",
+        "fasta"
+      ],
+      "output_formats": [
+        "vcf",
+        "json"
+      ]
+    },
+    {
       "id": "variant.annotate.v1",
       "status": "available",
       "category": "variant-calling",

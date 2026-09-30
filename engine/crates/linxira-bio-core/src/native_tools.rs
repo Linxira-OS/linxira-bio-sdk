@@ -265,6 +265,26 @@ impl Default for SnpEffOptions {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BcftoolsCallOptions {
+    pub min_mapping_quality: u32,
+    pub min_base_quality: u32,
+    pub threads: usize,
+    /// Emit every position, not only variant sites (drops bcftools call -v).
+    pub all_sites: bool,
+}
+
+impl Default for BcftoolsCallOptions {
+    fn default() -> Self {
+        Self {
+            min_mapping_quality: 20,
+            min_base_quality: 13,
+            threads: 1,
+            all_sites: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MastOptions {
     pub threads: usize,
@@ -870,6 +890,47 @@ pub fn run_snpeff_path(
         fs::write(output, native_output.stdout)?;
         finish_result("snpEff", "annotate", output, 1, 1)
     })();
+    if result.is_err() {
+        remove_incomplete_output(output);
+    }
+    result
+}
+
+/// Call small variants (SNV/indel) from an indexed, reference-sorted BAM/CRAM
+/// with bcftools mpileup + bcftools call. The intermediate BCF is staged in a
+/// scratch directory next to the output, mirroring the minimap2+samtools flow.
+pub fn run_bcftools_call_path(
+    alignment: impl AsRef<Path>,
+    reference: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &BcftoolsCallOptions,
+) -> Result<NativeToolResult, NativeToolError> {
+    validate_threads(options.threads)?;
+    if options.min_mapping_quality > 255 || options.min_base_quality > 255 {
+        return Err(NativeToolError::InvalidOption(
+            "minimum qualities must be in 0..=255".to_owned(),
+        ));
+    }
+    let alignment = alignment.as_ref();
+    let reference = reference.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[alignment, reference], output)?;
+    let executable = configured_program("LINXIRA_BIO_BCFTOOLS", "bcftools");
+    let temporary = create_temporary_directory(output, "bcftools-call")?;
+    let pileup = temporary.join("pileup.bcf");
+    let result = (|| {
+        let (pileup_arguments, call_arguments) =
+            bcftools_call_arguments(alignment, reference, output, &pileup, options);
+        run_native_command(&executable, &pileup_arguments, false)?;
+        run_native_command(&executable, &call_arguments, false)?;
+        finish_result("bcftools", "call", output, options.threads, 2)
+    })();
+    let cleanup = fs::remove_dir_all(&temporary);
+    if let Err(error) = cleanup
+        && result.is_ok()
+    {
+        return Err(NativeToolError::Io(error));
+    }
     if result.is_err() {
         remove_incomplete_output(output);
     }
@@ -1684,6 +1745,45 @@ pub fn snpeff_arguments(vcf: &Path, options: &SnpEffOptions) -> Vec<OsString> {
     args
 }
 
+/// Argument vectors for the two bcftools invocations (mpileup, then call).
+pub fn bcftools_call_arguments(
+    alignment: &Path,
+    reference: &Path,
+    output: &Path,
+    pileup: &Path,
+    options: &BcftoolsCallOptions,
+) -> (Vec<OsString>, Vec<OsString>) {
+    let pileup_arguments = vec![
+        OsString::from("mpileup"),
+        OsString::from("-f"),
+        reference.as_os_str().to_owned(),
+        OsString::from("-q"),
+        OsString::from(options.min_mapping_quality.to_string()),
+        OsString::from("-Q"),
+        OsString::from(options.min_base_quality.to_string()),
+        OsString::from("--threads"),
+        OsString::from(options.threads.to_string()),
+        OsString::from("-Ou"),
+        OsString::from("-o"),
+        pileup.as_os_str().to_owned(),
+        alignment.as_os_str().to_owned(),
+    ];
+    let mut call_arguments = vec![
+        OsString::from("call"),
+        OsString::from("--threads"),
+        OsString::from(options.threads.to_string()),
+        OsString::from("-m"),
+        OsString::from("-Ov"),
+        OsString::from("-o"),
+        output.as_os_str().to_owned(),
+    ];
+    if !options.all_sites {
+        call_arguments.push(OsString::from("-v"));
+    }
+    call_arguments.push(pileup.as_os_str().to_owned());
+    (pileup_arguments, call_arguments)
+}
+
 pub fn mast_arguments(
     motif: &Path,
     sequences: &Path,
@@ -2091,16 +2191,56 @@ fn stderr_summary(stderr: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        BlastProgram, DiamondMode, HmmerOptions, IqtreeOptions, MemeAlphabet, MemeOptions,
-        MuscleMode, MuscleOptions, ShortReadAlignmentOptions, SimilaritySearchOptions, TrimalMode,
-        bam_coverage_arguments, blast_arguments, diamond_arguments, dssp_arguments,
-        hmmer_arguments, iqtree_arguments, kaks_arguments, mcscanx_arguments, meme_arguments,
-        minimap2_short_read_arguments, muscle_arguments, parse_blast_program, parse_diamond_mode,
-        parse_hmmer_mode, parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode,
-        samtools_report_arguments, samtools_sort_arguments, trimal_arguments,
+        BcftoolsCallOptions, BlastProgram, DiamondMode, HmmerOptions, IqtreeOptions, MemeAlphabet,
+        MemeOptions, MuscleMode, MuscleOptions, ShortReadAlignmentOptions, SimilaritySearchOptions,
+        TrimalMode, bam_coverage_arguments, bcftools_call_arguments, blast_arguments,
+        diamond_arguments, dssp_arguments, hmmer_arguments, iqtree_arguments, kaks_arguments,
+        mcscanx_arguments, meme_arguments, minimap2_short_read_arguments, muscle_arguments,
+        parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
+        parse_muscle_mode, parse_trimal_mode, samtools_report_arguments, samtools_sort_arguments,
+        trimal_arguments,
     };
     use std::ffi::OsString;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn builds_two_step_bcftools_call_arguments() {
+        let options = BcftoolsCallOptions::default();
+        let (pileup, call) = bcftools_call_arguments(
+            Path::new("sample.sorted.bam"),
+            Path::new("reference.fa"),
+            Path::new("calls.vcf"),
+            Path::new("scratch/pileup.bcf"),
+            &options,
+        );
+        assert_eq!(pileup[0], OsString::from("mpileup"));
+        assert!(pileup.contains(&OsString::from("sample.sorted.bam")));
+        assert!(pileup.contains(&OsString::from("-q")));
+        assert!(pileup.contains(&OsString::from("20")));
+        assert!(pileup.contains(&OsString::from("-Q")));
+        assert!(pileup.contains(&OsString::from("13")));
+        assert_eq!(call[0], OsString::from("call"));
+        assert!(call.contains(&OsString::from("-m")));
+        // Variant-sites-only mode must pass -v; all-sites mode must omit it.
+        assert!(call.contains(&OsString::from("-v")));
+        assert_eq!(
+            call.last().and_then(|last| last.to_str()),
+            Some("scratch/pileup.bcf"),
+        );
+
+        let all_sites = BcftoolsCallOptions {
+            all_sites: true,
+            ..BcftoolsCallOptions::default()
+        };
+        let (_, call_all) = bcftools_call_arguments(
+            Path::new("a.bam"),
+            Path::new("ref.fa"),
+            Path::new("out.vcf"),
+            Path::new("p.bcf"),
+            &all_sites,
+        );
+        assert!(!call_all.contains(&OsString::from("-v")));
+    }
 
     #[test]
     fn plans_wgcna_workspace_without_creating_it() {

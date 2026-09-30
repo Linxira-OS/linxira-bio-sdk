@@ -86,6 +86,8 @@ the agent skills that select and validate them.
   normalization, label mapping, and single-leaf rerooting.
 - Read `skills/manipulate-bio-tables/SKILL.md` for the implemented CSV/TSV
   `table.manipulate.v1` capability.
+- Read `skills/call-variants/SKILL.md` for the implemented
+  `variant.call.v1` capability (native bcftools calling).
 - Read `skills/analyze-variant-statistics/SKILL.md` for the implemented
   `variant.stats.v1`, `variant.filter.v1`, `variant.normalize.v1`, and
   `variant.compare.v1` capabilities.
