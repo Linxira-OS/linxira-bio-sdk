@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fit Dose Response Curves"
+  short_description: "Fit IC50 four-parameter logistic, Michaelis-Menten, and Lineweaver-Burk models"
+  default_prompt: "Use $fit-dose-response-curves to fit this dose-response dataset and report parameters with confidence bounds."

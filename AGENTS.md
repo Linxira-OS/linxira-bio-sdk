@@ -109,6 +109,31 @@ the agent skills that select and validate them.
   `benchmark.run.v1` capability.
 - Do not use a capability marked `planned` as though it were available.
 
+## Documentation Map
+
+Paths and purposes, for agents working in this repository (not end-user docs):
+
+- `README.md` — product entry point (English-first, Chinese mirror below).
+- `AGENTS.md` — this file: agent routing, repository rules, validation gates.
+- `ROADMAP.md` — milestones and the closed capability-gap list (§11: register
+  a capability there before implementing it).
+- `docs/capabilities/<id>/{en-US,zh-CN}.md` — canonical bilingual capability
+  pages (10 fixed sections each; embedded in the GUI at build time).
+- `docs/engine-evals/` — engineering experiment ledgers (GPU kernels, engine
+  evaluations, vendor trials); committed together with the code that produced
+  them. Measurement: median of >=3 runs, GPU phases split.
+- `docs/*.md` (AI_AND_SDK, EXECUTION_POLICY, DATA_FORMATS, …) — engineering
+  policies and reference notes.
+- `benchmark-results/` — benchmark archives and the approved blog mirror;
+  public articles are written only after a quantified test the user approved.
+- `skills/<name>/SKILL.md` + `agents/openai.yaml` — agent skill body and its
+  registration-required interface file.
+- `skill-pack.json` — the import boundary for agent runtimes; every skill
+  folder must appear here with its capability ids, otherwise it ships in the
+  bundle but stays invisible to agents.
+- `gpu-lab/` — standalone (workspace-excluded) Rust GPU experiment carrier
+  (probe / bench / gpu-bench); not part of the release workspace.
+
 ## Repository Rules
 
 - Treat `skills/` as concise agent-facing procedures, not a place for shared
