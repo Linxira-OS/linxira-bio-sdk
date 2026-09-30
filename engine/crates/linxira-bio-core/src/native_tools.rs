@@ -325,6 +325,7 @@ impl Default for SamtoolsDepthOptions {
     }
 }
 
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MastOptions {
     pub threads: usize,
@@ -2158,7 +2159,10 @@ fn validate_paths(inputs: &[&Path], output: &Path) -> Result<(), NativeToolError
     if output.exists() {
         return Err(NativeToolError::OutputAlreadyExists(output.to_path_buf()));
     }
-    let parent = output.parent().unwrap_or_else(|| Path::new("."));
+    let parent = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     if !parent.is_dir() {
         return Err(NativeToolError::InvalidOption(format!(
             "output directory does not exist: {}",
@@ -2170,7 +2174,12 @@ fn validate_paths(inputs: &[&Path], output: &Path) -> Result<(), NativeToolError
 
 fn paths_equivalent(input: &Path, output: &Path) -> Result<bool, NativeToolError> {
     let input = fs::canonicalize(input)?;
-    let output_parent = output.parent().unwrap_or_else(|| Path::new("."));
+    // A bare file name has an empty parent component, not None; canonicalize
+    // would fail on it, so fall back to the working directory like the shell.
+    let output_parent = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     let output_parent = fs::canonicalize(output_parent)?;
     let output_name = output
         .file_name()
@@ -2455,12 +2464,13 @@ mod tests {
     use super::{
         BcftoolsCallOptions, BlastProgram, DiamondMode, HmmerOptions, IqtreeOptions, MemeAlphabet,
         MemeOptions, MuscleMode, MuscleOptions, SamtoolsDepthOptions, ShortReadAlignmentOptions,
-        SimilaritySearchOptions, TrimalMode, bam_coverage_arguments, bcftools_call_arguments,
-        blast_arguments, diamond_arguments, dssp_arguments, hmmer_arguments, iqtree_arguments,
-        kaks_arguments, mcscanx_arguments, meme_arguments, minimap2_short_read_arguments,
-        muscle_arguments, parse_blast_program, parse_diamond_mode, parse_hmmer_mode,
-        parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode, samtools_depth_arguments,
-        samtools_report_arguments, samtools_sort_arguments, trimal_arguments,
+        SimilaritySearchOptions, TrimalMode, bam_coverage_arguments,
+        bcftools_call_arguments, blast_arguments, diamond_arguments, dssp_arguments,
+        hmmer_arguments, iqtree_arguments, kaks_arguments, mcscanx_arguments, meme_arguments,
+        minimap2_short_read_arguments, muscle_arguments, parse_blast_program, parse_diamond_mode,
+        parse_hmmer_mode, parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode,
+        samtools_depth_arguments, samtools_report_arguments, samtools_sort_arguments,
+        trimal_arguments,
     };
     use std::ffi::OsString;
     use std::path::{Path, PathBuf};
