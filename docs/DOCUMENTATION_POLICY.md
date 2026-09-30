@@ -42,22 +42,16 @@ Documentation is part of the capability contract. Updating behavior, defaults,
 accepted formats, scientific interpretation, or runtime requirements requires
 updating both locales in the same change.
 
-## Experiment Ledger Policy (`docs/engine-evals/`)
+## Experiment Records
 
-Engineering experiments (GPU kernels, engine evaluations, vendor trials) are
-recorded as dated ledgers in `docs/engine-evals/`.
-
-- Naming: `<topic>-<YYYY-MM-DD>.md` (same-day revisions append `-2`).
-- Required sections: environment (host, hardware, driver, toolchain, version),
-  data (source, seed, scale), results table (with units), consistency verdict
-  (reference tier, tolerance, pass/fail), interpretation (including honest
-  negatives — record results that contradict the narrative), and a paste-able
-  reproduction command.
-- Measurement discipline: wall times use the median of at least 3 repeated
-  runs (or state single-run plus the observed spread). GPU timings are split
-  into upload / compute / readback phases.
-- Evolution, not overwrite: when a newer implementation supersedes an older
-  one, keep both rows (v1/v2) in the table — improvement history is data.
-- Corrections: when a conclusion is overturned (e.g. a driver or toolkit
-  support fact), amend the ledger and mark the correction explicitly rather
-  than silently editing history.
+- Intermediate development reports (kernel experiments, hardware ledgers,
+  vendor trials) stay LOCAL in `docs/engine-evals/` and are not committed
+  (the directory is gitignored; files already tracked remain as history).
+- Measurement discipline: median of at least 3 repeated runs (or state a
+  single run plus observed spread); GPU timings split into
+  upload/compute/readback; overturned conclusions are corrected explicitly.
+- Public blog posts / articles are written ONLY after a quantified test the
+  user explicitly approved, via the benchmark-results blog mirror. No public
+  writing at other stages.
+- Linux is the primary working environment: benchmark numbers are provisional
+  until reproduced on Linux.

@@ -22,3 +22,4 @@ scripts/bench-tier1v2-biolab.sh
 scripts/*-biolab.sh
 release-artifacts-*/
 .zcode/
+docs/engine-evals/
