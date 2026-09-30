@@ -1681,6 +1681,20 @@
       ]
     },
     {
+      "id": "chemistry.conformers.v1",
+      "status": "available",
+      "category": "chemistry",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio chemistry conformers <input.sdf> <output.sdf> --num-conformers 10 --seed 42 --json",
+      "input_formats": [
+        "sdf"
+      ],
+      "output_formats": [
+        "sdf",
+        "json"
+      ]
+    },
+    {
       "id": "medical.metabolomics.v1",
       "status": "available",
       "category": "research-use-only",
