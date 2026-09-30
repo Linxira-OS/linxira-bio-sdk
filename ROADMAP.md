@@ -390,19 +390,22 @@ async fn main() -> std::io::Result<()> {
 - **架构事实**：国产卡 CUDA 兼容全部为**源码级**（musify/cu-bridge 重编译），PTX/cubin 二进制
   不通用——跨厂商可复用的是 host 侧 driver FFI 与 WGSL，不是内核二进制。
 
-**硬件与叙事策略**（2026-09-30 定案，含本机实测）：**Linux 先行，以旧卡档位为兼容基线**——
-GTX 750 Ti（Maxwell sm_50，与新 CUDA 栈断代，仅剩 Vulkan 1.1）与 RX 580（Polaris gfx803，
-ROCm 官方不支持）为最低兼容档，**最低档能跑则向上皆稳**。**AMD 双层路径**：Vulkan 为覆盖
-基线与回退层（旧卡靠它），ROCm/HIP 官方栈在新卡（云租 RX 9060/9070 XT）并行验证。
-**本机核显不是 Vulkan 档**：主机 A = Core Ultra 5 225H（Arrow Lake-H，14 核）+ Arc 130T
-（**Xe-LPG+，含 DPAS 矩阵指令**）+ 31.4GB 内存，**oneAPI 2025.3 完整套件已装、Level Zero
-loader 与 OpenCL 运行时均在**——核显走 **oneAPI/SYCL/sycl-rs 主开发栈**（Vulkan 仅回退；
-sycl-rs 官方仅测 Linux，Windows 实测反馈即上游贡献点）；FP64 经 cl_khr_fp64 暴露但比率低
-（~1/16-1/32），GPU 侧 f64 内核仍采 f32/double-single 策略；CPU 侧实测未暴露 AVX-512（H2
-留云租）。云租：RTX 4090（sm_89，cutile-rs）、昇腾 910B。**"旧卡与核显上跑出性能"是核心
-宣传叙事**；Rust 内存安全对照 C++ 内核的内存泄露/任务中断为第二条叙事主线；CPU 型任务
-（如 Vina 编排的多核/AVX 加速，AVX2 实测 2.55×）同轨发声。**国产顺序摩尔线程优先**（cudarc-musa
-首批窗口，S80/S90 民用可购）＞华为昇腾（云租好租，cann-rs，后置）。
+**硬件与叙事策略**（2026-09-30 定案，含本机实测；750 Ti CUDA 结论同日修正）：**Linux 先行，
+以旧卡档位为兼容基线**——GTX 750 Ti 与 RX 580（Polaris gfx803，ROCm 官方不支持）为最低兼容档，
+**最低档能跑则向上皆稳**。**750 Ti 路径修正**：Linux 上 750 Ti（Maxwell）仍由 **R580 现代
+驱动分支支持**（GTX 700 老 Kepler 系才落入 490 legacy），且 **CUDA 12.x 仍支持 sm_50**（pre-
+Turing 移除发生在 CUDA 13）——故 750 Ti = **wgpu/Vulkan + cudarc/CUDA 12.x（sm_50）双路径**
+（仅 cutile-rs 因需 CUDA 13.2+/sm_80 不可用），"旧卡吃 CUDA 12"对照成立。**AMD 双层路径**：
+Vulkan 为覆盖基线与回退层（旧卡靠它），ROCm/HIP 官方栈在新卡（云租 RX 9060/9070 XT）并行
+验证。**本机核显不是 Vulkan 档**：主机 A = Core Ultra 5 225H（Arrow Lake-H，14 核）+
+Arc 130T（**Xe-LPG+，含 DPAS 矩阵指令**）+ 31.4GB 内存，**oneAPI 2025.3 完整套件已装、
+Level Zero loader 与 OpenCL 运行时均在**——核显走 **oneAPI/SYCL/sycl-rs 主开发栈**（Vulkan
+仅回退；sycl-rs 官方仅测 Linux，Windows 实测反馈即上游贡献点）；FP64 经 cl_khr_fp64 暴露
+但比率低（~1/16-1/32），GPU 侧 f64 内核仍采 f32/double-single 策略；CPU 侧实测未暴露
+AVX-512（H2 留云租）。云租：RTX 4090（sm_89，cutile-rs）、昇腾 910B。**"旧卡与核显上跑出
+性能"是核心宣传叙事**；Rust 内存安全对照 C++ 内核的内存泄露/任务中断为第二条叙事主线；
+CPU 型任务（如 Vina 编排的多核/AVX 加速，AVX2 实测 2.55×）同轨发声。**国产顺序摩尔线程
+优先**（cudarc-musa 首批窗口，S80/S90 民用可购）＞华为昇腾（云租好租，cann-rs，后置）。
 
 | 任务       | 内容                                                                                                   | 验收                                                                |
 | -------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |

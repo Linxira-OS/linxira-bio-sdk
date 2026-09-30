@@ -26,7 +26,7 @@ Arc 130T 的 Xe-LPG+ 带 DPAS 矩阵引擎，SYCL 矩阵负载可吃硬件加速
 
 | 卡 | 状态 | 预期路径 |
 | --- | --- | --- |
-| NVIDIA GTX 750 Ti（Maxwell，2GB） | 待测 | wgpu/Vulkan 1.1（唯一存续路径；与 CUDA 13 栈断代） |
+| NVIDIA GTX 750 Ti（Maxwell sm_50，2GB） | 待测 | **双路径（2026-09-30 修正）**：wgpu/Vulkan + cudarc/CUDA 12.x（sm_50 仍受支持；Linux R580 驱动分支支持 Maxwell，仅老 Kepler 700 系落 490 legacy）；cutile-rs 不可用（需 CUDA 13.2+/sm_80） |
 | AMD RX 580（Polaris，8GB） | 待测 | wgpu/Vulkan（RADV/AMDVLK 支持良好） |
 | 摩尔线程 S80 / S90（16GB） | 待购/待租 | cudarc-musa（官方 Rust fork）+ wgpu/Vulkan 1.3 |
 | 云租 RTX 4090（sm_89） | 待租 | cutile-rs（NVIDIA 官方 Rust，Tile 轨） |

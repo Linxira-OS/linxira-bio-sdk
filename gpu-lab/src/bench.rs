@@ -333,11 +333,18 @@ fn simd_tier() -> (String, bool, bool) {
     )
 }
 
+/// Median wall of 3 repeated runs (ledger policy); the deterministic body
+/// returns the same result each time.
 fn timed(mut body: impl FnMut() -> f64) -> (f64, f64) {
-    let start = Instant::now();
-    let result = body();
-    let wall_ms = start.elapsed().as_secs_f64() * 1000.0;
-    (wall_ms, result)
+    let mut walls = [0.0f64; 3];
+    let mut result = 0.0;
+    for run in 0..3 {
+        let start = Instant::now();
+        result = body();
+        walls[run] = start.elapsed().as_secs_f64() * 1000.0;
+    }
+    walls.sort_by(|a, b| a.total_cmp(b));
+    (walls[1], result)
 }
 
 // ---------------------------------------------------------------------------
