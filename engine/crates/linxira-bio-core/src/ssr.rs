@@ -213,7 +213,7 @@ fn mark_compound_groups(records: &mut [SsrRecord], compound_max_distance: u64) -
             gap <= compound_max_distance
         };
         if joins_previous {
-            let (start, _) = run.map_or((index - 1, index - 1), |bounds| bounds);
+            let (start, _) = run.unwrap_or((index - 1, index - 1));
             run = Some((start, index));
         } else {
             close_compound_run(run.take(), records, &mut groups);
