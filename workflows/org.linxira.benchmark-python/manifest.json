@@ -23,7 +23,7 @@
     "core_compatibility": ">=0.1.0,<2.0.0",
     "dependency_lock": {
       "path": "requirements.lock",
-      "sha256": "d447e7106408bc521ace63f4d636259ce9f781c6d896aea523640b0899ce10e9"
+      "sha256": "69e4e4399efeb722ea09b2e36862a584af4e1cf6e32392eaaa36c125bcdffc22"
     }
   },
   "input_schema": {
@@ -60,7 +60,7 @@
     },
     {
       "path": "requirements.lock",
-      "sha256": "d447e7106408bc521ace63f4d636259ce9f781c6d896aea523640b0899ce10e9"
+      "sha256": "69e4e4399efeb722ea09b2e36862a584af4e1cf6e32392eaaa36c125bcdffc22"
     },
     {
       "path": "schemas/input.schema.json",
@@ -76,7 +76,7 @@
     },
     {
       "path": "src/implementations/__init__.py",
-      "sha256": "55931cb772f86b23e6731c947436b2b22643f1fb033773955d3a5e9e6a862f3a"
+      "sha256": "716f3ff2e64ef48424acd29b241f86a4d69534ed1048abd690bf1824849b4d64"
     },
     {
       "path": "src/implementations/sequence_stats_v1.py",
@@ -84,7 +84,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.py",
-      "sha256": "e463c35012fd69a4cfb0c66117129ac0b8b895965c6b01bae327da81ea4e4acc"
+      "sha256": "f9b3771c9ed3a395dc2425a1506126cec151570ca5891753913a5a5be9501e62"
     },
     {
       "path": "src/implementations/expression_pca_v1.py",
