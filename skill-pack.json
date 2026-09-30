@@ -214,6 +214,15 @@
       ]
     },
     {
+      "id": "simulate-bio-data",
+      "path": "skills/simulate-bio-data",
+      "kind": "executable",
+      "capabilities": [
+        "simulate.sequence.v1",
+        "simulate.reads.v1"
+      ]
+    },
+    {
       "id": "analyze-set-overlaps",
       "path": "skills/analyze-set-overlaps",
       "kind": "executable",
@@ -308,6 +317,14 @@
         "interval.merge.v1",
         "interval.subtract.v1",
         "interval.closest.v1"
+      ]
+    },
+    {
+      "id": "annotate-peaks",
+      "path": "skills/annotate-peaks",
+      "kind": "executable",
+      "capabilities": [
+        "peak.annotate.v1"
       ]
     },
     {

@@ -106,7 +106,7 @@ pub struct IntervalSubtractContigStats {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum IntervalClosestDirection {
+pub(crate) enum IntervalClosestDirection {
     Upstream,
     Downstream,
     Overlap,
@@ -194,9 +194,9 @@ impl From<io::Error> for BedError {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct Interval {
-    start: u64,
-    end: u64,
+pub(crate) struct Interval {
+    pub(crate) start: u64,
+    pub(crate) end: u64,
 }
 
 impl Interval {
@@ -206,17 +206,17 @@ impl Interval {
 }
 
 #[derive(Debug)]
-struct ClosestTargetIndex {
+pub(crate) struct ClosestTargetIndex {
     by_start: Vec<Interval>,
     prefix_max_end: Vec<u64>,
     by_end: Vec<Interval>,
 }
 
 #[derive(Debug, Clone, Copy)]
-struct ClosestTargetMatch {
-    target: Interval,
-    distance: u64,
-    direction: IntervalClosestDirection,
+pub(crate) struct ClosestTargetMatch {
+    pub(crate) target: Interval,
+    pub(crate) distance: u64,
+    pub(crate) direction: IntervalClosestDirection,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -861,7 +861,7 @@ fn record_overlap(
 }
 
 impl ClosestTargetIndex {
-    fn new(mut targets: Vec<Interval>) -> Self {
+    pub(crate) fn new(mut targets: Vec<Interval>) -> Self {
         targets.sort_unstable_by_key(|interval| (interval.start, interval.end));
         let mut prefix_max_end = Vec::with_capacity(targets.len());
         let mut maximum_end = 0_u64;
@@ -878,11 +878,11 @@ impl ClosestTargetIndex {
         }
     }
 
-    fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.by_start.len()
     }
 
-    fn closest(&self, query: Interval) -> Option<ClosestTargetMatch> {
+    pub(crate) fn closest(&self, query: Interval) -> Option<ClosestTargetMatch> {
         let downstream_index = self
             .by_start
             .partition_point(|target| target.start < query.end);

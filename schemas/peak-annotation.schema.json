@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/peak-annotation.v1.json",
+  "title": "Linxira Bio peak annotation summary",
+  "type": "object",
+  "required": [
+    "peak_count",
+    "annotated_peak_count",
+    "unmatched_peak_count",
+    "feature_count",
+    "feature_type_counts",
+    "warnings"
+  ],
+  "properties": {
+    "peak_count": {"type": "integer", "minimum": 0},
+    "annotated_peak_count": {"type": "integer", "minimum": 0},
+    "unmatched_peak_count": {"type": "integer", "minimum": 0},
+    "feature_count": {"type": "integer", "minimum": 0},
+    "feature_type_counts": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "warnings": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "additionalProperties": false
+}

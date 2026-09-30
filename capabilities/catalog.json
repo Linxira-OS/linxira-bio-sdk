@@ -60,6 +60,32 @@
       ]
     },
     {
+      "id": "simulate.sequence.v1",
+      "status": "available",
+      "category": "simulation",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio simulate sequence <output.fasta> --count N --length N --gc 50 --seed 42 --json",
+      "input_formats": [],
+      "output_formats": [
+        "fasta",
+        "json"
+      ]
+    },
+    {
+      "id": "simulate.reads.v1",
+      "status": "available",
+      "category": "simulation",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio simulate reads <reference.fasta> <output.fastq> --read-length 150 --coverage 30 --paired --seed 42 --json",
+      "input_formats": [
+        "fasta"
+      ],
+      "output_formats": [
+        "fastq",
+        "json"
+      ]
+    },
+    {
       "id": "sequence.extract.v1",
       "status": "available",
       "category": "sequence-io",
@@ -567,6 +593,22 @@
       "command": "linxira-bio interval closest <query.bed> <target.bed> <output.tsv> --json",
       "input_formats": [
         "bed"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
+    },
+    {
+      "id": "peak.annotate.v1",
+      "status": "available",
+      "category": "functional-annotation",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio peak annotate <peaks.bed> <annotation.gff3|gtf[.gz]> <output.tsv> --feature-type gene --json",
+      "input_formats": [
+        "bed",
+        "gff3",
+        "gtf"
       ],
       "output_formats": [
         "tsv",

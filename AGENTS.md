@@ -67,6 +67,11 @@ the agent skills that select and validate them.
 - Read `skills/intersect-genomic-intervals/SKILL.md` for the implemented BED
   `interval.intersect.v1`, `interval.merge.v1`, `interval.subtract.v1`, and
   `interval.closest.v1` capabilities.
+- Read `skills/annotate-peaks/SKILL.md` for the implemented
+  `peak.annotate.v1` capability (nearest-feature peak annotation).
+- Read `skills/simulate-bio-data/SKILL.md` for the implemented
+  `simulate.sequence.v1` and `simulate.reads.v1` seeded data-synthesis
+  capabilities (benchmark and GPU-consistency fuel).
 - Read `skills/analyze-expression-matrix/SKILL.md` for implemented CSV/TSV
   matrix QC, normalization, PCA, sample/feature clustering, and native
   clustered-heatmap preparation.

@@ -3,9 +3,9 @@
 use linxira_bio_core::alignment::{SamQcMetrics, WindowDepthSummary, sam_qc_path};
 use linxira_bio_core::annotation::{
     AnnotationExtractOptions, AnnotationNormalizeOptions, AnnotationStats, GeneDensityOptions,
-    GeneDensityResult, GenePositionOptions, annotation_gene_positions_path, annotation_stats_path,
-    extract_annotation_sequences_path, gene_density_path, gxf_to_bed_path,
-    normalize_annotation_path,
+    GeneDensityResult, GenePositionOptions, PeakAnnotationOptions, annotation_gene_positions_path,
+    annotation_stats_path, extract_annotation_sequences_path, gene_density_path, gxf_to_bed_path,
+    normalize_annotation_path, peak_annotate_path,
 };
 use linxira_bio_core::benchmark::{
     diff_result_envelopes, environment_snapshot, iqr, median, parse_time_verbose,
@@ -103,6 +103,10 @@ use linxira_bio_core::set_analysis::{
 use linxira_bio_core::similarity::{
     BlastParseResult, ReciprocalBestHitOptions, ReciprocalBestHitResult, parse_blast_path,
     reciprocal_best_hits_path,
+};
+use linxira_bio_core::simulation::{
+    SimulateReadsOptions, SimulateSequenceOptions, simulate_reads_fastq_path,
+    simulate_sequence_fasta_path,
 };
 use linxira_bio_core::spatial_transcriptomics::{
     render_barcode_rank_table, spatial_transcriptomics_path,
@@ -390,6 +394,17 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if annotation == "annotation" && extract == "extract" =>
         {
             print_annotation_extract(arguments)
+        }
+        [peak, annotate, arguments @ ..] if peak == "peak" && annotate == "annotate" => {
+            print_peak_annotate(arguments)
+        }
+        [simulate, sequence, arguments @ ..]
+            if simulate == "simulate" && sequence == "sequence" =>
+        {
+            print_simulate_sequence(arguments)
+        }
+        [simulate, reads, arguments @ ..] if simulate == "simulate" && reads == "reads" => {
+            print_simulate_reads(arguments)
         }
         [annotation, gene_density, arguments @ ..]
             if annotation == "annotation" && gene_density == "gene-density" =>
@@ -4204,6 +4219,277 @@ fn print_annotation_to_bed(arguments: &[String]) -> Result<(), Box<dyn Error>> {
         summary,
         json,
     )
+}
+
+fn print_peak_annotate(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = PeakAnnotationOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--feature-type" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--feature-type requires a value")?;
+                options.feature_types.push(value.to_ascii_lowercase());
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown peak annotate option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err(
+            "peak annotate requires <peaks.bed> <annotation.gff3|gtf[.gz]> <output.tsv>".into(),
+        );
+    }
+    let summary = peak_annotate_path(&paths[0], &paths[1], &paths[2], &options)?;
+    if json {
+        print_analysis_json("peak-annotate", "peak.annotate.v1", &summary)?;
+    } else {
+        println!("output_path\t{}", paths[2].display());
+        println!("peak_count\t{}", summary.peak_count);
+        println!("annotated_peak_count\t{}", summary.annotated_peak_count);
+        println!("unmatched_peak_count\t{}", summary.unmatched_peak_count);
+        println!("feature_count\t{}", summary.feature_count);
+        for (feature_type, count) in &summary.feature_type_counts {
+            println!("feature_type_{feature_type}\t{count}");
+        }
+        for warning in &summary.warnings {
+            println!("warning\t{warning}");
+        }
+    }
+    Ok(())
+}
+
+fn print_simulate_sequence(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut output = None;
+    let mut options = SimulateSequenceOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--count" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--count requires a value")?;
+                options.sequence_count = value
+                    .parse::<u64>()
+                    .map_err(|_| format!("--count must be a positive integer: {value}"))?;
+            }
+            "--length" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--length requires a value")?;
+                let length = value
+                    .parse::<u64>()
+                    .map_err(|_| format!("--length must be a positive integer: {value}"))?;
+                options.min_length = length;
+                options.max_length = length;
+            }
+            "--min-length" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--min-length requires a value")?;
+                options.min_length = value
+                    .parse::<u64>()
+                    .map_err(|_| format!("--min-length must be a positive integer: {value}"))?;
+            }
+            "--max-length" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--max-length requires a value")?;
+                options.max_length = value
+                    .parse::<u64>()
+                    .map_err(|_| format!("--max-length must be a positive integer: {value}"))?;
+            }
+            "--gc" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--gc requires a value")?;
+                options.gc_percent_x100 = parse_percent_argument(value, "--gc")?;
+            }
+            "--n-fraction" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--n-fraction requires a value")?;
+                options.n_percent_x100 = parse_percent_argument(value, "--n-fraction")?;
+            }
+            "--seed" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--seed requires a value")?;
+                options.seed = value
+                    .parse::<u64>()
+                    .map_err(|_| format!("--seed must be a non-negative integer: {value}"))?;
+            }
+            "--prefix" => {
+                index += 1;
+                options.identifier_prefix = arguments
+                    .get(index)
+                    .ok_or("--prefix requires a value")?
+                    .clone();
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown simulate sequence option: {value}").into());
+            }
+            value => {
+                if output.is_some() {
+                    return Err("simulate sequence takes exactly one output path".into());
+                }
+                output = Some(value.to_owned());
+            }
+        }
+        index += 1;
+    }
+    let Some(output) = output else {
+        return Err(
+            "simulate sequence requires <output.fasta> [--count N] [--length N] [--gc 50] [--seed N] --json"
+                .into(),
+        );
+    };
+    let summary = simulate_sequence_fasta_path(&output, &options)?;
+    if json {
+        print_analysis_json("simulate-sequence", "simulate.sequence.v1", &summary)?;
+    } else {
+        println!("output_path\t{output}");
+        println!("seed\t{}", summary.seed);
+        println!("sequence_count\t{}", summary.sequence_count);
+        println!("total_bases\t{}", summary.total_bases);
+        println!("min_length\t{}", summary.min_length);
+        println!("max_length\t{}", summary.max_length);
+        println!("gc_percent\t{:.2}", summary.gc_percent);
+        println!("n_count\t{}", summary.n_count);
+    }
+    Ok(())
+}
+
+fn parse_percent_argument(value: &str, label: &str) -> Result<u64, Box<dyn Error>> {
+    let parsed: f64 = value
+        .parse()
+        .map_err(|_| format!("{label} must be a number between 0 and 100: {value}"))?;
+    if !(0.0..=100.0).contains(&parsed) {
+        return Err(format!("{label} must be between 0 and 100").into());
+    }
+    Ok((parsed * 100.0).round() as u64)
+}
+
+fn print_simulate_reads(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = SimulateReadsOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--read-length" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--read-length requires a value")?;
+                options.read_length = value
+                    .parse::<u64>()
+                    .map_err(|_| format!("--read-length must be a positive integer: {value}"))?;
+            }
+            "--coverage" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--coverage requires a value")?;
+                let coverage: f64 = value
+                    .parse()
+                    .map_err(|_| format!("--coverage must be a number: {value}"))?;
+                if !(0.0..=10_000.0).contains(&coverage) {
+                    return Err("--coverage must be between 0 and 10000".into());
+                }
+                options.coverage_percent_x100 = Some((coverage * 100.0).round() as u64);
+                options.read_count = None;
+            }
+            "--read-count" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--read-count requires a value")?;
+                options.read_count =
+                    Some(value.parse::<u64>().map_err(|_| {
+                        format!("--read-count must be a positive integer: {value}")
+                    })?);
+            }
+            "--paired" => options.paired = true,
+            "--fragment-length" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--fragment-length requires a value")?;
+                options.fragment_length = value.parse::<u64>().map_err(|_| {
+                    format!("--fragment-length must be a positive integer: {value}")
+                })?;
+            }
+            "--error-rate" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--error-rate requires a value")?;
+                options.error_rate_percent_x100 = parse_percent_argument(value, "--error-rate")?;
+            }
+            "--seed" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--seed requires a value")?;
+                options.seed = value
+                    .parse::<u64>()
+                    .map_err(|_| format!("--seed must be a non-negative integer: {value}"))?;
+            }
+            "--quality-char" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--quality-char requires a value")?;
+                let bytes = value.as_bytes();
+                if bytes.len() != 1 || !(33..=126).contains(&bytes[0]) {
+                    return Err("--quality-char must be one printable ASCII character".into());
+                }
+                options.quality_char = bytes[0];
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown simulate reads option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err(
+            "simulate reads requires <reference.fasta> <output.fastq> --read-length N --coverage C|--read-count N [--paired] [--seed N] --json"
+                .into(),
+        );
+    }
+    let summary = simulate_reads_fastq_path(&paths[0], &paths[1], &options)?;
+    if json {
+        print_analysis_json("simulate-reads", "simulate.reads.v1", &summary)?;
+    } else {
+        println!("output_path\t{}", paths[1].display());
+        println!("seed\t{}", summary.seed);
+        println!("paired\t{}", u8::from(summary.paired));
+        println!(
+            "reference_sequence_count\t{}",
+            summary.reference_sequence_count
+        );
+        println!("reference_bases\t{}", summary.reference_bases);
+        println!("read_count\t{}", summary.read_count);
+        println!("read_length\t{}", summary.read_length);
+        println!(
+            "realized_coverage_percent_x100\t{}",
+            summary.realized_coverage_percent_x100
+        );
+        println!(
+            "error_rate_percent_x100\t{}",
+            summary.error_rate_percent_x100
+        );
+    }
+    Ok(())
 }
 
 fn print_annotation_extract(arguments: &[String]) -> Result<(), Box<dyn Error>> {
@@ -8676,6 +8962,12 @@ fn usage() -> &'static str {
         "  linxira-bio annotation normalize <input.gff3|gtf[.gz]> <output.gff3> [--sort] [--json]\n",
         "  linxira-bio annotation positions <input.gff3|gtf[.gz]> <output.tsv> [--feature-type TYPE ...] [--json]\n",
         "  linxira-bio annotation extract <input.gff3|gtf[.gz]> <reference.fasta[.gz]> <output.fasta> [--feature-type gene|transcript|cds|exon|utr|five_prime_utr|three_prime_utr|promoter] [--promoter-length N] [--json]\n",
+        "  linxira-bio peak annotate <peaks.bed> <annotation.gff3|gtf[.gz]> <output.tsv> [--feature-type gene] [--json]
+",
+        "  linxira-bio simulate sequence <output.fasta> [--count N] [--length N] [--gc 50] [--seed N] [--json]
+",
+        "  linxira-bio simulate reads <reference.fasta> <output.fastq> --read-length 150 --coverage 30|--read-count N [--paired] [--seed N] [--json]
+",
         "  linxira-bio annotation gene-density <input.gff3|gtf[.gz]> [--feature-type TYPE ...] [--window-size N] [--step-size N] [--json]\n",
         "  linxira-bio annotation go <input.csv|tsv[.gz]> <output.tsv> [--gene-column NAME] [--go-column NAME] [--json]\n",
         "  linxira-bio annotation eggnog <input.tsv[.gz]> <output.tsv> [--json]\n",

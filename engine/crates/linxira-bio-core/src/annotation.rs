@@ -1361,6 +1361,306 @@ fn reverse_complement_in_place(sequence: &mut [u8]) {
     }
 }
 
+// --- peak annotation --------------------------------------------------------
+
+/// One annotated peak: the nearest feature of the requested type plus the
+/// relationship between the peak and that feature.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PeakAnnotationRow {
+    pub peak_contig: String,
+    pub peak_start: u64,
+    pub peak_end: u64,
+    pub peak_name: String,
+    pub feature_id: String,
+    pub feature_name: String,
+    pub feature_type: String,
+    pub feature_start: u64,
+    pub feature_end: u64,
+    pub feature_strand: String,
+    /// 0 when the peak overlaps the feature; otherwise the gap in bp.
+    pub distance: u64,
+    /// Upstream/downstream relative to the feature's stranded anchor.
+    pub direction: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct PeakAnnotationSummary {
+    pub peak_count: u64,
+    pub annotated_peak_count: u64,
+    pub unmatched_peak_count: u64,
+    pub feature_count: u64,
+    pub feature_type_counts: BTreeMap<String, u64>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PeakAnnotationOptions {
+    /// Feature types to consider (normalized lowercase, e.g. "gene").
+    pub feature_types: Vec<String>,
+}
+
+impl Default for PeakAnnotationOptions {
+    fn default() -> Self {
+        Self {
+            feature_types: vec!["gene".to_owned()],
+        }
+    }
+}
+
+/// Read a BED peak file: contig, start, end required; column 4 (when present
+/// and not ".") becomes the peak name.
+fn read_peak_bed_path(path: &Path) -> Result<Vec<PeakAnnotationRow>, AnnotationError> {
+    let file = File::open(path)?;
+    let mut reader = BufReader::new(file);
+    let mut peaks = Vec::new();
+    let mut line = String::new();
+    let mut line_number = 0_usize;
+    loop {
+        line_number += 1;
+        line.clear();
+        let bytes = reader.read_line(&mut line)?;
+        if bytes == 0 {
+            break;
+        }
+        let trimmed = line.trim_end_matches(['\r', '\n']);
+        if trimmed.is_empty()
+            || trimmed.starts_with('#')
+            || trimmed.starts_with("track")
+            || trimmed.starts_with("browser")
+        {
+            continue;
+        }
+        let fields: Vec<&str> = trimmed.split('\t').collect();
+        if fields.len() < 3 {
+            return Err(AnnotationError::MalformedRecord {
+                line: line_number,
+                message: format!("expected at least 3 BED columns, found {}", fields.len()),
+            });
+        }
+        let start = fields[1]
+            .parse::<u64>()
+            .map_err(|_| AnnotationError::MalformedRecord {
+                line: line_number,
+                message: format!("invalid BED start {:?}", fields[1]),
+            })?;
+        let end = fields[2]
+            .parse::<u64>()
+            .map_err(|_| AnnotationError::MalformedRecord {
+                line: line_number,
+                message: format!("invalid BED end {:?}", fields[2]),
+            })?;
+        if start == 0 || end <= start {
+            return Err(AnnotationError::MalformedRecord {
+                line: line_number,
+                message: "BED coordinates must be 0-based start with end > start".to_owned(),
+            });
+        }
+        let name = fields
+            .get(3)
+            .filter(|name| !name.is_empty() && **name != ".")
+            .map(|name| (*name).to_owned())
+            .unwrap_or_else(|| format!("peak_{}", peaks.len() + 1));
+        peaks.push(PeakAnnotationRow {
+            peak_contig: fields[0].to_owned(),
+            // BED is 0-based half-open; convert to 1-based inclusive.
+            peak_start: start + 1,
+            peak_end: end,
+            peak_name: name,
+            feature_id: String::new(),
+            feature_name: String::new(),
+            feature_type: String::new(),
+            feature_start: 0,
+            feature_end: 0,
+            feature_strand: String::new(),
+            distance: 0,
+            direction: String::new(),
+        });
+    }
+    Ok(peaks)
+}
+
+/// Annotate BED peaks with the nearest feature of the requested type from a
+/// GFF3/GTF annotation (interval.closest index reused). Distance is 0 for
+/// overlaps; otherwise the gap in bp. Direction is relative to the feature's
+/// stranded anchor ('+' start / '-' end; unstranded features anchor on start).
+pub fn peak_annotate_path(
+    peaks: impl AsRef<Path>,
+    annotation: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    options: &PeakAnnotationOptions,
+) -> Result<PeakAnnotationSummary, AnnotationError> {
+    let peaks_path = peaks.as_ref();
+    let annotation_path = annotation.as_ref();
+    let output_path = output.as_ref();
+    if output_path.exists() {
+        return Err(AnnotationError::OutputAlreadyExists(output_path.to_owned()));
+    }
+    let mut peak_rows = read_peak_bed_path(peaks_path)?;
+    let parsed = read_annotation_path(annotation_path)?;
+    let wanted = normalize_feature_types(&options.feature_types)?;
+
+    // Collect matching features per contig into the closest-target index.
+    let mut by_contig: BTreeMap<String, Vec<PeakFeature>> = BTreeMap::new();
+    let mut feature_type_counts: BTreeMap<String, u64> = BTreeMap::new();
+    for record in &parsed.records {
+        if !wanted.contains(&record.feature_type.to_ascii_lowercase()) {
+            continue;
+        }
+        by_contig
+            .entry(record.seqid.clone())
+            .or_default()
+            .push(PeakFeature {
+                interval: crate::interval::Interval {
+                    start: record.start,
+                    end: record.end,
+                },
+                id: record
+                    .attributes
+                    .get("ID")
+                    .and_then(|values| values.first())
+                    .cloned()
+                    .unwrap_or_default(),
+                name: record
+                    .attributes
+                    .get("Name")
+                    .and_then(|values| values.first())
+                    .cloned()
+                    .unwrap_or_default(),
+                feature_type: record.feature_type.clone(),
+                strand: record.strand,
+            });
+        *feature_type_counts
+            .entry(record.feature_type.to_ascii_lowercase())
+            .or_insert(0) += 1;
+    }
+    let feature_count = feature_type_counts.values().sum::<u64>();
+    let mut indexes: BTreeMap<String, crate::interval::ClosestTargetIndex> = BTreeMap::new();
+    for (contig, features) in &by_contig {
+        indexes.insert(
+            contig.clone(),
+            crate::interval::ClosestTargetIndex::new(
+                features.iter().map(|feature| feature.interval).collect(),
+            ),
+        );
+    }
+
+    let mut summary = PeakAnnotationSummary {
+        peak_count: peak_rows.len() as u64,
+        feature_count,
+        feature_type_counts,
+        ..Default::default()
+    };
+    if feature_count == 0 {
+        summary.warnings.push(
+            "no features of the requested types were found; no peaks were annotated".to_owned(),
+        );
+    }
+
+    peak_rows.sort_by(|left, right| {
+        (&left.peak_contig, left.peak_start, left.peak_end).cmp(&(
+            &right.peak_contig,
+            right.peak_start,
+            right.peak_end,
+        ))
+    });
+    with_new_output(output_path, |writer| {
+        writeln!(
+            writer,
+            "peak_contig\tpeak_start\tpeak_end\tpeak_name\tfeature_id\tfeature_name\tfeature_type\tfeature_start\tfeature_end\tfeature_strand\tdistance\tdirection"
+        )?;
+        for peak in &peak_rows {
+            let features = by_contig.get(&peak.peak_contig);
+            let index = indexes.get(&peak.peak_contig);
+            let query = crate::interval::Interval {
+                start: peak.peak_start,
+                end: peak.peak_end,
+            };
+            let nearest = match (features, index) {
+                (Some(features), Some(index)) => index.closest(query).and_then(|matched| {
+                    // The index holds bare intervals; recover the feature with
+                    // the matching span (first occurrence is unambiguous
+                    // because duplicates carry the same annotation).
+                    features
+                        .iter()
+                        .find(|feature| {
+                            feature.interval.start == matched.target.start
+                                && feature.interval.end == matched.target.end
+                        })
+                        .map(|feature| (matched, feature))
+                }),
+                _ => None,
+            };
+            match nearest {
+                Some((matched, feature)) => {
+                    summary.annotated_peak_count += 1;
+                    let direction = peak_direction(peak, feature);
+                    writeln!(
+                        writer,
+                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                        peak.peak_contig,
+                        peak.peak_start,
+                        peak.peak_end,
+                        peak.peak_name,
+                        feature.id,
+                        feature.name,
+                        feature.feature_type,
+                        feature.interval.start,
+                        feature.interval.end,
+                        feature.strand,
+                        matched.distance,
+                        direction,
+                    )?;
+                }
+                None => {
+                    summary.unmatched_peak_count += 1;
+                    writeln!(
+                        writer,
+                        "{}\t{}\t{}\t{}\t.\t.\t.\t.\t.\t.\t.\t.",
+                        peak.peak_contig, peak.peak_start, peak.peak_end, peak.peak_name,
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    })?;
+    if summary.unmatched_peak_count > 0 && feature_count > 0 {
+        summary.warnings.push(format!(
+            "{} peaks had no same-contig feature of the requested types",
+            summary.unmatched_peak_count
+        ));
+    }
+    Ok(summary)
+}
+
+struct PeakFeature {
+    interval: crate::interval::Interval,
+    id: String,
+    name: String,
+    feature_type: String,
+    strand: char,
+}
+
+fn peak_direction(peak: &PeakAnnotationRow, feature: &PeakFeature) -> String {
+    if peak.peak_start <= feature.interval.end && feature.interval.start <= peak.peak_end {
+        return "overlapping".to_owned();
+    }
+    let midpoint = (peak.peak_start + peak.peak_end) / 2;
+    let anchor = match feature.strand {
+        '-' => feature.interval.end,
+        _ => feature.interval.start,
+    };
+    let relative = if midpoint < anchor {
+        "upstream"
+    } else {
+        "downstream"
+    };
+    match feature.strand {
+        '-' if relative == "upstream" => "downstream".to_owned(),
+        '-' => "upstream".to_owned(),
+        _ => relative.to_owned(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

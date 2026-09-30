@@ -1,0 +1,10 @@
+{
+  "peak_count": 2,
+  "annotated_peak_count": 2,
+  "unmatched_peak_count": 0,
+  "feature_count": 2,
+  "feature_type_counts": {
+    "gene": 2
+  },
+  "warnings": []
+}
