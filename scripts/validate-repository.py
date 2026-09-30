@@ -103,6 +103,7 @@ SCHEMA_FILES = (
     "schemas/third-party-dependencies.schema.json",
     "schemas/tool-catalog.schema.json",
     "schemas/variant-comparison.schema.json",
+    "schemas/window-depth.schema.json",
     "schemas/workflow-pack-catalog.schema.json",
     "schemas/workflow-pack-manifest.schema.json",
 )
@@ -168,6 +169,10 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/msa-trimal.json",
         "schemas/native-tool-result.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/alignment-window-depth.json",
+        "schemas/window-depth.schema.json",
     ),
     (
         "tests/fixtures/capability-results/phylogeny-iqtree.json",

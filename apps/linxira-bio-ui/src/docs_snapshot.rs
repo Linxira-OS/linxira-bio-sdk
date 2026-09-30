@@ -17,6 +17,8 @@ pub fn embedded_document(capability: &str, locale: &str) -> Option<&'static str>
         ("alignment.qc.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/alignment.qc.v1/zh-CN.md")),
         ("alignment.short-read.v1", "en-US") => Some(include_str!("../../../docs/capabilities/alignment.short-read.v1/en-US.md")),
         ("alignment.short-read.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/alignment.short-read.v1/zh-CN.md")),
+        ("alignment.window-depth.v1", "en-US") => Some(include_str!("../../../docs/capabilities/alignment.window-depth.v1/en-US.md")),
+        ("alignment.window-depth.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/alignment.window-depth.v1/zh-CN.md")),
         ("annotation.eggnog.normalize.v1", "en-US") => Some(include_str!("../../../docs/capabilities/annotation.eggnog.normalize.v1/en-US.md")),
         ("annotation.eggnog.normalize.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/annotation.eggnog.normalize.v1/zh-CN.md")),
         ("annotation.gene-position.v1", "en-US") => Some(include_str!("../../../docs/capabilities/annotation.gene-position.v1/en-US.md")),

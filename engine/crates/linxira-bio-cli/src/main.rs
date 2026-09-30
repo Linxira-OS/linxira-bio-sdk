@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use linxira_bio_core::alignment::{SamQcMetrics, sam_qc_path};
+use linxira_bio_core::alignment::{SamQcMetrics, WindowDepthSummary, sam_qc_path};
 use linxira_bio_core::annotation::{
     AnnotationExtractOptions, AnnotationNormalizeOptions, AnnotationStats, GeneDensityOptions,
     GeneDensityResult, GenePositionOptions, annotation_gene_positions_path, annotation_stats_path,
@@ -57,14 +57,15 @@ use linxira_bio_core::microbiome::microbiome_analysis_path;
 use linxira_bio_core::native_tools::{
     BcftoolsCallOptions, HmmerOptions, IqtreeOptions, Kraken2Options, MastOptions, MemeOptions,
     Minimap2LongReadOptions, MuscleOptions, NativeToolResult, SalmonQuantOptions,
-    SamtoolsMarkdupOptions, ShortReadAlignmentOptions, SimilaritySearchOptions, SnpEffOptions,
-    WgcnaOptions, parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
-    parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
-    run_bcftools_call_path, run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path,
-    run_hmmer_path, run_iqtree_path, run_kaks_path, run_kraken2_path, run_mast_path,
-    run_mcscanx_path, run_meme_path, run_minimap2_long_read_path, run_muscle_path,
-    run_rnafold_path, run_samtools_markdup_path, run_samtools_report_path,
+    SamtoolsDepthOptions, SamtoolsMarkdupOptions, ShortReadAlignmentOptions,
+    SimilaritySearchOptions, SnpEffOptions, WgcnaOptions, parse_blast_program, parse_diamond_mode,
+    parse_hmmer_mode, parse_meme_alphabet, parse_minimap2_preset, parse_muscle_mode,
+    parse_trimal_mode, run_bam_to_bigwig_path, run_bcftools_call_path, run_blast_fasta_path,
+    run_diamond_fasta_path, run_dssp_path, run_hmmer_path, run_iqtree_path, run_kaks_path,
+    run_kraken2_path, run_mast_path, run_mcscanx_path, run_meme_path, run_minimap2_long_read_path,
+    run_muscle_path, run_rnafold_path, run_samtools_markdup_path, run_samtools_report_path,
     run_short_read_alignment_path, run_snpeff_path, run_trimal_path, run_wgcna_path,
+    run_window_depth_path,
 };
 use linxira_bio_core::npz::{NpzImportOptions, NpzImportResult, npz_to_matrix_path};
 use linxira_bio_core::pharmacogenomics::{pharmacogenomics_path, render_pgx_table};
@@ -344,6 +345,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             if alignment == "alignment" && markdup == "markdup" =>
         {
             print_alignment_markdup(arguments)
+        }
+        [alignment, window_depth, arguments @ ..]
+            if alignment == "alignment" && window_depth == "window-depth" =>
+        {
+            print_alignment_window_depth(arguments)
         }
         [alignment, bam_to_bigwig, arguments @ ..]
             if alignment == "alignment" && bam_to_bigwig == "bam-to-bigwig" =>
@@ -4458,6 +4464,103 @@ fn print_alignment_markdup(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     print_native_tool_result("alignment-markdup", "alignment.markdup.v1", result, json)
 }
 
+#[derive(serde::Serialize)]
+struct WindowDepthPayload<'a> {
+    #[serde(flatten)]
+    native: &'a NativeToolResult,
+    summary: &'a WindowDepthSummary,
+}
+
+fn print_alignment_window_depth(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = SamtoolsDepthOptions::default();
+    let mut window_size = 10_000_u64;
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--window-size" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--window-size requires a value")?;
+                window_size = value
+                    .parse::<u64>()
+                    .map_err(|_| format!("--window-size must be a positive integer: {value}"))?;
+                if window_size == 0 {
+                    return Err("--window-size must be positive".into());
+                }
+            }
+            "--min-mq" => {
+                index += 1;
+                options.min_mapping_quality = parse_quality(arguments.get(index), "--min-mq")?;
+            }
+            "--min-bq" => {
+                index += 1;
+                options.min_base_quality = parse_quality(arguments.get(index), "--min-bq")?;
+            }
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown alignment window-depth option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 2 {
+        return Err("alignment window-depth requires <input.bam|cram> <output.windows.tsv>".into());
+    }
+    let (result, summary) = run_window_depth_path(&paths[0], &paths[1], window_size, &options)?;
+    if json {
+        print_analysis_json(
+            "alignment-window-depth",
+            "alignment.window-depth.v1",
+            WindowDepthPayload {
+                native: &result,
+                summary: &summary,
+            },
+        )
+    } else {
+        println!("tool\t{}", result.tool);
+        println!("mode\t{}", result.mode);
+        println!("output_path\t{}", result.output_path);
+        println!("output_bytes\t{}", result.output_bytes);
+        println!("thread_count\t{}", result.thread_count);
+        println!("command_count\t{}", result.command_count);
+        println!("window_size\t{}", summary.window_size);
+        println!("reference_count\t{}", summary.reference_count);
+        println!("window_count\t{}", summary.window_count);
+        println!("total_bases\t{}", summary.total_bases);
+        println!("covered_bases\t{}", summary.covered_bases);
+        if let Some(breadth) = summary.breadth_percent {
+            println!("breadth_percent\t{breadth:.6}");
+        }
+        if let Some(mean) = summary.mean_depth {
+            println!("mean_depth\t{mean:.6}");
+        }
+        println!("max_depth\t{}", summary.max_depth);
+        for reference in &summary.references {
+            println!(
+                "reference-summary\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}",
+                reference.reference,
+                reference.length,
+                reference.window_count,
+                reference.mean_depth,
+                reference.breadth_percent,
+                reference.max_depth
+            );
+        }
+        for warning in result.warnings {
+            println!("warning\t{warning}");
+        }
+        Ok(())
+    }
+}
+
 fn print_variant_call(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     let mut paths = Vec::new();
     let mut options = BcftoolsCallOptions::default();
@@ -7989,6 +8092,7 @@ fn usage() -> &'static str {
 ",
         "  linxira-bio alignment markdup <input.bam> <output.bam> [--threads N] [--stats] [--json]
 ",
+        "  linxira-bio alignment window-depth <input.bam|cram> <output.windows.tsv> [--window-size N] [--min-mq 0] [--min-bq 0] [--threads N] [--json]\n",
         "  linxira-bio annotation stats <input.gff3|gtf[.gz]> [--json]\n",
         "  linxira-bio annotation normalize <input.gff3|gtf[.gz]> <output.gff3> [--sort] [--json]\n",
         "  linxira-bio annotation positions <input.gff3|gtf[.gz]> <output.tsv> [--feature-type TYPE ...] [--json]\n",

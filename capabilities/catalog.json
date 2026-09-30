@@ -666,6 +666,21 @@
       ]
     },
     {
+      "id": "alignment.window-depth.v1",
+      "status": "available",
+      "category": "alignment-files",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio alignment window-depth <input.bam|cram> <output.windows.tsv> --window-size 10000 --json",
+      "input_formats": [
+        "bam",
+        "cram"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
+    },
+    {
       "id": "variant.stats.v1",
       "status": "available",
       "category": "variant-calling",

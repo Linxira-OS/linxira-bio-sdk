@@ -258,6 +258,355 @@ fn parse_record(
     Ok(())
 }
 
+/// One fixed genomic window of per-base depth, 1-based inclusive coordinates.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct WindowDepthRow {
+    pub reference: String,
+    pub start: u64,
+    pub end: u64,
+    pub mean_depth: f64,
+    pub min_depth: u64,
+    pub max_depth: u64,
+    pub covered_bases: u64,
+    pub breadth_percent: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct WindowDepthReferenceSummary {
+    pub reference: String,
+    pub length: u64,
+    pub window_count: u64,
+    pub covered_bases: u64,
+    pub breadth_percent: f64,
+    pub mean_depth: f64,
+    pub max_depth: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct WindowDepthSummary {
+    pub window_size: u64,
+    pub reference_count: u64,
+    pub window_count: u64,
+    pub total_bases: u64,
+    pub covered_bases: u64,
+    pub breadth_percent: Option<f64>,
+    pub mean_depth: Option<f64>,
+    pub max_depth: u64,
+    pub references: Vec<WindowDepthReferenceSummary>,
+}
+
+/// Aggregate a `samtools depth -aa` stream (reference, position, depth per
+/// line) into fixed windows. Depth sums are exact `u64` integers; means and
+/// breadth percentages divide once per window, so no accumulation error can
+/// grow with genome size.
+pub fn aggregate_window_depth(
+    mut reader: impl BufRead,
+    window_size: u64,
+) -> Result<(Vec<WindowDepthRow>, WindowDepthSummary), SamError> {
+    if window_size == 0 {
+        return Err(SamError::MalformedRecord {
+            line: 0,
+            message: "window size must be positive".to_owned(),
+        });
+    }
+    let mut rows = Vec::new();
+    let mut references: Vec<WindowDepthReferenceSummary> = Vec::new();
+    let mut current_reference: Option<ReferenceAccumulator> = None;
+    let mut current_window: Option<WindowAccumulator> = None;
+    let mut total_bases = 0_u64;
+    let mut total_covered = 0_u64;
+    let mut total_depth = 0_u64;
+    let mut overall_max = 0_u64;
+    let mut line_number = 0_usize;
+    let mut buffer = String::new();
+
+    loop {
+        line_number += 1;
+        buffer.clear();
+        let bytes_read = reader
+            .read_line(&mut buffer)
+            .map_err(|source| SamError::ReadLine {
+                line: line_number,
+                source,
+            })?;
+        if bytes_read == 0 {
+            break;
+        }
+        let line = buffer.trim_end_matches(['\r', '\n']);
+        if line.is_empty() {
+            return malformed(line_number, "blank lines are not valid depth records");
+        }
+        let fields: Vec<&str> = line.split('\t').collect();
+        if fields.len() != 3 {
+            return malformed(
+                line_number,
+                format!(
+                    "expected 3 tab-separated depth fields, found {}",
+                    fields.len()
+                ),
+            );
+        }
+        if fields[0].is_empty() {
+            return malformed(line_number, "reference name must not be empty");
+        }
+        let position = fields[1]
+            .parse::<u64>()
+            .map_err(|_| SamError::MalformedRecord {
+                line: line_number,
+                message: format!("invalid position value {:?}", fields[1]),
+            })?;
+        if position == 0 {
+            return malformed(line_number, "positions are 1-based and must be positive");
+        }
+        let depth = fields[2]
+            .parse::<u64>()
+            .map_err(|_| SamError::MalformedRecord {
+                line: line_number,
+                message: format!("invalid depth value {:?}", fields[2]),
+            })?;
+
+        if current_reference
+            .as_ref()
+            .is_none_or(|reference| reference.name != fields[0])
+        {
+            if references
+                .iter()
+                .any(|summary| summary.reference == fields[0])
+            {
+                return malformed(
+                    line_number,
+                    format!(
+                        "reference {} appears more than once; depth input must be grouped by reference",
+                        fields[0]
+                    ),
+                );
+            }
+            if let Some(mut finished) = current_reference.take() {
+                if let Some(window) = current_window.take() {
+                    flush_window(&mut rows, window, &mut finished, window_size, false);
+                }
+                references.push(finished.into_summary());
+            }
+            current_reference = Some(ReferenceAccumulator::new(fields[0].to_owned()));
+        }
+
+        let index = (position - 1) / window_size;
+        match current_window.as_mut() {
+            None => current_window = Some(WindowAccumulator::new(index)),
+            Some(window) if window.index == index => {}
+            Some(window) if index > window.index => {
+                let contiguous = index == window.index + 1;
+                let finished = std::mem::replace(window, WindowAccumulator::new(index));
+                flush_window(
+                    &mut rows,
+                    finished,
+                    current_reference
+                        .as_mut()
+                        .expect("reference present after the switch check"),
+                    window_size,
+                    contiguous,
+                );
+            }
+            Some(_) => {
+                return malformed(
+                    line_number,
+                    "positions must be ascending within a reference",
+                );
+            }
+        }
+        current_window
+            .as_mut()
+            .expect("window is present after the index match")
+            .push(position, depth, line_number)?;
+        let reference = current_reference
+            .as_mut()
+            .expect("reference is present after the switch check");
+        reference.push(position, depth, line_number)?;
+
+        total_bases += 1;
+        if depth > 0 {
+            total_covered += 1;
+        }
+        total_depth = total_depth
+            .checked_add(depth)
+            .ok_or_else(|| SamError::MalformedRecord {
+                line: line_number,
+                message: "depth sum exceeds supported range".to_owned(),
+            })?;
+        overall_max = overall_max.max(depth);
+    }
+
+    if let Some(mut finished) = current_reference.take() {
+        if let Some(window) = current_window.take() {
+            flush_window(&mut rows, window, &mut finished, window_size, false);
+        }
+        references.push(finished.into_summary());
+    }
+
+    let summary = WindowDepthSummary {
+        window_size,
+        reference_count: references.len() as u64,
+        window_count: rows.len() as u64,
+        total_bases,
+        covered_bases: total_covered,
+        breadth_percent: percent(total_covered, total_bases),
+        mean_depth: ratio(total_depth, total_bases),
+        max_depth: overall_max,
+        references,
+    };
+    Ok((rows, summary))
+}
+
+/// Write the per-window depth table as a TSV with a header line.
+pub fn write_window_depth_tsv(
+    mut writer: impl std::io::Write,
+    rows: &[WindowDepthRow],
+) -> std::io::Result<()> {
+    writeln!(
+        writer,
+        "reference\tstart\tend\tmean_depth\tmin_depth\tmax_depth\tcovered_bases\tbreadth_percent"
+    )?;
+    for row in rows {
+        writeln!(
+            writer,
+            "{}\t{}\t{}\t{:.4}\t{}\t{}\t{}\t{:.4}",
+            row.reference,
+            row.start,
+            row.end,
+            row.mean_depth,
+            row.min_depth,
+            row.max_depth,
+            row.covered_bases,
+            row.breadth_percent
+        )?;
+    }
+    Ok(())
+}
+
+fn flush_window(
+    rows: &mut Vec<WindowDepthRow>,
+    window: WindowAccumulator,
+    reference: &mut ReferenceAccumulator,
+    window_size: u64,
+    full: bool,
+) {
+    rows.push(window.into_row(&reference.name, window_size, full));
+    reference.window_count += 1;
+}
+
+struct WindowAccumulator {
+    index: u64,
+    last_position: u64,
+    depth_sum: u64,
+    min_depth: u64,
+    max_depth: u64,
+    covered: u64,
+    count: u64,
+}
+
+impl WindowAccumulator {
+    fn new(index: u64) -> Self {
+        Self {
+            index,
+            last_position: 0,
+            depth_sum: 0,
+            min_depth: u64::MAX,
+            max_depth: 0,
+            covered: 0,
+            count: 0,
+        }
+    }
+
+    fn push(&mut self, position: u64, depth: u64, line: usize) -> Result<(), SamError> {
+        self.depth_sum =
+            self.depth_sum
+                .checked_add(depth)
+                .ok_or_else(|| SamError::MalformedRecord {
+                    line,
+                    message: "depth sum exceeds supported range".to_owned(),
+                })?;
+        self.last_position = position;
+        self.min_depth = self.min_depth.min(depth);
+        self.max_depth = self.max_depth.max(depth);
+        if depth > 0 {
+            self.covered += 1;
+        }
+        self.count += 1;
+        Ok(())
+    }
+
+    /// `full` marks a window followed by a contiguous next window; its end is
+    /// then the full window span instead of the last observed position.
+    fn into_row(self, reference: &str, window_size: u64, full: bool) -> WindowDepthRow {
+        let start = self.index * window_size + 1;
+        let end = if full {
+            (self.index + 1) * window_size
+        } else {
+            self.last_position
+        };
+        WindowDepthRow {
+            reference: reference.to_owned(),
+            start,
+            end,
+            mean_depth: self.depth_sum as f64 / self.count as f64,
+            min_depth: self.min_depth,
+            max_depth: self.max_depth,
+            covered_bases: self.covered,
+            breadth_percent: self.covered as f64 * 100.0 / self.count as f64,
+        }
+    }
+}
+
+struct ReferenceAccumulator {
+    name: String,
+    length: u64,
+    depth_sum: u64,
+    covered: u64,
+    max_depth: u64,
+    window_count: u64,
+}
+
+impl ReferenceAccumulator {
+    fn new(name: String) -> Self {
+        Self {
+            name,
+            length: 0,
+            depth_sum: 0,
+            covered: 0,
+            max_depth: 0,
+            window_count: 0,
+        }
+    }
+
+    fn push(&mut self, position: u64, depth: u64, line: usize) -> Result<(), SamError> {
+        self.depth_sum =
+            self.depth_sum
+                .checked_add(depth)
+                .ok_or_else(|| SamError::MalformedRecord {
+                    line,
+                    message: "depth sum exceeds supported range".to_owned(),
+                })?;
+        self.length = position;
+        if depth > 0 {
+            self.covered += 1;
+        }
+        self.max_depth = self.max_depth.max(depth);
+        Ok(())
+    }
+
+    fn into_summary(self) -> WindowDepthReferenceSummary {
+        WindowDepthReferenceSummary {
+            reference: self.name,
+            length: self.length,
+            window_count: self.window_count,
+            covered_bases: self.covered,
+            breadth_percent: self.covered as f64 * 100.0 / self.length as f64,
+            mean_depth: self.depth_sum as f64 / self.length as f64,
+            max_depth: self.max_depth,
+        }
+    }
+}
+
 fn ratio(numerator: u64, denominator: u64) -> Option<f64> {
     (denominator != 0).then_some(numerator as f64 / denominator as f64)
 }
@@ -275,7 +624,7 @@ fn malformed<T>(line: usize, message: impl Into<String>) -> Result<T, SamError> 
 
 #[cfg(test)]
 mod tests {
-    use super::{SamError, sam_qc};
+    use super::{SamError, WindowDepthRow, aggregate_window_depth, sam_qc, write_window_depth_tsv};
     use std::io::Cursor;
 
     #[test]
@@ -326,5 +675,117 @@ mod tests {
     fn warns_for_headerless_empty_sam() {
         let metrics = sam_qc(Cursor::new([])).expect("empty SAM summary");
         assert_eq!(metrics.warnings.len(), 2);
+    }
+
+    #[test]
+    fn aggregates_complete_depth_stream_into_fixed_windows() {
+        let input = "chr1\t1\t0\nchr1\t2\t1\nchr1\t3\t2\nchr1\t4\t3\nchr1\t5\t4\nchr1\t6\t0\nchr1\t7\t0\nchr1\t8\t0\nchr1\t9\t5\nchr1\t10\t0\n";
+        let (rows, summary) =
+            aggregate_window_depth(Cursor::new(input), 4).expect("valid depth stream");
+
+        assert_eq!(rows.len(), 3);
+        assert_eq!(
+            rows[0],
+            WindowDepthRow {
+                reference: "chr1".to_owned(),
+                start: 1,
+                end: 4,
+                mean_depth: 1.5,
+                min_depth: 0,
+                max_depth: 3,
+                covered_bases: 3,
+                breadth_percent: 75.0,
+            }
+        );
+        assert_eq!(rows[1].start, 5);
+        assert_eq!(rows[1].end, 8);
+        assert_eq!(rows[1].mean_depth, 1.0);
+        assert_eq!(rows[1].breadth_percent, 25.0);
+        // The final window is partial: it ends at the last position, not at
+        // the full window span.
+        assert_eq!(rows[2].start, 9);
+        assert_eq!(rows[2].end, 10);
+        assert_eq!(rows[2].mean_depth, 2.5);
+
+        assert_eq!(summary.window_size, 4);
+        assert_eq!(summary.reference_count, 1);
+        assert_eq!(summary.window_count, 3);
+        assert_eq!(summary.total_bases, 10);
+        assert_eq!(summary.covered_bases, 5);
+        assert_eq!(summary.breadth_percent, Some(50.0));
+        assert_eq!(summary.mean_depth, Some(1.5));
+        assert_eq!(summary.max_depth, 5);
+        let reference = &summary.references[0];
+        assert_eq!(reference.reference, "chr1");
+        assert_eq!(reference.length, 10);
+        assert_eq!(reference.window_count, 3);
+        assert_eq!(reference.covered_bases, 5);
+        assert_eq!(reference.mean_depth, 1.5);
+        assert_eq!(reference.max_depth, 5);
+    }
+
+    #[test]
+    fn aggregates_multiple_references_and_rejects_revisits() {
+        let input = "chr1\t1\t1\nchr1\t2\t1\nchr2\t1\t0\nchr2\t2\t4\nchr1\t1\t1\n";
+        let error = aggregate_window_depth(Cursor::new(input), 2).expect_err("chr1 revisited");
+        assert!(error.to_string().contains("appears more than once"));
+
+        let input = "chr1\t1\t1\nchr1\t2\t1\nchr2\t1\t0\nchr2\t2\t4\n";
+        let (rows, summary) =
+            aggregate_window_depth(Cursor::new(input), 2).expect("grouped references");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(summary.reference_count, 2);
+        assert_eq!(summary.total_bases, 4);
+        assert_eq!(summary.covered_bases, 3);
+        assert_eq!(summary.references[1].max_depth, 4);
+    }
+
+    #[test]
+    fn rejects_descending_positions_and_bad_records() {
+        let error = aggregate_window_depth(Cursor::new(b"chr1\t5\t1\nchr1\t4\t1\n"), 2)
+            .expect_err("descending positions");
+        assert!(error.to_string().contains("ascending"));
+
+        let error =
+            aggregate_window_depth(Cursor::new(b"chr1\t0\t1\n"), 2).expect_err("zero position");
+        assert!(error.to_string().contains("1-based"));
+
+        let error =
+            aggregate_window_depth(Cursor::new(b"chr1\t1\n"), 2).expect_err("missing depth column");
+        assert!(error.to_string().contains("expected 3"));
+
+        let error =
+            aggregate_window_depth(Cursor::new(b"chr1\t1\tx\n"), 2).expect_err("non-numeric depth");
+        assert!(error.to_string().contains("invalid depth"));
+
+        let error =
+            aggregate_window_depth(Cursor::new(b"chr1\t1\t1\n"), 0).expect_err("zero window size");
+        assert!(error.to_string().contains("window size must be positive"));
+    }
+
+    #[test]
+    fn empty_depth_stream_yields_empty_summary() {
+        let (rows, summary) = aggregate_window_depth(Cursor::new(b""), 100).expect("empty stream");
+        assert!(rows.is_empty());
+        assert_eq!(summary.reference_count, 0);
+        assert_eq!(summary.total_bases, 0);
+        assert_eq!(summary.breadth_percent, None);
+        assert_eq!(summary.mean_depth, None);
+    }
+
+    #[test]
+    fn writes_window_depth_tsv_with_header() {
+        let input = "chr1\t1\t2\nchr1\t2\t0\n";
+        let (rows, _summary) =
+            aggregate_window_depth(Cursor::new(input), 2).expect("valid depth stream");
+        let mut buffer = Vec::new();
+        write_window_depth_tsv(&mut buffer, &rows).expect("TSV written");
+        let text = String::from_utf8(buffer).expect("UTF-8 TSV");
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(
+            lines[0],
+            "reference\tstart\tend\tmean_depth\tmin_depth\tmax_depth\tcovered_bases\tbreadth_percent"
+        );
+        assert_eq!(lines[1], "chr1\t1\t2\t1.0000\t0\t2\t1\t50.0000");
     }
 }

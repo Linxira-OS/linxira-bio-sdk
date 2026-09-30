@@ -1,10 +1,12 @@
+use crate::alignment::{WindowDepthSummary, aggregate_window_depth, write_window_depth_tsv};
 use serde::Serialize;
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fmt::{Display, Formatter};
 use std::fs;
+use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const MAX_THREADS: usize = 1_024;
@@ -304,6 +306,25 @@ impl Default for SamtoolsMarkdupOptions {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SamtoolsDepthOptions {
+    /// Only count reads with mapping quality >= this value (--min-MQ).
+    pub min_mapping_quality: u32,
+    /// Only count bases with quality >= this value (--min-BQ).
+    pub min_base_quality: u32,
+    pub threads: usize,
+}
+
+impl Default for SamtoolsDepthOptions {
+    fn default() -> Self {
+        Self {
+            min_mapping_quality: 0,
+            min_base_quality: 0,
+            threads: 1,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MastOptions {
     pub threads: usize,
@@ -372,6 +393,10 @@ pub enum NativeToolError {
         status: Option<i32>,
         stderr: String,
     },
+    MalformedOutput {
+        tool: String,
+        message: String,
+    },
     MissingOutput {
         tool: String,
         path: PathBuf,
@@ -409,6 +434,9 @@ impl Display for NativeToolError {
                 "{tool} exited with status {}: {stderr}",
                 status.map_or_else(|| "unknown".to_owned(), |value| value.to_string())
             ),
+            Self::MalformedOutput { tool, message } => {
+                write!(formatter, "{tool} produced malformed output: {message}")
+            }
             Self::MissingOutput { tool, path } => write!(
                 formatter,
                 "{tool} reported success but did not create {}",
@@ -1028,6 +1056,83 @@ pub fn run_samtools_markdup_path(
         remove_incomplete_output(output);
     }
     result
+}
+
+/// Compute fixed-window depth metrics for a BAM/CRAM alignment by streaming
+/// `samtools depth -aa` output. The per-base stream is aggregated on the fly
+/// (never materialised), the window table is written as TSV, and the summary
+/// is returned alongside the native-tool provenance.
+pub fn run_window_depth_path(
+    alignment: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    window_size: u64,
+    options: &SamtoolsDepthOptions,
+) -> Result<(NativeToolResult, WindowDepthSummary), NativeToolError> {
+    validate_threads(options.threads)?;
+    if window_size == 0 {
+        return Err(NativeToolError::InvalidOption(
+            "window size must be positive".to_owned(),
+        ));
+    }
+    let alignment = alignment.as_ref();
+    let output = output.as_ref();
+    validate_paths(&[alignment], output)?;
+    let executable = configured_program("LINXIRA_BIO_SAMTOOLS", "samtools");
+    let tool = executable.to_string_lossy().into_owned();
+    let arguments = samtools_depth_arguments(alignment, options);
+    let analysis = (|| {
+        let mut command = Command::new(&executable);
+        command
+            .args(&arguments)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let mut child = command.spawn().map_err(|source| NativeToolError::Spawn {
+            tool: tool.clone(),
+            source,
+        })?;
+        let stdout = child.stdout.take().ok_or_else(|| NativeToolError::Spawn {
+            tool: tool.clone(),
+            source: std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "samtools stdout pipe unavailable",
+            ),
+        })?;
+        // If parsing fails mid-stream the pipe is dropped, samtools receives
+        // a broken pipe on its next write, and the wait below reaps it.
+        let aggregation = aggregate_window_depth(BufReader::new(stdout), window_size);
+        let mut stderr = Vec::new();
+        if let Some(mut pipe) = child.stderr.take() {
+            let _ = pipe.read_to_end(&mut stderr);
+        }
+        let status = child.wait()?;
+        if !status.success() {
+            return Err(NativeToolError::Failed {
+                tool: tool.clone(),
+                status: status.code(),
+                stderr: stderr_summary(&stderr),
+            });
+        }
+        let (rows, summary) = aggregation.map_err(|error| NativeToolError::MalformedOutput {
+            tool: tool.clone(),
+            message: error.to_string(),
+        })?;
+        let file = fs::File::create(output)?;
+        let mut writer = std::io::BufWriter::new(file);
+        write_window_depth_tsv(&mut writer, &rows)?;
+        writer.flush()?;
+        let mut result = finish_result("samtools", "window-depth", output, options.threads, 1)?;
+        if summary.reference_count == 0 {
+            result.warnings.push(
+                "no per-base depth records were produced; check that the alignment has mapped reads"
+                    .to_owned(),
+            );
+        }
+        Ok((result, summary))
+    })();
+    if analysis.is_err() {
+        remove_incomplete_output(output);
+    }
+    analysis
 }
 
 pub fn run_mast_path(
@@ -1977,6 +2082,24 @@ pub fn samtools_markdup_arguments(
     [collate, fixmate_args, sort_args, markdup]
 }
 
+/// Arguments for `samtools depth` with every reference position emitted
+/// (`-aa`), so zero-depth windows still appear. The long `--min-MQ` /
+/// `--min-BQ` flags are used because the short `-q`/`-Q` forms swapped
+/// meaning between samtools 1.12 and 1.13; the long flags require 1.13+.
+pub fn samtools_depth_arguments(input: &Path, options: &SamtoolsDepthOptions) -> Vec<OsString> {
+    vec![
+        OsString::from("depth"),
+        OsString::from("-aa"),
+        OsString::from("--min-MQ"),
+        OsString::from(options.min_mapping_quality.to_string()),
+        OsString::from("--min-BQ"),
+        OsString::from(options.min_base_quality.to_string()),
+        OsString::from("-@"),
+        OsString::from(options.threads.to_string()),
+        input.as_os_str().to_owned(),
+    ]
+}
+
 fn validate_similarity_options(options: &SimilaritySearchOptions) -> Result<(), NativeToolError> {
     validate_threads(options.threads)?;
     validate_evalue(options.evalue)?;
@@ -2331,16 +2454,42 @@ fn stderr_summary(stderr: &[u8]) -> String {
 mod tests {
     use super::{
         BcftoolsCallOptions, BlastProgram, DiamondMode, HmmerOptions, IqtreeOptions, MemeAlphabet,
-        MemeOptions, MuscleMode, MuscleOptions, ShortReadAlignmentOptions, SimilaritySearchOptions,
-        TrimalMode, bam_coverage_arguments, bcftools_call_arguments, blast_arguments,
-        diamond_arguments, dssp_arguments, hmmer_arguments, iqtree_arguments, kaks_arguments,
-        mcscanx_arguments, meme_arguments, minimap2_short_read_arguments, muscle_arguments,
-        parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
-        parse_muscle_mode, parse_trimal_mode, samtools_report_arguments, samtools_sort_arguments,
-        trimal_arguments,
+        MemeOptions, MuscleMode, MuscleOptions, SamtoolsDepthOptions, ShortReadAlignmentOptions,
+        SimilaritySearchOptions, TrimalMode, bam_coverage_arguments, bcftools_call_arguments,
+        blast_arguments, diamond_arguments, dssp_arguments, hmmer_arguments, iqtree_arguments,
+        kaks_arguments, mcscanx_arguments, meme_arguments, minimap2_short_read_arguments,
+        muscle_arguments, parse_blast_program, parse_diamond_mode, parse_hmmer_mode,
+        parse_meme_alphabet, parse_muscle_mode, parse_trimal_mode, samtools_depth_arguments,
+        samtools_report_arguments, samtools_sort_arguments, trimal_arguments,
     };
     use std::ffi::OsString;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn builds_samtools_depth_arguments_with_unambiguous_long_flags() {
+        let arguments = samtools_depth_arguments(
+            Path::new("sample.sorted.bam"),
+            &SamtoolsDepthOptions {
+                min_mapping_quality: 20,
+                min_base_quality: 13,
+                threads: 4,
+            },
+        );
+        assert_eq!(arguments[0], OsString::from("depth"));
+        assert!(arguments.contains(&OsString::from("-aa")));
+        // Long flags only: the short -q/-Q forms swapped meaning between
+        // samtools 1.12 and 1.13.
+        assert!(arguments.contains(&OsString::from("--min-MQ")));
+        assert!(arguments.contains(&OsString::from("20")));
+        assert!(arguments.contains(&OsString::from("--min-BQ")));
+        assert!(arguments.contains(&OsString::from("13")));
+        assert!(!arguments.contains(&OsString::from("-q")));
+        assert!(!arguments.contains(&OsString::from("-Q")));
+        assert_eq!(
+            arguments.last().and_then(|last| last.to_str()),
+            Some("sample.sorted.bam"),
+        );
+    }
 
     #[test]
     fn builds_two_step_bcftools_call_arguments() {
