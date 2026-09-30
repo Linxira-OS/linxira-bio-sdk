@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linxira.org/schemas/bio/simulate-sequence.v1.json",
+  "title": "Linxira Bio seeded sequence simulation summary",
+  "type": "object",
+  "required": [
+    "seed",
+    "sequence_count",
+    "total_bases",
+    "min_length",
+    "max_length",
+    "mean_length",
+    "gc_percent",
+    "n_count"
+  ],
+  "properties": {
+    "seed": {"type": "integer", "minimum": 0},
+    "sequence_count": {"type": "integer", "minimum": 1},
+    "total_bases": {"type": "integer", "minimum": 0},
+    "min_length": {"type": "integer", "minimum": 0},
+    "max_length": {"type": "integer", "minimum": 0},
+    "mean_length": {"type": "number", "minimum": 0},
+    "gc_percent": {"type": "number", "minimum": 0, "maximum": 100},
+    "n_count": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": false
+}

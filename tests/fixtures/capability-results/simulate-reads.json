@@ -1,0 +1,11 @@
+{
+  "seed": 42,
+  "paired": true,
+  "reference_sequence_count": 1,
+  "reference_bases": 3000,
+  "read_count": 200,
+  "read_length": 150,
+  "requested_coverage_percent_x100": 5000,
+  "realized_coverage_percent_x100": 5000,
+  "error_rate_percent_x100": 100
+}
