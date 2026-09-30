@@ -2,7 +2,7 @@
 //! fallback floor of the backend chain. Buffers are plain wgpu buffers;
 //! kernels are the WGSL sources already validated in `gpu_bench`.
 
-use crate::backend::{BackendBuffer, BufferRole, GpuBackend, KernelId, PhaseTimings};
+use crate::backend::{BackendBuffer, BufferRole, GpuBackend, KernelId, MemoryModel, PhaseTimings};
 use std::borrow::Cow;
 use std::time::Instant;
 use wgpu::util::DeviceExt;
@@ -72,6 +72,7 @@ struct WgpuContext {
     queue: wgpu::Queue,
     adapter_name: String,
     backend: String,
+    device_type: wgpu::DeviceType,
     buffers: std::collections::BTreeMap<u64, wgpu::Buffer>,
     next_buffer_id: u64,
 }
@@ -108,6 +109,7 @@ impl WgpuBackend {
                 queue,
                 adapter_name: info.name,
                 backend: format!("{:?}", info.backend),
+                device_type: info.device_type,
                 buffers: std::collections::BTreeMap::new(),
                 next_buffer_id: 1,
             });
@@ -160,8 +162,25 @@ impl GpuBackend for WgpuBackend {
 
     fn describe(&self) -> String {
         match &self.context {
-            Some(context) => format!("wgpu/{} ({})", context.adapter_name, context.backend),
+            Some(context) => format!(
+                "wgpu/{} ({}, {} memory)",
+                context.adapter_name,
+                context.backend,
+                self.memory_model().as_str()
+            ),
             None => "wgpu (probed, device not yet initialised)".to_owned(),
+        }
+    }
+
+    /// Heuristic until a runtime query exists: integrated GPUs on the market
+    /// today (Arc iGPU, Apple Silicon, AI Max-class) expose one shared
+    /// bandwidth pool, so zero-copy mapping is the intended fast path.
+    fn memory_model(&self) -> MemoryModel {
+        match &self.context {
+            Some(context) if context.device_type == wgpu::DeviceType::IntegratedGpu => {
+                MemoryModel::Unified
+            }
+            _ => MemoryModel::Discrete,
         }
     }
 

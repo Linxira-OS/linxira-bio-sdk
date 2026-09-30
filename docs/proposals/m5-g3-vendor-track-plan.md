@@ -128,10 +128,13 @@ HIP-C++ 对照间切换；厂商栈未就绪时自动回退 wgpu。
 
 ```rust
 // gpu-lab 内原型，成熟后迁 engine（gpu:optional 能力层只消费 trait 对象）
+pub enum MemoryModel { Discrete, Unified }   // 统一内存（见 2026-10-01 增补）
+
 pub trait GpuBackend {
     fn name(&self) -> &'static str;                       // "wgpu" | "cutile" | "musa" | "sycl"
     fn is_available(&self) -> bool;                        // 运行时探测（驱动/SDK）
-    fn upload(&mut self, bytes: &[u8]) -> BackendBuffer;   // host → device
+    fn memory_model(&self) -> MemoryModel;                 // 统一内存 → upload/readback 退化为映射
+    fn upload(&mut self, bytes: &[u8], role: BufferRole) -> BackendBuffer; // host → device
     fn dispatch(&mut self, kernel: KernelId, buffers: &[BackendBuffer], workgroup: [u32; 3]);
     fn readback(&mut self, buffer: &BackendBuffer, out: &mut [u8]);
     fn phases(&self) -> PhaseTimings;                      // upload/compute/readback 分相
@@ -152,6 +155,10 @@ pub trait GpuBackend {
    Windows 编译尝试在 gpu-lab（workspace 外）进行，不触碰 CI。
 4. **一致性协议**：同一输入四后端跑同一内核，逐指标容差显式写死在对照脚本
    （pearson：f32 档 |Δ| ≤ 1e-5 相对、histogram：整数精确），超差即记录并回退。
+5. **内存模型（2026-10-01 增补）**：trait 携带 `MemoryModel::{Discrete, Unified}`。
+   统一内存设备（Apple Silicon、AMD AI Max 395 级、NVIDIA DGX/RTX Spark、Arc iGPU）
+   上 upload/readback 退化为地址映射（zero-copy 快路径），且 host/device 共享同一
+   带宽池——带宽受限内核的台账必须声明内存模型；Linux 是统一内存的优先工况。
 5. **双实现硬规则落点**：CPU 侧（scalar+SIMD）与 GPU 侧（trait 任意后端）交付
    对齐 §9 双实现硬规则；k-mer 的 GPU 化（动态内存需求）排在厂商栈就绪后
    （§9 既定），走 musa/cutile 的动态 buffer，不走 trait 首版。

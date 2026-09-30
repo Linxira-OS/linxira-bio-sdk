@@ -8,6 +8,10 @@
 //! report says so.
 
 use serde::Serialize;
+// x86-64 SIMD tiers are the only intrinsics path; other architectures
+// (aarch64 on Apple Silicon / DGX Spark) compile against the scalar tier so
+// user-built ARM binaries work out of the box (packages are x86-64 only).
+#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::{
     __m256d, __m512d, _mm_add_pd, _mm256_extractf128_pd, _mm256_fmadd_pd, _mm256_loadu_pd,
     _mm512_fmadd_pd, _mm512_loadu_pd, _mm512_reduce_add_pd,
@@ -68,7 +72,7 @@ pub fn run_benchmarks() -> BenchReport {
     kernels.push(bench_quality_histogram(seed));
     BenchReport {
         seed,
-        simd_policy: "x86-64 only (AMD+Intel, runtime detect): avx512f -> avx2+fma -> scalar; no ARM adaptation".to_owned(),
+        simd_policy: "x86-64 (AMD+Intel, runtime detect): avx512f -> avx2+fma -> scalar; other architectures compile against the scalar tier for user-built ARM binaries".to_owned(),
         kernels,
     }
 }
@@ -164,6 +168,9 @@ pub fn run_pearson_bench(input: &PearsonInput) -> KernelBaseline {
     });
 
     let (tier, has_avx2_fma, has_avx512) = simd_tier();
+    // The SIMD call sites exist only on x86-64; other architectures compile
+    // this function against the scalar tier alone.
+    #[cfg(target_arch = "x86_64")]
     if has_avx2_fma {
         let avx2 = timed(|| unsafe { pearson_pairs_avx2(columns, squares) });
         implementations.push(ImplResult {
@@ -172,6 +179,7 @@ pub fn run_pearson_bench(input: &PearsonInput) -> KernelBaseline {
             checksum: format!("sum-r={:.9}", avx2.1),
         });
     }
+    #[cfg(target_arch = "x86_64")]
     if has_avx512 {
         let avx512 = timed(|| unsafe { pearson_pairs_avx512(columns, squares) });
         implementations.push(ImplResult {
@@ -180,6 +188,8 @@ pub fn run_pearson_bench(input: &PearsonInput) -> KernelBaseline {
             checksum: format!("sum-r={:.9}", avx512.1),
         });
     }
+    #[cfg(not(target_arch = "x86_64"))]
+    let _ = (has_avx2_fma, has_avx512);
 
     let selected = if has_avx512 {
         "avx512f".to_owned()
@@ -228,6 +238,7 @@ pub fn pearson_pairs_scalar(columns: &[Vec<f64>], squares: &[f64]) -> f64 {
 /// sequential scalar order by normal floating-point reassociation (~1e-12
 /// relative on this workload) — accepted under the tolerance-based
 /// consistency rule and recorded per implementation.
+#[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2,fma")]
 unsafe fn pearson_pairs_avx2(columns: &[Vec<f64>], squares: &[f64]) -> f64 {
     let cols = columns.len();
@@ -261,6 +272,7 @@ unsafe fn pearson_pairs_avx2(columns: &[Vec<f64>], squares: &[f64]) -> f64 {
     sum_r
 }
 
+#[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
 unsafe fn pearson_pairs_avx512(columns: &[Vec<f64>], squares: &[f64]) -> f64 {
     let cols = columns.len();
@@ -294,6 +306,7 @@ unsafe fn pearson_pairs_avx512(columns: &[Vec<f64>], squares: &[f64]) -> f64 {
     sum_r
 }
 
+#[cfg(target_arch = "x86_64")]
 unsafe fn horizontal_add_256(value: __m256d) -> f64 {
     unsafe {
         let hi128 = _mm256_extractf128_pd(value, 1);
@@ -326,8 +339,11 @@ fn simd_tier() -> (String, bool, bool) {
 
 #[cfg(not(target_arch = "x86_64"))]
 fn simd_tier() -> (String, bool, bool) {
+    // ARM binaries are user-built (no official packages); the CPU path runs
+    // the scalar tier. GPU-side capability differences are the accelerator's
+    // own concern and probed per device.
     (
-        "non-x86-64:scalar-only(no ARM adaptation)".to_owned(),
+        "non-x86-64:scalar fallback (user-built ARM; SIMD tiers are x86-64-only)".to_owned(),
         false,
         false,
     )
