@@ -1,0 +1,4 @@
+interface:
+  display_name: "Call Variants"
+  short_description: "Call SNV/indel variants from a sorted BAM with native bcftools"
+  default_prompt: "Use $call-variants to call small variants from this reference-sorted alignment and produce a VCF."

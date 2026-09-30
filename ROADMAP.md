@@ -68,6 +68,26 @@ M0 统一输出框架 ──┬──> M1 双后端绘图（依赖 OutputSpec/Pl
 
 - 每个里程碑内部任务按 T 编号串行验收；同一里程碑内无依赖的任务可并行。
 
+### 3.1 长程执行序列（2026-09-30 定案，跨里程碑能力批次）
+
+总原则：一能力一提交（四同步+验证绿）；批末 main/dev 同步推送；**发布只递增末位小版本**
+（1.1.0→1.1.1→…，不改中间号与首位号），每两批或用户点名时发版；跨轨混合，单项遇阻记录
+后跳过不阻塞；硬件触发项（Linux 机器/云租到位）插队执行不占批次槽。
+
+| 批次 | 内容 | 状态 |
+| --- | --- | --- |
+| A 变异检测断链 | variant.call.v1（bcftools）→ 长读排序/BAM 补全 → BAM 去重+窗口深度 | 进行中 |
+| B 化学轨首发 | chemistry.dock.v1（Vina+Meeko）→ chemistry.conformers.v1（RDKit pack） | 未开始 |
+| C 纯 Rust+模拟器 | SSR 挖掘 → peak 注释 → 模拟器一期（序列/读段合成） | 未开始 |
+| D GPU 内核推进 | Pearson v3（subgroup 归约）→ 厂商栈 host 抽象层 → sycl-rs 本机尝试 | 未开始 |
+| E 常规轨二 | 批次效应校正（ComBat/limma 双 pack）→ QTL+混合模型（R pack） | 未开始 |
+| F 化学二+长读长 | chemistry.screen.v1 → 长读 QC → quantum.semiempirical.v1 | 未开始 |
+| G GPU 前沿包装 | cellpose pack（gpu 契约首发）→ trajectory.analysis.v1 | 未开始 |
+| H 工具层收尾 | 报告层一期 → 模拟器二期（群体遗传）→ 参考基因组管理 | 未开始 |
+
+长期池（H 后按需提级）：AMR 分型套件、16S DADA2、MACS2、Evo2/Borzoi/RFdiffusion pack、
+批次 Tier2 各项、单细胞 M4 大件。
+
 ## 4. 现状基线（2026-08 盘点，作为对照起点）
 
 | 维度                                   | 基线值                                                                                                                                                                                                                                                                                                             | 证据位置                                                                                                                                                                                       |
@@ -610,7 +630,7 @@ C4 带宽并行 / C5 重型原生编排 / C6 DL 推理 / C7 仅云**。
 
 | 能力                        | 生态对标                  | 实现(Rust/Py/R)      | 数据类别      | 绘图      | 状态  |
 | ------------------------- | --------------------- | ------------------ | --------- | ------- | --- |
-| 小变异检测+联合分型（补断链：FASTQ→BAM→VCF） | bcftools mpileup/call（MIT） | Rust 编排+原生     | BAM+参考    | —      | 排期（最高优） |
+| 小变异检测+联合分型（补断链：FASTQ→BAM→VCF） | bcftools mpileup/call（MIT） | Rust 编排+原生     | BAM+参考    | —      | [x] 2026-09-30 单样本已发布（variant.call.v1）；联合分型排期 |
 | BAM 去重标记+窗口深度/插入片段指标      | samtools markdup/mosdepth | Rust 编排+原生      | BAM       | ✅深度分布图 | 排期 |
 | 批次效应校正                    | ComBat/limma           | R+Py 双 pack         | 矩阵        | ✅校正前后图 | 排期 |
 | QTL 定位+混合模型（BLUP/BLUE）      | qtl2/lme4/rrBLUP       | R pack              | 基因型+表型    | ✅LOD 曲线 | 排期 |

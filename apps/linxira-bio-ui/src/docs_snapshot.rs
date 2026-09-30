@@ -229,6 +229,8 @@ pub fn embedded_document(capability: &str, locale: &str) -> Option<&'static str>
         ("table.manipulate.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/table.manipulate.v1/zh-CN.md")),
         ("variant.annotate.v1", "en-US") => Some(include_str!("../../../docs/capabilities/variant.annotate.v1/en-US.md")),
         ("variant.annotate.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/variant.annotate.v1/zh-CN.md")),
+        ("variant.call.v1", "en-US") => Some(include_str!("../../../docs/capabilities/variant.call.v1/en-US.md")),
+        ("variant.call.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/variant.call.v1/zh-CN.md")),
         ("variant.compare.v1", "en-US") => Some(include_str!("../../../docs/capabilities/variant.compare.v1/en-US.md")),
         ("variant.compare.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/variant.compare.v1/zh-CN.md")),
         ("variant.filter.v1", "en-US") => Some(include_str!("../../../docs/capabilities/variant.filter.v1/en-US.md")),

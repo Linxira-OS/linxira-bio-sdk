@@ -231,6 +231,14 @@
       ]
     },
     {
+      "id": "call-variants",
+      "path": "skills/call-variants",
+      "kind": "executable",
+      "capabilities": [
+        "variant.call.v1"
+      ]
+    },
+    {
       "id": "configure-bio-environment",
       "path": "skills/configure-bio-environment",
       "kind": "executable",

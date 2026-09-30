@@ -55,12 +55,13 @@ use linxira_bio_core::interval::{
 use linxira_bio_core::metabolomics::{metabolomics_path, render_peak_table};
 use linxira_bio_core::microbiome::microbiome_analysis_path;
 use linxira_bio_core::native_tools::{
-    HmmerOptions, IqtreeOptions, Kraken2Options, MastOptions, MemeOptions, Minimap2LongReadOptions,
-    MuscleOptions, NativeToolResult, SalmonQuantOptions, ShortReadAlignmentOptions,
-    SimilaritySearchOptions, SnpEffOptions, WgcnaOptions, parse_blast_program, parse_diamond_mode,
-    parse_hmmer_mode, parse_meme_alphabet, parse_minimap2_preset, parse_muscle_mode,
-    parse_trimal_mode, run_bam_to_bigwig_path, run_blast_fasta_path, run_diamond_fasta_path,
-    run_dssp_path, run_hmmer_path, run_iqtree_path, run_kaks_path, run_kraken2_path, run_mast_path,
+    BcftoolsCallOptions, HmmerOptions, IqtreeOptions, Kraken2Options, MastOptions, MemeOptions,
+    Minimap2LongReadOptions, MuscleOptions, NativeToolResult, SalmonQuantOptions,
+    ShortReadAlignmentOptions, SimilaritySearchOptions, SnpEffOptions, WgcnaOptions,
+    parse_blast_program, parse_diamond_mode, parse_hmmer_mode, parse_meme_alphabet,
+    parse_minimap2_preset, parse_muscle_mode, parse_trimal_mode, run_bam_to_bigwig_path,
+    run_bcftools_call_path, run_blast_fasta_path, run_diamond_fasta_path, run_dssp_path,
+    run_hmmer_path, run_iqtree_path, run_kaks_path, run_kraken2_path, run_mast_path,
     run_mcscanx_path, run_meme_path, run_minimap2_long_read_path, run_muscle_path,
     run_rnafold_path, run_samtools_report_path, run_short_read_alignment_path, run_snpeff_path,
     run_trimal_path, run_wgcna_path,
@@ -559,6 +560,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         [variant, annotate, arguments @ ..] if variant == "variant" && annotate == "annotate" => {
             print_variant_annotate(arguments)
+        }
+        [variant, call, arguments @ ..] if variant == "variant" && call == "call" => {
+            print_variant_call(arguments)
         }
         [interval, intersect, left, right]
             if interval == "interval" && intersect == "intersect" =>
@@ -2318,6 +2322,17 @@ fn parse_sequence_usize(value: Option<&String>, option: &str) -> Result<usize, B
     value
         .parse::<usize>()
         .map_err(|_| format!("{option} requires a non-negative integer, got {value:?}").into())
+}
+
+fn parse_quality(value: Option<&String>, option: &str) -> Result<u32, Box<dyn Error>> {
+    let value = value.ok_or_else(|| format!("{option} requires a value"))?;
+    let quality = value
+        .parse::<u32>()
+        .map_err(|_| format!("{option} requires an integer in 0..=255, got {value:?}"))?;
+    if quality > 255 {
+        return Err(format!("{option} must be in 0..=255, got {quality}").into());
+    }
+    Ok(quality)
 }
 
 fn parse_sequence_percentage(value: Option<&String>, option: &str) -> Result<f64, Box<dyn Error>> {
@@ -4399,6 +4414,41 @@ fn print_variant_annotate(arguments: &[String]) -> Result<(), Box<dyn Error>> {
     }
     let result = run_snpeff_path(&paths[0], &paths[1], &options)?;
     print_native_tool_result("variant-annotate", "variant.annotate.v1", result, json)
+}
+
+fn print_variant_call(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut paths = Vec::new();
+    let mut options = BcftoolsCallOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--min-mq" => {
+                index += 1;
+                options.min_mapping_quality = parse_quality(arguments.get(index), "--min-mq")?;
+            }
+            "--min-bq" => {
+                index += 1;
+                options.min_base_quality = parse_quality(arguments.get(index), "--min-bq")?;
+            }
+            "--threads" => {
+                index += 1;
+                options.threads = parse_sequence_usize(arguments.get(index), "--threads")?;
+            }
+            "--all-sites" => options.all_sites = true,
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown variant call option: {value}").into());
+            }
+            value => paths.push(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if paths.len() != 3 {
+        return Err("variant call requires <sorted.bam|cram> <reference.fa> <output.vcf>".into());
+    }
+    let result = run_bcftools_call_path(&paths[0], &paths[1], &paths[2], &options)?;
+    print_native_tool_result("variant-call", "variant.call.v1", result, json)
 }
 
 fn print_alignment_qc(path: &str, json: bool) -> Result<(), Box<dyn Error>> {
@@ -7893,6 +7943,8 @@ fn usage() -> &'static str {
         "  linxira-bio alignment short-read <reference.fasta> <reads.fastq> <output.bam> [--threads N] [--json]\n",
         "  linxira-bio alignment long-read <reference.fasta> <reads.fastq> <output.sam> [--preset map-ont|map-pb|map-hifi|splice] [--threads N] [--secondary] [--json]\n",
         "  linxira-bio variant annotate <input.vcf> <output.vcf> [--database DB] [--upstream-downstream N] [--no-stats] [--json]\n",
+        "  linxira-bio variant call <sorted.bam|cram> <reference.fa> <output.vcf> [--min-mq 20] [--min-bq 13] [--threads N] [--all-sites] [--json]
+",
         "  linxira-bio annotation stats <input.gff3|gtf[.gz]> [--json]\n",
         "  linxira-bio annotation normalize <input.gff3|gtf[.gz]> <output.gff3> [--sort] [--json]\n",
         "  linxira-bio annotation positions <input.gff3|gtf[.gz]> <output.tsv> [--feature-type TYPE ...] [--json]\n",
