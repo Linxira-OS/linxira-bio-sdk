@@ -59,7 +59,7 @@ benchmark pack lock. R backend: Biostrings from the benchmark pack lock.
 ## Citations
 
 When reporting SSR surveys, cite Thiel et al. 2003 (Theor. Appl. Genet.
-106:1231-1238, MISA) for the semantics and thresholds; cite Benson 1999
+106(3):411-422, MISA) for the semantics and thresholds; cite Benson 1999
 (Nucleic Acids Res. 27:573-580) when contrasting with TRF-derived repeats.
 
 ## Troubleshooting
