@@ -56,12 +56,21 @@
 | 2 | 依赖被 yank | `cuda-bindings 0.0.0-alpha` yanked，元数据无 repo 字段 | 本地 vendor + `[patch.crates-io]` | 上游应留 repo/重新发布 |
 | 3 | 构建入口 | build.rs 要 `CUDA_TOOLKIT_PATH`（非 `CUDA_PATH`），无 toolkit 可用 | pip `nvidia-cuda-nvcc==13.3.73` wheel（`nvidia/cu13/`） | wheel 化 toolkit 可作构建端 |
 | 4 | bindgen 依赖 | libclang 缺失；`curand.h` 等 header 缺失 | apt `libclang-dev`；pip runtime/curand/cccl 等 wheel，`cp -rs` 合并头文件进 `cu13/include` | header wheel 合并套路可复用 |
-| 5 | llvm-sys 版本墙 | `failed to find correct version (21.x.x) of llvm-config (found 14.0.0)` | 加 apt.llvm.org jammy-21 源装 `llvm-21-dev` (21.1.8)，构建接力脚本后台执行 | Ubuntu 22.04 无 LLVM 21，前沿 Rust-CUDA 栈的隐性系统要求 |
+| 5 | **mlir/tblgen 版本墙（定案）** | `failed to find correct version (21.x.x) of llvm-config (found 14.0.0)`——报错源为 **mlir-sys 210.0.4 与 tblgen 0.8.1** 的 build.rs（注册表缓存实搜定位），要求 **LLVM 21 且带 MLIR** | Ubuntu 22.04 无；apt.llvm.org 在本网络 ~7 KB/s（144 MB ≈ 4 h）；GitHub release tarball 走加速代理亦停滞（67 MB/2 GB 处 stall） | 前沿工具链栈的真实系统要求 |
 
-- 状态：llvm-21 安装 → 切 `llvm-config` → `cargo build` → GPU 运行为一条
-  setsid 脱会话链式流水线（远端 `/root/round1-chain.log`），结果回填于文末
-  「T3 回填」。第一轮安装曾因父 ssh 会话取消连带进程组 SIGHUP 中断——
-  远端长任务必须 setsid 脱离会话组，本条已写入踩坑清单。
+- **架构定性（T3 的核心产出）**：`cuda-bindings 0.0.0-alpha` 的 repository 字段
+  指向 **`nvidia/tile-rust`**；cutile 依赖树含 `cuda-tile-rs`、`cutile-compiler`、
+  `cuda-async`、`cuda-core`、`candle-core`，编译器路径走 **MLIR**。即 cutile
+  0.0.0-alpha 不是薄 CUDA FFI，而是 NVIDIA **TILE 实验性编译器栈**的社区快照。
+- **战略裁决**：G3 厂商抽象层需要的"薄宿主端内核发射"归 **cudarc**（成熟、
+  纯 FFI、无 MLIR 工具链负担）；cutile 转入**实验轨**——它是 TILE ISA
+  （Rubin 世代）的早期入口，待 TILE 硬件入列再启动；TILE 内核在 sm_89 上
+  的可运行性未验证（即便完成 LLVM 21+MLIR 工具链，运行价值存疑）。
+  `gpu-lab/src/backends_cutile.rs` 保持 feature-gated stub，本页为定案依据。
+- 运维注：远端长任务必须 setsid 脱会话（父 ssh 取消会连带进程组 SIGHUP，
+  第一轮 llvm 安装即死于此时）；容器内国际网络差，apt.llvm.org 实测
+  ~50 KB/s（无代理）/ ~7 KB/s（turbo 代理反慢），GitHub release tarball
+  加速通道亦会 stall——大件工具链获取是本轮最大的非 GPU 时间黑洞。
 - 性质区分：#2–#5 属**前沿工具链摩擦**（alpha crate / LLVM 21），换任何厂商
   都要再付一遍；#2 之外唯 Vulkan ICD（T2）是 **NVIDIA vGPU 专属摩擦**。
 
@@ -89,7 +98,7 @@
 | T1 vina+官方数据+对接×2 | 0 | ~10 min | 通用 |
 | T2 Vulkan 追查 | 1（ICD 无入口） | ~15 min | **NVIDIA vGPU 专属** |
 | T4 pip+四跑 parity | 1（numpy） | ~10 min | 通用 |
-| T3 cutile 阻塞链 | 5（见上表） | 90–120 min+，未走完 | **前沿工具链，跨厂商** |
+| T3 cutile 阻塞链 | 5（见上表） | ~90 min，定案闭环 | **前沿工具链，跨厂商** |
 
 - **NVIDIA 最优生态、零成本预算约束下，五项验收 ≈ 2.5–3 h**，其中 T3 占
   一半以上且尚未走完。
@@ -116,7 +125,13 @@
 - 远端保留：`/root/autodl-tmp/`（供 S4000 轮同流程对照）。
 - **T3 回填**：见下节。
 
-## T3 回填
+## T3 回填（2026-10-02 定案）
 
-（待 auto-build.log 结果落地后回填：构建成功 → hello-compute 记录；
-失败 → LLVM 21 为最终阻塞，出上游 issue 后闭环。任一结果按计划均算验收。）
+- **结果：工具链未走通，按计划记档闭环（任一结果均算验收）。** 五级阻塞链
+  全部实修/定位到源头，最终定案为 mlir-sys/tblgen 的 LLVM 21+MLIR 要求 +
+  本容器国际网络对大件工具链获取不友好；非 GPU 因素，与 sm_89 无关。
+- **以架构定性代替编译通过**：cutile = nvidia/tile-rust TILE 实验栈（证据：
+  cuda-bindings repository 字段 + 依赖树），G3 薄 FFI 路线定 cudarc；
+  cutile 留 TILE 硬件（Rubin 世代）启动后再战。
+- 上游 issue 素材已备齐：yanked crate 无 repo 字段、`CUDA_TOOLKIT_PATH`
+  命名、wheel 头文件合并套路、mlir-sys/tblgen 对 LLVM tip 的硬依赖。
