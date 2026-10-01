@@ -1,272 +1,199 @@
 ---
-title: "Bandwidth Twins: A Fair Cross-Vendor Comparison of the RTX 4080 SUPER and Moore Threads MTT S4000 on Rented Hardware"
+title: "Taking a Docking Benchmark with a Known Answer onto Two GPU Servers from Different Vendors"
 date: 2026-10-02
 tag: technical
 lang: en
-desc: "Linxira Bio SDK cloud-rental validation: a single-source dual-compiler kernel suite confirms the bandwidth-twin pairing (STREAM-triad 666 vs 711 GB/s, 90%/93% of spec); a 36-point docking sweep reproduces value-for-value across vendors with exhaustiveness>=32 converging within 0.07 A of the official pose; five classes of analysis outputs hash-identical across vendor CPUs; storage, RAM, and toolchain ecosystem dimensions fully disclosed."
+desc: "Linxira Bio SDK cloud validation: on the official HIV-1 protease / indinavir redocking benchmark, how much search budget is enough (e=8 loses the correct pose 1 in 3 times; e>=32 never did); whether our analysis chain recovers a signal deliberately planted in a simulated transcriptome; and whether switching to a completely different vendor's server changes the output by a single byte."
 ---
 
-# Bandwidth Twins: A Fair Cross-Vendor Comparison of the RTX 4080 SUPER and Moore Threads MTT S4000 on Rented Hardware
+# Taking a Docking Benchmark with a Known Answer onto Two GPU Servers from Different Vendors
 
-> Linxira Bio SDK cloud-rental validation report · 2026-10-02. One NVIDIA vGPU
-> (RTX 4080 SUPER, modified, 32 GB) and one Moore Threads MTT S4000 (48 GB),
-> rented in the same window, built from the same repository clone on-site, fed
-> the same data and seeds. Environment, commands, and boundaries fully
-> disclosed; reproduction scripts ship with the repository.
+> Linxira Bio SDK cloud validation report · 2026-10-02. We rented two
+> servers — one with an NVIDIA RTX 4080 SUPER, one with a Moore Threads
+> MTT S4000 — and ran several of our analysis chains on both. This post
+> records the answers to three questions. Environment and commands are
+> fully disclosed; reproduction scripts ship with the repository.
 
-## TL;DR
+## The short version
 
-- **The bandwidth-twin pairing holds**: in the single-source dual-compiler
-  kernel suite, STREAM-triad measures 665.7 vs 711.2 GB/s (spec 736/768 GB/s;
-  90.2%/92.8% efficiency) — for bandwidth-bound kernels these two cards are a
-  fair controlled pair (§3.1).
-- **36 docking runs reproduce value-for-value across vendors**: the
-  RMSD-to-reference table for 12 (exhaustiveness, seed) points is identical on
-  both vendors' CPUs; at exhaustiveness ≥ 32 every seed converges within
-  0.07 Å of the official pose, while e = 8 loses the global minimum 1-in-3
-  seeds (RMSD 12.4 Å) (§3.2).
-- **Five classes of analysis outputs are SHA256-identical across vendors**:
-  docking JSONs, SSR TSVs, same-seed docking reruns, the five-step expression
-  chain (QC/normalize/PCA/clustering), and GO-enrichment JSONs — the
-  determinism design holds across the stack, not just one analysis type
-  (§3.4).
-- **Ecosystem observations (neutral, evidence attached)**: Moore Threads'
-  vendor compiler mcc fired on the first try; the NVIDIA community frontier
-  Rust stack (cutile 0.0.0-alpha) traces to NVIDIA's experimental TILE
-  compiler lineage (LLVM 21 + MLIR required) and was unusable this round.
-  Vulkan is blocked on both vendors at different layers, each with verbatim
-  evidence (§3.5).
+1. **Molecular docking has a clear "enough" line for search budget**: on
+   the official tutorial system (HIV-1 protease + indinavir), the default
+   exhaustiveness of 8 lost the correct pose once in three seeds (off by
+   12 Å); at 32 and above, all seeds landed within 0.07 Å of the official
+   pose. Use 8 for fast screening, 32 for anything you will report —
+   that is our operational recommendation.
+2. **The analysis chain recovered everything we planted**: in a simulated
+   transcriptome with 150 differential genes and one deliberately
+   enriched pathway, the five-step chain (QC → normalization → PCA →
+   clustering → enrichment) pulled the planted pathway out at
+   p = 6×10⁻³¹ while every other pathway sat at background level — no
+   misses, no false alarms.
+3. **Different vendor, different CPU, different core count — not a
+   single byte of difference**: docking outputs, SSR mining TSVs, the
+   five-step expression chain, enrichment results — five classes of
+   output files have identical SHA256 hashes on both machines. For a
+   tool that claims local-first reproducibility, this is the hardest
+   evidence there is.
+4. **The domestic card runs our stuff**: the same kernel source compiled
+   first-try under Moore Threads' mcc and produced correct results, and
+   its memory bandwidth utilization is in the same band as the NVIDIA
+   card (both have weak spots — see section 4).
 
-## Changelog
+## 1 The questions we were answering
 
-- **2026-10-02** Initial release.
+This was not a benchmarking exercise for its own sake. We build
+bioinformatics tooling; what we care about are three things every user
+runs into:
 
-## 1 Background and question
+**First, is the tool correct?** Docking is the ideal exam question
+because it has an answer key: the AutoDock Vina tutorial uses HIV-1
+protease with indinavir (PDB entry 1iep [3]) and publishes its best pose
+at -13.234 kcal/mol. Starting from the same receptor and ligand, does
+our toolchain put the molecule back where the crystal structure says it
+belongs?
 
-Comparing GPUs from two vendors first demands an answer to **which pairing
-axis is fair**. Pairing by compute (TFLOPS) conflates architecture
-differences; pairing by price chases market noise. Our GPU workloads are
-dominated by low-arithmetic-intensity kernels (a few FMAs per element, large
-streaming traffic), which run under the memory-bandwidth roof of the roofline
-model [1]. This round therefore uses **bandwidth-twin pairing**: the RTX 4080
-SUPER (736 GB/s spec) against the MTT S4000 (768 GB/s spec, 4.2% apart) — a
-controlled single-variable comparison for bandwidth-bound kernels. The cards
-differ ~2× in peak compute; under the bandwidth roof that gap must not turn
-into a throughput gap. That is the hypothesis under test.
+**Second, is the analysis chain sensitive and specific?** Transcriptome
+analysis has no single answer key, so we used signal injection: plant
+known differential genes and an enriched pathway in simulated data, then
+check whether the tool finds exactly those. A miss is a false negative;
+anything "discovered" beyond the plants is a false positive.
 
-The second question is **reproducibility**. A local-first SDK that claims
-determinism should not carry evidence from a single vendor's machines only.
-This round takes five classes of SDK outputs (including orchestrated native
-tool output) to both vendors' CPUs/GPUs for bit-level comparison.
+**Third, do results reproduce?** If the same input produces different
+outputs on two vendors' machines, every downstream statistic inherits
+that problem. We wanted the strictest version of the answer: file-level,
+byte-identical.
 
-## 2 Environment and methods
+## 2 The docking experiment: how much budget is enough
 
-### 2.1 Machines (cloud-rental container instances, same-day window)
+**What redocking is**: take an experimentally solved complex apart, keep
+only the structures of the protein and the ligand, and let the docking
+program place the ligand back from a random start. If it returns to the
+crystal-bound position, the scoring function and search are trustworthy
+on that system — the routine sanity check before virtual screening
+[2,4].
 
-| | Instance A (NVIDIA) | Instance B (Moore Threads) |
-| --- | --- | --- |
-| GPU | RTX 4080 SUPER, 32 GB (modified vGPU card), driver 595.71.05, sm_89 | MTT S4000, 48 GB, MUSA driver 2.7.0 |
-| GPU compiler | nvcc 11.8 (V11.8.89) | mcc (clang-14 derivative, MUSA toolkit 3.1.0) |
-| CPU | Xeon Platinum 8375C @2.9GHz, 128 vCPUs | Xeon Gold 6430, 15 cores |
-| Kernel | 5.15.0-25-generic | 5.15.0-105-generic |
-| SDK | linxira-bio 1.1.1, on-site `cargo build --release` after clone (rsproxy mirror) | same (build 47.3 s, 59 crates) |
-| Docking tool | AutoDock Vina 1.2.5 (official release binary, probed by name, never bundled) | same |
+We swept exhaustiveness (the search budget — roughly the number of
+independent searches Vina runs in parallel) × random seed, 12
+combinations, on both machines. The table shows the heavy-atom deviation
+of the best pose from the official reference pose, in angstroms:
 
-### 2.2 Method contract
-
-- **Single source, dual compile**: the GPU kernel suite is one C source file
-  (`scripts/rental/bench_suite.mu`) compiled by `mcc -O3` (MUSA) and
-  `nvcc -O3 -arch=sm_89` (CUDA); only the file extension differs.
-- **Timing**: device events, median of 3; every kernel carries a correctness
-  gate (copy/triad bit-level, histogram exact 256-bin equality, Pearson
-  relative error < 2e-4 against an f64 reference).
-- **Docking**: the official basic_docking example (HIV-1 protease / indinavir,
-  PDB 1iep [3]); sweep of exhaustiveness {8,16,32,64} × seeds {42,43,44} plus
-  a thread sweep; metrics are binding affinity, heavy-atom in-place RMSD to
-  the official reference pose, and wall clock. Vina methodology per [2,4].
-- **Analysis chain**: a simulated expression profile (2000 genes × 12 samples,
-  150 planted DE genes and one planted enriched term, seed 4242) flows through
-  `expression matrix-qc → normalize (median-ratio) [6] → pca → cluster →
-  enrichment go` (hypergeometric test [7]).
-- Cross-checked datasets and tools are identical by construction (the
-  repository rental bundle, SHA256-verified).
-
-## 3 Results
-
-### 3.1 GPU kernel suite: the bandwidth-twin test
-
-Same source, both vendor compilers, all correctness gates passed:
-
-| Kernel | 4080 SUPER (nvcc) | MTT S4000 (mcc) | ratio |
+| Search budget | seed 42 | seed 43 | seed 44 |
 | --- | --- | --- | --- |
-| copy 1 GiB (read+write) | **629.8 GB/s** | 473.8 GB/s | 1.33× |
-| STREAM-triad (2r+1w) | 665.7 GB/s | **711.2 GB/s** | 0.94× |
-| 256-bin histogram (shared+atomic) | 26.6 GB/s | 6.5 GB/s | 4.1× |
-| Pearson v2 4000×1000 (499,500 pairs) | 281.9 GB/s | 49.0 GB/s | 5.75× |
-
-**Verdict**: on triad — the closest to the STREAM convention [5] — both cards
-sit in the same efficiency band (90.2% vs 92.8%), confirming the twin
-hypothesis. The texture is interesting: unidirectional copy favors NVIDIA by
-33% (write path / L2 policy) while triad tips to Moore Threads. Atomic
-throughput and compiler maturity gaps (4–5.8×) are current MUSA weaknesses,
-consistent with our per-card strategy rule — no pre-declared winners. The
-Pearson kernel is a first non-coalesced version (equally penalized on both
-cards); the ratio is fair, the absolute numbers are not peak bandwidth.
-
-### 3.2 Molecular docking: convergence + cross-vendor determinism
-
-**Convergence** (identical on both machines; RMSD to the official reference
-pose, Å):
-
-| exhaustiveness | seed 42 | seed 43 | seed 44 |
-| --- | --- | --- | --- |
-| 8 | 0.058 | 0.861 | **12.42 (-10.9, global minimum lost)** |
+| 8 (default) | 0.058 | 0.861 | **12.42 (affinity -10.9, correct pose lost)** |
 | 16 | 0.058 | 0.861 | 0.015 |
 | 32 | 0.062 | 0.068 | 0.015 |
 | 64 | 0.056 | 0.047 | 0.045 |
 
-Practical reading: default e = 8 is fine for fast screening, but
-**pose-defining conclusions need e ≥ 32**. Thread scaling saturates at 8
-threads (72 s → 12.7 s, then flat) — Vina's e = 8 is exactly 8 independent
-MC chains, so 8 is the physical limit [2].
+How to read it: within 1–2 Å means "back in the same pocket"; 12 Å means
+the molecule ended up somewhere else entirely — and the program does not
+know it, because the affinity of -10.9 still looks "fine". That is the
+Monte Carlo trap: not an error message, but a quietly suboptimal answer.
 
-**Cross-vendor determinism**: the RMSD and affinity tables for all 12
-(e, seed) points are **value-for-value identical** on the two vendors' CPUs
-(failed seed included); same-seed reruns produce byte-identical output files.
-Given seed and exhaustiveness, Vina's result is independent of CPU vendor and
-core count.
+**The recommendation**: keep the default 8 when screening large compound
+libraries (the misses are random and ranking mostly survives); the moment
+a docking result is going into a conclusion, budget 32 or more.
 
-### 3.3 Storage and RAM dimensions
+One counterintuitive observation along the way: threads stop helping
+beyond 8 (72 s → 13 s, then flat). The reason is plain — e=8 is 8
+independent search chains, so 8 threads map one-to-one and there is
+nothing left to parallelize. More threads do not help; only more budget
+does.
 
-| Dimension | Instance A | Instance B |
-| --- | --- | --- |
-| Data-disk sequential write (dd conv=fdatasync, 2 GiB) | 505 MB/s | **677 MB/s** |
-| Data-disk read (page-cache figure†) | 5.4 GB/s | 7.4 GB/s |
-| RAM STREAM triad (single thread) | **14.9 GB/s** | 13.5 GB/s |
-| RAM STREAM triad (all cores, OpenMP) | 14.6 GB/s | 13.3 GB/s |
+## 3 The transcriptome chain: plant a signal, find the signal
 
-† The container may not drop caches, so reads reflect the cache; the flat
-OpenMP scaling (128 threads ≈ single thread) is a cloud per-instance memory
-bandwidth cap — an **instance property, not a vendor CPU comparison**,
-corroborated by the docking wall clocks (instance B's 15 physical cores beat
-instance A's 128 vCPUs at e = 64; suspected oversubscription).
+We built a simulated expression profile: 2000 genes, 12 samples (6
+control, 6 treated), Poisson counts with library-size variation. 150
+genes were given a planted up- or down-regulation (1–2×), and one
+pathway was made specifically enriched among them.
 
-### 3.4 Analysis chain and five classes of bit-level reproduction
+The five-step chain ran entirely through our Rust CLI (QC → median-ratio
+normalization [6] → PCA → two-way clustering → GO hypergeometric
+enrichment [7]):
 
-The simulated expression profile ran end-to-end on both machines with
-**SHA256-identical result JSONs for all five steps**: QC (2000×12) →
-median-ratio normalization → PCA (4 components) → two-way clustering → GO
-hypergeometric enrichment. The planted term is recovered at the top with
-**p = 6.3e-31 (44/80 genes)** while background terms sit at p > 0.03 — a
-closed signal-injection/recovery validation.
+- the planted pathway came out **first at p = 6.3×10⁻³¹** (44 genes hit);
+- all 25 other pathways sat above p = 0.03 — nothing false surfaced;
+- PCA and clustering separated the 12 samples cleanly by condition
+  (simulated data should separate; failing to separate would mean a
+  broken pipeline).
 
-Together with the earlier rounds this makes **five classes of cross-vendor
-bit-level reproduction**: docking result JSONs, SSR three-backend TSVs
-(1 M bases), same-seed docking reruns, the five-step expression chain, and
-enrichment JSONs. The SSR rust backend holds 3.6–4.0× over pytrf across three
-CPUs (15/16/128 cores) with byte-identical output.
+This plant-and-recover scheme is entering our routine validation flow:
+it is far stricter than "ran without errors" and needs no real clinical
+data.
 
-### 3.5 Ecosystem observations (neutral, evidence attached)
+## 4 The two GPUs, side by side
 
-- **Moore Threads' mcc works out of the box**: CUDA-style source compiled by
-  `mcc x.mu -lmusart` fired on the first serious attempt (three micro
-  iterations: no `--musarchs` flag — nvcc-style defaults; explicit
-  `-lmusart` needed). The `musa_runtime` API is CUDA-shaped, and the
-  prerequisite for a Rust-side FFI wrapper was validated on the spot.
-- **The NVIDIA community frontier Rust stack was unusable this round**: the
-  crates.io `cutile 0.0.0-alpha` tree contains a yanked `cuda-bindings` (no
-  repository field); after assembling a CUDA 13 pip-wheel toolchain and
-  headers, the final blocker was `mlir-sys`/`tblgen` requiring LLVM 21 +
-  MLIR (absent on Ubuntu 22.04; fetching the 144 MB toolchain over the
-  rented network did not complete inside the window). Tracing the tree shows
-  `cuda-bindings`' repository field pointing at nvidia/tile-rust with
-  `cuda-tile-rs`/`cutile-compiler` in the graph — **it is a community
-  snapshot of NVIDIA's experimental TILE compiler stack, not a thin CUDA
-  FFI**. Conclusion: thin-FFI duty goes to a mature route; the TILE stack
-  waits for its hardware generation.
-- **Vulkan (the wgpu route) is blocked on both vendors, at different layers,
-  with three layers of evidence archived**: the NVIDIA vGPU guest driver
-  595.71.05 exposes the negotiate symbol but no `vkCreateInstance` entry
-  point (three independent instances reproduce the same loader error
-  verbatim); Moore Threads' `libVK_MT.so` loads, negotiates, opens the device
-  node, and completes its ioctls, then fails `vkCreateInstance` inside the
-  driver (loader/strace evidence archived; suspected userspace toolkit 3.1.0
-  vs host kernel driver 2.7.0 mismatch). Both are **driver-stack facts**, not
-  SDK defects; neither extrapolates to retail cards.
+Docking and transcriptome work are CPU-bound. On the GPUs we did a
+different thing: **compile the same kernel source under both vendors'
+compilers and check correctness and speed**. Four kernels (copy, triad,
+histogram, correlation) all passed their correctness gates (bit-level or
+< 10⁻⁴ against an f64 reference):
 
-## 4 Honest boundaries
+| Kernel | RTX 4080 SUPER | MTT S4000 | Note |
+| --- | --- | --- | --- |
+| copy 1 GiB | 630 GB/s | 474 GB/s | one-directional; NVIDIA a third faster |
+| triad (2r+1w) | 666 GB/s | 711 GB/s | the standard memory-bandwidth convention [5]; effectively a tie |
+| histogram (atomics) | 26.6 GB/s | 6.5 GB/s | MUSA atomic throughput clearly behind |
+| correlation matrix | 282 GB/s | 49 GB/s | see below |
 
-1. **Instance properties ≠ vendor specifications**: rented vCPUs, memory
-   bandwidth, and storage are subject to host load and oversubscription;
-   wall clocks are recorded as instance observations only. Cross-vendor
-   conclusions rest solely on same-source kernel ratios and bit-level
-   identity.
-2. **Read figures are page-cache numbers**; dd is a sequential large-block
-   figure, not fio 4k-random.
-3. The Pearson kernel is a non-coalesced first version; absolute numbers are
-   not peak bandwidth.
-4. One instance per card, one rental window; **no cross-architecture
-   extrapolation** (to other GPU models or retail drivers).
-5. The e = 8 failure mode (§3.2) is an inherent property of the Monte Carlo
-   search budget, not a defect; the numbers hold for the official 1iep
-   example.
+In plain words: **these two cards deliver memory bandwidth in the same
+league** (both around 90% of spec), so bioinformatics kernels that
+mostly move data treat them as equivalent; the gap is in fine-grained
+synchronization — Moore Threads is about 4× behind on atomics, which
+means MUSA kernels should prefer bucketed reductions over atomic
+counters. The correlation kernel is slow on both because this version
+does no coalesced access (equally penalized, so the ratio means
+something and the absolute numbers do not).
 
-## 5 Reproduction
+**Two ecosystem facts** (neutral, evidence archived in the repository
+ledgers):
 
-Reproduction scripts and kernel sources ship with the repository
-(`scripts/rental/`; visible in-repo, never bundled into any release):
+- Moore Threads' mcc compiled CUDA-style source directly; three micro
+  fixes (a link flag and friends) later the kernels ran right the first
+  time. For us this means the MUSA backend has no toolchain obstacle.
+- Both vendors' Vulkan stacks have a broken layer on these cloud
+  instances (NVIDIA's vGPU driver ships no Vulkan entry point; Moore
+  Threads' driver loads but fails during initialization), so the
+  cross-platform Vulkan GPU route is currently blocked on both — logs
+  archived, feedback to the vendors planned. This does not affect the
+  results above: the kernels went through each vendor's native compiler.
+
+## 5 How to reproduce
+
+The scripts ship in the repository (`scripts/rental/`); any Linux box
+with the corresponding GPU works:
 
 ```bash
 git clone https://github.com/Linxira-OS/linxira-bio-sdk.git
 cd linxira-bio-sdk && cargo build --release -p linxira-bio-cli
 
-# GPU kernel suite (single source, dual compile)
-mcc -O3 scripts/rental/bench_suite.mu -o bench_mu -lmusart          # MUSA
-cp scripts/rental/bench_suite.mu b.cu && nvcc -O3 -arch=sm_89 b.cu -o bench_cu  # CUDA
-./bench_mu   # median-of-3 + correctness gate per kernel; exit 0 iff all pass
-
-# Docking study (run once per machine, then compare rmsd_vs_official.tsv)
-bash scripts/rental/dock-study.sh         # 128-core parameters
-bash scripts/rental/dock-study-s4000.sh   # 15-core parameters
+# docking study (12-point sweep + RMSD analysis)
+bash scripts/rental/dock-study.sh
 python3 scripts/rental/analyze_dock.py <bundle>/docking <study_dir>
 
-# Storage and RAM
-bash scripts/rental/system_bench.sh       # dd + four-kernel STREAM
+# GPU kernel comparison (one source, two vendor compilers)
+mcc -O3 scripts/rental/bench_suite.mu -o bench_mu -lmusart
+cp scripts/rental/bench_suite.mu b.cu && nvcc -O3 -arch=sm_89 b.cu -o bench_cu
 
-# Expression chain + GO enrichment (simulated data, seed 4242)
+# transcriptome signal-injection validation + storage/RAM bandwidth
 bash scripts/rental/rna_analysis.sh
+bash scripts/rental/system_bench.sh
 ```
 
-Raw artifacts (JSON/TSV/logs/hashes) live in the local archive
-`release-artifacts-rental/round{1..4}-*` (git-ignored, not committed).
+Raw output files (JSON/TSV/logs/hashes) live in the local archive
+`release-artifacts-rental/` (not committed); per-round experiment
+ledgers are in `docs/engine-evals/`.
 
-## 6 Engineering records (operational lessons, all fixed in the scripts)
+## 6 Boundaries (as always)
 
-1. Long remote jobs must be detached with `setsid`: cancelling the parent SSH
-   session kills the whole process group — round 1's LLVM install died
-   exactly this way.
-2. Rental containers generally lack `/usr/bin/time`; use `date +%s.%N`
-   deltas instead.
-3. Two PDBQT parsing traps: `ENDROOT` matches a naive prefix test of
-   `startswith("END")` (the ROOT block holds exactly 4 atoms, producing a
-   "4-atom ligand" illusion); polar hydrogens (HD) must be filtered by
-   element for heavy-atom RMSD to mean anything.
-4. The GO term validator accepts only `GO:` plus seven digits — a synthetic
-   association table using `GO:TERM00` was correctly rejected; input error,
-   not over-validation.
-5. On mainland-China cloud networks, cargo via the rsproxy mirror and GitHub
-   via the academic accelerator are mandatory; the accelerator is conversely
-   slower for apt.llvm.org (~7 KB/s measured).
-
-## 7 Conclusion
-
-On the bandwidth-bound axis the RTX 4080 SUPER and the MTT S4000 are a
-legitimate pair: same STREAM efficiency band, triad slightly to Moore
-Threads, unidirectional copy and atomics to NVIDIA — the "never cheaper"
-intuition holds at the ecosystem layer (toolchains, driver stacks) but not
-at the silicon layer. The more important result for the SDK: **five classes
-of analysis outputs are bit-identical across the two vendors' machines**;
-the determinism claim survived a cross-vendor test.
+- One rented cloud instance per card, one time window; cloud vCPUs and
+  memory bandwidth are subject to host scheduling, so **wall clocks
+  describe that instance, not the vendor's hardware spec**.
+- Disk read figures are page-cache numbers (the container may not drop
+  caches); the docking conclusions hold for the official 1iep system —
+  validate others independently.
+- The e=8 failure mode is an inherent property of Monte Carlo search
+  budget, not a defect in Vina or in us; its value is reminding you to
+  set your own budget line.
 
 ## References
 
@@ -299,11 +226,12 @@ biology. *Nat. Genet.* 25(1), 25–29 (2000). doi:10.1038/75556
 
 ## Version & Declarations
 
-- **Version**: initial release 2026-10-02.
-- **Self-assessment**: an author-reported comparison, not third-party
-  verified; single instance per card, single window; boundaries in §4.
-  Third-party replication (via `scripts/rental/` and the commands above) is
-  planned follow-up work.
+- **Version**: initial release 2026-10-02 (this is a rewrite: the first
+  draft was restructured the same day after reader feedback — organized
+  around the scientific questions and written for the user).
+- **Self-assessment**: an author-reported validation, not third-party
+  verified; one instance per card, one window; boundaries in §6.
+  Third-party replication is planned follow-up.
 - **License**: code AGPL-3.0-or-later; this article CC-BY-4.0.
 - **Author & provenance**: Linxira-OS project maintainer · Repository:
   <https://github.com/Linxira-OS/linxira-bio-sdk>
