@@ -9,16 +9,14 @@ the verification data the post references.
 - `SHA256SUMS.txt` — hashes of the two markdown files; a mismatch between
   the live site and these hashes means the post was edited after handoff
 
-Structure (both languages): the short version (4 findings) → 1 the three
-scientific questions (correctness on a benchmark with an answer key;
-sensitivity/specificity via signal injection; byte-level reproduction) →
-2 docking: how much search budget is enough (e=8 loses the pose 1-in-3;
-e>=32 never did; thread saturation explained) → 3 transcriptome
-plant-and-recover → 4 the two GPUs side by side (same source, two vendor
-compilers; bandwidth tie, atomics gap, ecosystem facts) → 5 reproduction →
-6 boundaries → references (7 entries, DOIs where they exist) → version &
-declarations. First draft was rewritten the same day after reader
-feedback (jargon removed, science-first structure).
+Structure (both languages): the short version (5 findings) → 1 who ran
+this and why (established community benchmarks only, nothing home-made)
+→ 2 environment and machine performance → 3 what was proven (docking
+budget line, signal injection, byte-level reproduction) → 4 our speed
+against the traditional tool (Rust vs pytrf on three CPUs) → 5 the two
+GPUs side by side → 6 two driver-layer facts → 7 reproduction →
+8 boundaries → references (7 entries, DOIs where they exist) → version &
+declarations.
 
 Evidence base: docs/engine-evals/gpu-rental-2026-10-02.md (round 1),
 gpu-rental-round2-s4000-2026-10-02.md (round 2),
