@@ -1,0 +1,2 @@
+eb3c48e4cb79bfedcc492f250f5b68c1fb2b97a38e9992563b4ff7ac06feb4b0 *cloud-gpu-dual-vendor-validation.zh.md
+b6908fbf51b42bfcd4a05952b073aa34061aa693d328239f51264e4a54a1a768 *cloud-gpu-dual-vendor-validation.en.md
