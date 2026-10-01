@@ -44,10 +44,10 @@ SEED_DIRS = [Path("/tmp"), Path("C:/tmp"), Path(__import__("tempfile").gettempdi
 RUNBOOK = """\
 # Linxira cloud-rental runbook (2026-10-02 round 1)
 
-Machines: NVIDIA V100-32GB (sm_70) or Tesla T4 (sm_75) + Moore Threads MTT
-S4000 (MUSA). cutile-rs requires an sm_80+ class card; with this round's
-lineup its measurement is deferred to a later window (record the sm
-boundary result instead).
+Machines: vGPU-32GB (RTX 4080S-based, sm_89) + Moore Threads MTT S4000
+(MUSA); V100-32GB (sm_70) / Tesla T4 (sm_75) as optional third/edge
+points. cutile-rs runs on the vGPU-32GB this round (first verify the
+host driver supports CUDA 13.2+).
 
 ## T0 — setup (<= 15 min)
 
@@ -98,11 +98,16 @@ Acceptance:
 
 ## T3 — vendor stacks (<= 40 min)
 
-NVIDIA (V100 sm_70 / T4 sm_75):
+NVIDIA vGPU-32GB (sm_89):
+    nvidia-smi   # confirm driver; CUDA 13.2+ needed by cutile-rs
     cargo build --features gpu-cutile   # in gpu-lab
-    EXPECTED on these cards: cutile-rs declares sm_80+; the compile/run
-    result on sm_70/75 is a documented boundary, not a failure of the plan.
-    Record the exact error text.
+    If the driver qualifies: run the pearson v3 kernel through cutile and
+    record phased timings next to the wgpu numbers. Any failure is a
+    documented outcome (driver cap, vGPU compute policy) - record verbatim.
+
+V100 / T4 (if rented as edge points):
+    EXPECTED: cutile-rs declares sm_80+; sm_70/75 results are boundary
+    records, not plan failures. Record the exact error text.
 
 Moore S4000:
     Check musa-smi / mthreads-gmi driver version (listing showed 2.7.0;

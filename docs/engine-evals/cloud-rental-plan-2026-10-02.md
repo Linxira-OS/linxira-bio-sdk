@@ -6,16 +6,20 @@
 > 传输包已构建：`release-artifacts-rental/linxira-rental-bundle-2026-10-02.tar.gz`
 > （SHA256SUMS.txt 同目录；重建/校验：`python scripts/prepare-rental-bundle.py [--check]`）。
 
-## 1. 机器配置（租用渠道与时价不入库，仅记技术配置）
+## 1. 机器配置与对位（租用渠道与时价不入库，仅记技术配置）
 
-| 机型 | CPU/内存 | 驱动与 CUDA | SM | 本轮角色 |
-| --- | --- | --- | --- | --- |
-| Tesla T4 / 16GB | 8 核 Xeon / 56GB | 550.90-580.65，CUDA ≤12.4-13.0 | sm_75 | wgpu/Vulkan 尝试 + 对接 + parity + cutile-rs sm 下限记录 |
-| V100-32GB | 6 核 Xeon Gold 6130 / 25GB | 525.89-580.82，CUDA ≤12.0-13.0 | sm_70 | 同上（二选一，优选驱动 580 机型即 CUDA ≤13.0） |
-| MTT S4000 / 48GB | 15 核 Xeon Gold 6430 / 100GB | MUSA 驱动 2.7.0 | MUSA mp | wgpu/Vulkan（官方 Vulkan 1.3）+ cudarc-musa git 尝试 + 对接 |
+| 机型 | FP32 理论 | 带宽 | 显存 | 驱动与 CUDA | SM | 本轮角色 |
+| --- | --- | --- | --- | --- | --- | --- |
+| vGPU-32GB（RTX 4080S 改造） | ~49T | 736 GB/s | 32GB | 视宿主驱动（CUDA 13.2 需验证） | sm_89 | **主角一**：cutile-rs 真实测（本轮唯一 sm_80+ 卡）+ wgpu/Vulkan + 对接 |
+| MTT S4000 / 48GB | 25T | 768 GB/s | 48GB | MUSA 驱动 2.7.0 | MUSA mp | **主角二**：wgpu/Vulkan（官方 Vulkan 1.3）+ cudarc-musa git 尝试 + 对接 |
+| V100-32GB | 15.7T | 900 GB/s (HBM2) | 32GB | 525.89-580.82，CUDA ≤12.0-13.0 | sm_70 | 可选第三点：与 S4000 同价档（带宽富余/算力低的一角）+ sm_70 边界 |
+| Tesla T4 / 16GB | 8.1T | 320 GB/s | 16GB | 550.90-580.65，CUDA ≤12.4-13.0 | sm_75 | 可选加测（最便宜；边界数据） |
 
-> cutile-rs 实测需 sm_80+ 档机型；本轮三张卡均在其下限之下（sm_70/75/MUSA），
-> 故本轮只固化边界数据，cutile-rs 真实测顺延到下一个 sm_89 档租用窗口。
+**对位口径（2026-10-01 定）**：市场上不存在与 S4000（25 TFLOPS）理论算力相等的
+英伟达在售卡（最近邻 3090/3080 Ti 为 1.4×，且 3090 无空闲）。我们的内核
+（pearson/直方图）是**带宽受限型**，故公平对比的主轴取**显存带宽孪生**：
+vGPU-32GB（736 GB/s）对 S4000（768 GB/s）仅差 4%，算力差（2×）由此单变量诚实
+量化；其余轴（V100 的 HBM2 带宽富余、T4 的低带宽）作补充角点。
 
 **SM 与 CUDA 版本口径（重要，决定验收预期）**：cutile-rs 的约束是 **SM 下限
 sm_80+**（工具链声明），与 toolkit 支持面是两回事——CUDA 13 移除的是 pre-Turing
@@ -30,7 +34,7 @@ cutile-rs 在这两张卡上**预期不可用**（记录失败文本即验收）
 | T0 | 环境与构建 | ≤15min | 克隆 + release 构建 + doctor + 环境审计（Linux 正式工况首跑） | `git clone` → `cargo build --release -p linxira-bio-cli` → `environment audit` |
 | T1 | **分子对接（首要）** | ≤30min | 官方 1iep 教程数据（伊马替尼/c-Abl 激酶域）经 chemistry.dock.v1 全链；同种子复跑 | `mamba install -c conda-forge autodock-vina` → `chemistry dock … --seed 42 --json` |
 | T2 | wgpu 基线 | ≤30min | probe + gpu-bench（pearson v1/v2/v3 + 直方图）——**首批非 iGPU 数据点** | `gpu-lab probe` / `gpu-bench` |
-| T3 | 厂商栈边界 | ≤40min | NVIDIA：gpu-cutile feature 编译（sm_70/75 预期边界记录）；S4000：cudarc-musa git 依赖尝试 + MUSA 驱动/SDK 版本核对 | `cargo build --features gpu-cutile`；scratch crate + git dep |
+| T3 | 厂商栈实测/边界 | ≤40min | **vGPU-32GB（sm_89）：gpu-cutile 真实测**（编译 + hello-compute + pearson v3 对照，CUDA 13.2 驱动门槛先核）；V100/T4（若加测）：预期 sm 下限记录；S4000：cudarc-musa git 依赖尝试 + MUSA 驱动/SDK 版本核对 | `cargo build --features gpu-cutile`；scratch crate + git dep |
 | T4 | SSR 三方 parity | ≤20min | rust vs pytrf（Linux 装锁）同输入逐字段一致 + 百万碱基基准 | `sequence ssr … --backend rust/python` |
 
 ## 3. 验收清单（PASS 判据，逐条勾选回填台账）
@@ -41,7 +45,7 @@ cutile-rs 在这两张卡上**预期不可用**（记录失败文本即验收）
 | T1a 对接功能 | exit 0；JSON status=ok；`docking.modes ≥ 3`；`best_affinity_kcal_per_mol ∈ [-14.5, -12.0]`（官方预期 **-13.234**） | dock.json |
 | T1b 可复现 | 同种子（42）复跑：最佳亲和力与 mode 数**完全一致**；out.pdbqt 字节级一致 | dock-2.json、out.pdbqt |
 | T2 wgpu | probe 列出租用卡（型号+backend）；gpu-bench 全 kernel pass=true（直方图整数精确、pearson |Δ|≤1e-5）；分相中位数入表 | gpu-bench-<card>.json |
-| T3a NVIDIA 边界 | sm_70/75 上 cutile-rs 编译/运行结果与官方 sm_80+ 声明一致，错误原文记录（**预期失败也是验收**） | build log |
+| T3a NVIDIA cutile | vGPU-32GB（sm_89）：若宿主驱动支持 CUDA 13.2+ 则编译/运行成功且 pearson v3 对照 |Δ|≤1e-5；否则记录驱动版本与错误原文（**任一结果都是验收**）。V100/T4 加测时：sm_70/75 边界错误原文 | build log + 版本快照 |
 | T3b MUSA | S4000 上 musa-smi 版本、cudarc-musa git 构建结果、与 MUSA SDK 5.2 ABI 的匹配结论（驱动 2.7.0 与 SDK 5.x 的错位是首批窗口检查点） | build log + 版本快照 |
 | T4 parity | 同输入 rust/pytrb 两路 `summary` 逐字段相等（records 含 start/motif/repeats/compound）；1M bases 计时入表 | ssr_*.json/tsv |
 
@@ -54,7 +58,7 @@ cutile-rs 在这两张卡上**预期不可用**（记录失败文本即验收）
 | --- | --- |
 | Tesla 数据中心驱动可能不暴露 Vulkan → T2 无 non-CPU adapter | 该结果本身入台账（回退层覆盖面结论）；S4000 的 Vulkan 1.3 是本轮 Vulkan 主数据点 |
 | MUSA 驱动 2.7.0 与 cudarc-musa 的 MUSA SDK 5.2 ABI 错位 | 只记录结论不改代码；issue 素材归档（提案 §2.2） |
-| 本轮无 sm_80+ 机型 → cutile-rs 实测顺延 | 本轮先固化 sm_70/75 边界数据；sm_89 档机型租用窗口直接执行 cutile 执行卡 |
+| vGPU 宿主驱动低于 CUDA 13.2 → cutile-rs 在 sm_89 上仍不可用 | 记录宿主驱动版本与错误原文；改为纯 wgpu/Vulkan 数据点，cutile 顺延到驱动达标窗口 |
 | GitHub 拉取慢 | 租用平台的 GitHub 加速或镜像；bundle 走 FTP/网页上传 |
 | 25GB 内存的 V100 机型构建吃紧 | 只构建 `-p linxira-bio-cli`（跳过 workspace 全量）；数据盘 50GB 足够 |
 
@@ -103,5 +107,5 @@ cutile-rs 在这两张卡上**预期不可用**（记录失败文本即验收）
 ## 6. 待办回填
 
 - [ ] 租用后回填：各机 T0-T4 结果到 `gpu-rental-2026-10-02.md`
-- [ ] sm_89 档机型租用窗口 → cutile-rs 执行卡（提案 §1.1/§2.3）
+- [ ] cutile-rs 执行卡本轮在 vGPU-32GB 上执行（提案 §1.1/§2.3）；若驱动门槛未过则顺延
 - [ ] 博客草稿 → `benchmark-results/2026-10-xx/`（本轮验收全 PASS 后）
