@@ -48,7 +48,7 @@ Rust 后端：无。Python 后端：benchmark pack 锁定的 pytrf 环境。R �
 
 ## 引用
 
-报告 SSR 普查时引用 Thiel 等 2003（Theor. Appl. Genet. 106:1231-1238，MISA）的语义与
+报告 SSR 普查时引用 Thiel 等 2003（Theor. Appl. Genet. 106(3):411-422，MISA）的语义与
 阈值；与 TRF 来源重复对比时引用 Benson 1999（Nucleic Acids Res. 27:573-580）。
 
 ## 故障排除
