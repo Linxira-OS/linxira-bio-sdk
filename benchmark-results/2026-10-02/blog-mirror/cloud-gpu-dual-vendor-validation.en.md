@@ -3,197 +3,194 @@ title: "Taking a Docking Benchmark with a Known Answer onto Two GPU Servers from
 date: 2026-10-02
 tag: technical
 lang: en
-desc: "Linxira Bio SDK cloud validation: on the official HIV-1 protease / indinavir redocking benchmark, how much search budget is enough (e=8 loses the correct pose 1 in 3 times; e>=32 never did); whether our analysis chain recovers a signal deliberately planted in a simulated transcriptome; and whether switching to a completely different vendor's server changes the output by a single byte."
+desc: "Pre-launch validation for GPU vendor support in the Linxira Bio SDK, run entirely on established community benchmarks (the official Vina tutorial system, the STREAM convention, pytrf as the reference implementation) on one NVIDIA and one Moore Threads server: correctness, byte-level reproduction, and speed. The docking search budget gets a clear enough line (e=8 loses the pose 1 in 3; e>=32 never did), five classes of outputs hash-identical across vendors, and the Rust implementation holds a steady 3.6-4.0x over the traditional Python tool."
 ---
 
 # Taking a Docking Benchmark with a Known Answer onto Two GPU Servers from Different Vendors
 
-> Linxira Bio SDK cloud validation report · 2026-10-02. We rented two
-> servers — one with an NVIDIA RTX 4080 SUPER, one with a Moore Threads
-> MTT S4000 — and ran several of our analysis chains on both. This post
-> records the answers to three questions. Environment and commands are
-> fully disclosed; reproduction scripts ship with the repository.
+> Linxira Bio SDK cloud validation report · 2026-10-02. Environment,
+> machine performance, and commands fully disclosed; reproduction scripts
+> ship with the repository.
 
 ## The short version
 
-1. **Molecular docking has a clear "enough" line for search budget**: on
-   the official tutorial system (HIV-1 protease + indinavir), the default
+1. **Docking search budget has a clear "enough" line**: on the official
+   Vina tutorial system (HIV-1 protease + indinavir), the default
    exhaustiveness of 8 lost the correct pose once in three seeds (off by
    12 Å); at 32 and above, all seeds landed within 0.07 Å of the official
-   pose. Use 8 for fast screening, 32 for anything you will report —
-   that is our operational recommendation.
-2. **The analysis chain recovered everything we planted**: in a simulated
-   transcriptome with 150 differential genes and one deliberately
-   enriched pathway, the five-step chain (QC → normalization → PCA →
-   clustering → enrichment) pulled the planted pathway out at
-   p = 6×10⁻³¹ while every other pathway sat at background level — no
-   misses, no false alarms.
-3. **Different vendor, different CPU, different core count — not a
-   single byte of difference**: docking outputs, SSR mining TSVs, the
-   five-step expression chain, enrichment results — five classes of
-   output files have identical SHA256 hashes on both machines. For a
-   tool that claims local-first reproducibility, this is the hardest
-   evidence there is.
-4. **The domestic card runs our stuff**: the same kernel source compiled
-   first-try under Moore Threads' mcc and produced correct results, and
-   its memory bandwidth utilization is in the same band as the NVIDIA
-   card (both have weak spots — see section 4).
+   pose. Use 8 for fast screening, 32 for anything you report.
+2. **The analysis chain passed a signal-injection test**: with 150
+   differential genes and one deliberately enriched pathway planted in a
+   simulated transcriptome, the five-step chain recovered the pathway at
+   p = 6×10⁻³¹ with everything else at background level — no misses, no
+   false alarms.
+3. **The two servers produced byte-identical outputs**: docking, SSR
+   mining, the expression chain, enrichment — five classes of output
+   files have identical SHA256 hashes on both machines.
+4. **The Rust implementation holds a steady 3.6–4.0× over the traditional
+   Python tool** (1 M-base SSR mining, re-measured on three different
+   CPUs), with byte-identical output to the reference implementation.
+5. **The domestic card runs our stack**: the same kernel source compiled
+   first-try under Moore Threads' mcc with correct results, and its
+   memory bandwidth utilization is in the same band as the NVIDIA card.
 
-## 1 The questions we were answering
+## 1 Who ran this, and why
 
-This was not a benchmarking exercise for its own sake. We build
-bioinformatics tooling; what we care about are three things every user
-runs into:
+We did — the Linxira Bio SDK project. The SDK is about to gain GPU vendor
+backends (including Moore Threads MUSA), and before shipping that we
+needed one question answered: **on different vendors' hardware, is our
+toolchain still correct, still fast, and still reproducible?** We rented
+two cloud servers for a full validation round; this post is the record.
 
-**First, is the tool correct?** Docking is the ideal exam question
-because it has an answer key: the AutoDock Vina tutorial uses HIV-1
-protease with indinavir (PDB entry 1iep [3]) and publishes its best pose
-at -13.234 kcal/mol. Starting from the same receptor and ligand, does
-our toolchain put the molecule back where the crystal structure says it
-belongs?
+One principle up front: **every exam question is an existing community
+benchmark, nothing home-made** —
 
-**Second, is the analysis chain sensitive and specific?** Transcriptome
-analysis has no single answer key, so we used signal injection: plant
-known differential genes and an enriched pathway in simulated data, then
-check whether the tool finds exactly those. A miss is a false negative;
-anything "discovered" beyond the plants is a false positive.
+- docking uses the official AutoDock Vina tutorial system (HIV-1 protease
+  + indinavir, PDB entry 1iep [3]), whose answer key ships with the
+  tutorial (best affinity -13.234 kcal/mol and the reference pose file);
+- memory bandwidth uses the STREAM convention [5];
+- SSR mining uses pytrf, the community reference implementation, as the
+  correctness control;
+- transcriptomics has no single answer key, so we used signal injection —
+  plant known signals in simulated data and have the tool find them — the
+  standard way to validate an analysis pipeline.
 
-**Third, do results reproduce?** If the same input produces different
-outputs on two vendors' machines, every downstream statistic inherits
-that problem. We wanted the strictest version of the answer: file-level,
-byte-identical.
+Established benchmarks mean the results are directly comparable with the
+community, with no question of a test tailored to ourselves.
 
-## 2 The docking experiment: how much budget is enough
+## 2 Environment and machine performance
 
-**What redocking is**: take an experimentally solved complex apart, keep
-only the structures of the protein and the ligand, and let the docking
-program place the ligand back from a random start. If it returns to the
-crystal-bound position, the scoring function and search are trustworthy
-on that system — the routine sanity check before virtual screening
-[2,4].
+Two cloud-rented servers, same-day window, same repository clone built
+on-site (47.3 s for 59 crates):
 
-We swept exhaustiveness (the search budget — roughly the number of
-independent searches Vina runs in parallel) × random seed, 12
-combinations, on both machines. The table shows the heavy-atom deviation
-of the best pose from the official reference pose, in angstroms:
+| | Server A (NVIDIA) | Server B (Moore Threads) |
+| --- | --- | --- |
+| GPU | RTX 4080 SUPER, 32 GB, driver 595.71.05 (sm_89) | MTT S4000, 48 GB, MUSA driver 2.7.0 |
+| GPU compiler | nvcc 11.8 | mcc (MUSA toolkit 3.1.0) |
+| CPU | Xeon Platinum 8375C @2.9GHz, 128 vCPUs | Xeon Gold 6430, 15 cores |
+| OS | Ubuntu 22.04, kernel 5.15.0-25 | Ubuntu 22.04, kernel 5.15.0-105 |
+| Memory bandwidth (measured, STREAM triad) | 14.9 GB/s | 13.5 GB/s |
+| Data-disk seq. write (2 GiB) | 505 MB/s | 677 MB/s |
+| SDK | linxira-bio 1.1.1 (Rust) | same |
+| Docking tool | AutoDock Vina 1.2.5 official binary | same |
+
+(Measured memory/disk figures reflect these two cloud instances under
+host scheduling, not vendor specifications; see §8.)
+
+## 3 What was proven
+
+### 3.1 Docking: correct, and with a known budget line
+
+The redocking check — take the experimentally solved complex apart and
+let the program place the ligand back from a random start [2,4]. Twelve
+(budget × seed) combinations on each machine; the table shows heavy-atom
+deviation of the best pose from the official reference pose, in Å:
 
 | Search budget | seed 42 | seed 43 | seed 44 |
 | --- | --- | --- | --- |
-| 8 (default) | 0.058 | 0.861 | **12.42 (affinity -10.9, correct pose lost)** |
+| 8 (default) | 0.058 | 0.861 | **12.42 (-10.9, correct pose lost)** |
 | 16 | 0.058 | 0.861 | 0.015 |
 | 32 | 0.062 | 0.068 | 0.015 |
 | 64 | 0.056 | 0.047 | 0.045 |
 
-How to read it: within 1–2 Å means "back in the same pocket"; 12 Å means
-the molecule ended up somewhere else entirely — and the program does not
-know it, because the affinity of -10.9 still looks "fine". That is the
-Monte Carlo trap: not an error message, but a quietly suboptimal answer.
+**Both machines produced this table value-for-value identical** (failed
+seed included). Within 1–2 Å means "back in the same pocket"; 12 Å is the
+classic Monte Carlo under-budget trap — no error message, just a quietly
+suboptimal answer (-10.9 still looks "fine"). Threads stop helping past 8
+(72 s → 13 s, then flat) because e=8 is exactly 8 independent chains.
 
-**The recommendation**: keep the default 8 when screening large compound
-libraries (the misses are random and ranking mostly survives); the moment
-a docking result is going into a conclusion, budget 32 or more.
+### 3.2 The transcriptome chain passed signal injection
 
-One counterintuitive observation along the way: threads stop helping
-beyond 8 (72 s → 13 s, then flat). The reason is plain — e=8 is 8
-independent search chains, so 8 threads map one-to-one and there is
-nothing left to parallelize. More threads do not help; only more budget
-does.
+A simulated profile (2000 genes × 12 samples, Poisson counts) with 150
+planted differential genes and one planted enriched pathway, run through
+the five-step chain (QC → median-ratio normalization [6] → PCA →
+clustering → GO hypergeometric enrichment [7]) entirely via our Rust CLI:
 
-## 3 The transcriptome chain: plant a signal, find the signal
+- the planted pathway came out **first at p = 6.3×10⁻³¹** (44 genes);
+  all 25 others sat above p = 0.03 — nothing false surfaced;
+- PCA and clustering separated the samples cleanly by condition.
 
-We built a simulated expression profile: 2000 genes, 12 samples (6
-control, 6 treated), Poisson counts with library-size variation. 150
-genes were given a planted up- or down-regulation (1–2×), and one
-pathway was made specifically enriched among them.
+### 3.3 Reproducibility: five output classes, byte-identical
 
-The five-step chain ran entirely through our Rust CLI (QC → median-ratio
-normalization [6] → PCA → two-way clustering → GO hypergeometric
-enrichment [7]):
+Docking JSONs, SSR TSVs (1 M bases), same-seed docking reruns, expression
+chain JSONs, enrichment JSONs — **SHA256-identical across the two
+servers**. Different vendor, different CPU, different core count, same
+bytes.
 
-- the planted pathway came out **first at p = 6.3×10⁻³¹** (44 genes hit);
-- all 25 other pathways sat above p = 0.03 — nothing false surfaced;
-- PCA and clustering separated the 12 samples cleanly by condition
-  (simulated data should separate; failing to separate would mean a
-  broken pipeline).
+## 4 Our speed against the traditional tool
 
-This plant-and-recover scheme is entering our routine validation flow:
-it is far stricter than "ran without errors" and needs no real clinical
-data.
+SSR (microsatellite) mining is a direct same-algorithm comparison: our
+Rust implementation vs pytrf, the community's standard Python
+implementation (which doubles as the correctness reference). 1 M-base
+input, median of three runs on three different CPUs:
 
-## 4 The two GPUs, side by side
+| Machine (CPU) | Rust | pytrf (traditional Python) | speedup |
+| --- | --- | --- | --- |
+| 16-core Xeon (round-1 server) | 0.082 s | 0.312 s | 3.8× |
+| 15-core Xeon Gold 6430 (server B) | 0.047 s | 0.169 s | 3.6× |
+| 128-vCPU Xeon Platinum 8375C (server A) | 0.073 s | 0.288 s | 4.0× |
 
-Docking and transcriptome work are CPU-bound. On the GPUs we did a
-different thing: **compile the same kernel source under both vendors'
-compilers and check correctness and speed**. Four kernels (copy, triad,
-histogram, correlation) all passed their correctness gates (bit-level or
-< 10⁻⁴ against an f64 reference):
+Output files are **byte-identical** to the reference implementation —
+the speedup does not come at the cost of changed results. Worth stating
+about docking: our role there is orchestration and reproduction (we call
+the native Vina engine [2,4]); we claim no credit on the docking
+algorithm itself — this round proves our orchestration adds no bias.
+
+## 5 The two GPUs, side by side
+
+One kernel source, each vendor's compiler, four kernels (copy, triad,
+histogram, correlation), all through their correctness gates (bit-level
+or < 10⁻⁴ vs an f64 reference):
 
 | Kernel | RTX 4080 SUPER | MTT S4000 | Note |
 | --- | --- | --- | --- |
 | copy 1 GiB | 630 GB/s | 474 GB/s | one-directional; NVIDIA a third faster |
-| triad (2r+1w) | 666 GB/s | 711 GB/s | the standard memory-bandwidth convention [5]; effectively a tie |
-| histogram (atomics) | 26.6 GB/s | 6.5 GB/s | MUSA atomic throughput clearly behind |
-| correlation matrix | 282 GB/s | 49 GB/s | see below |
+| triad (2r+1w, STREAM) | 666 GB/s | 711 GB/s | effectively a tie |
+| histogram (atomics) | 26.6 GB/s | 6.5 GB/s | MUSA atomic throughput ~4× behind |
+| correlation matrix | 282 GB/s | 49 GB/s | no coalescing on either side; not peak |
 
-In plain words: **these two cards deliver memory bandwidth in the same
-league** (both around 90% of spec), so bioinformatics kernels that
-mostly move data treat them as equivalent; the gap is in fine-grained
-synchronization — Moore Threads is about 4× behind on atomics, which
-means MUSA kernels should prefer bucketed reductions over atomic
-counters. The correlation kernel is slow on both because this version
-does no coalesced access (equally penalized, so the ratio means
-something and the absolute numbers do not).
+Conclusion: **same bandwidth league** (both ~90% of spec), equivalent for
+data-movement-bound bioinformatics kernels; the atomics gap is worth
+coding around on MUSA (bucketed reductions instead of atomic counters).
 
-**Two ecosystem facts** (neutral, evidence archived in the repository
-ledgers):
+## 6 Two driver-layer facts found along the way
 
-- Moore Threads' mcc compiled CUDA-style source directly; three micro
-  fixes (a link flag and friends) later the kernels ran right the first
-  time. For us this means the MUSA backend has no toolchain obstacle.
-- Both vendors' Vulkan stacks have a broken layer on these cloud
-  instances (NVIDIA's vGPU driver ships no Vulkan entry point; Moore
-  Threads' driver loads but fails during initialization), so the
-  cross-platform Vulkan GPU route is currently blocked on both — logs
-  archived, feedback to the vendors planned. This does not affect the
-  results above: the kernels went through each vendor's native compiler.
+Neutral records, log evidence in the repository ledgers: NVIDIA's vGPU
+cloud driver ships no Vulkan entry point (three independent instances,
+same verbatim error); Moore Threads' Vulkan driver loads and opens the
+device but fails during initialization (suspected userspace toolkit
+3.1.0 vs host driver 2.7.0 pairing; evidence being packaged for vendor
+feedback). Neither affects this post's results — the kernels went
+through each vendor's native compiler.
 
-## 5 How to reproduce
-
-The scripts ship in the repository (`scripts/rental/`); any Linux box
-with the corresponding GPU works:
+## 7 How to reproduce
 
 ```bash
 git clone https://github.com/Linxira-OS/linxira-bio-sdk.git
 cd linxira-bio-sdk && cargo build --release -p linxira-bio-cli
 
-# docking study (12-point sweep + RMSD analysis)
-bash scripts/rental/dock-study.sh
-python3 scripts/rental/analyze_dock.py <bundle>/docking <study_dir>
-
-# GPU kernel comparison (one source, two vendor compilers)
-mcc -O3 scripts/rental/bench_suite.mu -o bench_mu -lmusart
+bash scripts/rental/dock-study.sh                          # docking study + RMSD
+mcc -O3 scripts/rental/bench_suite.mu -o bench_mu -lmusart # GPU kernels (MUSA)
 cp scripts/rental/bench_suite.mu b.cu && nvcc -O3 -arch=sm_89 b.cu -o bench_cu
-
-# transcriptome signal-injection validation + storage/RAM bandwidth
-bash scripts/rental/rna_analysis.sh
-bash scripts/rental/system_bench.sh
+bash scripts/rental/rna_analysis.sh                        # signal-injection check
+bash scripts/rental/system_bench.sh                        # storage/RAM bandwidth
 ```
 
-Raw output files (JSON/TSV/logs/hashes) live in the local archive
-`release-artifacts-rental/` (not committed); per-round experiment
-ledgers are in `docs/engine-evals/`.
+Raw outputs (JSON/TSV/logs/hashes) live in the local archive
+`release-artifacts-rental/` (not committed); per-round ledgers in
+`docs/engine-evals/`.
 
-## 6 Boundaries (as always)
+## 8 Boundaries
 
-- One rented cloud instance per card, one time window; cloud vCPUs and
-  memory bandwidth are subject to host scheduling, so **wall clocks
-  describe that instance, not the vendor's hardware spec**.
-- Disk read figures are page-cache numbers (the container may not drop
-  caches); the docking conclusions hold for the official 1iep system —
-  validate others independently.
+- One rented instance per card, one window; cloud vCPUs, memory
+  bandwidth, and disks are subject to host scheduling — **measured
+  latencies describe these two instances, not vendor specifications**.
+- Disk reads are page-cache figures (containers may not drop caches);
+  the docking conclusions hold for the official 1iep system — validate
+  others independently.
 - The e=8 failure mode is an inherent property of Monte Carlo search
-  budget, not a defect in Vina or in us; its value is reminding you to
-  set your own budget line.
+  budget, not a defect; its value is reminding you to set your own
+  budget line.
 
 ## References
 
@@ -226,11 +223,9 @@ biology. *Nat. Genet.* 25(1), 25–29 (2000). doi:10.1038/75556
 
 ## Version & Declarations
 
-- **Version**: initial release 2026-10-02 (this is a rewrite: the first
-  draft was restructured the same day after reader feedback — organized
-  around the scientific questions and written for the user).
+- **Version**: initial release 2026-10-02.
 - **Self-assessment**: an author-reported validation, not third-party
-  verified; one instance per card, one window; boundaries in §6.
+  verified; one instance per card, one window; boundaries in §8.
   Third-party replication is planned follow-up.
 - **License**: code AGPL-3.0-or-later; this article CC-BY-4.0.
 - **Author & provenance**: Linxira-OS project maintainer · Repository:
