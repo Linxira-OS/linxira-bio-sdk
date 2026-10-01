@@ -6,15 +6,16 @@
 > 传输包已构建：`release-artifacts-rental/linxira-rental-bundle-2026-10-02.tar.gz`
 > （SHA256SUMS.txt 同目录；重建/校验：`python scripts/prepare-rental-bundle.py [--check]`）。
 
-## 1. 机器清单（AutoDL，2026-10-01 截图核实）
+## 1. 机器配置（租用渠道与时价不入库，仅记技术配置）
 
-| 机型 | 价格 | CPU/内存 | 驱动与 CUDA | SM | 本轮角色 |
-| --- | --- | --- | --- | --- | --- |
-| Tesla T4 / 16GB | ¥0.82/时 | 8 核 Xeon / 56GB | 550.90-580.65，CUDA ≤12.4-13.0 | sm_75 | wgpu/Vulkan 尝试 + 对接 + parity + cutile-rs sm 下限记录 |
-| V100-32GB | ¥1.98/时 | 6 核 Xeon Gold 6130 / 25GB | 525.89-580.82，CUDA ≤12.0-13.0 | sm_70 | 同上（二选一，优选驱动 580 机型即 CUDA ≤13.0） |
-| MTT S4000 / 48GB | ¥1.96/时 | 15 核 Xeon Gold 6430 / 100GB | MUSA 驱动 2.7.0 | MUSA mp | wgpu/Vulkan（官方 Vulkan 1.3）+ cudarc-musa git 尝试 + 对接 |
-| vGPU-32G（RTX 4080S 改造单卡） | 待上线（西北B区陆续上线） | — | — | sm_89 | **第二轮**：cutile-rs 真实测（本轮唯一 sm_80+ 候选卡未上线） |
-| RTX PRO 6000 ×400 | 十月下旬上线 | — | — | Blackwell | 观察档 |
+| 机型 | CPU/内存 | 驱动与 CUDA | SM | 本轮角色 |
+| --- | --- | --- | --- | --- |
+| Tesla T4 / 16GB | 8 核 Xeon / 56GB | 550.90-580.65，CUDA ≤12.4-13.0 | sm_75 | wgpu/Vulkan 尝试 + 对接 + parity + cutile-rs sm 下限记录 |
+| V100-32GB | 6 核 Xeon Gold 6130 / 25GB | 525.89-580.82，CUDA ≤12.0-13.0 | sm_70 | 同上（二选一，优选驱动 580 机型即 CUDA ≤13.0） |
+| MTT S4000 / 48GB | 15 核 Xeon Gold 6430 / 100GB | MUSA 驱动 2.7.0 | MUSA mp | wgpu/Vulkan（官方 Vulkan 1.3）+ cudarc-musa git 尝试 + 对接 |
+
+> cutile-rs 实测需 sm_80+ 档机型；本轮三张卡均在其下限之下（sm_70/75/MUSA），
+> 故本轮只固化边界数据，cutile-rs 真实测顺延到下一个 sm_89 档租用窗口。
 
 **SM 与 CUDA 版本口径（重要，决定验收预期）**：cutile-rs 的约束是 **SM 下限
 sm_80+**（工具链声明），与 toolkit 支持面是两回事——CUDA 13 移除的是 pre-Turing
@@ -53,8 +54,8 @@ cutile-rs 在这两张卡上**预期不可用**（记录失败文本即验收）
 | --- | --- |
 | Tesla 数据中心驱动可能不暴露 Vulkan → T2 无 non-CPU adapter | 该结果本身入台账（回退层覆盖面结论）；S4000 的 Vulkan 1.3 是本轮 Vulkan 主数据点 |
 | MUSA 驱动 2.7.0 与 cudarc-musa 的 MUSA SDK 5.2 ABI 错位 | 只记录结论不改代码；issue 素材归档（提案 §2.2） |
-| 4080S vGPU 未上线 → cutile-rs 实测推第二轮 | 本轮先固化 sm_70/75 边界数据；vGPU 上线后直接执行 cutile 执行卡 |
-| GitHub 拉取慢 | AutoDL 学术加速（`source /etc/network_turbo`）；bundle 走 FTP/JupyterLab 上传 |
+| 本轮无 sm_80+ 机型 → cutile-rs 实测顺延 | 本轮先固化 sm_70/75 边界数据；sm_89 档机型租用窗口直接执行 cutile 执行卡 |
+| GitHub 拉取慢 | 租用平台的 GitHub 加速或镜像；bundle 走 FTP/网页上传 |
 | 25GB 内存的 V100 机型构建吃紧 | 只构建 `-p linxira-bio-cli`（跳过 workspace 全量）；数据盘 50GB 足够 |
 
 ## 5. 博客（G5）规范 —— 技术论文体 + 参考文献
@@ -102,5 +103,5 @@ cutile-rs 在这两张卡上**预期不可用**（记录失败文本即验收）
 ## 6. 待办回填
 
 - [ ] 租用后回填：各机 T0-T4 结果到 `gpu-rental-2026-10-02.md`
-- [ ] 4080S vGPU 上线 → 第二轮（cutile-rs 执行卡，提案 §1.1/§2.3）
+- [ ] sm_89 档机型租用窗口 → cutile-rs 执行卡（提案 §1.1/§2.3）
 - [ ] 博客草稿 → `benchmark-results/2026-10-xx/`（本轮验收全 PASS 后）

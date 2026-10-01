@@ -45,8 +45,9 @@ RUNBOOK = """\
 # Linxira cloud-rental runbook (2026-10-02 round 1)
 
 Machines: NVIDIA V100-32GB (sm_70) or Tesla T4 (sm_75) + Moore Threads MTT
-S4000 (MUSA). The 4080S vGPU-32G (sm_89, cutile-rs candidate) is not yet
-online on AutoDL; it is round 2.
+S4000 (MUSA). cutile-rs requires an sm_80+ class card; with this round's
+lineup its measurement is deferred to a later window (record the sm
+boundary result instead).
 
 ## T0 — setup (<= 15 min)
 
@@ -60,7 +61,6 @@ online on AutoDL; it is round 2.
 
 Install the native tool (never bundled; probed by name):
 
-    # AutoDL images ship conda; vina is on conda-forge
     mamba install -y -c conda-forge autodock-vina
     vina --version
 
@@ -105,7 +105,8 @@ NVIDIA (V100 sm_70 / T4 sm_75):
     Record the exact error text.
 
 Moore S4000:
-    Check musa-smi / mthreads-gmi driver version (AutoDL shows 2.7.0).
+    Check musa-smi / mthreads-gmi driver version (listing showed 2.7.0;
+    confirm on the machine).
     cudarc-musa is not yet on crates.io (checked 2026-10-01); attempt a git
     dependency build in a scratch crate and record the outcome. Also run T2
     here: S4000 has an official Vulkan 1.3 driver, so wgpu may enumerate —
