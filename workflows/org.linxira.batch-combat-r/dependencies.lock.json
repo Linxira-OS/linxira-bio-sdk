@@ -1,0 +1,63 @@
+{
+  "schema_version": "2",
+  "lock_kind": "compatibility-and-resolution-policy",
+  "runtime": {
+    "name": "R",
+    "preferred_version": "4.6.1",
+    "version_requirement": ">=4.6.1,<4.7.0",
+    "release_policy": "latest-stable-patch-within-tested-minor"
+  },
+  "isolation": {
+    "scope": "project",
+    "interpreter_environment_variable": "LINXIRA_BIO_WORKFLOW_R",
+    "library_environment_variable": "LINXIRA_BIO_WORKFLOW_R_LIBRARY",
+    "declared_packages_must_resolve_from_project_library": true,
+    "all_loaded_non_base_packages_must_resolve_from_project_library": true,
+    "base_and_recommended_packages_may_resolve_from_runtime": true,
+    "global_library_mutation": false,
+    "global_path_mutation": false,
+    "side_by_side_runtime_versions": true
+  },
+  "repositories": [
+    {
+      "id": "cran",
+      "url": "https://cloud.r-project.org"
+    }
+  ],
+  "direct_requirements": [
+    {
+      "name": "jsonlite",
+      "version_requirement": ">=1.8.9,<3.0.0",
+      "repository": "cran",
+      "license": "MIT"
+    }
+  ],
+  "resolved_environment_lock": {
+    "required_before_activation": true,
+    "scope": "one-platform-one-r-runtime-one-project-library",
+    "completeness": "direct-and-transitive",
+    "required_fields": [
+      "name",
+      "version",
+      "repository",
+      "source_url",
+      "sha256",
+      "license"
+    ],
+    "activation_policy": "verify-hashes-and-health-check-before-atomic-activation",
+    "reuse_policy": "reuse-only-when-runtime-and-complete-lock-identities-match",
+    "entries": [
+      {
+        "name": "jsonlite",
+        "version": "2.0.0",
+        "repository": "cran",
+        "source_url": "https://cloud.r-project.org/src/contrib/jsonlite_2.0.0.tar.gz",
+        "sha256": "75eb910c82b350ec33f094779da0f87bff154c232e4ae39c9896a9b89f3ac82d",
+        "license": "MIT + file LICENSE"
+      }
+    ]
+  },
+  "pack_lock_completeness": "runtime-and-direct-requirements",
+  "execution_policy": "require-compatible-runtime-and-project-resolved-dependencies",
+  "installable": true
+}

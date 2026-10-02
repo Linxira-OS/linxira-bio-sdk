@@ -417,6 +417,14 @@
         "protein.domain.visualize.v1",
         "structure.viewer.v1"
       ]
+    },
+    {
+      "id": "correct-batch-effects",
+      "path": "skills/correct-batch-effects",
+      "kind": "executable",
+      "capabilities": [
+        "expression.batch-correct.v1"
+      ]
     }
   ]
 }

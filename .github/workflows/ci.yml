@@ -328,6 +328,35 @@ jobs:
           assert table.startswith("molecule_index\tmolecular_weight\tlogp"), table[:80]
           print("descriptors E2E ok: molecule_count", result["result"]["molecule_count"])
           PY
+      - name: Install batch-combat R pack dependency
+        run: |
+          Rscript -e 'lib <- Sys.getenv("LINXIRA_BIO_WORKFLOW_R_LIBRARY"); dir.create(lib, recursive = TRUE, showWarnings = FALSE); if (!requireNamespace("jsonlite", quietly = TRUE)) install.packages("jsonlite", lib = lib, repos = "https://cloud.r-project.org")'
+      - name: Run batch-combat R pack tests
+        run: Rscript workflows/org.linxira.batch-combat-r/tests/test_validation.R
+      - name: Create isolated batch-combat environment from hashed lock
+        run: |
+          uv python install 3.12
+          uv venv --python 3.12 "$GITHUB_WORKSPACE/.venv-combat"
+          uv pip install --python "$GITHUB_WORKSPACE/.venv-combat/bin/python" \
+            --disable-pip-version-check --require-hashes \
+            -r workflows/org.linxira.batch-combat-py/requirements.lock
+      - name: Run batch-combat python pack tests under locked Python
+        run: |
+          "$GITHUB_WORKSPACE/.venv-combat/bin/python" -m unittest discover \
+            -s workflows/org.linxira.batch-combat-py/tests -p "test_*.py"
+      - name: Run batch-combat cross-backend parity
+        run: |
+          export LINXIRA_BIO_WORKFLOW_PYTHON="$GITHUB_WORKSPACE/.venv-combat/bin/python"
+          "$GITHUB_WORKSPACE/.venv-combat/bin/python" workflows/tests/test_batch_parity.py
+      - name: Run chemistry conformers pack tests under locked Python
+        run: |
+          uv python install 3.12
+          uv venv --python 3.12 "$GITHUB_WORKSPACE/.venv-conformers"
+          uv pip install --python "$GITHUB_WORKSPACE/.venv-conformers/bin/python" \
+            --disable-pip-version-check --require-hashes \
+            -r workflows/org.linxira.chemistry-conformers-rdkit/requirements.lock
+          "$GITHUB_WORKSPACE/.venv-conformers/bin/python" -m unittest discover \
+            -s workflows/org.linxira.chemistry-conformers-rdkit/tests -p "test_*.py"
       - run: .venv-ci/bin/python scripts/validate-repository.py
       - run: .venv-ci/bin/python -m unittest discover -s tests/python -p "test_*.py"
       - run: .venv-ci/bin/python -m unittest discover -s workflows/tests -p "test_*.py"

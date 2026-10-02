@@ -71,6 +71,8 @@ pub fn embedded_document(capability: &str, locale: &str) -> Option<&'static str>
         ("environment.audit.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/environment.audit.v1/zh-CN.md")),
         ("environment.plan.v1", "en-US") => Some(include_str!("../../../docs/capabilities/environment.plan.v1/en-US.md")),
         ("environment.plan.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/environment.plan.v1/zh-CN.md")),
+        ("expression.batch-correct.v1", "en-US") => Some(include_str!("../../../docs/capabilities/expression.batch-correct.v1/en-US.md")),
+        ("expression.batch-correct.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/expression.batch-correct.v1/zh-CN.md")),
         ("expression.cluster.v1", "en-US") => Some(include_str!("../../../docs/capabilities/expression.cluster.v1/en-US.md")),
         ("expression.cluster.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/expression.cluster.v1/zh-CN.md")),
         ("expression.differential.v1", "en-US") => Some(include_str!("../../../docs/capabilities/expression.differential.v1/en-US.md")),

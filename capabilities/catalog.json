@@ -1822,6 +1822,21 @@
       "output_formats": [
         "json"
       ]
+    },
+    {
+      "id": "expression.batch-correct.v1",
+      "status": "available",
+      "category": "expression",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio expression batch-correct <matrix.csv|tsv> <output.tsv> --sample-table <samples.csv|tsv> [--batch-column batch] [--method combat] [--backend auto|python|r] [--json]",
+      "input_formats": [
+        "csv",
+        "tsv"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
     }
   ]
 }

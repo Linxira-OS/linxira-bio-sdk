@@ -1,0 +1,82 @@
+{
+  "schema_version": "2",
+  "id": "org.linxira.batch-combat-r",
+  "version": "0.1.0",
+  "publisher": {
+    "name": "Linxira OS",
+    "url": "https://github.com/Linxira-OS"
+  },
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
+  "entrypoint": {
+    "path": "src/run_combat.R",
+    "arguments": [
+      "--request",
+      "{request}",
+      "--result",
+      "{result}"
+    ]
+  },
+  "runtime": {
+    "kind": "r",
+    "version": ">=4.6.1,<4.7.0",
+    "core_compatibility": ">=0.1.0,<2.0.0",
+    "dependency_lock": {
+      "path": "dependencies.lock.json",
+      "sha256": "779b0f398235707442cb620a8f5b391abad52afc86e3af1bd8966e1b7da6f94c"
+    }
+  },
+  "input_schema": {
+    "type": "object",
+    "$ref": "schemas/input.schema.json"
+  },
+  "output_schema": {
+    "type": "object",
+    "$ref": "schemas/output.schema.json"
+  },
+  "platforms": [
+    "windows-gnu",
+    "debian",
+    "arch"
+  ],
+  "network": {
+    "access": "none",
+    "allowed_hosts": []
+  },
+  "resources": {
+    "minimum_memory_mb": 1024,
+    "minimum_disk_mb": 1024,
+    "recommended_threads": 1,
+    "gpu": "none"
+  },
+  "files": [
+    {
+      "path": "NOTICE.md",
+      "sha256": "8d20517dfbae24ec4fa13b5d68d6fff737c17327027b75a38755525b72596630"
+    },
+    {
+      "path": "README.md",
+      "sha256": "893992498abc59c179ae54d46fe24c10e077d94a95bb610918691ea2cc482b7e"
+    },
+    {
+      "path": "dependencies.lock.json",
+      "sha256": "779b0f398235707442cb620a8f5b391abad52afc86e3af1bd8966e1b7da6f94c"
+    },
+    {
+      "path": "schemas/input.schema.json",
+      "sha256": "aaa113025c3fa39035af3e425b20e46d4f56a30e23d496f339854cddde629712"
+    },
+    {
+      "path": "schemas/output.schema.json",
+      "sha256": "dd2bc619a4b49ef1472bbc7e561b070dc2e403a0aaaefd56446a48e8cd57b4ef"
+    },
+    {
+      "path": "src/run_combat.R",
+      "sha256": "78421608f4f44da78b20635290632f2f32025d89c4ff9e87980aec0300f5333b"
+    },
+    {
+      "path": "tests/test_validation.R",
+      "sha256": "e69d61d94554042445f0ac66f3749828629e8fa4611c05af1251ec0efee14222"
+    }
+  ]
+}

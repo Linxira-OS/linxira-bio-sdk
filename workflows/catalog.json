@@ -120,6 +120,22 @@
       "trust": "official",
       "runtime": "python",
       "manifest": "workflows/org.linxira.chemistry-conformers-rdkit/manifest.json"
+    },
+    {
+      "id": "org.linxira.batch-combat-py",
+      "capability": "expression.batch-correct.v1",
+      "status": "cataloged",
+      "trust": "official",
+      "runtime": "python",
+      "manifest": "workflows/org.linxira.batch-combat-py/manifest.json"
+    },
+    {
+      "id": "org.linxira.batch-combat-r",
+      "capability": "expression.batch-correct.v1",
+      "status": "cataloged",
+      "trust": "official",
+      "runtime": "r",
+      "manifest": "workflows/org.linxira.batch-combat-r/manifest.json"
     }
   ]
 }

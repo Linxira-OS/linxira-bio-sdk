@@ -75,6 +75,9 @@ the agent skills that select and validate them.
 - Read `skills/analyze-expression-matrix/SKILL.md` for implemented CSV/TSV
   matrix QC, normalization, PCA, sample/feature clustering, and native
   clustered-heatmap preparation.
+- Read `skills/correct-batch-effects/SKILL.md` for the implemented
+  `expression.batch-correct.v1` capability (ComBat parametric empirical
+  Bayes; python and r backends with byte-identical output).
 - Read `skills/quantify-expression/SKILL.md` for the implemented
   `expression.quantify.v1` capability (native salmon quant orchestration
   with quant.sf cross-check summaries).
