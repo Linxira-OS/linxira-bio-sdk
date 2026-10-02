@@ -712,6 +712,11 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         [expression, wgcna, arguments @ ..] if expression == "expression" && wgcna == "wgcna" => {
             print_wgcna(arguments)
         }
+        [expression, batch_correct, arguments @ ..]
+            if expression == "expression" && batch_correct == "batch-correct" =>
+        {
+            print_expression_batch_correct(arguments)
+        }
         [set, venn, arguments @ ..] if set == "set" && venn == "venn" => {
             print_set_analysis(arguments, true)
         }
@@ -3208,6 +3213,179 @@ fn print_chemistry_conformers(arguments: &[String]) -> Result<(), Box<dyn Error>
         &request_path,
         &result_path,
     )
+}
+
+fn print_expression_batch_correct(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut input: Option<String> = None;
+    let mut output: Option<String> = None;
+    let mut sample_table: Option<String> = None;
+    let mut batch_column = "batch".to_string();
+    let mut backend = "auto".to_string();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        let argument = &arguments[index];
+        let (flag, inline_value) = split_cli_flag(argument);
+        match flag.as_str() {
+            "--json" => json = true,
+            "--sample-table" => {
+                sample_table = Some(cli_flag_value(
+                    inline_value,
+                    arguments,
+                    &mut index,
+                    "--sample-table",
+                )?);
+            }
+            "--batch-column" => {
+                let value = cli_flag_value(inline_value, arguments, &mut index, "--batch-column")?;
+                if value.trim().is_empty() {
+                    return Err("--batch-column must be a non-empty string".into());
+                }
+                batch_column = value.trim().to_string();
+            }
+            "--method" => {
+                let value = cli_flag_value(inline_value, arguments, &mut index, "--method")?;
+                if value != "combat" {
+                    return Err(format!(
+                        "unsupported batch-correction method {value:?}; expected 'combat'"
+                    )
+                    .into());
+                }
+            }
+            "--backend" => {
+                let value = cli_flag_value(inline_value, arguments, &mut index, "--backend")?;
+                match value.as_str() {
+                    "auto" | "python" | "r" => backend = value,
+                    other => {
+                        return Err(format!(
+                            "unknown --backend value {other:?}; expected auto, python, or r"
+                        )
+                        .into());
+                    }
+                }
+            }
+            other if other.starts_with('-') => {
+                return Err(format!("unknown expression batch-correct option: {other}").into());
+            }
+            other if input.is_none() => input = Some(other.to_owned()),
+            other if output.is_none() => output = Some(other.to_owned()),
+            other => {
+                return Err(
+                    format!("unexpected expression batch-correct argument: {other}").into(),
+                );
+            }
+        }
+        index += 1;
+    }
+    let _ = json;
+    let input_path = Path::new(input.as_deref().ok_or(
+        "expression batch-correct requires <matrix.csv|tsv> <output.tsv> --sample-table <samples.csv|tsv>",
+    )?);
+    let output_path = Path::new(output.as_deref().ok_or(
+        "expression batch-correct requires <matrix.csv|tsv> <output.tsv> --sample-table <samples.csv|tsv>",
+    )?);
+    let sample_table_path = Path::new(sample_table.as_deref().ok_or(
+        "expression batch-correct requires --sample-table <samples.csv|tsv> (first column: sample id; batch column required)",
+    )?);
+    if !input_path.is_file() {
+        return Err(format!(
+            "expression batch-correct input matrix does not exist: {}",
+            input_path.display()
+        )
+        .into());
+    }
+    if !sample_table_path.is_file() {
+        return Err(format!(
+            "expression batch-correct sample table does not exist: {}",
+            sample_table_path.display()
+        )
+        .into());
+    }
+    if output_path.exists() {
+        return Err(format!(
+            "refusing to overwrite expression batch-correct output: {}",
+            output_path.display()
+        )
+        .into());
+    }
+    let input_path = fs::canonicalize(input_path)?;
+    let sample_table_path = fs::canonicalize(sample_table_path)?;
+    let output_parent = output_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    if !output_parent.is_dir() {
+        return Err(format!(
+            "expression batch-correct output directory does not exist: {}",
+            output_parent.display()
+        )
+        .into());
+    }
+    let output_parent = fs::canonicalize(output_parent)?;
+    let output_filename = output_path
+        .file_name()
+        .ok_or("expression batch-correct output has no file name")?
+        .to_string_lossy()
+        .into_owned();
+    let pack_id = match backend.as_str() {
+        "auto" | "python" => "org.linxira.batch-combat-py",
+        _ => "org.linxira.batch-combat-r",
+    };
+    let matrix_format = if input_path.extension().and_then(|e| e.to_str()) == Some("csv") {
+        "csv"
+    } else {
+        "tsv"
+    };
+    let sample_format = if sample_table_path.extension().and_then(|e| e.to_str()) == Some("csv") {
+        "csv"
+    } else {
+        "tsv"
+    };
+    let request = serde_json::json!({
+        "schema_version": "2",
+        "job_id": "cli",
+        "capability": "expression.batch-correct.v1",
+        "inputs": [
+            {
+                "artifact_id": "expression-matrix",
+                "role": "expression-matrix",
+                "cardinality": "single",
+                "files": [{
+                    "file_id": "input-matrix-1",
+                    "path": input_path.to_string_lossy(),
+                    "format": matrix_format,
+                    "compression": "none",
+                    "size_bytes": fs::metadata(&input_path)?.len(),
+                }],
+            },
+            {
+                "artifact_id": "sample-metadata",
+                "role": "sample-metadata",
+                "cardinality": "single",
+                "files": [{
+                    "file_id": "input-samples-1",
+                    "path": sample_table_path.to_string_lossy(),
+                    "format": sample_format,
+                    "compression": "none",
+                    "size_bytes": fs::metadata(&sample_table_path)?.len(),
+                }],
+            },
+        ],
+        "execution": {"mode": "local-cpu"},
+        "parameters": {
+            "output_directory": output_parent.to_string_lossy(),
+            "output_filename": output_filename,
+            "batch_column": batch_column,
+            "method": "combat",
+        },
+    });
+    let temporary = tempfile::Builder::new()
+        .prefix("linxira-bio-batch-correct-")
+        .tempdir()?;
+    let request_path = temporary.path().join("request.json");
+    let result_path = temporary.path().join("result.json");
+    fs::write(&request_path, serde_json::to_vec(&request)?)?;
+    run_workflow_pack(pack_id, &request_path, &result_path)
 }
 
 #[derive(serde::Serialize)]
@@ -8995,6 +9173,7 @@ fn usage() -> &'static str {
         "  linxira-bio expression heatmap <matrix.csv|tsv[.gz]> [--top-features N] [--no-scale] [--json]\n",
         "  linxira-bio expression volcano <differential.csv> <output.svg> [--padj P] [--log2-fold-change X] [--max-points N] [--json]\n",
         "  linxira-bio expression wgcna <expression.csv|tsv> <output.json> [--min-expression X] [--min-samples N] [--min-module-size N] [--merge-cut-height X] [--network-type signed|unsigned|signed hybrid] [--power N] [--no-log-transform] [--threads N] [--json]\n",
+        "  linxira-bio expression batch-correct <matrix.csv|tsv> <output.tsv> --sample-table <samples.csv|tsv> [--batch-column batch] [--method combat] [--backend auto|python|r] [--json]\n",
         "  linxira-bio set venn <sets.csv|tsv[.gz]> [--include-items] [--json]\n",
         "  linxira-bio set upset <sets.csv|tsv[.gz]> [--max-intersections N] [--include-items] [--json]\n",
         "  linxira-bio enrichment custom <genes.txt|csv|tsv> <associations.csv|tsv[.gz]> [--min-overlap N] [--max-terms N] [--include-genes] [--json]\n",

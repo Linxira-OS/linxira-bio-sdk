@@ -1,0 +1,4 @@
+interface:
+  display_name: "Correct Batch Effects"
+  short_description: "Remove batch effects from expression matrices with ComBat"
+  default_prompt: "Use $correct-batch-effects to remove the batch effect from this expression matrix while preserving the condition covariate."

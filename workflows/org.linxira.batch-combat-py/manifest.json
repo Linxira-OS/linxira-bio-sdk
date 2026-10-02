@@ -1,0 +1,120 @@
+{
+  "schema_version": "2",
+  "id": "org.linxira.batch-combat-py",
+  "version": "0.1.0",
+  "publisher": {
+    "name": "Linxira OS",
+    "url": "https://github.com/Linxira-OS"
+  },
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/Linxira-OS/linxira-bio-sdk",
+  "entrypoint": {
+    "path": "src/run_combat.py",
+    "arguments": [
+      "--request",
+      "{request}",
+      "--result",
+      "{result}"
+    ]
+  },
+  "runtime": {
+    "kind": "python",
+    "version": "3.12.x",
+    "core_compatibility": ">=0.1.0,<2.0.0",
+    "dependency_lock": {
+      "path": "requirements.lock",
+      "sha256": "a09edf324e32b20e36e6452656a75b26e109278d82fd43ea1c8f54023f49f4ed"
+    }
+  },
+  "resume": {
+    "enabled": true,
+    "state_file": "resume-state.json"
+  },
+  "contract": {
+    "inputs": [
+      {
+        "role": "expression-matrix",
+        "formats": [
+          "csv",
+          "tsv"
+        ]
+      },
+      {
+        "role": "sample-metadata",
+        "formats": [
+          "csv",
+          "tsv"
+        ]
+      }
+    ],
+    "outputs": {
+      "roles": [
+        "corrected-expression"
+      ],
+      "kind": "domain-file",
+      "formats": [
+        "tsv"
+      ],
+      "media_type": "text/tab-separated-values"
+    },
+    "parameters": [
+      "output_directory",
+      "output_filename",
+      "batch_column",
+      "method"
+    ]
+  },
+  "input_schema": {
+    "type": "object",
+    "$ref": "schemas/input.schema.json"
+  },
+  "output_schema": {
+    "type": "object",
+    "$ref": "schemas/output.schema.json"
+  },
+  "platforms": [
+    "windows-gnu",
+    "debian",
+    "arch"
+  ],
+  "network": {
+    "access": "none",
+    "allowed_hosts": []
+  },
+  "resources": {
+    "minimum_memory_mb": 1024,
+    "minimum_disk_mb": 1024,
+    "recommended_threads": 1,
+    "gpu": "none"
+  },
+  "files": [
+    {
+      "path": "NOTICE.md",
+      "sha256": "8d20517dfbae24ec4fa13b5d68d6fff737c17327027b75a38755525b72596630"
+    },
+    {
+      "path": "README.md",
+      "sha256": "23d63700d7dace7ec671486766cfb5e40f68c19f6f6a81f745c62bf0b4a6fe64"
+    },
+    {
+      "path": "requirements.lock",
+      "sha256": "a09edf324e32b20e36e6452656a75b26e109278d82fd43ea1c8f54023f49f4ed"
+    },
+    {
+      "path": "schemas/input.schema.json",
+      "sha256": "50266c23c46580faed364a3c549beda717d8cb59deb322d082ab7c05af741716"
+    },
+    {
+      "path": "schemas/output.schema.json",
+      "sha256": "8c09e0e582da31e3522f1b6af3d57f9f92434f2eb17ea2217d60060ee96c4007"
+    },
+    {
+      "path": "src/run_combat.py",
+      "sha256": "a2f1cbdaabf410a0a2dff63a24f6dda2c830a58afb91f5a4d6f7dc02f881277a"
+    },
+    {
+      "path": "tests/test_validation.py",
+      "sha256": "26600fbec1b5f69be35c5b0359eea0e63a155ae47dd9307f510785af4f5f74a9"
+    }
+  ]
+}
