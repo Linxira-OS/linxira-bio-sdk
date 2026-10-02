@@ -26,6 +26,40 @@
       "sha256": "7e36d404babd39f0afe0a7ee0b87ccf8eacf17476b8fea67939a97d9d9680231"
     }
   },
+  "contract": {
+    "inputs": [
+      {
+        "role": "expression-matrix",
+        "formats": [
+          "csv",
+          "tsv"
+        ]
+      },
+      {
+        "role": "sample-metadata",
+        "formats": [
+          "csv",
+          "tsv"
+        ]
+      }
+    ],
+    "outputs": {
+      "roles": [
+        "corrected-expression"
+      ],
+      "kind": "domain-file",
+      "formats": [
+        "tsv"
+      ],
+      "media_type": "text/tab-separated-values"
+    },
+    "parameters": [
+      "output_directory",
+      "output_filename",
+      "batch_column",
+      "method"
+    ]
+  },
   "input_schema": {
     "type": "object",
     "$ref": "schemas/input.schema.json"
@@ -52,7 +86,7 @@
   "files": [
     {
       "path": "NOTICE.md",
-      "sha256": "b1c568d00ae124461b22ea5789205e144b7717e13e7413166ebd9a1a35b4f124"
+      "sha256": "f17f1b4712f3622a93d4eb126f844cfaac3f5f4bf990359c77bd0d260f71b8ad"
     },
     {
       "path": "README.md",
