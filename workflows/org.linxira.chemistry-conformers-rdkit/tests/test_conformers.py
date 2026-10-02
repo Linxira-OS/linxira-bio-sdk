@@ -150,7 +150,10 @@ class ConformerPackTests(unittest.TestCase):
 
     def test_rejects_missing_output_parameter(self):
         with tempfile.TemporaryDirectory(prefix="linxira-conformers-missing-") as temporary:
-            request = self.build_request(temporary, {})
+            request = self.build_request(
+                temporary,
+                {"output_directory": temporary, "output_filename": "conformers.sdf"},
+            )
             del request["parameters"]["output_directory"]
             envelope, _ = self.run_pack(request)
             self.assertEqual(envelope["status"], "error")

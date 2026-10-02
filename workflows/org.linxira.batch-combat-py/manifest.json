@@ -23,7 +23,7 @@
     "core_compatibility": ">=0.1.0,<2.0.0",
     "dependency_lock": {
       "path": "requirements.lock",
-      "sha256": "a09edf324e32b20e36e6452656a75b26e109278d82fd43ea1c8f54023f49f4ed"
+      "sha256": "866c6db450c58ce88d268577154aa7e83f0dd4f2de6208d2028b204657a9a1b6"
     }
   },
   "resume": {
@@ -90,23 +90,23 @@
   "files": [
     {
       "path": "NOTICE.md",
-      "sha256": "8d20517dfbae24ec4fa13b5d68d6fff737c17327027b75a38755525b72596630"
+      "sha256": "b1c568d00ae124461b22ea5789205e144b7717e13e7413166ebd9a1a35b4f124"
     },
     {
       "path": "README.md",
-      "sha256": "23d63700d7dace7ec671486766cfb5e40f68c19f6f6a81f745c62bf0b4a6fe64"
+      "sha256": "10a73017161ce5c49cd7f773e1b5ac0d9a41eacc3822356e6cea4610dabd8d99"
     },
     {
       "path": "requirements.lock",
-      "sha256": "a09edf324e32b20e36e6452656a75b26e109278d82fd43ea1c8f54023f49f4ed"
+      "sha256": "866c6db450c58ce88d268577154aa7e83f0dd4f2de6208d2028b204657a9a1b6"
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "50266c23c46580faed364a3c549beda717d8cb59deb322d082ab7c05af741716"
+      "sha256": "3a2a383c52aef6d4bd13bfd9e6715df98fed27696a06359ebf3234787f651b21"
     },
     {
       "path": "schemas/output.schema.json",
-      "sha256": "8c09e0e582da31e3522f1b6af3d57f9f92434f2eb17ea2217d60060ee96c4007"
+      "sha256": "7dd6449ec1cfd389167bae09fe60a3a6c24e78dcc4372b74cf02817490b6314e"
     },
     {
       "path": "src/run_combat.py",

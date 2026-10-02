@@ -107,7 +107,7 @@
     },
     {
       "path": "tests/test_conformers.py",
-      "sha256": "9dd6c672abba0a5cb2a7ca39ce5041d8f855d1ef4c5ddef0803138f2c84beee3"
+      "sha256": "de1a73b6c404bd36aba6157e14dc279ab90a5d20ff1a61a98ad91382115a3a68"
     }
   ]
 }

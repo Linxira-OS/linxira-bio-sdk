@@ -23,7 +23,7 @@
     "core_compatibility": ">=0.1.0,<2.0.0",
     "dependency_lock": {
       "path": "dependencies.lock.json",
-      "sha256": "779b0f398235707442cb620a8f5b391abad52afc86e3af1bd8966e1b7da6f94c"
+      "sha256": "7e36d404babd39f0afe0a7ee0b87ccf8eacf17476b8fea67939a97d9d9680231"
     }
   },
   "input_schema": {
@@ -52,23 +52,23 @@
   "files": [
     {
       "path": "NOTICE.md",
-      "sha256": "8d20517dfbae24ec4fa13b5d68d6fff737c17327027b75a38755525b72596630"
+      "sha256": "b1c568d00ae124461b22ea5789205e144b7717e13e7413166ebd9a1a35b4f124"
     },
     {
       "path": "README.md",
-      "sha256": "893992498abc59c179ae54d46fe24c10e077d94a95bb610918691ea2cc482b7e"
+      "sha256": "0d9a656f15d73b37dac43cb321504aae03106bc97f8af27e68a0245f00e57389"
     },
     {
       "path": "dependencies.lock.json",
-      "sha256": "779b0f398235707442cb620a8f5b391abad52afc86e3af1bd8966e1b7da6f94c"
+      "sha256": "7e36d404babd39f0afe0a7ee0b87ccf8eacf17476b8fea67939a97d9d9680231"
     },
     {
       "path": "schemas/input.schema.json",
-      "sha256": "aaa113025c3fa39035af3e425b20e46d4f56a30e23d496f339854cddde629712"
+      "sha256": "da941804a467a88134e1333db73df9a29c723da0f11941351262673d3c4e8e94"
     },
     {
       "path": "schemas/output.schema.json",
-      "sha256": "dd2bc619a4b49ef1472bbc7e561b070dc2e403a0aaaefd56446a48e8cd57b4ef"
+      "sha256": "97e452617a72c0cfa19bd5daedb1cf0b1e0d8b3033660fae9e58067039983f42"
     },
     {
       "path": "src/run_combat.R",
