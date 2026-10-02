@@ -15,6 +15,7 @@ import json
 
 import os
 import shutil
+import sys
 import subprocess
 import tempfile
 import unittest
@@ -129,7 +130,7 @@ class TestCrossBackendParity(unittest.TestCase):
                 Path(python_interpreter) / "bin" / "python",
             ]
             python_interpreter = next((str(c) for c in candidates if c.is_file()), None)
-        python_interpreter = python_interpreter or shutil.which("python3") or shutil.which("python")
+        python_interpreter = python_interpreter or sys.executable
         assert python_interpreter is not None
         py_bytes = run_backend(PY_PACK, python_interpreter, "run_combat.py", matrix, table, root / "py")
         r_bytes = run_backend(R_PACK, "Rscript", "run_combat.R", matrix, table, root / "r")

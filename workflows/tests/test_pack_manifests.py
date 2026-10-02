@@ -149,8 +149,26 @@ class WorkflowManifestTests(unittest.TestCase):
             "org.linxira.visualization-ggplot2",
         }:
             self.verify_host_r_runtime_policy(pack_root, manifest)
+        elif pack_id == "org.linxira.batch-combat-r":
+            self.verify_combat_r_runtime_policy(pack_root, manifest)
         else:
             self.fail(f"no R runtime policy defined for pack {pack_id}")
+
+    def verify_combat_r_runtime_policy(self, pack_root: Path, manifest: dict) -> None:
+        """The batch-combat R pack resolves jsonlite from the project-isolated
+        library; base-R-only computation keeps the locked surface minimal."""
+        lock = load_json(pack_root / manifest["runtime"]["dependency_lock"]["path"])
+        self.assertEqual(lock["schema_version"], "2")
+        self.assertEqual(lock["lock_kind"], "compatibility-and-resolution-policy")
+        self.assertEqual(lock["runtime"]["version_requirement"],
+                         manifest["runtime"]["version"])
+        self.assertEqual(lock["isolation"]["scope"], "project")
+        self.assertTrue(lock["isolation"]["declared_packages_must_resolve_from_project_library"])
+        requirements = lock["direct_requirements"]
+        self.assertEqual([entry["name"] for entry in requirements], ["jsonlite"])
+        entries = lock["resolved_environment_lock"]["entries"]
+        self.assertTrue(entries, "project lock must resolve its dependency set")
+        self.assertEqual([entry["name"] for entry in entries], ["jsonlite"])
 
     def verify_host_r_runtime_policy(self, pack_root: Path, manifest: dict) -> None:
         """Benchmark/viz packs resolve against the host interpreter library
