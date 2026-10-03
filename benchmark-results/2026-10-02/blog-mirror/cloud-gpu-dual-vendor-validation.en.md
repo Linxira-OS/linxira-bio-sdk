@@ -67,7 +67,7 @@ on-site (47.3 s for 59 crates):
 | --- | --- | --- |
 | GPU | RTX 4080 SUPER, 32 GB, driver 595.71.05 (sm_89) | MTT S4000, 48 GB, MUSA driver 2.7.0 |
 | GPU compiler | nvcc 11.8 | mcc (MUSA toolkit 3.1.0) |
-| CPU | Xeon Platinum 8375C @2.9GHz, 128 vCPUs | Xeon Gold 6430, 15 cores |
+| CPU | Xeon Platinum 8375C @2.9GHz, 12 vCPUs (62 GB RAM) | Xeon Gold 6430, 15 vCPUs (100 GB RAM) |
 | OS | Ubuntu 22.04, kernel 5.15.0-25 | Ubuntu 22.04, kernel 5.15.0-105 |
 | Memory bandwidth (measured, STREAM triad) | 14.9 GB/s | 13.5 GB/s |
 | Data-disk seq. write (2 GiB) | 505 MB/s | 677 MB/s |
@@ -128,7 +128,7 @@ input, median of three runs on three different CPUs:
 | --- | --- | --- | --- |
 | 16-core Xeon (round-1 server) | 0.082 s | 0.312 s | 3.8× |
 | 15-core Xeon Gold 6430 (server B) | 0.047 s | 0.169 s | 3.6× |
-| 128-vCPU Xeon Platinum 8375C (server A) | 0.073 s | 0.288 s | 4.0× |
+| 12-vCPU Xeon Platinum 8375C (server A) | 0.073 s | 0.288 s | 4.0× |
 
 Output files are **byte-identical** to the reference implementation —
 the speedup does not come at the cost of changed results. Worth stating
@@ -185,6 +185,9 @@ Raw outputs (JSON/TSV/logs/hashes) live in the local archive
 - One rented instance per card, one window; cloud vCPUs, memory
   bandwidth, and disks are subject to host scheduling — **measured
   latencies describe these two instances, not vendor specifications**.
+  CPU/memory in the environment table follow the rental platform's
+  console specification (in-container nproc reports host CPUs, not the
+  instance quota); software versions are on-machine readings.
 - Disk reads are page-cache figures (containers may not drop caches);
   the docking conclusions hold for the official 1iep system — validate
   others independently.
