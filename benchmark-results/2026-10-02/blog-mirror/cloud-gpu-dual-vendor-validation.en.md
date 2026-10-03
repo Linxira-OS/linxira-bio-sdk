@@ -126,7 +126,7 @@ input, median of three runs on three different CPUs:
 
 | Machine (CPU) | Rust | pytrf (traditional Python) | speedup |
 | --- | --- | --- | --- |
-| 16-core Xeon (round-1 server) | 0.082 s | 0.312 s | 3.8× |
+| Round-1 cloud-rental instance (16-core Xeon) | 0.082 s | 0.312 s | 3.8× |
 | 15-core Xeon Gold 6430 (server B) | 0.047 s | 0.169 s | 3.6× |
 | 12-vCPU Xeon Platinum 8375C (server A) | 0.073 s | 0.288 s | 4.0× |
 
