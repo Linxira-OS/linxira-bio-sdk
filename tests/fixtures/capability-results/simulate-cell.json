@@ -1,0 +1,252 @@
+{
+  "seed": 42,
+  "model_source": "builtin",
+  "model": {
+    "monod_constant": 1000.0,
+    "substrate_initial": 100000,
+    "division_biomass": 150.0,
+    "genes": [
+      {
+        "id": "gene01",
+        "kon": 1.0,
+        "koff": 0.5,
+        "ks": 1.5,
+        "kdm": 0.12,
+        "ktl": 3.0,
+        "kdp": 0.02,
+        "yield_per_protein": 0.15
+      },
+      {
+        "id": "gene02",
+        "kon": 0.8,
+        "koff": 0.6,
+        "ks": 1.2,
+        "kdm": 0.1,
+        "ktl": 2.5,
+        "kdp": 0.02,
+        "yield_per_protein": 0.15
+      },
+      {
+        "id": "gene03",
+        "kon": 1.2,
+        "koff": 0.4,
+        "ks": 1.0,
+        "kdm": 0.15,
+        "ktl": 3.5,
+        "kdp": 0.025,
+        "yield_per_protein": 0.15
+      },
+      {
+        "id": "gene04",
+        "kon": 0.6,
+        "koff": 0.8,
+        "ks": 1.8,
+        "kdm": 0.11,
+        "ktl": 2.0,
+        "kdp": 0.02,
+        "yield_per_protein": 0.15
+      },
+      {
+        "id": "gene05",
+        "kon": 0.9,
+        "koff": 0.5,
+        "ks": 1.4,
+        "kdm": 0.13,
+        "ktl": 3.2,
+        "kdp": 0.022,
+        "yield_per_protein": 0.15
+      },
+      {
+        "id": "gene06",
+        "kon": 0.7,
+        "koff": 0.7,
+        "ks": 1.1,
+        "kdm": 0.14,
+        "ktl": 2.8,
+        "kdp": 0.02,
+        "yield_per_protein": 0.15
+      },
+      {
+        "id": "gene07",
+        "kon": 1.1,
+        "koff": 0.45,
+        "ks": 1.6,
+        "kdm": 0.12,
+        "ktl": 3.1,
+        "kdp": 0.024,
+        "yield_per_protein": 0.15
+      },
+      {
+        "id": "gene08",
+        "kon": 0.5,
+        "koff": 0.9,
+        "ks": 0.9,
+        "kdm": 0.16,
+        "ktl": 2.2,
+        "kdp": 0.02,
+        "yield_per_protein": 0.15
+      },
+      {
+        "id": "gene09",
+        "kon": 1.0,
+        "koff": 0.55,
+        "ks": 1.3,
+        "kdm": 0.12,
+        "ktl": 2.9,
+        "kdp": 0.021,
+        "yield_per_protein": 0.15
+      },
+      {
+        "id": "gene10",
+        "kon": 0.85,
+        "koff": 0.6,
+        "ks": 1.5,
+        "kdm": 0.13,
+        "ktl": 3.3,
+        "kdp": 0.023,
+        "yield_per_protein": 0.15
+      },
+      {
+        "id": "gene11",
+        "kon": 0.75,
+        "koff": 0.65,
+        "ks": 1.0,
+        "kdm": 0.15,
+        "ktl": 2.6,
+        "kdp": 0.02,
+        "yield_per_protein": 0.15
+      },
+      {
+        "id": "gene12",
+        "kon": 0.95,
+        "koff": 0.5,
+        "ks": 1.7,
+        "kdm": 0.11,
+        "ktl": 3.4,
+        "kdp": 0.025,
+        "yield_per_protein": 0.15
+      }
+    ]
+  },
+  "end_time": 120.0,
+  "bins": 100,
+  "event_count": 8240,
+  "transcription_events": 1108,
+  "translation_events": 4241,
+  "division_count": 7,
+  "lineage_depth": 7,
+  "initial_substrate": 100000,
+  "final_substrate": 0,
+  "final_biomass": 111.15000000000418,
+  "mean_generation_time": 5.655199990740379,
+  "per_gene": [
+    {
+      "id": "gene01",
+      "mean_mrna": 5.798082746102698,
+      "mean_protein": 36.617872637463826,
+      "final_mrna": 5,
+      "final_protein": 11,
+      "transcription_events": 121,
+      "translation_events": 359
+    },
+    {
+      "id": "gene02",
+      "mean_mrna": 4.693041403147272,
+      "mean_protein": 32.55818491907563,
+      "final_mrna": 8,
+      "final_protein": 12,
+      "transcription_events": 82,
+      "translation_events": 313
+    },
+    {
+      "id": "gene03",
+      "mean_mrna": 5.232922707648031,
+      "mean_protein": 37.15241957953817,
+      "final_mrna": 2,
+      "final_protein": 14,
+      "transcription_events": 99,
+      "translation_events": 325
+    },
+    {
+      "id": "gene04",
+      "mean_mrna": 6.053701724324963,
+      "mean_protein": 31.297959079633344,
+      "final_mrna": 8,
+      "final_protein": 7,
+      "transcription_events": 101,
+      "translation_events": 374
+    },
+    {
+      "id": "gene05",
+      "mean_mrna": 5.845718845188361,
+      "mean_protein": 33.76573294214342,
+      "final_mrna": 12,
+      "final_protein": 9,
+      "transcription_events": 124,
+      "translation_events": 404
+    },
+    {
+      "id": "gene06",
+      "mean_mrna": 1.804396489555885,
+      "mean_protein": 13.5017898258561,
+      "final_mrna": 6,
+      "final_protein": 5,
+      "transcription_events": 43,
+      "translation_events": 137
+    },
+    {
+      "id": "gene07",
+      "mean_mrna": 6.807213323541189,
+      "mean_protein": 56.93015610801358,
+      "final_mrna": 13,
+      "final_protein": 17,
+      "transcription_events": 135,
+      "translation_events": 666
+    },
+    {
+      "id": "gene08",
+      "mean_mrna": 1.5767359425788299,
+      "mean_protein": 9.446942379435125,
+      "final_mrna": 0,
+      "final_protein": 4,
+      "transcription_events": 33,
+      "translation_events": 84
+    },
+    {
+      "id": "gene09",
+      "mean_mrna": 4.0301900683428915,
+      "mean_protein": 34.33166381254853,
+      "final_mrna": 7,
+      "final_protein": 15,
+      "transcription_events": 83,
+      "translation_events": 312
+    },
+    {
+      "id": "gene10",
+      "mean_mrna": 6.4324589083061054,
+      "mean_protein": 47.710539150836,
+      "final_mrna": 10,
+      "final_protein": 15,
+      "transcription_events": 110,
+      "translation_events": 460
+    },
+    {
+      "id": "gene11",
+      "mean_mrna": 2.4850748415806394,
+      "mean_protein": 18.638578443187694,
+      "final_mrna": 7,
+      "final_protein": 7,
+      "transcription_events": 66,
+      "translation_events": 173
+    },
+    {
+      "id": "gene12",
+      "mean_mrna": 6.218615488033899,
+      "mean_protein": 50.027288991879246,
+      "final_mrna": 6,
+      "final_protein": 11,
+      "transcription_events": 111,
+      "translation_events": 634
+    }
+  ]
+}

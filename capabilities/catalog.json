@@ -86,6 +86,20 @@
       ]
     },
     {
+      "id": "simulate.cell.v1",
+      "status": "available",
+      "category": "simulation",
+      "default_execution": "local-cpu",
+      "command": "linxira-bio simulate cell <output.tsv> --time 120 --seed 42 --json",
+      "input_formats": [
+        "json"
+      ],
+      "output_formats": [
+        "tsv",
+        "json"
+      ]
+    },
+    {
       "id": "sequence.extract.v1",
       "status": "available",
       "category": "sequence-io",

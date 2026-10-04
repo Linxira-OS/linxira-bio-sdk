@@ -97,6 +97,7 @@ SCHEMA_FILES = (
     "schemas/peak-annotation.schema.json",
     "schemas/simulate-reads.schema.json",
     "schemas/simulate-sequence.schema.json",
+    "schemas/simulate-cell.schema.json",
     "schemas/ssr.schema.json",
     "schemas/structure-contact-map.schema.json",
     "schemas/structure-geometry.schema.json",
@@ -198,6 +199,10 @@ CAPABILITY_RESULT_CONTRACTS = (
     (
         "tests/fixtures/capability-results/simulate-reads.json",
         "schemas/simulate-reads.schema.json",
+    ),
+    (
+        "tests/fixtures/capability-results/simulate-cell.json",
+        "schemas/simulate-cell.schema.json",
     ),
     (
         "tests/fixtures/capability-results/phylogeny-iqtree.json",

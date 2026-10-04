@@ -105,8 +105,8 @@ use linxira_bio_core::similarity::{
     reciprocal_best_hits_path,
 };
 use linxira_bio_core::simulation::{
-    SimulateReadsOptions, SimulateSequenceOptions, simulate_reads_fastq_path,
-    simulate_sequence_fasta_path,
+    SimulateCellOptions, SimulateReadsOptions, SimulateSequenceOptions, simulate_cell_path,
+    simulate_reads_fastq_path, simulate_sequence_fasta_path,
 };
 use linxira_bio_core::spatial_transcriptomics::{
     render_barcode_rank_table, spatial_transcriptomics_path,
@@ -405,6 +405,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
         [simulate, reads, arguments @ ..] if simulate == "simulate" && reads == "reads" => {
             print_simulate_reads(arguments)
+        }
+        [simulate, cell, arguments @ ..] if simulate == "simulate" && cell == "cell" => {
+            print_simulate_cell(arguments)
         }
         [annotation, gene_density, arguments @ ..]
             if annotation == "annotation" && gene_density == "gene-density" =>
@@ -4555,6 +4558,84 @@ fn parse_percent_argument(value: &str, label: &str) -> Result<u64, Box<dyn Error
         return Err(format!("{label} must be between 0 and 100").into());
     }
     Ok((parsed * 100.0).round() as u64)
+}
+
+fn print_simulate_cell(arguments: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut output = None;
+    let mut model = None;
+    let mut options = SimulateCellOptions::default();
+    let mut json = false;
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--model" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--model requires a path")?;
+                model = Some(PathBuf::from(value));
+            }
+            "--time" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--time requires a value")?;
+                options.end_time = value
+                    .parse::<f64>()
+                    .map_err(|_| format!("--time must be a number of minutes: {value}"))?;
+            }
+            "--seed" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--seed requires a value")?;
+                options.seed = value
+                    .parse::<u64>()
+                    .map_err(|_| format!("--seed must be a non-negative integer: {value}"))?;
+            }
+            "--bins" => {
+                index += 1;
+                let value = arguments.get(index).ok_or("--bins requires a value")?;
+                options.bins = value
+                    .parse::<u32>()
+                    .map_err(|_| format!("--bins must be a positive integer: {value}"))?;
+            }
+            "--max-events" => {
+                index += 1;
+                let value = arguments
+                    .get(index)
+                    .ok_or("--max-events requires a value")?;
+                options.max_events = value
+                    .parse::<u64>()
+                    .map_err(|_| format!("--max-events must be a positive integer: {value}"))?;
+            }
+            "--json" => json = true,
+            value if value.starts_with('-') => {
+                return Err(format!("unknown simulate cell option: {value}").into());
+            }
+            value => {
+                if output.is_some() {
+                    return Err("simulate cell takes exactly one output path".into());
+                }
+                output = Some(value.to_owned());
+            }
+        }
+        index += 1;
+    }
+    let Some(output) = output else {
+        return Err(
+            "simulate cell requires <output.tsv> [--model model.json] [--time MIN] [--seed N] [--bins N] [--max-events N] --json"
+                .into(),
+        );
+    };
+    options.model = model;
+    let summary = simulate_cell_path(&output, &options)?;
+    if json {
+        print_analysis_json("simulate-cell", "simulate.cell.v1", &summary)?;
+    } else {
+        println!("output_path\t{output}");
+        println!("seed\t{}", summary.seed);
+        println!("division_count\t{}", summary.division_count);
+        println!("lineage_depth\t{}", summary.lineage_depth);
+        println!("final_substrate\t{}", summary.final_substrate);
+        println!("final_biomass\t{:.6}", summary.final_biomass);
+        println!("mean_generation_time\t{:.6}", summary.mean_generation_time);
+    }
+    Ok(())
 }
 
 fn print_simulate_reads(arguments: &[String]) -> Result<(), Box<dyn Error>> {
@@ -9146,6 +9227,7 @@ fn usage() -> &'static str {
 ",
         "  linxira-bio simulate reads <reference.fasta> <output.fastq> --read-length 150 --coverage 30|--read-count N [--paired] [--seed N] [--json]
 ",
+        "  linxira-bio simulate cell <output.tsv> [--model model.json] [--time MIN] [--seed N] [--bins N] [--max-events N] [--json]\n",
         "  linxira-bio annotation gene-density <input.gff3|gtf[.gz]> [--feature-type TYPE ...] [--window-size N] [--step-size N] [--json]\n",
         "  linxira-bio annotation go <input.csv|tsv[.gz]> <output.tsv> [--gene-column NAME] [--go-column NAME] [--json]\n",
         "  linxira-bio annotation eggnog <input.tsv[.gz]> <output.tsv> [--json]\n",

@@ -4,7 +4,7 @@
 //! harness and GPU consistency checks rely on.
 
 use flate2::read::MultiGzDecoder;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
@@ -613,11 +613,597 @@ fn percent(numerator: u64, denominator: u64) -> f64 {
     }
 }
 
+// --- mechanistic cell simulation ---------------------------------------------
+//
+// Minimal whole-cell-style lineage simulator: every gene runs a telegraph
+// (two-state promoter) model, translation is throttled by a Monod factor of
+// the remaining substrate, synthesized protein accrues biomass, and reaching
+// the division threshold splits the cell with binomial molecule partitioning.
+// The Gillespie direct method drives every reaction from the shared
+// xoshiro256** stream, so a run is byte-reproducible from
+// (seed, model, options) alone — the contract the benchmark harness and
+// cross-machine rental ledgers rely on.
+
+/// Reaction rates for one gene, all in events per minute.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CellGeneParams {
+    pub id: String,
+    /// Promoter activation rate (OFF -> ON).
+    pub kon: f64,
+    /// Promoter deactivation rate (ON -> OFF).
+    pub koff: f64,
+    /// Transcription rate while the promoter is ON.
+    pub ks: f64,
+    /// mRNA decay rate.
+    pub kdm: f64,
+    /// Translation rate per mRNA molecule.
+    pub ktl: f64,
+    /// Protein decay rate.
+    pub kdp: f64,
+    /// Biomass units contributed by each synthesized protein molecule.
+    pub yield_per_protein: f64,
+}
+
+/// Mechanistic cell model consumed by `simulate cell` and echoed in the
+/// summary so every run is self-describing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CellModel {
+    /// Substrate half-saturation constant of the Monod factor.
+    pub monod_constant: f64,
+    /// Initial substrate units; integer units partition binomially at division.
+    pub substrate_initial: u64,
+    /// Biomass threshold that triggers division.
+    pub division_biomass: f64,
+    pub genes: Vec<CellGeneParams>,
+}
+
+impl CellGeneParams {
+    fn builtin(index: usize) -> Self {
+        // Hand-picked varied rates: every gene bursts, none dominates the
+        // biomass budget.
+        const TABLE: [[f64; 7]; 12] = [
+            [1.00, 0.50, 1.5, 0.12, 3.0, 0.020, 0.15],
+            [0.80, 0.60, 1.2, 0.10, 2.5, 0.020, 0.15],
+            [1.20, 0.40, 1.0, 0.15, 3.5, 0.025, 0.15],
+            [0.60, 0.80, 1.8, 0.11, 2.0, 0.020, 0.15],
+            [0.90, 0.50, 1.4, 0.13, 3.2, 0.022, 0.15],
+            [0.70, 0.70, 1.1, 0.14, 2.8, 0.020, 0.15],
+            [1.10, 0.45, 1.6, 0.12, 3.1, 0.024, 0.15],
+            [0.50, 0.90, 0.9, 0.16, 2.2, 0.020, 0.15],
+            [1.00, 0.55, 1.3, 0.12, 2.9, 0.021, 0.15],
+            [0.85, 0.60, 1.5, 0.13, 3.3, 0.023, 0.15],
+            [0.75, 0.65, 1.0, 0.15, 2.6, 0.020, 0.15],
+            [0.95, 0.50, 1.7, 0.11, 3.4, 0.025, 0.15],
+        ];
+        let row = TABLE[index % TABLE.len()];
+        Self {
+            id: format!("gene{:02}", index + 1),
+            kon: row[0],
+            koff: row[1],
+            ks: row[2],
+            kdm: row[3],
+            ktl: row[4],
+            kdp: row[5],
+            yield_per_protein: row[6],
+        }
+    }
+}
+
+impl CellModel {
+    /// Built-in 12-gene panel: bursting expression, Monod-coupled growth, and
+    /// substrate exhaustion (visible growth slowdown) after roughly a dozen
+    /// divisions on a default-length lineage.
+    pub fn builtin() -> Self {
+        Self {
+            monod_constant: 1000.0,
+            substrate_initial: 100_000,
+            division_biomass: 150.0,
+            genes: (0..12).map(CellGeneParams::builtin).collect(),
+        }
+    }
+
+    fn validate(&self) -> Result<(), SimulationError> {
+        if self.genes.is_empty() {
+            return Err(SimulationError::InvalidOption(
+                "cell model needs at least 1 gene".to_owned(),
+            ));
+        }
+        if self.genes.len() > 4096 {
+            return Err(SimulationError::InvalidOption(
+                "cell model supports at most 4096 genes".to_owned(),
+            ));
+        }
+        if !self.monod_constant.is_finite() || self.monod_constant < 0.0 {
+            return Err(SimulationError::InvalidOption(
+                "monod_constant must be finite and non-negative".to_owned(),
+            ));
+        }
+        if !self.division_biomass.is_finite() || self.division_biomass <= 0.0 {
+            return Err(SimulationError::InvalidOption(
+                "division_biomass must be finite and positive".to_owned(),
+            ));
+        }
+        for gene in &self.genes {
+            if gene.id.is_empty() {
+                return Err(SimulationError::InvalidOption(
+                    "every gene needs a non-empty id".to_owned(),
+                ));
+            }
+            for (name, rate) in [
+                ("kon", gene.kon),
+                ("koff", gene.koff),
+                ("ks", gene.ks),
+                ("kdm", gene.kdm),
+                ("ktl", gene.ktl),
+                ("kdp", gene.kdp),
+                ("yield_per_protein", gene.yield_per_protein),
+            ] {
+                if !rate.is_finite() || rate < 0.0 {
+                    return Err(SimulationError::InvalidOption(format!(
+                        "gene {} rate {name} must be finite and non-negative",
+                        gene.id
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Options for `simulate cell`; `model: None` selects the built-in panel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SimulateCellOptions {
+    /// Optional model JSON path; `None` uses `CellModel::builtin`.
+    pub model: Option<PathBuf>,
+    /// Simulated minutes for the lineage run.
+    pub end_time: f64,
+    pub seed: u64,
+    /// Equal-width time-series bins for the TSV output.
+    pub bins: u32,
+    /// Upper bound on Gillespie events (guards runaway rate sets).
+    pub max_events: u64,
+}
+
+impl Default for SimulateCellOptions {
+    fn default() -> Self {
+        Self {
+            model: None,
+            // Two simulated hours: the built-in panel ramps up, divides fast,
+            // exhausts the medium (Monod collapse), and enters stationary
+            // phase — the full arc without minutes of dead tail.
+            end_time: 120.0,
+            seed: 42,
+            bins: 100,
+            max_events: 20_000_000,
+        }
+    }
+}
+
+/// Time-averaged per-gene expression over the whole run.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CellGeneSummary {
+    pub id: String,
+    pub mean_mrna: f64,
+    pub mean_protein: f64,
+    pub final_mrna: u64,
+    pub final_protein: u64,
+    pub transcription_events: u64,
+    pub translation_events: u64,
+}
+
+/// Summary of one lineage run; byte-identical for identical seed/model/options.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SimulateCellSummary {
+    pub seed: u64,
+    /// "builtin" or the model path as given on the command line.
+    pub model_source: String,
+    pub model: CellModel,
+    pub end_time: f64,
+    pub bins: u32,
+    pub event_count: u64,
+    pub transcription_events: u64,
+    pub translation_events: u64,
+    pub division_count: u64,
+    /// Generations completed by the tracked lineage.
+    pub lineage_depth: u64,
+    pub initial_substrate: u64,
+    pub final_substrate: u64,
+    pub final_biomass: f64,
+    /// Mean minutes between the first and last division; 0.0 with <2 divisions.
+    pub mean_generation_time: f64,
+    pub per_gene: Vec<CellGeneSummary>,
+}
+
+const CHANNELS_PER_GENE: usize = 5;
+
+#[derive(Debug)]
+struct LineageState {
+    promoter_on: Vec<bool>,
+    mrna: Vec<u64>,
+    protein: Vec<u64>,
+    substrate: u64,
+    biomass: f64,
+    time: f64,
+    depth: u64,
+}
+
+#[derive(Debug, Default, Clone)]
+struct BinAccumulator {
+    dt: f64,
+    mrna: f64,
+    protein: f64,
+    biomass: f64,
+    monod: f64,
+    divisions: u64,
+}
+
+#[derive(Debug)]
+struct LineageOutputs {
+    bins: Vec<BinAccumulator>,
+    transcription: Vec<u64>,
+    translation: Vec<u64>,
+    transcription_total: u64,
+    translation_total: u64,
+    gene_mrna_integral: Vec<f64>,
+    gene_protein_integral: Vec<f64>,
+    division_times: Vec<f64>,
+    event_count: u64,
+    final_state: LineageState,
+}
+
+fn validate_cell_options(options: &SimulateCellOptions) -> Result<(), SimulationError> {
+    if !options.end_time.is_finite() || options.end_time <= 0.0 {
+        return Err(SimulationError::InvalidOption(
+            "end time must be finite and positive".to_owned(),
+        ));
+    }
+    if options.bins == 0 || options.bins > 100_000 {
+        return Err(SimulationError::InvalidOption(
+            "bins must be between 1 and 100000".to_owned(),
+        ));
+    }
+    if options.max_events == 0 {
+        return Err(SimulationError::InvalidOption(
+            "max events must be at least 1".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+/// 53 random mantissa bits -> uniform in `[0, 1)`.
+fn uniform_unit_interval(rng: &mut SimulationRng) -> f64 {
+    (rng.next_u64() >> 11) as f64 * (1.0 / (1u64 << 53) as f64)
+}
+
+fn exponential_waiting_time(rng: &mut SimulationRng, total_rate: f64) -> f64 {
+    -(1.0 - uniform_unit_interval(rng)).ln() / total_rate
+}
+
+/// Independent fair coin flips; n can be large (substrate units), so this is
+/// the only part of the run whose cost scales with molecule counts.
+fn binomial_half(rng: &mut SimulationRng, count: u64) -> u64 {
+    (0..count).filter(|_| rng.below(2) == 0).count() as u64
+}
+
+fn run_lineage(
+    model: &CellModel,
+    options: &SimulateCellOptions,
+) -> Result<LineageOutputs, SimulationError> {
+    let gene_count = model.genes.len();
+    let mut state = LineageState {
+        promoter_on: vec![false; gene_count],
+        mrna: vec![0; gene_count],
+        protein: vec![0; gene_count],
+        substrate: model.substrate_initial,
+        biomass: 0.0,
+        time: 0.0,
+        depth: 0,
+    };
+    let bin_width = options.end_time / options.bins as f64;
+    let mut bins = vec![BinAccumulator::default(); options.bins as usize];
+    let mut gene_mrna_integral = vec![0.0; gene_count];
+    let mut gene_protein_integral = vec![0.0; gene_count];
+    let mut transcription: Vec<u64> = vec![0; gene_count];
+    let mut translation: Vec<u64> = vec![0; gene_count];
+    let mut division_times: Vec<f64> = Vec::new();
+    let mut rng = SimulationRng::new(options.seed);
+    let mut propensities = vec![0.0_f64; gene_count * CHANNELS_PER_GENE];
+    let mut event_count: u64 = 0;
+
+    // Accumulate `elapsed` minutes of the current (constant) state into the
+    // binned time series, splitting at bin boundaries. Bins advance by
+    // arithmetic index, never by re-walking a floating-point cursor, so the
+    // loop always terminates.
+    let accumulate = |state: &LineageState,
+                      monod: f64,
+                      start: f64,
+                      elapsed: f64,
+                      bins: &mut Vec<BinAccumulator>,
+                      gene_mrna_integral: &mut [f64],
+                      gene_protein_integral: &mut [f64]| {
+        if elapsed <= 0.0 {
+            return;
+        }
+        let total_mrna = state.mrna.iter().sum::<u64>() as f64;
+        let total_protein = state.protein.iter().sum::<u64>() as f64;
+        let first_index = ((start / bin_width) as usize).min(bins.len() - 1);
+        let last_index = (((start + elapsed) / bin_width) as usize).min(bins.len() - 1);
+        for index in first_index..=last_index {
+            let bin_start = bin_width * index as f64;
+            let bin_end = if index + 1 == bins.len() {
+                options.end_time
+            } else {
+                bin_width * (index + 1) as f64
+            };
+            let lo = if index == first_index {
+                start
+            } else {
+                bin_start
+            };
+            let hi = if index == last_index {
+                start + elapsed
+            } else {
+                bin_end
+            };
+            let chunk = hi - lo;
+            if chunk <= 0.0 {
+                continue;
+            }
+            let bin = &mut bins[index];
+            bin.dt += chunk;
+            bin.mrna += total_mrna * chunk;
+            bin.protein += total_protein * chunk;
+            bin.biomass += state.biomass * chunk;
+            bin.monod += monod * chunk;
+            for slot in 0..gene_count {
+                gene_mrna_integral[slot] += state.mrna[slot] as f64 * chunk;
+                gene_protein_integral[slot] += state.protein[slot] as f64 * chunk;
+            }
+        }
+    };
+
+    while state.time < options.end_time {
+        let current_monod = if state.substrate == 0 {
+            0.0
+        } else {
+            let substrate = state.substrate as f64;
+            substrate / (model.monod_constant + substrate)
+        };
+        let mut total_rate = 0.0;
+        for (index, gene) in model.genes.iter().enumerate() {
+            let on = state.promoter_on[index];
+            let mrna = state.mrna[index] as f64;
+            let protein = state.protein[index] as f64;
+            let rates = [
+                if on { gene.koff } else { gene.kon },
+                if on { gene.ks } else { 0.0 },
+                gene.kdm * mrna,
+                gene.ktl * current_monod * mrna,
+                gene.kdp * protein,
+            ];
+            for (slot, rate) in rates.iter().enumerate() {
+                propensities[index * CHANNELS_PER_GENE + slot] = *rate;
+            }
+            total_rate += rates[0] + rates[1] + rates[2] + rates[3] + rates[4];
+        }
+        if total_rate <= 0.0 {
+            // Absorbing state: nothing can ever fire again.
+            let elapsed = options.end_time - state.time;
+            accumulate(
+                &state,
+                current_monod,
+                state.time,
+                elapsed,
+                &mut bins,
+                &mut gene_mrna_integral,
+                &mut gene_protein_integral,
+            );
+            state.time = options.end_time;
+            break;
+        }
+        let waiting = exponential_waiting_time(&mut rng, total_rate);
+        let next_time = state.time + waiting;
+        let elapsed = if next_time >= options.end_time {
+            options.end_time - state.time
+        } else {
+            waiting
+        };
+        accumulate(
+            &state,
+            current_monod,
+            state.time,
+            elapsed,
+            &mut bins,
+            &mut gene_mrna_integral,
+            &mut gene_protein_integral,
+        );
+        if next_time >= options.end_time {
+            state.time = options.end_time;
+            break;
+        }
+        state.time = next_time;
+
+        // Pick the firing channel in fixed gene-then-reaction order.
+        let mut target = uniform_unit_interval(&mut rng) * total_rate;
+        let mut chosen = propensities.len() - 1;
+        for (slot, rate) in propensities.iter().enumerate() {
+            target -= rate;
+            if target < 0.0 {
+                chosen = slot;
+                break;
+            }
+        }
+        // Floating-point residue guard: land on the last positive channel.
+        if propensities[chosen] == 0.0 {
+            chosen = propensities
+                .iter()
+                .rposition(|rate| *rate > 0.0)
+                .unwrap_or(chosen);
+        }
+
+        let gene_index = chosen / CHANNELS_PER_GENE;
+        match chosen % CHANNELS_PER_GENE {
+            // Slot 0 carries kon (when OFF) or koff (when ON) — a toggle.
+            0 => state.promoter_on[gene_index] = !state.promoter_on[gene_index],
+            1 => {
+                state.mrna[gene_index] += 1;
+                transcription[gene_index] += 1;
+            }
+            2 => state.mrna[gene_index] -= 1,
+            3 => {
+                state.protein[gene_index] += 1;
+                state.biomass += model.genes[gene_index].yield_per_protein;
+                state.substrate = state.substrate.saturating_sub(1);
+                translation[gene_index] += 1;
+            }
+            _ => state.protein[gene_index] -= 1,
+        }
+        event_count += 1;
+        if event_count > options.max_events {
+            return Err(SimulationError::InvalidOption(format!(
+                "event budget exhausted after {} events; raise max events, shorten the run, or reduce the gene count",
+                options.max_events
+            )));
+        }
+
+        // Biomass only changes on translation, so division is checked here.
+        if state.biomass >= model.division_biomass {
+            for index in 0..gene_count {
+                state.mrna[index] = binomial_half(&mut rng, state.mrna[index]);
+                state.protein[index] = binomial_half(&mut rng, state.protein[index]);
+            }
+            state.substrate = binomial_half(&mut rng, state.substrate);
+            state.biomass /= 2.0;
+            state.depth += 1;
+            division_times.push(state.time);
+            let index = ((state.time / bin_width) as usize).min(bins.len() - 1);
+            bins[index].divisions += 1;
+        }
+    }
+
+    let transcription_total = transcription.iter().sum();
+    let translation_total = translation.iter().sum();
+    Ok(LineageOutputs {
+        bins,
+        transcription,
+        translation,
+        transcription_total,
+        translation_total,
+        gene_mrna_integral,
+        gene_protein_integral,
+        division_times,
+        event_count,
+        final_state: state,
+    })
+}
+
+fn write_time_series(
+    output: &Path,
+    options: &SimulateCellOptions,
+    bins: &[BinAccumulator],
+) -> Result<(), SimulationError> {
+    let file = File::create(output)?;
+    let mut writer = BufWriter::new(file);
+    writeln!(
+        writer,
+        "bin\tt_start\tt_end\tmean_total_mrna\tmean_total_protein\tmean_biomass\tmean_monod_factor\tdivisions"
+    )?;
+    let bin_width = options.end_time / options.bins as f64;
+    for (index, bin) in bins.iter().enumerate() {
+        let start = bin_width * index as f64;
+        let end = if index + 1 == bins.len() {
+            options.end_time
+        } else {
+            bin_width * (index + 1) as f64
+        };
+        let mean = |sum: f64| if bin.dt > 0.0 { sum / bin.dt } else { 0.0 };
+        writeln!(
+            writer,
+            "{}\t{:.6}\t{:.6}\t{:.6}\t{:.6}\t{:.6}\t{:.6}\t{}",
+            index,
+            start,
+            end,
+            mean(bin.mrna),
+            mean(bin.protein),
+            mean(bin.biomass),
+            mean(bin.monod),
+            bin.divisions
+        )?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+/// Simulates one lineage with the exact Gillespie direct method and writes the
+/// binned time-series TSV. Identical `(seed, model, options)` inputs produce
+/// byte-identical outputs.
+pub fn simulate_cell_path(
+    output: impl AsRef<Path>,
+    options: &SimulateCellOptions,
+) -> Result<SimulateCellSummary, SimulationError> {
+    validate_cell_options(options)?;
+    let (model, model_source) = match &options.model {
+        Some(path) => {
+            let file = File::open(path).map_err(|_| SimulationError::MissingInput(path.clone()))?;
+            let parsed: CellModel =
+                serde_json::from_reader(BufReader::new(file)).map_err(|error| {
+                    SimulationError::InvalidOption(format!("invalid cell model JSON: {error}"))
+                })?;
+            (parsed, path.display().to_string())
+        }
+        None => (CellModel::builtin(), "builtin".to_owned()),
+    };
+    model.validate()?;
+    let output = output.as_ref();
+    if output.exists() {
+        return Err(SimulationError::OutputAlreadyExists(output.to_path_buf()));
+    }
+    let initial_substrate = model.substrate_initial;
+    let outputs = run_lineage(&model, options)?;
+    write_time_series(output, options, &outputs.bins)?;
+    let mean_generation_time = match outputs.division_times.as_slice() {
+        [first, .., last] => (last - first) / (outputs.division_times.len() - 1) as f64,
+        _ => 0.0,
+    };
+    let end_time = options.end_time;
+    let per_gene = model
+        .genes
+        .iter()
+        .enumerate()
+        .map(|(index, gene)| CellGeneSummary {
+            id: gene.id.clone(),
+            mean_mrna: outputs.gene_mrna_integral[index] / end_time,
+            mean_protein: outputs.gene_protein_integral[index] / end_time,
+            final_mrna: outputs.final_state.mrna[index],
+            final_protein: outputs.final_state.protein[index],
+            transcription_events: outputs.transcription[index],
+            translation_events: outputs.translation[index],
+        })
+        .collect();
+    Ok(SimulateCellSummary {
+        seed: options.seed,
+        model_source,
+        model,
+        end_time,
+        bins: options.bins,
+        event_count: outputs.event_count,
+        transcription_events: outputs.transcription_total,
+        translation_events: outputs.translation_total,
+        division_count: outputs.division_times.len() as u64,
+        lineage_depth: outputs.final_state.depth,
+        initial_substrate,
+        final_substrate: outputs.final_state.substrate,
+        final_biomass: outputs.final_state.biomass,
+        mean_generation_time,
+        per_gene,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        SimulateReadsOptions, SimulateSequenceOptions, SimulationRng, simulate_reads_fastq_path,
-        simulate_sequence_fasta_path,
+        CellModel, SimulateCellOptions, SimulateReadsOptions, SimulateSequenceOptions,
+        SimulationRng, simulate_cell_path, simulate_reads_fastq_path, simulate_sequence_fasta_path,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -722,6 +1308,146 @@ mod tests {
         )
         .expect_err("zero count rejected");
         assert!(error.to_string().contains("at least 1"));
+        let _ = fs::remove_file(&output);
+    }
+
+    #[test]
+    fn cell_lineage_is_byte_reproducible() {
+        let options = SimulateCellOptions {
+            end_time: 240.0,
+            bins: 12,
+            seed: 7,
+            ..SimulateCellOptions::default()
+        };
+        let first = scratch("cell-a.tsv");
+        let second = scratch("cell-b.tsv");
+        let summary_a = simulate_cell_path(&first, &options).expect("cell run");
+        let summary_b = simulate_cell_path(&second, &options).expect("cell repeat");
+        assert_eq!(summary_a, summary_b);
+        assert_eq!(fs::read(&first).unwrap(), fs::read(&second).unwrap());
+        assert!(
+            summary_a.division_count >= 2,
+            "builtin panel should divide within 240 minutes"
+        );
+        assert!(summary_a.lineage_depth >= 1);
+        let transcription_sum = summary_a
+            .per_gene
+            .iter()
+            .map(|gene| gene.transcription_events)
+            .sum::<u64>();
+        assert_eq!(transcription_sum, summary_a.transcription_events);
+        fs::remove_file(&first).unwrap();
+        fs::remove_file(&second).unwrap();
+    }
+
+    #[test]
+    fn starvation_stretches_generation_time() {
+        let rich_options = SimulateCellOptions {
+            end_time: 600.0,
+            bins: 10,
+            seed: 5,
+            ..SimulateCellOptions::default()
+        };
+        let mut starved_model = CellModel::builtin();
+        starved_model.substrate_initial = 120;
+        let model_path = scratch("starved-model.json");
+        fs::write(&model_path, serde_json::to_string(&starved_model).unwrap()).unwrap();
+        let starved_options = SimulateCellOptions {
+            model: Some(model_path.clone()),
+            end_time: 600.0,
+            bins: 10,
+            seed: 5,
+            ..SimulateCellOptions::default()
+        };
+        let rich_path = scratch("cell-rich.tsv");
+        let starved_path = scratch("cell-starved.tsv");
+        let rich = simulate_cell_path(&rich_path, &rich_options).expect("rich run");
+        let starved = simulate_cell_path(&starved_path, &starved_options).expect("starved run");
+        assert!(rich.mean_generation_time > 0.0);
+        // Substrate depletion throttles translation (Monod), so the starved
+        // lineage must complete far fewer divisions in the same window.
+        assert!(
+            starved.division_count * 3 < rich.division_count,
+            "starved {} vs rich {} divisions",
+            starved.division_count,
+            rich.division_count
+        );
+        assert!(starved.final_substrate <= starved_model.substrate_initial / 2);
+        fs::remove_file(&rich_path).unwrap();
+        fs::remove_file(&starved_path).unwrap();
+        fs::remove_file(&model_path).unwrap();
+    }
+
+    #[test]
+    fn default_summary_matches_fixture() {
+        // The committed fixture is the byte-level record of the default
+        // builtin run (seed 42, end_time 120). First run generates it; every
+        // later run — on any machine — must reproduce it exactly. Delete the
+        // file only when the builtin model or defaults changed intentionally.
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture_path =
+            manifest.join("../../../tests/fixtures/capability-results/simulate-cell.json");
+        let out = scratch("cell-fixture.tsv");
+        let summary = simulate_cell_path(&out, &SimulateCellOptions::default()).unwrap();
+        let generated = serde_json::to_string_pretty(&summary).unwrap() + "\n";
+        if fixture_path.exists() {
+            let committed = fs::read_to_string(&fixture_path).unwrap();
+            assert_eq!(
+                committed, generated,
+                "default cell summary drifted from the committed fixture"
+            );
+        } else {
+            fs::write(&fixture_path, &generated).unwrap();
+        }
+        fs::remove_file(&out).unwrap();
+    }
+
+    #[test]
+    fn cell_rejects_invalid_options_models_and_budgets() {
+        let output = scratch("cell-bad.tsv");
+        let error = simulate_cell_path(
+            &output,
+            &SimulateCellOptions {
+                end_time: 0.0,
+                ..SimulateCellOptions::default()
+            },
+        )
+        .expect_err("zero end time rejected");
+        assert!(error.to_string().contains("end time"));
+        let error = simulate_cell_path(
+            &output,
+            &SimulateCellOptions {
+                bins: 0,
+                ..SimulateCellOptions::default()
+            },
+        )
+        .expect_err("zero bins rejected");
+        assert!(error.to_string().contains("bins"));
+        let model_path = scratch("cell-bad-model.json");
+        fs::write(
+            &model_path,
+            "{\"monod_constant\":1000.0,\"substrate_initial\":100,\"division_biomass\":10.0,\"genes\":[]}",
+        )
+        .unwrap();
+        let error = simulate_cell_path(
+            &output,
+            &SimulateCellOptions {
+                model: Some(model_path.clone()),
+                ..SimulateCellOptions::default()
+            },
+        )
+        .expect_err("empty gene panel rejected");
+        assert!(error.to_string().contains("at least 1 gene"));
+        let error = simulate_cell_path(
+            &output,
+            &SimulateCellOptions {
+                max_events: 10,
+                ..SimulateCellOptions::default()
+            },
+        )
+        .expect_err("tiny event budget rejected");
+        assert!(error.to_string().contains("event budget"));
+        fs::remove_file(&model_path).unwrap();
         let _ = fs::remove_file(&output);
     }
 }

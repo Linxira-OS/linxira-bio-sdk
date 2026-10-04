@@ -219,6 +219,8 @@ pub fn embedded_document(capability: &str, locale: &str) -> Option<&'static str>
         ("similarity.hmmer.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/similarity.hmmer.v1/zh-CN.md")),
         ("similarity.reciprocal.v1", "en-US") => Some(include_str!("../../../docs/capabilities/similarity.reciprocal.v1/en-US.md")),
         ("similarity.reciprocal.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/similarity.reciprocal.v1/zh-CN.md")),
+        ("simulate.cell.v1", "en-US") => Some(include_str!("../../../docs/capabilities/simulate.cell.v1/en-US.md")),
+        ("simulate.cell.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/simulate.cell.v1/zh-CN.md")),
         ("simulate.reads.v1", "en-US") => Some(include_str!("../../../docs/capabilities/simulate.reads.v1/en-US.md")),
         ("simulate.reads.v1", "zh-CN") => Some(include_str!("../../../docs/capabilities/simulate.reads.v1/zh-CN.md")),
         ("simulate.sequence.v1", "en-US") => Some(include_str!("../../../docs/capabilities/simulate.sequence.v1/en-US.md")),
