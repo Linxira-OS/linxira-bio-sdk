@@ -82,8 +82,9 @@ M0 统一输出框架 ──┬──> M1 双后端绘图（依赖 OutputSpec/Pl
 | D GPU 内核推进 | Pearson v3（subgroup 归约）→ 厂商栈 host 抽象层 → sycl-rs 本机尝试 | 未开始 |
 | E 常规轨二 | 批次效应校正（ComBat R+Py 双 pack）→ QTL+混合模型（R pack） | 进行中（2026-10-02：expression.batch-correct.v1 已发布，python/r 后端字节一致） |
 | F 化学二+长读长 | chemistry.screen.v1 → 长读 QC → quantum.semiempirical.v1 | 未开始 |
-| G GPU 前沿包装 | cellpose pack（gpu 契约首发）→ trajectory.analysis.v1 | 未开始 |
+| G GPU 前沿包装（插队特批，2026-10-04） | cellpose pack（gpu 契约首发，AIVC 包装范式模板）→ trajectory.analysis.v1 | 进行中（用户点名插队：AIVC/虚拟细胞面试叙事；首发验证窗口 = vGPU-32GB，见 cloud-rental-plan-round5 W5） |
 | H 工具层收尾 | 报告层一期 → 模拟器二期（群体遗传）→ 参考基因组管理 | 未开始 |
+| I 机制细胞模拟（插队特批，2026-10-04） | simulate.cell.v1（最小全细胞机制模拟：Telegraph 随机基因表达 + Monod 代谢耦合生长 + 种子化分裂；Gillespie 精确算法、xoshiro256、字节级复现；纯 Rust 无 DL 依赖） | 进行中（用户点名插队：求职展示优先级） |
 
 长期池（H 后按需提级）：AMR 分型套件、16S DADA2、MACS2、Evo2/Borzoi/RFdiffusion pack、
 批次 Tier2 各项、单细胞 M4 大件。
@@ -664,6 +665,7 @@ C4 带宽并行 / C5 重型原生编排 / C6 DL 推理 / C7 仅云**。
 | --- | --- | --- |
 | 模拟器层（序列/读段/群体遗传合成数据+黄金真值） | M2 benchmark 与 GPU 一致性对照的燃料 | 一期 [x] 2026-09-30：序列+读段合成已发布（simulate.sequence.v1 / simulate.reads.v1，xoshiro256 种子、字节级可复现）；二期（群体遗传）构思中 |
 | 模拟器三期：qPCR 反应模拟（`simulate.qpcr.v1` 构思：扩增效率/熔解曲线/Ct 真值合成，benchmark 燃料） | 云租赁第 4 轮用户点名（2026-10-01）；对标 MIQE 规范的合成数据 | 未开始（先定 schema 再动工） |
+| 模拟器四期：机制型全细胞模拟（`simulate.cell.v1`：Telegraph 随机基因表达 + Monod 代谢耦合 + 分裂二项分区；Gillespie 精确模拟、xoshiro256 种子、字节级可复现；GPU 加速内核后置登记） | 用户点名插队（2026-10-04，求职展示优先；AIVC 讨论裁决走机制路线，AI 封装行维持观察档）；黄金真值作 M2 benchmark 与 GPU 内核对照燃料 | 进行中（2026-10-04 起，插队批次 I） |
 | 虚拟细胞/全细胞模型包装（开放权重推断封装，不写内核） | 长期池观察项；依赖 GPU 前沿批次包装范式成熟 | 未开始（仅登记） |
 | 可复现报告层（capability 结果 → 带 manifest 的分析报告） | 高级工作台体验胶水：独立小步推进（先 manifest 汇编，再模板渲染），不绑里程碑 | **独立小步** |
 
