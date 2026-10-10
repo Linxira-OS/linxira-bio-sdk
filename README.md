@@ -24,7 +24,7 @@ browser, and delivery workflows.
 - `linxira-bio`: command-line interface for people and workflows
 - `skills/`: agent instructions bound to versioned capabilities
 - `capabilities/`: machine-readable capability catalog
-- `engine/`: Rust runtime and future benchmark-justified C++ kernels
+- `engine/`: Rust compute runtime; C++ kernels only after a benchmark justifies them
 - `skill-pack.json`: import boundary for agent runtimes and `linxira-skills`
 - `linxira-bio-ui`: native Rust desktop application without a WebView
 - Python SDK: planned after the CLI contract stabilizes
@@ -228,7 +228,7 @@ HPC 场景受支持的 Linux 家族。macOS 目前不是经过测试或打包的
 - `linxira-bio`：面向人员和工作流的命令行界面
 - `skills/`：绑定到带版本能力上的 Agent 指令
 - `capabilities/`：机器可读的能力目录
-- `engine/`：Rust 运行时以及未来有基准数据支撑的 C++ 内核
+- `engine/`：Rust 计算运行时；C++ 内核仅在基准数据证明必要时引入
 - `skill-pack.json`：面向 Agent 运行时和 `linxira-skills` 的导入边界
 - `linxira-bio-ui`：不依赖 WebView 的原生 Rust 桌面应用
 - Python SDK：计划在 CLI 契约稳定之后提供

@@ -15,6 +15,29 @@ result envelopes; v1 remains a compatibility surface. The implementation order i
 The first Python SDK remains a subprocess client. This avoids tying the Python
 ABI and release schedule to PyO3 before the capability model is stable.
 
+## Runtime Boundary: No RustPython
+
+Python and R are workflow backends reached as separate processes, not embedded
+interpreters. Replacing CPython with RustPython was evaluated and rejected:
+
+- RustPython's CPython C-API layer is still described as minimal, so the
+  packages the bioinformatics packs rely on (NumPy, SciPy, Biopython, RDKit)
+  cannot be imported. Pure-Python-only execution covers no pack we ship.
+- Delegated work is accepted only when its output is byte-identical to the
+  reference implementation; a different interpreter invalidates that standard.
+- R has the same shape as CPython: the official runtime is written in C,
+  Fortran, and R, and the statistical cores behind DESeq2, WGCNA, and survival
+  are compiled C/Fortran. Nothing can be swapped without discarding the packages
+  that define the method.
+
+A second interpreter would move computation out of the Rust engine rather than
+into it. Strengthening the Rust core means pulling computation into Rust as
+scheduled in `RUST_NATIVE_ROADMAP.md`, not changing the interpreter.
+
+One case stays open: running ephemeral, model-generated pure-Python snippets in
+a sandbox that deliberately has no package ecosystem. That is a sandbox
+interpreter role, not a replacement for the workflow runtimes.
+
 ## Built-In Assistant
 
 The assistant follows a constrained workflow:

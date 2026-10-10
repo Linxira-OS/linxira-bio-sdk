@@ -10,12 +10,12 @@
 | Alignment files | SAM/BAM/CRAM QC, pileup, coverage | Local CPU | Rust with htslib/noodles |
 | Variants | VCF/BCF QC, filtering, normalization, summaries | Local CPU | Rust with htslib/noodles |
 | Expression | count QC, sparse matrix primitives, bulk RNA-seq workflow | Local/HPC | Rust plus maintained R/native tools |
-| Single-cell and spatial | object QC, sparse operations, aggregation | Local/HPC/cloud by size | Rust/C++ kernels after profiling |
+| Single-cell and spatial | object QC, sparse operations, aggregation | Local/HPC/cloud by size | Rust; C++ kernels only after a profiling benchmark |
 | Metagenomics | classification workflow and abundance validation | Local/HPC by database size | Wrap maintained native tools |
 | Comparative genomics | alignment statistics, synteny and orthology workflows | Local/HPC | Native tools plus Rust validation |
-| Phylogenetics | distance, tree QC, bootstrap summaries | Local/HPC | Rust/C++ only where justified |
+| Phylogenetics | distance, tree QC, bootstrap summaries | Local/HPC | Rust; C++ only where a benchmark justifies |
 | Proteomics/metabolomics | table QC and workflow adapters | Local/HPC | Rust tables plus native tools |
-| Structural biology | PDB/mmCIF, PAE, pLDDT, RMSD, contact analysis | Local CPU/GPU | Rust/C++ |
+| Structural biology | PDB/mmCIF, PAE, pLDDT, RMSD, contact analysis | Local CPU/GPU | Rust; C++ where a benchmark justifies |
 | Structure prediction | AlphaFold 2 compatible execution | Local GPU/HPC/cloud | External model backend |
 | Browser services | AlphaFold Server and account-bound tools | Authenticated browser | Gated connector |
 | Reporting | manifests, provenance, validated result packages | Local CPU | Rust |

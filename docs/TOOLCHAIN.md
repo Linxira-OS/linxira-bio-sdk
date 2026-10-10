@@ -15,8 +15,9 @@ the primary desktop release target.
   release gates.
 - macOS: no build, CI, packaging, or support commitment is made at this stage.
 
-The current source tree is pure Rust and does not require CMake. Add CMake only
-when the first benchmark-justified C++ kernel is introduced.
+The current source tree is pure Rust and does not require CMake. Rust stays the
+default compute runtime; add CMake only when the first benchmark-justified C++
+kernel is admitted.
 
 ## Native Analysis Tools
 
