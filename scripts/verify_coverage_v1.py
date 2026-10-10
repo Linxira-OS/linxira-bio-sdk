@@ -37,7 +37,6 @@ DISPOSITIONS = {
 }
 EXECUTIONS = {"local", "cloud"}
 ID_PATTERN = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*$")
-SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 class CoverageValidationError(ValueError):
@@ -260,10 +259,8 @@ def validate_coverage_documents(
             f"target item weights {dict(targets_by_domain)} do not equal {DOMAIN_TARGETS}"
         )
 
-    if reference_inventory.get("product") != "legacy-desktop-reference" or reference_inventory.get(
-        "version"
-    ) != "legacy":
-        raise CoverageValidationError("unexpected offline reference product/version")
+    if reference_inventory.get("product") != "legacy-desktop-reference":
+        raise CoverageValidationError("unexpected offline reference product")
     origin = reference_inventory.get("origin")
     if not isinstance(origin, dict):
         raise CoverageValidationError("reference inventory requires source origin")
@@ -282,9 +279,12 @@ def validate_coverage_documents(
     if clean_room.get("resource_redistribution") is not False:
         raise CoverageValidationError("clean-room inventory must forbid resource redistribution")
 
+    # Reference artifacts are recorded by role only. Filenames, byte sizes, and
+    # cryptographic hashes are deliberately not stored: they fingerprint the
+    # third-party distribution and are not needed for coverage accounting.
     artifacts = reference_inventory.get("artifacts")
     if not isinstance(artifacts, list) or not artifacts:
-        raise CoverageValidationError("reference inventory requires artifact hashes")
+        raise CoverageValidationError("reference inventory requires artifact records")
     artifact_ids: set[str] = set()
     for artifact in artifacts:
         if not isinstance(artifact, dict):
@@ -293,13 +293,12 @@ def validate_coverage_documents(
         if artifact_id in artifact_ids:
             raise CoverageValidationError(f"duplicate reference artifact id: {artifact_id}")
         artifact_ids.add(artifact_id)
-        _require_nonempty_string(artifact.get("filename"), f"filename for {artifact_id}")
-        sha256 = _require_nonempty_string(artifact.get("sha256"), f"sha256 for {artifact_id}")
-        if not SHA256_PATTERN.fullmatch(sha256):
-            raise CoverageValidationError(f"invalid sha256 for {artifact_id}")
-        size = artifact.get("size_bytes")
-        if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
-            raise CoverageValidationError(f"invalid size_bytes for {artifact_id}")
+        _require_nonempty_string(artifact.get("role"), f"role for {artifact_id}")
+        for leaked in ("filename", "sha256", "size_bytes"):
+            if leaked in artifact:
+                raise CoverageValidationError(
+                    f"reference artifact {artifact_id} must not record {leaked}"
+                )
 
     observed_features = reference_inventory.get("observed_features")
     if not isinstance(observed_features, list) or not observed_features:

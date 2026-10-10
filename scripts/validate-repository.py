@@ -921,9 +921,102 @@ def validate_embedded_docs_snapshot() -> None:
         )
 
 
+# Research isolation gate.
+#
+# `.research/` holds third-party material that is cloned for study only. Nothing
+# observed there may reach tracked source or the release bundle. These tokens
+# identify a specific upstream product or its author; they must never reappear in
+# the repository. The gate scans the shipped surface plus the tracked source
+# trees. The gate script itself is excluded because this list is its policy text.
+RESEARCH_ISOLATION_ROOTS = (
+    "apps",
+    "capabilities",
+    "docs",
+    "engine",
+    "gpu-lab",
+    "licenses",
+    "packaging",
+    "profiles",
+    "runtimes",
+    "schemas",
+    "scripts",
+    "skills",
+    "tests",
+    "tools",
+    "workflows",
+)
+RESEARCH_ISOLATION_TOP_LEVEL_GLOBS = ("*.md", "*.json", "*.toml")
+RESEARCH_ISOLATION_DENYLIST = (
+    
+    
+    
+    
+    
+    
+)
+RESEARCH_ISOLATION_SELF = "scripts/validate-repository.py"
+
+
+def _gitignored_root_names() -> set[str]:
+    """Root-level names excluded by `.gitignore` (plain names only)."""
+    ignored: set[str] = set()
+    gitignore = ROOT / ".gitignore"
+    if not gitignore.is_file():
+        return ignored
+    for line in gitignore.read_text(encoding="utf-8").splitlines():
+        entry = line.strip().rstrip("/")
+        if not entry or entry.startswith("#") or entry.startswith("!"):
+            continue
+        if any(marker in entry for marker in ("/", "*", "?", "[")):
+            continue
+        ignored.add(entry)
+    return ignored
+
+
+def validate_research_isolation() -> int:
+    """Reject upstream-identifying tokens anywhere in the committed surface."""
+    ignored_names = _gitignored_root_names()
+    scanned = 0
+    violations: list[str] = []
+    files: list[tuple[Path, str]] = []
+    for relative_root in RESEARCH_ISOLATION_ROOTS:
+        files.extend(_iter_repo_text_files(relative_root))
+    for pattern in RESEARCH_ISOLATION_TOP_LEVEL_GLOBS:
+        for path in sorted(ROOT.glob(pattern)):
+            if not path.is_file() or path.name in ignored_names:
+                continue
+            content = path.read_bytes()
+            if b"\x00" in content:
+                continue
+            files.append((path, content.decode("utf-8", errors="replace")))
+
+    for path, text in files:
+        relative = display_path(path)
+        if relative == RESEARCH_ISOLATION_SELF:
+            continue
+        if any(part == "__pycache__" for part in path.parts):
+            continue
+        scanned += 1
+        lowered = text.lower()
+        for token in RESEARCH_ISOLATION_DENYLIST:
+            start = lowered.find(token)
+            while start != -1:
+                line_number = lowered.count("\n", 0, start) + 1
+                violations.append(f"{relative}:{line_number}: {token}")
+                start = lowered.find(token, start + 1)
+
+    if violations:
+        preview = "; ".join(violations[:8])
+        remaining = len(violations) - min(8, len(violations))
+        suffix = f" (+{remaining} more)" if remaining else ""
+        raise ValueError(f"research-isolation violation: {preview}{suffix}")
+    return scanned
+
+
 def validate() -> None:
     validate_methods_tree_self_containment()
     validate_core_tree_self_containment()
+    validate_research_isolation()
     schema_count, schema_instance_count, format_check_count = validate_schema_contracts()
     validate_embedded_docs_snapshot()
     catalog = load_json("capabilities/catalog.json")
@@ -975,7 +1068,6 @@ def validate() -> None:
         "licenses/cargo-overrides.json",
         "licenses/NotoSansCJK-OFL.txt",
         "capabilities/coverage-v1.json",
-        "capabilities/reference-inventories/offline-reference.json",
         "tools/catalog.json",
         "profiles/local-core.json",
     }

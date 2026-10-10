@@ -157,7 +157,19 @@ Paths and purposes, for agents working in this repository (not end-user docs):
   implementation code.
 - Put deterministic shared computation in `engine/` and expose it through a
   versioned capability, CLI command, result schema, and test fixture.
+- `.research/` is a read-only study area, and it is airgapped from the product.
+  Content observed there — file names, paths, package or class names, version
+  strings, checksums, sizes, feature lists, and extracted facts — must never
+  appear in tracked source, documentation, `capabilities/`, `packaging/`, or
+  the release bundle. Treat every such token as a leak.
+- Agents may write **only** research notes inside `.research/`. An agent must
+  not write research-derived material into production code (`engine/`, `apps/`,
+  `runtimes/`, `tools/`), into shipped data (`capabilities/`, `skills/`,
+  `workflows/`, `packaging/`, `schemas/`), or into any release artifact.
+  Research content is never a release input.
 - Keep `.research/` source clones untracked and do not edit upstream bodies.
+- `scripts/validate-repository.py` enforces this with a denylist gate; a
+  violation fails CI before anything ships.
 - Record provenance before adapting an upstream method or example.
 - Prefer maintained native tools over reimplementing mature algorithms.
 - Add C++ only after a benchmark identifies a kernel that Rust or an existing

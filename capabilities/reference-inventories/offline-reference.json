@@ -1,0 +1,540 @@
+{
+  "schema_version": "1",
+  "product": "legacy-desktop-reference",
+  "purpose": "Clean-room functional reference facts for Linxira Bio SDK coverage accounting; not a source-code or redistribution manifest.",
+  "origin": {
+    "acquisition": "user-supplied local distribution artifacts",
+    "recorded_on": "2026-07-25",
+    "redistribution_status": "not authorized by this reference record"
+  },
+  "inventory_scope": {
+    "source": "bundled high-frequency feature registry plus filename-only cross-checks",
+    "observed_feature_count": 60,
+    "offline_feature_count": 57,
+    "cloud_feature_count": 3,
+    "claim": "complete for the fixed high-frequency registry, not a claim that the registry enumerates every reference menu entry"
+  },
+  "clean_room": {
+    "class_decompilation": false,
+    "implementation_copying": false,
+    "resource_redistribution": false,
+    "allowed_observations": [
+      "publicly visible menu names and local/cloud execution facts",
+      "bundled open-source tool and executable filenames"
+    ]
+  },
+  "artifacts": [
+    {
+      "id": "windows-portable",
+      "role": "primary inventory source"
+    },
+    {
+      "id": "windows-installer",
+      "role": "provenance cross-check only; not executed"
+    },
+    {
+      "id": "windows-installer-latest-jdk",
+      "role": "provenance cross-check only; not executed"
+    },
+    {
+      "id": "macos-intel-image",
+      "role": "platform cross-reference only; not mounted"
+    },
+    {
+      "id": "portable-current-jar",
+      "role": "JAR entry-name inventory source"
+    },
+    {
+      "id": "repository-legacy-jar",
+      "role": "historical comparison only; not the current baseline"
+    },
+    {
+      "id": "bundled-high-frequency-registry",
+      "role": "menu-name and local/cloud classification facts only"
+    }
+  ],
+  "observed_features": [
+    {
+      "id": "offline-reference.hf.001",
+      "name": "heatmap",
+      "execution": "local",
+      "coverage_ids": [
+        "expression.heatmap"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.002",
+      "name": "FASTA extraction by ID or region",
+      "execution": "local",
+      "coverage_ids": [
+        "sequence.extract"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.003",
+      "name": "GFF/GTF-guided sequence extraction",
+      "execution": "local",
+      "coverage_ids": [
+        "annotation.sequence.extract"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.004",
+      "name": "combined gene structure view",
+      "execution": "local",
+      "coverage_ids": [
+        "annotation.structure.visualize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.005",
+      "name": "BLAST between two sequence files",
+      "execution": "local",
+      "coverage_ids": [
+        "similarity.blast.local"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.006",
+      "name": "BLAST query against a large target",
+      "execution": "local",
+      "coverage_ids": [
+        "similarity.blast.local"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.007",
+      "name": "Venn set comparison",
+      "execution": "local",
+      "coverage_ids": [
+        "set.venn"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.008",
+      "name": "basic biosequence view",
+      "execution": "local",
+      "coverage_ids": [
+        "annotation.structure.visualize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.009",
+      "name": "FASTA statistics",
+      "execution": "local",
+      "coverage_ids": [
+        "sequence.stats"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.010",
+      "name": "sequence identifier simplification",
+      "execution": "local",
+      "coverage_ids": [
+        "sequence.id.normalize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.011",
+      "name": "gene locations from GFF/GTF",
+      "execution": "local",
+      "coverage_ids": [
+        "annotation.gene-position"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.012",
+      "name": "BLAST result exploration",
+      "execution": "local",
+      "coverage_ids": [
+        "similarity.blast.parse"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.013",
+      "name": "basic FASTA extraction",
+      "execution": "local",
+      "coverage_ids": [
+        "sequence.extract"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.014",
+      "name": "HMM profile search",
+      "execution": "local",
+      "coverage_ids": [
+        "similarity.hmmer"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.015",
+      "name": "advanced circular genome plot",
+      "execution": "local",
+      "coverage_ids": [
+        "comparative.synteny.visualize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.016",
+      "name": "MCScanX one-step workflow",
+      "execution": "local",
+      "coverage_ids": [
+        "comparative.mcscanx"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.017",
+      "name": "protein domain pattern view",
+      "execution": "local",
+      "coverage_ids": [
+        "protein.domain.visualize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.018",
+      "name": "MEME or MAST motif pattern view",
+      "execution": "local",
+      "coverage_ids": [
+        "motif.visualize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.019",
+      "name": "batch CDS translation",
+      "execution": "local",
+      "coverage_ids": [
+        "sequence.translate"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.020",
+      "name": "dual synteny plot",
+      "execution": "local",
+      "coverage_ids": [
+        "comparative.synteny.visualize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.021",
+      "name": "gene structure view from GFF/GTF",
+      "execution": "local",
+      "coverage_ids": [
+        "annotation.structure.visualize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.022",
+      "name": "accelerated MCScanX workflow",
+      "execution": "local",
+      "coverage_ids": [
+        "comparative.mcscanx"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.023",
+      "name": "quick FASTA extract or filter",
+      "execution": "local",
+      "coverage_ids": [
+        "sequence.extract",
+        "sequence.filter"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.024",
+      "name": "table row manipulation",
+      "execution": "local",
+      "coverage_ids": [
+        "table.manipulate"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.025",
+      "name": "GO enrichment",
+      "execution": "local",
+      "coverage_ids": [
+        "enrichment.go"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.026",
+      "name": "sequence identifier rename",
+      "execution": "local",
+      "coverage_ids": [
+        "sequence.id.normalize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.027",
+      "name": "reverse and complement sequence manipulation",
+      "execution": "local",
+      "coverage_ids": [
+        "sequence.revcomp"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.028",
+      "name": "FASTA to table conversion",
+      "execution": "local",
+      "coverage_ids": [
+        "sequence.to-table"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.029",
+      "name": "MCScanX text merge",
+      "execution": "local",
+      "coverage_ids": [
+        "table.manipulate",
+        "comparative.mcscanx"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.030",
+      "name": "one-step maximum-likelihood tree",
+      "execution": "local",
+      "coverage_ids": [
+        "phylogeny.iqtree"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.031",
+      "name": "KEGG enrichment",
+      "execution": "local",
+      "coverage_ids": [
+        "enrichment.kegg"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.032",
+      "name": "MEME motif discovery wrapper",
+      "execution": "local",
+      "coverage_ids": [
+        "motif.meme"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.033",
+      "name": "FASTA merge and split",
+      "execution": "local",
+      "coverage_ids": [
+        "sequence.merge-split"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.034",
+      "name": "protein parameter calculation",
+      "execution": "local",
+      "coverage_ids": [
+        "protein.properties"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.035",
+      "name": "simple primer check",
+      "execution": "local",
+      "coverage_ids": [
+        "primer.epcr"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.036",
+      "name": "GFF/GTF gene position and metadata extraction",
+      "execution": "local",
+      "coverage_ids": [
+        "annotation.gene-position"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.037",
+      "name": "advanced gene location view",
+      "execution": "local",
+      "coverage_ids": [
+        "annotation.structure.visualize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.038",
+      "name": "multiple synteny plot",
+      "execution": "local",
+      "coverage_ids": [
+        "comparative.synteny.visualize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.039",
+      "name": "large text preview",
+      "execution": "local",
+      "coverage_ids": [
+        "dataset.inspect"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.040",
+      "name": "BLAST between two sequence sets",
+      "execution": "local",
+      "coverage_ids": [
+        "similarity.blast.local"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.041",
+      "name": "gene density profile",
+      "execution": "local",
+      "coverage_ids": [
+        "genome.gene-density"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.042",
+      "name": "BLAST XML to table",
+      "execution": "local",
+      "coverage_ids": [
+        "similarity.blast.parse"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.043",
+      "name": "UpSet set comparison",
+      "execution": "local",
+      "coverage_ids": [
+        "set.upset"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.044",
+      "name": "enrichment bar plot",
+      "execution": "local",
+      "coverage_ids": [
+        "enrichment.visualize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.045",
+      "name": "trimAl alignment trimming wrapper",
+      "execution": "local",
+      "coverage_ids": [
+        "msa.trimal"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.046",
+      "name": "text block extraction",
+      "execution": "local",
+      "coverage_ids": [
+        "table.manipulate"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.047",
+      "name": "micro-synteny text transform",
+      "execution": "local",
+      "coverage_ids": [
+        "comparative.synteny.visualize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.048",
+      "name": "WGCNA workflow",
+      "execution": "local",
+      "coverage_ids": [
+        "expression.wgcna"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.049",
+      "name": "IQ-TREE wrapper",
+      "execution": "local",
+      "coverage_ids": [
+        "phylogeny.iqtree"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.050",
+      "name": "Ka/Ks calculation",
+      "execution": "local",
+      "coverage_ids": [
+        "comparative.kaks"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.051",
+      "name": "eggNOG-mapper result helper",
+      "execution": "local",
+      "coverage_ids": [
+        "annotation.eggnog"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.052",
+      "name": "MUSCLE wrapper",
+      "execution": "local",
+      "coverage_ids": [
+        "msa.muscle"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.053",
+      "name": "NCBI sequence download",
+      "execution": "cloud",
+      "coverage_ids": [
+        "ncbi.sequence.fetch"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.054",
+      "name": "batch SMART web workflow",
+      "execution": "cloud",
+      "coverage_ids": [
+        "protein.domain.parse"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.055",
+      "name": "quick MCScanX wrapper",
+      "execution": "local",
+      "coverage_ids": [
+        "comparative.mcscanx"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.056",
+      "name": "complete or partial ORF prediction",
+      "execution": "local",
+      "coverage_ids": [
+        "sequence.orf"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.057",
+      "name": "GO annotation",
+      "execution": "local",
+      "coverage_ids": [
+        "annotation.go"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.058",
+      "name": "basic FASTA subsequence extraction",
+      "execution": "local",
+      "coverage_ids": [
+        "sequence.extract"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.059",
+      "name": "Pfam result visualization",
+      "execution": "local",
+      "coverage_ids": [
+        "protein.domain.visualize"
+      ]
+    },
+    {
+      "id": "offline-reference.hf.060",
+      "name": "remote BLAST web workflow",
+      "execution": "cloud",
+      "coverage_ids": [
+        "similarity.blast.remote"
+      ]
+    }
+  ]
+}
