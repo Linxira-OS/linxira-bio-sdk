@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import importlib.util
 import json
@@ -924,10 +925,9 @@ def validate_embedded_docs_snapshot() -> None:
 # Research isolation gate.
 #
 # `.research/` holds third-party material that is cloned for study only. Nothing
-# observed there may reach tracked source or the release bundle. These tokens
-# identify a specific upstream product or its author; they must never reappear in
-# the repository. The gate scans the shipped surface plus the tracked source
-# trees. The gate script itself is excluded because this list is its policy text.
+# observed there may reach tracked source or the release bundle. The denied
+# identifiers are stored encoded so that this gate never republishes the names
+# it exists to suppress; decode them before matching.
 RESEARCH_ISOLATION_ROOTS = (
     "apps",
     "capabilities",
@@ -946,15 +946,18 @@ RESEARCH_ISOLATION_ROOTS = (
     "workflows",
 )
 RESEARCH_ISOLATION_TOP_LEVEL_GLOBS = ("*.md", "*.json", "*.toml")
-RESEARCH_ISOLATION_DENYLIST = (
-    
-    
-    
-    
-    
-    
+RESEARCH_ISOLATION_DENYLIST_ENCODED = (
+    "YmlvY2phdmE=",
+    "Y2otY2hlbg==",
+    "amlncGxvdA==",
+    "amlncGxvdHRvb2xraXQ=",
+    "dGJ0b29scw==",
+    "cmVmZXJlbmNlX2pyZQ==",
 )
-RESEARCH_ISOLATION_SELF = "scripts/validate-repository.py"
+RESEARCH_ISOLATION_DENYLIST = tuple(
+    base64.b64decode(entry).decode("ascii")
+    for entry in RESEARCH_ISOLATION_DENYLIST_ENCODED
+)
 
 
 def _gitignored_root_names() -> set[str]:
@@ -992,8 +995,6 @@ def validate_research_isolation() -> int:
 
     for path, text in files:
         relative = display_path(path)
-        if relative == RESEARCH_ISOLATION_SELF:
-            continue
         if any(part == "__pycache__" for part in path.parts):
             continue
         scanned += 1
