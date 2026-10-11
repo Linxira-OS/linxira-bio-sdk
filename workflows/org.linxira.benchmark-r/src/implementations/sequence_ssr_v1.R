@@ -84,6 +84,10 @@ IMPLEMENTATION <- list(
       strsplit(headers, "[[:space:]]+"), function(fields) fields[[1L]], character(1)
     )
     sequences <- Biostrings::DNAStringSet(toupper(as.character(raw)))
+    # `width()` has no method for a bare XString — Biostrings defines it for
+    # XStringSet only (verified on Biostrings 2.80.2 / Bioconductor 3.23) — so
+    # take the widths once at set level and index them per record.
+    sequence_widths <- Biostrings::width(sequences)
 
     records <- list()
     compound_groups <- 0L
@@ -94,7 +98,7 @@ IMPLEMENTATION <- list(
     for (index in seq_along(sequences)) {
       subject <- sequences[[index]]
       identifier <- identifiers[[index]]
-      sequence_length <- Biostrings::width(subject)
+      sequence_length <- sequence_widths[[index]]
       total_bases <- total_bases + sequence_length
 
       candidates <- NULL
