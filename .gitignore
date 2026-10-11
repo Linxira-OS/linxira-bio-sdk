@@ -22,3 +22,14 @@ scripts/bench-tier1v2-biolab.sh
 scripts/*-biolab.sh
 release-artifacts-*/
 .zcode/
+# key material and credential files (never commit; see the history-rewrite incident)
+*.pem
+*.key
+*.ppk
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+id_ecdsa*
+.env
+.env.*

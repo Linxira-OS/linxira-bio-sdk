@@ -6797,13 +6797,13 @@ mod tests {
     #[test]
     fn detects_windows_paths_with_consumed_separators() {
         assert!(looks_like_drive_relative_path(&PathBuf::from(
-            "C:UsersETPauDocumentsGITHUBbio-codingtestsfixtures"
+            "C:UsersExampledatateststestsfixtures"
         )));
         assert!(!looks_like_drive_relative_path(&PathBuf::from(
-            r"C:\Users\ETPau\Documents\GITHUB\bio-coding\tests\fixtures"
+            r"C:\Users\Example\data\tests\tests\fixtures"
         )));
         assert!(!looks_like_drive_relative_path(&PathBuf::from(
-            "C:/Users/ETPau/Documents/GITHUB/bio-coding/tests/fixtures"
+            "C:/Users/Example/data/tests/tests/fixtures"
         )));
     }
 

@@ -26,19 +26,19 @@ BWA / samtools / bcftools / DESeq2 / matplotlib / ggplot2 等原生工具**完�
 
 | 底座 | 位置 | 关键能力 | 现状 |
 |---|---|---|---|
-| 协议层 | [lib.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/engine/crates/linxira-bio-protocol/src/lib.rs) | V1/V2 envelope、`OutputArtifact`、`BioDataFormat`、`ProvenanceV2`(含 `started_at/finished_at/input_sha256/software/command`) | 已有，但**时间字段从未被填充** |
-| 导出层 | [export/lib.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/engine/crates/linxira-bio-export/src/lib.rs) | CSV/TSV/JSON/JSONL/XLSX 原子导出、`Table::from_json` 规整化 | 已有，但**只支持 5 种表格格式，缺生信传统格式(FASTA/BED/VCF/SAM/GFF/SVG/PNG)** |
-| 绘图层(Rust) | [scientific_visualization.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/engine/crates/linxira-bio-core/src/scientific_visualization.rs) | volcano / motif-logo / synteny / annotation-structure / domain-architecture / enrichment 六个 SVG | 已有，保留 |
-| 绘图预览(GUI) | [visualization.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/apps/linxira-bio-ui/src/visualization.rs) | bar/line/scatter/heatmap 能力感知图表 | 已有，是"表格类结果"的内嵌预览，**不是图片查看器** |
-| 工作流执行 | [worker/workflow.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/engine/crates/linxira-bio-worker/src/workflow.rs) | R/Python pack：manifest 契约、SHA256 校验、resume、输出目录解析、跨平台 `canonical_existing_input` | 已有，**runtime 只有 R/Python 两个，无 Java/benchmark** |
-| 工作流 packs | [workflows/](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/workflows) | deseq2(R) / wgcna(R) / survival(R) / biopython(Py) / rdkit(Py) | 已有 5 个 pack，**覆盖面极小** |
-| CLI | [cli/main.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/engine/crates/linxira-bio-cli/src/main.rs) | 手写 dispatch，`--json` 开关 | 已有，无 benchmark 命令 |
-| CI | [ci.yml](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/.github/workflows/ci.yml) | win/debian/arch 三平台 + 真实 E2E(DESeq2/survival/biopython/rdkit) + license-audit + publish | 已有，**需要叠加 benchmark 与绘图后端测试** |
-| 主站 | `F:\Linxira-OS\Linxira-OS.github.io\public\bio-sdk\` | 官网（index.html 之前已增强） | 已有，**缺 benchmark 结果页** |
+| 协议层 | [lib.rs](engine/crates/linxira-bio-protocol/src/lib.rs) | V1/V2 envelope、`OutputArtifact`、`BioDataFormat`、`ProvenanceV2`(含 `started_at/finished_at/input_sha256/software/command`) | 已有，但**时间字段从未被填充** |
+| 导出层 | [export/lib.rs](engine/crates/linxira-bio-export/src/lib.rs) | CSV/TSV/JSON/JSONL/XLSX 原子导出、`Table::from_json` 规整化 | 已有，但**只支持 5 种表格格式，缺生信传统格式(FASTA/BED/VCF/SAM/GFF/SVG/PNG)** |
+| 绘图层(Rust) | [scientific_visualization.rs](engine/crates/linxira-bio-core/src/scientific_visualization.rs) | volcano / motif-logo / synteny / annotation-structure / domain-architecture / enrichment 六个 SVG | 已有，保留 |
+| 绘图预览(GUI) | [visualization.rs](apps/linxira-bio-ui/src/visualization.rs) | bar/line/scatter/heatmap 能力感知图表 | 已有，是"表格类结果"的内嵌预览，**不是图片查看器** |
+| 工作流执行 | [worker/workflow.rs](engine/crates/linxira-bio-worker/src/workflow.rs) | R/Python pack：manifest 契约、SHA256 校验、resume、输出目录解析、跨平台 `canonical_existing_input` | 已有，**runtime 只有 R/Python 两个，无 Java/benchmark** |
+| 工作流 packs | [workflows/](workflows) | deseq2(R) / wgcna(R) / survival(R) / biopython(Py) / rdkit(Py) | 已有 5 个 pack，**覆盖面极小** |
+| CLI | [cli/main.rs](engine/crates/linxira-bio-cli/src/main.rs) | 手写 dispatch，`--json` 开关 | 已有，无 benchmark 命令 |
+| CI | [ci.yml](.github/workflows/ci.yml) | win/debian/arch 三平台 + 真实 E2E(DESeq2/survival/biopython/rdkit) + license-audit + publish | 已有，**需要叠加 benchmark 与绘图后端测试** |
+| 主站 | `Linxira-OS.github.io/public/bio-sdk/` | 官网（index.html 之前已增强） | 已有，**缺 benchmark 结果页** |
 
 ### 2.2 能力盘点（语言/格式/绘图三张表）
 
-> 全量能力在 [catalog.json](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/capabilities/catalog.json)，
+> 全量能力在 [catalog.json](capabilities/catalog.json)，
 > available ≈ 90，planned 2（AF2/AF3）。
 
 **(1) 语言落实情况**：当前 Rust ≈ 85 个能力；**Python 仅 2**（biopython 转换、rdkit 描述符）；
@@ -250,11 +250,11 @@ README 明确声明："绘图默认使用原生 Python(matplotlib) / R(ggplot2) 
      （如 `expression.differential.v1` → `analysis/expression/expression.differential.v1/`）。
    - `timestamp_suffix()`：`_YYYYMMDD-HHMMSS`；同名再撞时追加 `_2`、`_3`…（防覆盖，符合"同一批数据多次输出区分"）。
 
-3. 改 [worker/workflow.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/engine/crates/linxira-bio-worker/src/workflow.rs)：
+3. 改 [worker/workflow.rs](engine/crates/linxira-bio-worker/src/workflow.rs)：
    - `resolve_output_directory` 增加 `timestamp_suffix` 逻辑与 `classify_output_dir` 挂钩（默认路径）。
    - 填充 `provenance.started_at/finished_at`（现有字段，仅补赋值）。
 
-4. 改 [cli/main.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/engine/crates/linxira-bio-cli/src/main.rs)：
+4. 改 [cli/main.rs](engine/crates/linxira-bio-cli/src/main.rs)：
    - 新增 `export bio <input.json> <output.fa|.bed|.vcf|.sam|.gff>` 子命令，走 `BioDataWriter`。
 
 5. 新增 `schemas/output-spec.schema.json`、`schemas/plot-spec.schema.json`；补测试 fixture：
@@ -280,12 +280,12 @@ README 明确声明："绘图默认使用原生 Python(matplotlib) / R(ggplot2) 
    `requirements.lock`）：消费 PlotSpec JSON → matplotlib 渲染 svg/png/pdf。
 2. 新增 `workflows/org.linxira.visualization-ggplot2/`（R pack，`src/render.R` +
    `dependencies.lock.json`）：同一 PlotSpec → ggplot2 渲染。
-3. 改 [scientific_visualization.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/engine/crates/linxira-bio-core/src/scientific_visualization.rs)：
+3. 改 [scientific_visualization.rs](engine/crates/linxira-bio-core/src/scientific_visualization.rs)：
    让 6 个 Rust SVG 渲染函数接受/输出 PlotSpec 结构（向后兼容，旧参数走默认 PlotSpec）。
-4. 改 [apps/linxira-bio-ui/src/visualization.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/apps/linxira-bio-ui/src/visualization.rs) + [main.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/apps/linxira-bio-ui/src/main.rs)：
+4. 改 [apps/linxira-bio-ui/src/visualization.rs](apps/linxira-bio-ui/src/visualization.rs) + [main.rs](apps/linxira-bio-ui/src/main.rs)：
    - 新增 `ImageGallery`（图片查看器）：翻上一张/下一张、滚轮/按钮放大缩小、适配窗口、PNG/SVG 微浏览。
    - 图表结果页改为：内嵌预览 + "打开图片查看器"按钮。
-5. 改 [README.md](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/README.md)：
+5. 改 [README.md](README.md)：
    在绘图相关段落加一句声明（3.2 的原文措辞）。
 6. 新增 `schemas/plot-render-result.schema.json`；绘图 pack 各含测试。
 
@@ -299,7 +299,7 @@ README 明确声明："绘图默认使用原生 Python(matplotlib) / R(ggplot2) 
 
 **文件改动**：
 
-1. 改 [protocol/lib.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/engine/crates/linxira-bio-protocol/src/lib.rs)：
+1. 改 [protocol/lib.rs](engine/crates/linxira-bio-protocol/src/lib.rs)：
    新增 `BenchmarkReport` / `BenchmarkRun`（runtime 字段：wall_ms、cpu_ms、peak_rss_mb、
    disk_read_bytes、disk_write_bytes、output_bytes、一致性 verdict、加速比）。
 2. 新增 `engine/crates/linxira-bio-core/src/benchmark.rs`：
@@ -311,19 +311,19 @@ README 明确声明："绘图默认使用原生 Python(matplotlib) / R(ggplot2) 
    - `workflows/org.linxira.benchmark-python/`（包装原生 Python 实现，自带时间/内存埋点）。
    - `workflows/org.linxira.benchmark-r/`（包装原生 R 实现）。
    - 每个"三份独立实现"能力在阶段 3/4 补齐对应脚本。
-4. 改 [cli/main.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/engine/crates/linxira-bio-cli/src/main.rs)：
+4. 改 [cli/main.rs](engine/crates/linxira-bio-cli/src/main.rs)：
    新增 `benchmark run <capability> <input...> --backends rust,python,r --repeat 3 --output dir`。
-5. 改 [apps/linxira-bio-ui/src/main.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/apps/linxira-bio-ui/src/main.rs)：
+5. 改 [apps/linxira-bio-ui/src/main.rs](apps/linxira-bio-ui/src/main.rs)：
    结果页新增"Benchmark"按钮：选中输入/输出后并行跑原生后端与 Rust 后端，展示对比表。
 6. 新增 `schemas/benchmark-report.schema.json`；新增 `capabilities/catalog.json` 注册 `benchmark.run.v1`。
 7. 新增 `scripts/run-benchmark-linux.sh`：Linux 服务器一键跑分（读 4TB 数据路径、写
    `benchmark-results/<date>/`、生成 `summary.json` + `summary.md`）。
-8. 主站：`F:\Linxira-OS\Linxira-OS.github.io\public\bio-sdk\` 新增 `benchmark.html`
+8. 主站：`Linxira-OS.github.io/public/bio-sdk/` 新增 `benchmark.html`
    （或 `index.html` 加 benchmark 页），渲染 summary.json；列出"核心数据优势点"卡片。
 9. 新增 `runtime-preferences.json`（仓库根）+ schema `runtime-preferences.schema.json`：
-   - [worker/lib.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/engine/crates/linxira-bio-worker/src/lib.rs)
+   - [worker/lib.rs](engine/crates/linxira-bio-worker/src/lib.rs)
      读取偏好表；能力分发无显式 `--backend` 时走 `default_backend`。
-   - [cli/main.rs](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/engine/crates/linxira-bio-cli/src/main.rs)
+   - [cli/main.rs](engine/crates/linxira-bio-cli/src/main.rs)
      与 GUI 增加 `--backend auto|rust|python|r` 覆盖项。
    - `scripts/run-benchmark-linux.sh` 跑完后把最优后端写回 `runtime-preferences.json`。
 10. SRR 数据专项测速：`scripts/run-benchmark-linux.sh` 支持 `--sra <...>`：先 `sra.unpack.v1`
@@ -388,7 +388,7 @@ README 明确声明："绘图默认使用原生 Python(matplotlib) / R(ggplot2) 
 
 **文件改动**：
 
-1. 改 [.github/workflows/ci.yml](file:///c:/Users/ETPau/Documents/GITHUB/bio-coding/.github/workflows/ci.yml)：
+1. 改 [.github/workflows/ci.yml](.github/workflows/ci.yml)：
    - 每个平台增加：绘图 pack（matplotlib/ggplot2）冒烟、`export bio` 往返测试、
      benchmark 小样本（3 后端、断言一致性 + 计时字段非空）。
    - 新增专用 `benchmark` job（ubuntu，跑 `scripts/run-benchmark-linux.sh --smoke`）。
