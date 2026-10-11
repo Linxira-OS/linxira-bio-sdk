@@ -117,26 +117,28 @@ read_membership_table <- function(path) {
 
 summarize_memberships <- function(table, include_items) {
   names <- table$names
+  all_masks <- unlist(table$masks, use.names = FALSE)
+  all_items <- names(table$masks)
   sizes <- integer(length(names))
-  masks <- sort(unlist(table$masks, use.names = FALSE))
-  intersections <- vector("list", length(masks))
-  for (position in seq_along(masks)) {
-    mask <- masks[[position]]
-    member_items <- sort(
-      names(table$masks)[unlist(table$masks, use.names = FALSE) == mask],
-      method = "radix"
-    )
+  # One entry per distinct occupancy mask (the engine groups in a BTreeMap and
+  # iterates it in ascending mask order), not one per item.
+  distinct <- sort(unique(all_masks))
+  intersections <- vector("list", length(distinct))
+  for (position in seq_along(distinct)) {
+    mask <- distinct[[position]]
+    member_items <- sort(all_items[all_masks == mask], method = "radix")
+    member_count <- length(member_items)
     degree <- 0L
     for (column in seq_along(names)) {
       if (has_bit(mask, column)) {
-        sizes[[column]] <- sizes[[column]] + 1L
+        sizes[[column]] <- sizes[[column]] + member_count
         degree <- degree + 1L
       }
     }
     intersections[[position]] <- list(
       sets = as.list(names[vapply(seq_along(names), function(column) has_bit(mask, column), logical(1))]),
       degree = degree,
-      count = length(member_items),
+      count = member_count,
       items = if (isTRUE(include_items)) as.list(member_items) else list()
     )
   }

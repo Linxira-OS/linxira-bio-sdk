@@ -312,6 +312,19 @@ with_workspace(function(workspace) {
   outcome <- try(venn$run(list(table = wide), list()), silent = TRUE)
   stopifnot(inherits(outcome, "try-error"))
 
+  # Repeated occupancy masks must collapse into ONE intersection entry with the
+  # right count and per-set totals: the tiny fixture has one item per mask, so
+  # it cannot catch a per-item grouping.
+  repeated <- file.path(workspace, "repeated.tsv")
+  writeLines(c("control\ttreated", "geneA\tgeneA", "geneB\tgeneB", "geneC\t", "geneD\t"), repeated)
+  grouped <- venn$run(list(table = repeated), list(include_items = TRUE))
+  stopifnot(grouped$set_count == 2, grouped$union_size == 4)
+  stopifnot(length(grouped$intersections) == 2)
+  stopifnot(grouped$intersections[[1]]$degree == 1, grouped$intersections[[1]]$count == 2)
+  stopifnot(grouped$intersections[[2]]$degree == 2, grouped$intersections[[2]]$count == 2)
+  stopifnot(identical(grouped$intersections[[2]]$items, list("geneA", "geneB")))
+  stopifnot(grouped$set_sizes[[1]]$count == 4, grouped$set_sizes[[2]]$count == 2)
+
   parity_compare("$", read_reference("expression.pca.v1.k3.json"),
                  roundtrip(pca$run(list(matrix = pca_matrix), list(components = 3))))
 
