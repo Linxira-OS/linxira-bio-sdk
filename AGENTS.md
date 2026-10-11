@@ -138,7 +138,11 @@ Paths and purposes, for agents working in this repository (not end-user docs):
   pages (10 fixed sections each; embedded in the GUI at build time).
 - `docs/engine-evals/` — engineering experiment ledgers (GPU kernels, engine
   evaluations, vendor trials); committed together with the code that produced
-  them. Measurement: median of >=3 runs, GPU phases split.
+  them. Measurement: median of >=3 runs, GPU phases split. Repository-only:
+  not staged into the release bundle.
+- `docs/proposals/` — design proposals and window plans. Repository-only: not
+  staged into the release bundle. Only `docs/capabilities/` and the
+  specification documents listed in `packaging/bundle-manifest.json` ship.
 - `docs/*.md` (AI_AND_SDK, EXECUTION_POLICY, DATA_FORMATS, …) — engineering
   policies and reference notes.
 - `benchmark-results/` — benchmark archives and the approved blog mirror;

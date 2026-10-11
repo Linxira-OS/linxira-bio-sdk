@@ -76,7 +76,7 @@ def validate_sources(manifest: dict[str, object]) -> None:
     if not required_files <= set(include_files):
         raise ValueError("release bundle lacks a required catalog, policy, or license file")
     required_trees = {
-        "docs",
+        "docs/capabilities",
         "schemas",
         "skills",
         "workflows",
@@ -84,7 +84,8 @@ def validate_sources(manifest: dict[str, object]) -> None:
     }
     if not required_trees <= set(include_trees):
         raise ValueError(
-            "release bundle requires docs, schemas, skills, workflows, and license texts"
+            "release bundle requires docs/capabilities, schemas, skills, workflows, "
+            "and license texts"
         )
 
     notice_configuration = load_bundle_notice_configuration()

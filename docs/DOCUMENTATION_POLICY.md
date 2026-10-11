@@ -8,8 +8,10 @@ canonical source for the GUI help panel, CLI help, AI retrieval, and future
 website generation.
 
 The native GUI embeds these canonical files at compile time. Release packaging
-also stages the unchanged `docs/` tree according to
-`packaging/bundle-manifest.json`; there is no manually maintained copy. Run
+also stages `docs/capabilities/` plus the specification documents enumerated in
+`packaging/bundle-manifest.json`; there is no manually maintained copy. Internal
+engineering records (`docs/engine-evals/`) and proposals (`docs/proposals/`) are
+repository-only and are never staged. Run
 `scripts/stage-release.py --check` to validate the shared package inputs.
 
 Both locales must contain these exact second-level sections:

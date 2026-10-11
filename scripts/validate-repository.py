@@ -1054,7 +1054,7 @@ def validate() -> None:
         raise ValueError("managed runtimes must default to user scope")
     if not isinstance(bundle_manifest, dict) or bundle_manifest.get("schema_version") != "1":
         raise ValueError("invalid release bundle manifest")
-    if "docs" not in bundle_manifest.get("include_trees", []):
+    if "docs/capabilities" not in bundle_manifest.get("include_trees", []):
         raise ValueError("release bundle does not include canonical documentation")
     if "workflows" not in bundle_manifest.get("include_trees", []):
         raise ValueError("release bundle does not include the workflow catalog")

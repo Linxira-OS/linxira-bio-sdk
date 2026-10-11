@@ -99,8 +99,11 @@ an approved local interpreter. A cataloged pack is not an installed runtime or
 an available analysis capability.
 
 Release bundles are staged from `packaging/bundle-manifest.json`, which always
-includes the canonical bilingual `docs/` tree, schemas, catalogs, skills, and
-license notices. Repository contract checks use the pinned Draft 2020-12
+includes the canonical bilingual `docs/capabilities/` tree plus the released
+specification documents listed in the manifest, together with schemas,
+catalogs, skills, and license notices. Internal engineering records
+(`docs/engine-evals/`) and proposals (`docs/proposals/`) are deliberately not
+released. Repository contract checks use the pinned Draft 2020-12
 validator in `requirements-ci.txt`:
 
 ```bash
@@ -295,7 +298,9 @@ pLDDT 处理使用 `structure.pdb.summary.v1`；mmCIF 目前只是查看器输�
 校验每个包。已编目的包不等于已安装的运行时，也不等于可用的分析能力。
 
 发布包从 `packaging/bundle-manifest.json` 暂存，其中始终包含规范的双语
-`docs/` 树、schema、目录、技能和许可证声明。仓库契约检查使用
+`docs/capabilities/` 树与清单列出的已发布规范文档，以及 schema、目录、技能和
+许可证声明；内部工程记录（`docs/engine-evals/`）与方案稿（`docs/proposals/`）
+**刻意不随包**。仓库契约检查使用
 `requirements-ci.txt` 中固定的 Draft 2020-12 验证器：
 
 ```bash
