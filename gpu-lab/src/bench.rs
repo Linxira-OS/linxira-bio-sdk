@@ -66,10 +66,11 @@ pub struct BenchReport {
 
 pub fn run_benchmarks() -> BenchReport {
     let seed = 0x5EED_5EED_5EED_5EEDu64;
-    let mut kernels = Vec::with_capacity(3);
-    kernels.push(run_pearson_bench(&pearson_input(seed)));
-    kernels.push(bench_kmer(seed));
-    kernels.push(bench_quality_histogram(seed));
+    let kernels = vec![
+        run_pearson_bench(&pearson_input(seed)),
+        bench_kmer(seed),
+        bench_quality_histogram(seed),
+    ];
     BenchReport {
         seed,
         simd_policy: "x86-64 (AMD+Intel, runtime detect): avx512f -> avx2+fma -> scalar; other architectures compile against the scalar tier for user-built ARM binaries".to_owned(),
