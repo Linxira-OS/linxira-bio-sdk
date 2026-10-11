@@ -46,6 +46,9 @@ parallelism** — we state only what was measured.
 - A **record-granularity experiment** was added to explain the ≈1× on `sequence.stats` — the original
   hypothesis was **falsified** (§8.5).
 - Data, scripts, tables and figures ship with the repository and can be re-checked item by item (§12).
+- Two sections added: **§14 where this goes next** (multi-core is the roadmap's first priority, the
+  vendors' official Rust GPU paths, why the virtual cell needs both) and **§15 expected objections**
+  (the attacks a sceptical reader would make, with the evidence that answers them).
 
 ## 3. Background
 
@@ -442,10 +445,75 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 - Raw per-run wall times: `backends[].runs[]` in each capability report (10 entries per backend with
   `wall_ms`, `peak_rss_mb`, `ok`).
 - Input digests: `data_sources[]` in `summary.json` (recorded for this window at archive time).
-- Figures: `benchmark-results/2026-10-11/blog-mirror/figures/` (7 self-contained SVGs, no scripts,
-  no external references).
+- Figures: `benchmark-results/2026-10-11/blog-mirror/figures/zh/` and `figures/en/` (8 self-contained
+  SVGs each, no scripts, no external references; both languages are rendered from the same numbers).
 
-## 14. Appendix: table index
+## 14. Where this goes next: multi-core, GPU, and the virtual cell
+
+One of this window's most important results is a **scope** result: we only measured a single core, and
+Rust's language-level parallelism has not appeared yet. Writing about what we did not measure as an
+advantage would be dishonest, so the plan goes here.
+
+**（1）Multi-core first — and it is already a registered, actionable roadmap item.** `ROADMAP.md` §9
+(M5) audited the current state: **zero concurrency anywhere under `engine/`** (no
+`rayon`/`tokio`/`par_iter`/`thread::spawn`), and every `.gz` is decompressed synchronously with **no
+overlap** against compute — §9.0's own conclusion is that throughput cannot use multiple cores and
+decompression does not overlap, so on multiple terabytes of gzipped data the engine cannot pull ahead
+of native Python/R. The decided stack is parallel decompression (BGZF via
+`noodles-bgzf::MultithreadedReader`, plain gzip via `libdeflater`/SIMD), a `thread_io` pipeline
+overlapping decompression with compute, `Rayon` for multi-core compute, and `Tokio` for IO
+orchestration. In other words: **this window's 1.02×–1097× are single-core numbers**; once parallelism
+lands, the gap for very large sequence comparison and multi-trajectory simulation should widen with
+the core count. We would then re-measure with **the same protocol** (warm-up + 10 timed repeats +
+bootstrap CI + three-way verdict) and add a **core-count scaling curve** (parallel efficiency and the
+knee point), otherwise a reader cannot tell whether a gain comes from the algorithm or from the cores.
+
+**（2）GPU: two vendors opened official Rust paths in September 2026.** `ROADMAP.md` §9.5 records the
+facts we verified against vendor primary sources: NVIDIA announced its CUDA Rust dual track on
+**2026-09-08** (`cutile-rs`, a tile DSL on stable Rust 1.89+; `cuda-oxide`, SIMT, nightly) and says
+itself that "both [are] early-stage, neither production-ready"; MThreads released **`cudarc-musa`** on
+**2026-09-23** (an official fork of cudarc against the MUSA 5.2 driver ABI) — the first official Rust
+GPU artefact from a domestic vendor; Intel has an official `sycl-rs` (experimental); **AMD has no
+official Rust compute path today** (only `amdsmi`-style management bindings). Our own evidence: in
+`gpu-lab/`, **one source file** compiles through both MUSA (`mcc`) and CUDA (`nvcc`) toolchains and
+passes the same kernel suite on both cards with matching results (second post; `gpu-lab/`). "One Rust
+source, two vendors" has therefore already been walked once here; what remains is toolchain maturity,
+not architecture.
+
+**（3）Why the virtual cell needs both.** Our mechanism-level cell simulator (`simulate.cell.v1`:
+exact Gillespie, transcriptional bursting, Monod growth, binomial division) is single-threaded today
+as well. Its parallel axis is intrinsic: trajectories, parameter points and cells are independent —
+embarrassingly parallel — so the core count directly bounds the study size once parameters are swept
+or populations are simulated. Going further, folding omics-scale computation in (which is where "AI
+virtual cell" work actually spends compute) makes GPUs a necessity — and Rust now has official entry
+points on two vendors' GPU stacks.
+
+**（4）What these numbers are for.** This window's single-core numbers become the **baseline** for the
+parallel version: same machine, same inputs, same protocol is the only way to report "what parallelism
+bought" separately from "what the language/implementation difference buys". Parallel versions will
+follow the repository's version-coexistence rule (`foo.v2`) and the four-way sync (schema + fixture +
+SKILL + bilingual docs), and **we promise no timeline here**.
+
+## 15. Expected objections, and what answers them
+
+Paper-style writing means stating in advance how a sceptical reader would attack this, and what
+evidence answers it.
+
+| Objection | Our answer and the evidence |
+| --- | --- |
+| "Rust only wins because it is compared against interpreters" | The layering is its own counterexample: `sequence.stats` differs by just 1.02× (CI crossing 1) because that capability's per-base work lives in C primitives; interpreter cost appears only where every element must pass through the interpreter (31×–1097×) |
+| "The comparison arms were written to be slow" | They are **idiomatic** Biopython/Biostrings code, and we state explicitly that this is a **whole-stack** comparison and that a hand-written Python implementation would change the ratios substantially (§11). We also never claim "Python is slow" |
+| "Single core — you never showed Rust's real advantage" | **Agreed, and it is in the abstract**: the engine has zero concurrency today (grep-verifiable), CPython has the GIL and R's evaluator is single-threaded; a 2-core/4-thread machine **physically cannot** show a parallelism advantage. We do not count what we did not measure as an advantage, and multi-core is item (1) in §14 |
+| "10 repeats is too few / the statistics are unreliable" | Pre-registered rule (resolvable only when the CI excludes 1.00; material only when the CI lower bound is ≥ 1.10); all three trimming bases agree; all 10 raw wall times per backend are public; and **the one capability where nothing is resolvable is written up as exactly that** — which is itself evidence of statistical discipline |
+| "Why only one machine and one input scale?" | Single host and single scale are this window's deliberate scope; inputs are 100–200 MB, far above start-up magnitude; cross-machine anchoring (a public hosted benchmark platform) and correctness truth sets (GIAB + hap.py) are planned and are not evidence until executed (§4, §11) |
+| "Is R's 27-minute SSR leg just the slowest library you could pick?" | It uses Biostrings' `matchPattern`, the standard approach in that ecosystem, and its cost grows with the motif space; we report its absolute time and explain that this is an algorithmic property rather than our tuning. The three-backend SSR run at N=10 is re-scheduled after the maintenance window |
+| "Is the memory comparison fair?" | Same tool (GNU `/usr/bin/time -v` VmHWM), same definition of the instant, median of 10; and we disclose that **RSS is not the whole memory footprint** (shared libraries and mapped files are not attributed the same way) |
+| "Why no third-party benchmark suite (PTS/GIAB)?" | Disclosed as **not used** in this window and planned (§4); the comparison arms here are third-party **library** implementations, which is a different thing from a third-party benchmark suite |
+| "The figures make the gap look bigger — did you massage the data?" | Figures and tables are generated by one script from one archive, and `figures/verify-figures.py` converts every plotted number back into the archive values (including all 210 dots of the stability figure) and fails otherwise; every caption carries the "no smoothing, no axis truncation, no statistical transformation" disclosure. Axes are linear, and the **truncated range is printed on the figure** |
+
+
+
+## 16. Appendix: table index
 
 | File | Contents |
 | --- | --- |
@@ -456,10 +524,10 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 | [`../statistics-comparison.tsv`](../statistics-comparison.tsv) | cross-window comparison against the September archive |
 | [`../summary.json`](../summary.json) / [`../summary.md`](../summary.md) | archive index (schema-validated) |
 
-## 15. Versions and disclosures
+## 17. Versions and disclosures
 
-- **Versions**: first release 2026-10-11 (the six fast capabilities at N=10 plus the record-granularity
-  experiment; the `fastq.qc` and `sequence.ssr` long runs are filled in with the archive). Item-by-item
+- **Versions**: first release 2026-10-11 (the six fast capabilities at N=10, `fastq.qc`, and the
+  record-granularity experiment; the `sequence.ssr` long run is filled in with the archive). Item-by-item
   changes are in the changelog at the top.
 - **Self-report disclosure**: this is an **author-run benchmark**, not independently replicated by a
   third party. The comparison arms are third-party **library** implementations (Biopython 1.88,
