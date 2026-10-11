@@ -5,7 +5,7 @@
 
 ## 现状事实
 
-- 桌面应用 `apps/linxira-bio-ui` 为原生 Rust + egui/eframe 0.35，无 WebView；UI 源码规模 **10.7 万行**（占仓库总代码量约一半）。
+- 桌面应用为原生 Rust + egui/eframe 0.35（无 WebView）；UI 源码规模 **10.7 万行**（占仓库总代码量约一半）。
 - 刷新纪律已正确：仅任务运行中 `request_repaint_after`，空闲 CPU ≈ 0；耗时任务走后台线程 + channel。
 - 已确认的 UI 短板只有一个方向：**表格/列表虚拟化覆盖不全**（除日志查看器外约 6 处 `ScrollArea` 未虚拟化，大量导入时每帧全量布局）。这是 egui 内部可修的问题（`show_rows` 模式已在日志查看器验证），不需要换框架。
 - 平台优先级（项目既定）：**Linux 第一**（Arch 系基线），Windows 为开发机。
