@@ -107,7 +107,10 @@ IMPLEMENTATION <- list(
         occurring <- names(frequency)[frequency > 0]
         threshold <- thresholds[[as.character(motif_length)]]
         for (motif in occurring) {
-          hits <- start(Biostrings::matchPattern(motif, subject, fixed = TRUE))
+          # `start` must be qualified: `stats::start` shadows it when the
+          # pack namespace is used without attaching Biostrings, and silently
+          # returns a two-element time-series start instead of the hit starts.
+          hits <- Biostrings::start(Biostrings::matchPattern(motif, subject, fixed = TRUE))
           if (length(hits) < threshold) next
           # Link consecutive hits spaced exactly one motif apart into runs.
           run_start <- 1L
