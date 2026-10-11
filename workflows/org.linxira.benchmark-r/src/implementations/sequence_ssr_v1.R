@@ -193,10 +193,14 @@ IMPLEMENTATION <- list(
       )
     }
 
-    counts <- list()
-    for (key in sort(as.integer(ls(motif_length_counts)))) {
-      counts[[as.character(key)]] <- motif_length_counts[[as.character(key)]]
-    }
+    # Keep the names attribute even when no repeat was found: jsonlite renders
+    # an unnamed empty list as `[]`, but the contract's motif_length_counts is
+    # a map, so an SSR-free input must serialize as `{}`.
+    keys <- sort(as.integer(ls(motif_length_counts)))
+    counts <- structure(
+      lapply(as.character(keys), function(key) motif_length_counts[[key]]),
+      names = as.character(keys)
+    )
 
     list(
       records = records,

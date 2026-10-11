@@ -457,7 +457,7 @@ if (have_biostrings) {
     on.exit(unlink(directory, recursive = TRUE), add = TRUE)
     ssr$run(list(fasta = path), parameters)
   }
-  result <- ssr_run("AAAAAAAAAATATATATATATAT")
+  result <- ssr_run("AAAAAAAAAATATATATATATA")
   stopifnot(result$summary$sequence_count == 1)
   stopifnot(result$summary$total_bases == 22)
   stopifnot(result$summary$ssr_count == 2)
