@@ -80,7 +80,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.R",
-      "sha256": "c7f35d6b9b5b740bc0cfa0eabce43a9e43fca7a3d5833fac95ca3b67a2528f96"
+      "sha256": "4b66a04c34bc5fa00666196d7c07cad03107192abc8ed5423d9bdc984740d8d7"
     },
     {
       "path": "src/implementations/expression_pca_v1.R",
@@ -152,7 +152,7 @@
     },
     {
       "path": "src/implementations/sequence_ssr_v1.R",
-      "sha256": "5239fb2e77f03906eda3de66ec5f0f84e6bf6669dea44501b12d7e427912791e"
+      "sha256": "cd8d1616865f599fe4b48aa15b411b38cb63d9bbb5a42bef031cc6f3783dfe2f"
     }
   ],
   "contract": {

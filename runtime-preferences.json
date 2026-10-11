@@ -8,14 +8,18 @@
       "measured": {
         "rust": {
           "wall_ms": 800.0,
-          "peak_rss_mb": 5.83984375
+          "peak_rss_mb": 7.70703125
         },
         "python": {
-          "wall_ms": 830.0,
-          "peak_rss_mb": 72.5546875
+          "wall_ms": 840.0,
+          "peak_rss_mb": 69.6015625
+        },
+        "r": {
+          "wall_ms": 1820.0,
+          "peak_rss_mb": 321.24609375
         }
       },
-      "sampled_on": "2026-10-11T06:28:28Z",
+      "sampled_on": "2026-10-11T07:09:58Z",
       "speedup": null,
       "consistency": "consistent"
     },
@@ -25,15 +29,19 @@
       "default_backend": "rust",
       "measured": {
         "rust": {
-          "wall_ms": 7760.0,
-          "peak_rss_mb": 6.1171875
+          "wall_ms": 1600.0,
+          "peak_rss_mb": 7.63671875
         },
         "python": {
-          "wall_ms": 249780.0,
-          "peak_rss_mb": 48.921875
+          "wall_ms": 49170.0,
+          "peak_rss_mb": 45.9765625
+        },
+        "r": {
+          "wall_ms": 704130.0,
+          "peak_rss_mb": 79.59765625
         }
       },
-      "sampled_on": "2026-10-11T06:46:03Z",
+      "sampled_on": "2026-10-11T08:00:22Z",
       "speedup": null,
       "consistency": "consistent"
     }

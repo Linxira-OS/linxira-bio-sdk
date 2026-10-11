@@ -87,6 +87,9 @@ NAS 另需装 GNU `time`（否则报告精度降级、`peak_rss` 为 `null`—�
 | `sequence.stats.v1` | 97 MB FASTA（20×5 Mb） | **800.0 ms** | **830.0 ms** | **1.04×** | 5.84 MB | 72.55 MB | **91.9%** |
 | `fastq.qc.v1` | 1.1 GB FASTQ（3,333,334 reads × 150 bp） | **7,760.0 ms** | **249,780.0 ms** | **32.2×** | 6.12 MB | 48.92 MB | **87.5%** |
 
+> 本节是 **rust/python 两腿**的测量（1.1 GB FASTQ 档）；装了 R 之后用 200 MB FASTQ 重跑了三腿，
+> 见 §6.1——两档数据互相印证（Rust ≈2.3–2.5 µs/read、python ≈70 µs/read 在两种规模上一致）。
+
 - 两次独立窗口（无 GNU time / 有 GNU time）同输入复跑，中位差 <3% ⇒ 数字可复现；
   离散度 `iqr_wall_ms`：rust 0.59 ms、python 4.62 ms（stats）；rust 125.6 ms、python 227.9 ms（fastq.qc）。
 - **python 侧自报进程内分析时间**（`benchmark.self_reported`）把墙钟拆开：
@@ -103,7 +106,36 @@ NAS 另需装 GNU `time`（否则报告精度降级、`peak_rss` 为 `null`—�
 > ② **纯 Python 逐记录循环**（`fastq.qc`）→ Rust 优势 **32.2×**；
 > ③ Rust 的**稳定收益是内存**（同任务 1/8–1/12 峰值 RSS）与零解释器启动，而非全局吞吐倍数。
 
-## 6. 门禁宿主机迁移（本轮新增约束）
+## 6. R 腿（第三个语言后端）——首次真实执行，抓出 4 个缺陷
+
+NAS 装好 R 4.6.1 + CRAN/Bioconductor（jsonlite 2.0.0、digest 0.6.39、Biostrings 2.80.2 /
+Bioconductor 3.23；Arch 的系统库不可写 → 必须用用户库 `$HOME/R/x86_64-pc-linux-gnu-library/4.6`）。
+
+### 6.1 三端结果（GNU time 高精度，median-of-3）
+
+| 能力 | 数据集 | rust | python | r | rust:python:r | rust RSS / python RSS / r RSS |
+| --- | --- | --- | --- | --- | --- | --- |
+| `sequence.stats.v1` | 97 MB FASTA | **800 ms** | 840 ms | **1820 ms** | 1 : 1.05 : **2.28** | 7.7 / 69.6 / 321.2 MB |
+| `fastq.qc.v1` | 200 MB（646k reads） | **1600 ms** | 49,170 ms | **704,130 ms** | 1 : 30.7 : **440** | 7.6 / 46.0 / 79.6 MB |
+
+- `precision: high`、`consistency: consistent`（三端结果在 1e-6 内一致）。
+- self_reported（进程内分析耗时）：stats python 471/840 ms（启动占 44%）、r 319/1820 ms
+  （**启动占 82%**，R 解释器 + 包加载）；fastq.qc python 48.6/49.2 s、r 703.4/704.1 s（大规模下启动可忽略）。
+- 结论升级为三层：**C 级原语可覆盖**（stats）→ r 仅 2.3× 慢；**纯解释器逐记录循环**（fastq.qc）
+  → python 30.7×、**r 440×**。R 的用途是"生态唯一实现"（DESeq2/survival 等），不是性能路径。
+
+### 6.2 抓出的缺陷（全部因为该包从未被真正执行过）
+
+| # | 位置 | 症状 | 根因 | 状态 |
+| --- | --- | --- | --- | --- |
+| 1 | `sequence_ssr_v1.R` | `width()` 派发失败 | Biostrings 只对 **XStringSet** 定义 `width()`，裸 XString 没有方法 | 已修（宽度提到集合级） |
+| 2 | 测试本身 | 断言 22 与字面量不符 | 测试字面量 `"AAAAAAAAAATATATATATATAT"` 实为 **23** 字符（多一个 T） | 待修（测试用例） |
+| 3 | `sequence_ssr_v1.R` | SSR 恒返回 0 条 | `start(...)` **未加前缀** → 命中 `stats::start`（时间序列）返回 `c(1,1)` | 已修（`Biostrings::start`） |
+| 4 | CI | 缺陷长期潜伏 | **CI 从未运行 benchmark 两包的测试**（`benchmark-r`/`benchmark-python` 无任何 step） | 已补（debian 作业新增两包测试；R 侧经 BiocManager 装 Biostrings） |
+
+> 教训：三个语言后端里，只有"真的在机器上跑起来"才暴露实现问题。**测试存在但不在 CI 执行 = 不存在**。
+
+## 7. 门禁宿主机迁移（本轮新增约束）
 
 用户 2026-10-04 指令：**本机（含 WSL）不得再跑负载**（其他主线项目占用），NAS 可随意使用。
 ⇒ 正式 Linux 门禁的宿主机从 WSL **迁到 NAS**，并补齐 NAS 缺的两个开发依赖：
@@ -128,7 +160,7 @@ NAS 另需装 GNU `time`（否则报告精度降级、`peak_rss` 为 `null`—�
 `-D warnings` 干净，避免"载体项目长期带警告"变成盲区。功能性冒烟同时通过：
 `gpu-lab backend-smoke` → `histogram[1]=64 pass=true`。
 
-## 7. 文档边界与隐私评估（2026-10-04 追加）
+## 8. 文档边界与隐私评估（2026-10-04 追加）
 
 **发布树事实**：`packaging/bundle-manifest.json` 的 `include_trees` = `docs, schemas, skills,
 workflows, licenses` —— 即 **`docs/` 整棵树随发布包发给用户**，`docs/engine-evals/**` 也不例外。
@@ -147,11 +179,14 @@ workflows, licenses` —— 即 **`docs/` 整棵树随发布包发给用户**，
 `docs/` 只保留用户可见内容；或反过来在 bundle manifest 里显式列出要发布的 doc 子集。
 用户倾向："哪些给用户看、哪些内部看"需要梳理，后续再动。
 
-## 8. 本轮得出的行动项
+## 9. 本轮得出的行动项
 
 - [ ] 对外口径改写：小输入比值标注为"启动开销"，吞吐结论按内核类型分层（C 级原语 ≈1.0×、纯 Python 逐记录 ≈30×）
-- [ ] 三端覆盖扩展：R 装到 NAS 后补 r 后端（`sequence.stats`/`fastq.qc`/`variant.stats` 等），并把 `sequence.stats` 的 r 行重新测量回填
+- [x] 三端覆盖扩展：R 装到 NAS（用户批准）后补齐 r 腿，`sequence.stats` 的 r 行与 `fastq.qc` 三腿数据已回写（§6.1）
 - [ ] 低档 GPU 扩测：GTX 750 Ti 的 CUDA 12.x 路径（需装 toolkit）与 Vulkan 路径对照
+- [ ] 其余三语言能力（`variant.stats`/`expression.pca`/`set.venn`/`enrichment.overrepresentation`/`structure.pdb.summary`）也补 r 腿
+- [ ] R 包测试字面量修正（`"AAAAAAAAAATATATATATATAT"` 多一个 T，断言按 22 写）
+- [ ] R SSR 实现的规模化能力评估（`matchPattern` 逐 motif 扫描在 97 MB 上可能不可行——见 §6）
 - [ ] NAS 侧固定 `performance` governor 或记录并接受 powersave（当前已如实记录）
-- [ ] 文档边界：`docs/` 整树随包（见 §7），内部工程计划（`engine-evals/`、`proposals/`）是否移出发布树待用户定
+- [ ] 文档边界：已改为 bundle 白名单（`docs/capabilities` + 17 份规范文档），`engine-evals`/`proposals` 不再随包 ✅
 - [ ] `docs/research/` 空目录（git 未跟踪、易与 `.research/` 混淆）待清理
