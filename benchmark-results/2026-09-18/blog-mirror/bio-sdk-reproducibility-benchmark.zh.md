@@ -340,7 +340,7 @@ linxira-bio expression quantify SRR1460477_1.fastq.gz SRR1460477_2.fastq.gz \
 ```bash
 # 批量对照与 3σ 汇总；批量补算支持断点续跑（已完成样本按产物自动跳过）、
 # 逐 run CPU 计量入 CSV 台账
-scripts/tier23-bench.sh --cli <linxira-bio> --index <salmon_idx> \
+scripts/benchmark/run/tier23-bench.sh --cli <linxira-bio> --index <salmon_idx> \
   --sra-dir <inbox> --reference-dir <ref_quant> --output-dir <results> \
   --tmp-dir <tmp> --csv <ledger.csv> --pin "taskset -c 8-15 nice -n 10" \
   --cores 8 --threads 8 --pull-source <nas>:<tier23> --scp-identity <key> \

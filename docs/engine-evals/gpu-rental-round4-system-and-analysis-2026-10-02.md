@@ -2,7 +2,7 @@
 
 > 承接第 3 轮。用户点名补齐：硬盘读写、内存速度作为评估维度；把已有
 > 能力尽可能真跑一遍。两机同窗口并发（NV 克隆 + S4000）。
-> 复现脚本随 `scripts/rental/`（第 3 轮已立）追加。
+> 复现脚本随 `scripts/benchmark/rental/`（第 3 轮已立）追加。
 
 ## 表 A — 存储与内存带宽（dd + 自编 STREAM 四核，2.3 GiB 工作集）
 
@@ -59,7 +59,7 @@
 
 - `release-artifacts-rental/round4/{nv,mt}/`：五份 JSON + norm.tsv + 输入
   数据 + 双机 sha256 + sysbench/rna 日志（git-ignored）。
-- 复现脚本：`system_bench.sh`、`rna_analysis.sh`（本轮，随 scripts/rental/
+- 复现脚本：`system_bench.sh`、`rna_analysis.sh`（本轮，随 scripts/benchmark/rental/
   一并提交）。
 
 ## 结论

@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# ---------------------------------------------------------------------------
+# Benchmark tooling — scripts/benchmark/analysis/statistics-tables.py
+# Role: standalone TSV statistics tables (N, median, IQR, CV, ratio, bootstrap 95% CI, two-part verdict) plus trimming-robustness and cross-window tables
+# Windows: 2026-10-11 (N=10 three-backend window)
+# Direction: the paper's tables; consumes the archive, writes `statistics*.tsv`
+# Provenance index: scripts/benchmark/README.md
+# ---------------------------------------------------------------------------
 """Emit the standalone statistics tables for an archived benchmark run.
 
 The blog article must be verifiable from the repository: this script writes
@@ -14,7 +21,7 @@ Outputs (all LF, tab-separated, deterministic order):
     statistics-consistency.tsv cross-backend agreement basis per capability
 
 Usage:
-    python3 scripts/benchmark-statistics.py --summary benchmark-results/<date>/summary.json \
+    python3 scripts/benchmark/analysis/statistics-tables.py --summary benchmark-results/<date>/summary.json \
         --reports /path/to/reports --output-dir benchmark-results/<date> \
         --comparison benchmark-results/2026-09-13/summary.json
 """

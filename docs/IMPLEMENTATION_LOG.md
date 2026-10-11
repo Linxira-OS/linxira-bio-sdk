@@ -32,6 +32,9 @@
 | 2026-09-13 | `plot.render.v1` 双包 | 新增 matplotlib/ggplot2 绘图 pack（M1-T1/T2）：PlotSpec 全参数渲染、svg/png 字节稳定（固定 svg hash 盐 / svglite）、跨后端 data_summary 一致性断言 | 回应"绘图=可复现数据产品"设计定位；M1 落地 | 双 pack 测试（py 5/5、R 全过、跨后端一致） | current |
 | 2026-09-13 | `enrichment.overrepresentation.v1` 三端 | 引擎 ORA 的 Python/R 移植（log 阶乘超几何上尾 + 同款 BH 平局规则；刻意不用 gseapy/clusterProfiler）。修复两处移植语义：查询表头行跳过、BH rank 反向错误、R jsonlite 单元素数组坍缩 | M3 #6 三端 | 双 pack parity 对 Rust golden（default+include_genes）；WSL E2E Consistent（rust 90ms / py 390ms / r 500ms，4.33x） | current |
 
+| 2026-10-11 | `linxira-bio-core` 输入探测 | `looks_like_sam` 改为要求 SAM 结构证据（FLAG ≤ 0xFFF、RNAME 非纯数字、CIGAR `(\d+[MIDNSHP=X])+` 或 `*`、SEQ 碱基字母或 `*`） | 产品级缺陷：≥11 列的宽计数矩阵被误判为 SAM，worker 会拒绝合法表达矩阵（实测边界 10 列→tsv、11 列→sam） | commit `bfe6fd0` + 回归测试 `wide_numeric_matrix_is_not_mistaken_for_sam` | current |
+| 2026-10-11 | benchmark-r pack（6 处） | R 后端**首次真正执行**后修复 6 个潜伏缺陷：① 裸 `XString` 的 `width()` 派发 ② 测试字面量 23 bp 却断言 22 ③ `start()` 未加命名空间命中 `stats::start` ④ 空 `motif_length_counts` 被序列化成 `[]` ⑤ `set_venn` 按 item 而非 occupancy mask 生成 intersections ⑥ CI 从未运行 benchmark 两包测试 | 测试存在但不在 CI 执行 = 不存在；三端声称缺一端的执行证据 | commits `90d982a`/`dd8e226`/`c567f94`/`9b9e4fa`/`005404c`；NAS 全量门禁 525 测试绿 | current |
+
 ## v2 迁移模板（Upgrading to v2）
 
 当某能力需要不兼容的算法改动时：

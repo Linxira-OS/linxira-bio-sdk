@@ -43,14 +43,14 @@
 
 | # | 项 | 位置 | 内容 | 验收 |
 | --- | --- | --- | --- | --- |
-| D1 | MUSA 内核移植包 | `scripts/rental/musa/` | pearson v2（R3 已有）→ 补 **v4 合并访存版** 与 **k-mer 计数** 的 `.mu` 源码 + 编译/运行脚本（mcc，`-lmusart`，无架构旗标——R2 口径） | 脚本本地可 dry-run；正确性门同 R3（hist 整数精确、pearson 相对误差 <2e-4） |
+| D1 | MUSA 内核移植包 | `scripts/benchmark/rental/musa/` | pearson v2（R3 已有）→ 补 **v4 合并访存版** 与 **k-mer 计数** 的 `.mu` 源码 + 编译/运行脚本（mcc，`-lmusart`，无架构旗标——R2 口径） | 脚本本地可 dry-run；正确性门同 R3（hist 整数精确、pearson 相对误差 <2e-4） |
 | D2 | cudarc-musa 接线预案 | `gpu-lab/src/backends_musa.rs` | stub → 预案注释补齐：probe 顺序（`musa-smi` → dlopen `libmusart`）、musaMalloc/Memcpy/LaunchKernel 映射表、错误分类（ABI 错位 vs 设备缺失）；**不改 CI**（feature `gpu-musa`） | `cargo check -p gpu-lab` 绿（stub 保持编译）；映射表评审通过 |
-| D3 | torch_npu parity 工具 | `scripts/rental/ascend/` | `npu_parity.py`：① pearson 4000×1000 相关矩阵 NPU vs CPU；② SVD/PCA（符号规范化后对照，沿 M3 §8.1 口径）；③ k-means（固定种子）；④ copy 1GiB 带宽 + matmul 4096³（f16/f32）probe | 双输出 JSON（npu/cpu）+ 判据内建（pearson \|Δ\|≤1e-5、PCA 逐分量一致）；README 记录 torch/torch_npu/CANN 版本矩阵检查法 |
+| D3 | torch_npu parity 工具 | `scripts/benchmark/rental/ascend/` | `npu_parity.py`：① pearson 4000×1000 相关矩阵 NPU vs CPU；② SVD/PCA（符号规范化后对照，沿 M3 §8.1 口径）；③ k-means（固定种子）；④ copy 1GiB 带宽 + matmul 4096³（f16/f32）probe | 双输出 JSON（npu/cpu）+ 判据内建（pearson \|Δ\|≤1e-5、PCA 逐分量一致）；README 记录 torch/torch_npu/CANN 版本矩阵检查法 |
 | D4 | cann-rs spike 预案 | `gpu-lab/src/backends_ascend.rs`（新 stub，feature `gpu-ascend`） | 只做设备枚举级 probe 设计（`libascendcl.so: aclrtGetDeviceCount`）；cann-rs / ruda-driver-cann 可用性核对清单；**内核不动工**（M5-G4 口径） | stub 编译绿；`describe()` 说清 spike 范围 |
 | D5 | k-mer GPU 内核（首批新内核，G1 门控） | `gpu-lab/`（WGSL 规范源）+ MUSA C 版（D1） | k≤31、2-bit 编码、atomic 计数谱；CPU 参考实现在 gpu-lab 内（沿 bench 套件先例）；**生产化 promotion 不在本轮** | WGSL + `.mu` + CPU 三方对同输入：谱完全相等（整数精确门） |
-| D6 | aarch64 就绪 | `scripts/rental/RUNBOOK*` | W2 容器若为鲲鹏：有 SSH → rustup aarch64 工具链 + 机上构建时限预估；**无 SSH 档走 D8 预编译件**，机上构建降级为对照数据点；gpu-lab aarch64 交叉检查结论引用 | RUNBOOK 更新入库 |
-| D7 | AMD 协助测试工具包 | `scripts/rental/amd/` | **无公开租赁平台 → 第三方代测包**：wgpu probe + gpu-bench（Vulkan 覆盖路线）+（代测机有 ROCm 时）`.hip` 同源内核编译运行脚本；自足式 README（依赖、命令、产物命名、回传方式） | 干净 Linux 机器按 README 可独立复跑；产物字段与台账格式一致 |
-| D8 | 无 SSH 预案：预编译 aarch64 件进 bundle | `scripts/prepare-rental-bundle.py` | bundle 追加 `aarch64/linxira-bio-cli`（`--target aarch64-unknown-linux-gnu` 交叉产物）+ `scripts/rental/ascend/`；昇腾 Web 终端/Jupyter 档：上传 bundle → 解包 → 直接跑二进制与 python 工具，**不依赖机上 rustup/cargo** | `--check` 含新件；交叉二进制过一次 qemu-user 或 CI 冒烟 |
+| D6 | aarch64 就绪 | `scripts/benchmark/rental/RUNBOOK*` | W2 容器若为鲲鹏：有 SSH → rustup aarch64 工具链 + 机上构建时限预估；**无 SSH 档走 D8 预编译件**，机上构建降级为对照数据点；gpu-lab aarch64 交叉检查结论引用 | RUNBOOK 更新入库 |
+| D7 | AMD 协助测试工具包 | `scripts/benchmark/rental/amd/` | **无公开租赁平台 → 第三方代测包**：wgpu probe + gpu-bench（Vulkan 覆盖路线）+（代测机有 ROCm 时）`.hip` 同源内核编译运行脚本；自足式 README（依赖、命令、产物命名、回传方式） | 干净 Linux 机器按 README 可独立复跑；产物字段与台账格式一致 |
+| D8 | 无 SSH 预案：预编译 aarch64 件进 bundle | `scripts/benchmark/rental/prepare-bundle.py` | bundle 追加 `aarch64/linxira-bio-cli`（`--target aarch64-unknown-linux-gnu` 交叉产物）+ `scripts/benchmark/rental/ascend/`；昇腾 Web 终端/Jupyter 档：上传 bundle → 解包 → 直接跑二进制与 python 工具，**不依赖机上 rustup/cargo** | `--check` 含新件；交叉二进制过一次 qemu-user 或 CI 冒烟 |
 | D9 | 批次 G 前置：cellpose pack 骨架（插队） | `workflows/org.linxira.cellpose-segmentation/` | manifest（`gpu: required` + `minimum_vram_mb: 8192`）+ 依赖锁（torch CUDA 轮子口径）+ 内置样例图 + tests；**CPU 路径单测先行**（CI 三平台绿），GPU 路径留 W5 窗口验收 | pack 冒烟测试绿（CPU 路径）；W5-T2 GPU 冒烟通过 |
 
 红线沿用：内核受 benchmark 门控（无 CPU 基线不写内核）；数值一致性判据沿 §7.1；

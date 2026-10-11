@@ -4,7 +4,7 @@
 > **分子对接**（chemistry.dock.v1），其次 wgpu 基线跨卡数据点、厂商栈边界、SSR 三方
 > parity。每台机器 1-3 小时窗口，源码临场克隆编译。
 > 传输包已构建：`release-artifacts-rental/linxira-rental-bundle-2026-10-02.tar.gz`
-> （SHA256SUMS.txt 同目录；重建/校验：`python scripts/prepare-rental-bundle.py [--check]`）。
+> （SHA256SUMS.txt 同目录；重建/校验：`python scripts/benchmark/rental/prepare-bundle.py [--check]`）。
 
 ## 1. 机器配置与对位（租用渠道与时价不入库，仅记技术配置）
 

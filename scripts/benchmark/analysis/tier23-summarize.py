@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# ---------------------------------------------------------------------------
+# Benchmark tooling — scripts/benchmark/analysis/tier23-summarize.py
+# Role: aggregate the tier23-bench CSV into a comparison table
+# Windows: 2026-09-14
+# Direction: post-run reporting for the batched quantify suite
+# Provenance index: scripts/benchmark/README.md
+# ---------------------------------------------------------------------------
 """Summarize a tier23/quantify cross-check CSV into a 3-sigma archival
 summary (bench-YYYYMMDD-NNN.summary.json).
 

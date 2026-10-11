@@ -22,5 +22,5 @@ Evidence base: docs/engine-evals/gpu-rental-2026-10-02.md (round 1),
 gpu-rental-round2-s4000-2026-10-02.md (round 2),
 gpu-rental-round3-dual-vendor-2026-10-02.md (round 3),
 gpu-rental-round4-system-and-analysis-2026-10-02.md (round 4);
-reproduction sources in scripts/rental/. Vendor listing prices, roadmaps,
+reproduction sources in scripts/benchmark/rental/. Vendor listing prices, roadmaps,
 and marketplace availability deliberately excluded (config-only policy).

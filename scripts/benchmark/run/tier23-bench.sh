@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# Benchmark tooling — scripts/benchmark/run/tier23-bench.sh
+# Role: batched cross-check of `expression.quantify.v1` against stored reference quant outputs, with per-run wall/user/sys CPU accounting
+# Windows: 2026-09-14 (tier-2/3 batched suite)
+# Direction: correctness plus CPU-utilisation evidence; paired with analysis/tier23-summarize.py
+# Provenance index: scripts/benchmark/README.md
+# ---------------------------------------------------------------------------
 # tier23-bench — batched cross-check of SDK expression.quantify.v1 against
 # stored reference quant outputs, with per-run CPU accounting.
 #

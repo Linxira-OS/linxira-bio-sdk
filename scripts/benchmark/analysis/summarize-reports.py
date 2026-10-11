@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# ---------------------------------------------------------------------------
+# Benchmark tooling — scripts/benchmark/analysis/summarize-reports.py
+# Role: build `benchmark-results/<date>/summary.json` + `summary.md` from per-capability reports and an environment descriptor, validating against the summary schema
+# Windows: 2026-09-13, 2026-09-14, 2026-09-18, 2026-10-02, 2026-10-11
+# Direction: archive assembly (the entry point every window uses)
+# Provenance index: scripts/benchmark/README.md
+# ---------------------------------------------------------------------------
 """Aggregate `benchmark run` reports into an archival summary.
 
 `benchmark-results/<date>/summary.json` is the machine-checked archival unit
@@ -10,7 +17,7 @@ that were produced elsewhere (a rented box, a NAS, an ad-hoc window) and only
 needs the per-capability metadata a human has to state anyway.
 
 Usage:
-    python3 scripts/summarize-benchmark-reports.py \
+    python3 scripts/benchmark/analysis/summarize-reports.py \
         --descriptor descriptor.json --reports /tmp/lxthree --date 2026-10-11 \
         --output-dir benchmark-results/2026-10-11
 

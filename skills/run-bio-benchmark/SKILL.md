@@ -62,7 +62,7 @@ cargo run -p linxira-bio-cli -- benchmark run sequence.stats.v1 fasta=INPUT.fast
 
 - Never mix `precision: high` and `precision: degraded` numbers in one
   comparison.
-- One capability per `benchmark run`; use `scripts/run-benchmark-linux.sh`
+- One capability per `benchmark run`; use `scripts/benchmark/run/run-linux.sh`
   for the full server matrix.
 - A backend that never produces a result makes the whole report
   `consistency: failed` with a finding naming it — fix the pack or drop the

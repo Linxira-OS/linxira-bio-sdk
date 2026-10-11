@@ -145,10 +145,10 @@ methodology, and provenance only.
 
 Install salmon 2.7.0 (e.g. `micromamba create -p $PREFIX -c bioconda
 salmon`), point `LINXIRA_BIO_SALMON` at it, then use the generalized
-cross-check tool committed under `scripts/quantify-bench.sh`:
+cross-check tool committed under `scripts/benchmark/run/quantify-bench.sh`:
 
 ```bash
-scripts/quantify-bench.sh \
+scripts/benchmark/run/quantify-bench.sh \
   --cli /path/to/linxira-bio \
   --index /path/to/salmon_idx \
   --inputs-dir /path/to/fastq/ \
@@ -189,4 +189,4 @@ miRNA 专线。正常覆盖（67–71% mapping）样本上的公平对照见下�
 
 **数据**：全部为公开 SRA 数据（荞麦转录组项目，检索号见 §4），原始 reads
 与参考索引留在实验工作站、不入库；本目录只存指标、方法与来源。
-**复现**：用入库的 `scripts/quantify-bench.sh`（全参数化，无站点路径）。
+**复现**：用入库的 `scripts/benchmark/run/quantify-bench.sh`（全参数化，无站点路径）。

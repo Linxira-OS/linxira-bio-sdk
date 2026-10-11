@@ -89,7 +89,7 @@ per segment · per-run CPU accounting (model/cores/threads/user+sys)
 | SRR17715778 | 257 | 390 | 155.9 | 1.000000 | 0 | PASS |
 
 **Final: 10/10 PASS.** Batch statistics (ingest via
-`scripts/tier23-summarize.py`): TPM Pearson r mean 1.000000 σ 0.000000,
+`scripts/benchmark/analysis/tier23-summarize.py`): TPM Pearson r mean 1.000000 σ 0.000000,
 NumReads relative difference mean 0 σ 0, quant wall 602.9 ± 94.4 s
 (3σ interval [319.8, 886.0]), unpack wall 250.8 ± 27.4 s ([168.7, 332.9]) —
 **zero 3σ outliers on every metric**. Archived as

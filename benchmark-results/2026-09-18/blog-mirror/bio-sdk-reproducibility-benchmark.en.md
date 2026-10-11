@@ -261,7 +261,7 @@ linxira-bio expression quantify SRR1460477_1.fastq.gz SRR1460477_2.fastq.gz \
 ```bash
 # Batch comparison and 3σ summary; batch backfill supports checkpoint resume
 # (completed samples auto-skipped by artifacts), per-run CPU accounting into a CSV ledger
-scripts/tier23-bench.sh --cli <linxira-bio> --index <salmon_idx> \
+scripts/benchmark/run/tier23-bench.sh --cli <linxira-bio> --index <salmon_idx> \
   --sra-dir <inbox> --reference-dir <ref_quant> --output-dir <results> \
   --tmp-dir <tmp> --csv <ledger.csv> --pin "taskset -c 8-15 nice -n 10" \
   --cores 8 --threads 8 --pull-source <nas>:<tier23> --scp-identity <key> \

@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# Benchmark tooling — scripts/benchmark/run/run-linux.sh
+# Role: one-command Linux benchmark matrix (dataset manifest to `benchmark run` to archive + runtime-preference write-back), ROADMAP M2-T6
+# Windows: 2026-09-14 tier1_v2 and 2026-09-18 reproducibility (laptop, WSL) plus every later Linux window
+# Direction: product-CLI orchestration; its reports feed analysis/ and figures/
+# Provenance index: scripts/benchmark/README.md
+# ---------------------------------------------------------------------------
 # run-benchmark-linux.sh — one-command benchmark matrix for the Linux server
 # (ROADMAP M2-T6).
 #
@@ -12,7 +19,7 @@
 # disclosure (warm-cache only; never mix with cold-cache numbers).
 #
 # Usage:
-#   scripts/run-benchmark-linux.sh [--datasets FILE] [--output DIR]
+#   scripts/benchmark/run/run-linux.sh [--datasets FILE] [--output DIR]
 #       [--backends rust,python,r] [--repeat N] [--cli PATH]
 #       [--skip-writeback]
 #

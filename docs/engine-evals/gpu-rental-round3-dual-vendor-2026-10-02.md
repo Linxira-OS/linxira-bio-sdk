@@ -3,7 +3,7 @@
 > 承接第 1/2 轮。用户开两个窗口同时跑：克隆 vGPU 实例（RTX 4080 SUPER，
 > Xeon Platinum 8375C 128 vCPU）+ S4000（Xeon Gold 6430 15 核）。本轮补齐
 > 论文两张主表：**双厂原生工具链内核实测**与**分子对接定量研究**。
-> 复现源码在 `scripts/rental/`（仓库内，不进发布包）。
+> 复现源码在 `scripts/benchmark/rental/`（仓库内，不进发布包）。
 
 ## 机器快照（论文环境表）
 
@@ -84,7 +84,7 @@ TSV 字节一致。
 
 - `release-artifacts-rental/round3-vgpu-clone/`（16 对接 JSON+PDBQT、
   bench_nv.txt、nvcc 版本、sha256）与 `round3-s4000/`（15 JSON、bench_mt.txt）。
-- `scripts/rental/`：bench_suite.mu、pearson_bandwidth.mu、dock-study.sh、
+- `scripts/benchmark/rental/`：bench_suite.mu、pearson_bandwidth.mu、dock-study.sh、
   dock-study-s4000.sh、analyze_dock.py、README（复现指引；仓库内、
   不进发布包）。
 - 分析器两处修正已固化：参考构象在 `expected/` 子目录；PDBQT 解析须

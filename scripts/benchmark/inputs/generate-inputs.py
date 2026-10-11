@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# ---------------------------------------------------------------------------
+# Benchmark tooling — scripts/benchmark/inputs/generate-inputs.py
+# Role: deterministic benchmark input generator (synthetic tables, granularity FASTAs, engine-simulated FASTA/FASTQ)
+# Windows: 2026-10-11 (N=10 window inputs and the granularity experiment)
+# Direction: reproducibility — byte-identical inputs on any machine
+# Provenance index: scripts/benchmark/README.md
+# ---------------------------------------------------------------------------
 """Deterministic generator for every benchmark input used in the archived runs.
 
 Reproducibility contract: the same command must yield byte-identical inputs on
@@ -22,8 +29,8 @@ meaningful. Two families exist:
     ``reads200.fq`` = ``simulate reads big.fa --read-length 150 --coverage 100 --seed 42``
 
 Usage:
-    python scripts/generate-benchmark-inputs.py --set synthetic --out /tmp/lxn10
-    python scripts/generate-benchmark-inputs.py --set sequence --out /tmp/lxn10 \\
+    python scripts/benchmark/inputs/generate-inputs.py --set synthetic --out /tmp/lxn10
+    python scripts/benchmark/inputs/generate-inputs.py --set sequence --out /tmp/lxn10 \\
         --binary target/release/linxira-bio
 """
 

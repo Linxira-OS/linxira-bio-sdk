@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# Benchmark tooling — scripts/benchmark/run/quantify-bench.sh
+# Role: cross-check `linxira-bio expression quantify` against an existing salmon quant directory on three acceptability lines (identifier parity, NumReads within 1%, TPM Pearson >= 0.995)
+# Windows: 2026-09-14 tier1_v2
+# Direction: correctness; the single-sample companion of tier23-bench.sh
+# Provenance index: scripts/benchmark/README.md
+# ---------------------------------------------------------------------------
 # quantify-bench — cross-check `linxira-bio expression quantify` against an
 # existing salmon quant directory.
 #

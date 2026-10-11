@@ -32,5 +32,5 @@ writes `rmsd_vs_official.tsv` + `summary.tsv`.
 Prerequisites on the rented box: repo cloned and built
 (`cargo build --release -p linxira-bio-cli`), vina probed by name, and
 the rental bundle extracted at `/root/autodl-tmp/bundle` (built by
-`scripts/prepare-rental-bundle.py`). Timing uses `date +%s.%N` because
+`scripts/benchmark/rental/prepare-bundle.py`). Timing uses `date +%s.%N` because
 the containers ship without `/usr/bin/time`.

@@ -149,11 +149,11 @@ Vulkan 入口（三个独立实例同一报错）；摩尔线程的 Vulkan 驱�
 git clone https://github.com/Linxira-OS/linxira-bio-sdk.git
 cd linxira-bio-sdk && cargo build --release -p linxira-bio-cli
 
-bash scripts/rental/dock-study.sh                          # 对接研究 + RMSD 分析
-mcc -O3 scripts/rental/bench_suite.mu -o bench_mu -lmusart # GPU 内核（MUSA）
-cp scripts/rental/bench_suite.mu b.cu && nvcc -O3 -arch=sm_89 b.cu -o bench_cu
-bash scripts/rental/rna_analysis.sh                        # 信号注入验证
-bash scripts/rental/system_bench.sh                        # 存储/内存带宽
+bash scripts/benchmark/rental/dock-study.sh                          # 对接研究 + RMSD 分析
+mcc -O3 scripts/benchmark/rental/bench_suite.mu -o bench_mu -lmusart # GPU 内核（MUSA）
+cp scripts/benchmark/rental/bench_suite.mu b.cu && nvcc -O3 -arch=sm_89 b.cu -o bench_cu
+bash scripts/benchmark/rental/rna_analysis.sh                        # 信号注入验证
+bash scripts/benchmark/rental/system_bench.sh                        # 存储/内存带宽
 ```
 
 原始输出（JSON/TSV/日志/哈希）在本地归档 `release-artifacts-rental/`

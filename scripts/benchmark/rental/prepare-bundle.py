@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# ---------------------------------------------------------------------------
+# Benchmark tooling — scripts/benchmark/rental/prepare-bundle.py
+# Role: assemble the upload bundle for a rented cloud GPU instance
+# Windows: 2026-10-02 cloud rental rounds
+# Direction: provisioning material for the GPU-rental experiments (never shipped)
+# Provenance index: scripts/benchmark/README.md
+# ---------------------------------------------------------------------------
 """Assemble the cloud-rental transfer bundle (FTP / JupyterLab upload).
 
 Downloads the AutoDock Vina official basic-docking example files once,
@@ -6,8 +13,8 @@ verifies them by size and SHA-256, stages a runbook, and produces one
 tar.gz plus SHA256SUMS.txt under release-artifacts-rental/ (git-ignored).
 
 Usage:
-    python scripts/prepare-rental-bundle.py            # build/refresh bundle
-    python scripts/prepare-rental-bundle.py --check    # verify existing files only
+    python scripts/benchmark/rental/prepare-bundle.py            # build/refresh bundle
+    python scripts/benchmark/rental/prepare-bundle.py --check    # verify existing files only
 """
 
 from __future__ import annotations

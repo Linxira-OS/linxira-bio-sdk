@@ -95,7 +95,7 @@ NAS 另需装 GNU `time`（否则报告精度降级、`peak_rss` 为 `null`—�
 - **python 侧自报进程内分析时间**（`benchmark.self_reported`）把墙钟拆开：
   `sequence.stats` 分析 472.5 ms / 墙钟 841 ms ⇒ **约 45% 是解释器启动 + pack 校验**；
   `fastq.qc` 分析 250.3 s / 墙钟 252.6 s ⇒ 大规模下启动占比可忽略，差值即真实吞吐差。
-- **回写**：`scripts/update-runtime-preferences.py` 已把两行写入 `runtime-preferences.json`
+- **回写**：`scripts/benchmark/analysis/update-runtime-preferences.py` 已把两行写入 `runtime-preferences.json`
   （`sequence.stats.v1` 类 `sequence`、`fastq.qc.v1` 类 `other`，均 `default_backend=rust`）。
   注意：该工具按报告内的后端整行替换，**旧行的 r 后端数字（1770 ms / 238.5 MB，2026-09-11）
   因 NAS 未装 R 未入新行**——那是另一台机、另一日期的口径，混排反而不诚实；原值留在

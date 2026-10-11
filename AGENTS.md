@@ -179,6 +179,34 @@ Paths and purposes, for agents working in this repository (not end-user docs):
 - Add C++ only after a benchmark identifies a kernel that Rust or an existing
   native dependency does not handle adequately.
 
+## Benchmark Scripts And Archives
+
+Benchmark tooling is grouped by function under `scripts/benchmark/`; new
+benchmark scripts do not belong loose in `scripts/`.
+
+| Path | Purpose |
+| --- | --- |
+| `scripts/benchmark/inputs/` | deterministic input generators (byte-identical across machines) |
+| `scripts/benchmark/run/` | capability runners (product-CLI orchestration, batched suites) |
+| `scripts/benchmark/analysis/` | archive assembly, statistics tables, preference write-back |
+| `scripts/benchmark/figures/` | self-contained SVG rendering |
+| `scripts/benchmark/windows/<YYYY-MM-DD>/` | the exact stage scripts of one window, kept verbatim as executed |
+| `scripts/benchmark/rental/` | cloud-rental provisioning material |
+
+- Every script under `scripts/benchmark/` carries a header comment naming its
+  role, the window(s) that used it, and the direction of its data flow.
+  `scripts/benchmark/README.md` holds the window-to-script index and MUST be
+  updated when a window runs.
+- A measurement window is reproducible only when its inputs, stage scripts and
+  archive are committed together: `scripts/benchmark/inputs/` +
+  `scripts/benchmark/windows/<date>/` + `benchmark-results/<date>/`.
+- Archived numbers are never hand-copied: statistics tables and figures are
+  produced by scripts in this directory and committed next to the archive they
+  describe, and an article quotes them rather than re-deriving them.
+- These paths are repository-development material, distinct from the agent
+  documentation shipped inside the bundle (`docs/capabilities/`, `skills/`).
+  Shipped documents must not depend on `scripts/benchmark/` internals.
+
 ## Execution Safety
 
 - Execute locally by default.

@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
+# ---------------------------------------------------------------------------
+# Benchmark tooling — scripts/benchmark/analysis/update-runtime-preferences.py
+# Role: write the measured backend rows of `runtime-preferences.json` from benchmark reports
+# Windows: 2026-10-04 (N=3 three-backend) and 2026-10-11 (N=10)
+# Direction: product-facing default-backend selection derived from measurement
+# Provenance index: scripts/benchmark/README.md
+# ---------------------------------------------------------------------------
 """Write benchmark results back into the runtime preference table.
 
 Usage:
-    python scripts/update-runtime-preferences.py <capability.benchmark.json> [...]
-    python scripts/update-runtime-preferences.py --check <report.json> [...]
-    python scripts/update-runtime-preferences.py --file PATH <report.json> [...]
+    python scripts/benchmark/analysis/update-runtime-preferences.py <capability.benchmark.json> [...]
+    python scripts/benchmark/analysis/update-runtime-preferences.py --check <report.json> [...]
+    python scripts/benchmark/analysis/update-runtime-preferences.py --file PATH <report.json> [...]
 
 For every report with verdict `consistent`, the fastest backend (lowest
 median wall time among backends with successful runs; ties go to `rust`)

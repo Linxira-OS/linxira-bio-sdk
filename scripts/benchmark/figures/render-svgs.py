@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# ---------------------------------------------------------------------------
+# Benchmark tooling — scripts/benchmark/figures/render-svgs.py
+# Role: render the self-contained SVG figure set (absolute medians, memory, ratio CI, repeat stability, layered speedup, two-window series, record granularity)
+# Windows: 2026-10-11, comparing against the 2026-09-13 archive
+# Direction: publication figures; reads the archive plus raw reports
+# Provenance index: scripts/benchmark/README.md
+# ---------------------------------------------------------------------------
 """Render self-contained SVG figures from archived benchmark reports.
 
 The figures are generated from the archived JSON, never hand-drawn: every
@@ -8,7 +15,7 @@ resampling seed, sorted capability order) so re-running produces identical
 bytes.
 
 Usage:
-    python3 scripts/render-benchmark-svgs.py \
+    python3 scripts/benchmark/figures/render-svgs.py \
         --summary benchmark-results/<date>/summary.json \
         --reports /path/to/reports-with-raw-runs \
         --comparison benchmark-results/2026-09-13/summary.json \
@@ -43,7 +50,7 @@ FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Aria
 
 BOOTSTRAP_SEED = 20261011
 BOOTSTRAP_ROUNDS = 10_000
-# Same pre-registered rule as scripts/benchmark-statistics.py: detectable when
+# Same pre-registered rule as scripts/benchmark/analysis/statistics-tables.py: detectable when
 # the ratio CI excludes 1.0, material only at/above this floor.
 MATERIAL_RATIO = 1.10
 
@@ -55,6 +62,21 @@ def esc(text: str) -> str:
         .replace("<", "&lt;")
         .replace(">", "&gt;")
     )
+
+
+def _wrap_caption(text: str, limit: int) -> list[str]:
+    lines: list[str] = []
+    current = ""
+    for word in str(text).split():
+        candidate = f"{current} {word}".strip()
+        if len(candidate) > limit and current:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    return lines or [""]
 
 
 class Canvas:
@@ -96,10 +118,15 @@ class Canvas:
         )
 
     def save(self, path: Path) -> None:
-        self.parts.append(
-            f'<text x="24" y="{self.height - 14}" fill="{MUTED}" font-family="{FONT}" '
-            f'font-size="11">{esc(self.caption)}</text>'
-        )
+        # Captions can exceed the canvas width; an unwrapped <text> would simply be
+        # clipped by the viewBox, so wrap at word boundaries and stack upward.
+        lines = _wrap_caption(self.caption, 150)
+        for index, line in enumerate(lines):
+            y = self.height - 14 - (len(lines) - 1 - index) * 14
+            self.parts.append(
+                f'<text x="24" y="{y}" fill="{MUTED}" font-family="{FONT}" '
+                f'font-size="11">{esc(line)}</text>'
+            )
         self.parts.append("</svg>")
         path.write_text("\n".join(self.parts) + "\n", encoding="utf-8")
 
@@ -173,7 +200,7 @@ def figure_speedup(summary: dict, path: Path) -> None:
     row_height = 34
     height = 120 + row_height * len(rows) + 30
     canvas = Canvas(940, height, "Rust vs interpreter backends — wall-time ratio (log scale)",
-                    f"Source: {summary['report_id']} · median of N repeats per backend, same input, same machine · "
+                    f"Source: {summary['report_id']} · median of 10 timed repeats per backend after one untimed warm-up, same input, same machine · "
                     "left of the divider a C-level library already covers the loop, right of it the interpreter iterates per record")
     left, right = 250, 860
     high = max([row[2] or row[1] for row in rows] or [2]) * 1.6
@@ -196,9 +223,11 @@ def figure_speedup(summary: dict, path: Path) -> None:
             canvas.rect(left, y + 19, log_scale(r_ratio, low, high, left, right) - left, 11, R_LANG)
             canvas.text(log_scale(r_ratio, low, high, left, right) + 6, y + 29,
                         f"{r_ratio:.2f}×", size=11, fill=R_LANG)
-    canvas.text(right - 4, 56, "python", size=12, fill=PYTHON, anchor="end", weight="600")
-    canvas.text(right - 4, 56, "", size=12, fill=R_LANG, anchor="end")
-    canvas.text(right, 78 + row_height * len(rows), "r", size=12, fill=R_LANG, anchor="end", weight="600")
+    canvas.text(right - 4, 56, "", size=12, fill=INK)
+    for offset, (backend, colour) in enumerate((("python", PYTHON), ("r", R_LANG))):
+        x = right - 170 + offset * 90
+        canvas.rect(x, 30, 9, 9, colour, radius=2)
+        canvas.text(x + 15, 39, backend, size=12, fill=colour)
     canvas.save(path)
 
 
@@ -207,7 +236,7 @@ def figure_medians(summary: dict, path: Path) -> None:
     bar_group = 46
     height = 150 + bar_group * len(entries) + 40
     canvas = Canvas(940, height, "Absolute wall time per backend (log scale, ms)",
-                    f"Source: {summary['report_id']} · median of N repeats · warm page cache")
+                    f"Source: {summary['report_id']} · median of 10 timed repeats per backend (after one untimed warm-up; warm page cache)")
     left = 250
     values = []
     for entry in entries:
@@ -246,7 +275,7 @@ def figure_memory(summary: dict, path: Path) -> None:
     row_height = 34
     height = 130 + row_height * len(entries) + 30
     canvas = Canvas(940, height, "Peak resident memory per backend (log scale, MB)",
-                    f"Source: {summary['report_id']} · /usr/bin/time -v VmHWM per timed run, median of N repeats")
+                    f"Source: {summary['report_id']} · /usr/bin/time -v VmHWM per timed run, median of 10 timed repeats per backend")
     left, right = 250, 830
     values = [v for e in entries for b in ("rust", "python", "r")
               if (v := (e["backends"].get(b) or {}).get("median_peak_rss_mb"))]
@@ -296,8 +325,10 @@ def figure_ratio_ci(summary: dict, reports: Path, path: Path) -> None:
     row_height = 34
     height = 140 + row_height * len(rows) + 40
     canvas = Canvas(940, height, "Is the gap real? — ratio with bootstrap 95% CI (log scale)",
-                    f"Source: {summary['report_id']} raw runs · {BOOTSTRAP_ROUNDS:,} resamples of the N recorded wall times, seed {BOOTSTRAP_SEED} · "
-                    "shaded band = ±2×(CV_rust+CV_other): inside it the gap is not resolvable at this N")
+                    f"Source: {summary['report_id']} raw runs · {BOOTSTRAP_ROUNDS:,} bootstrap resamples of the median ratio, "
+                    f"seed {BOOTSTRAP_SEED} · each arm is 10 timed repeats after one untimed warm-up · "
+                    "verdicts come from the CI: material when the whole interval sits at or above the 1.10× floor, "
+                    "within-noise when the interval crosses 1.00× (the shaded band is ±2×(CV_rust+CV_other), shown for context only)")
     left, right = 300, 870
     ratios = [row[1] for row in rows] + [row[3] for row in rows]
     low = min(0.9, min(ratios) * 0.9) if ratios else 0.9
@@ -337,27 +368,43 @@ def figure_ratio_ci(summary: dict, reports: Path, path: Path) -> None:
         else:
             verdict, marker = "detectable-immaterial", ACCENT
         canvas.rect(x_mid - 3.5, y, 7, 10, marker)
-        canvas.text(x_high + 8, y + 9, f"{ratio:.2f}× [{low_ci:.2f}, {high_ci:.2f}] {verdict}",
-                    size=10, fill=marker)
+        annotation = f"{ratio:.2f}× [{low_ci:.2f}, {high_ci:.2f}] {verdict}"
+        if x_high + 8 + 6.2 * len(annotation) > canvas.width - 8:
+            canvas.text(x_low - 8, y + 9, annotation, size=10, fill=marker, anchor="end")
+        else:
+            canvas.text(x_high + 8, y + 9, annotation, size=10, fill=marker)
     canvas.save(path)
 
 
 def figure_granularity(reports: Path, path: Path) -> None:
-    shapes = [("one", "1 × 100 Mb"), ("twenty", "20 × 5 Mb"), ("many", "100,000 × 1 kb")]
+    """Record-shape experiment: 1 / 20 / 100 000 records at constant ~100 Mb.
+
+    The hypothesis this figure was built to test — "python pays one language
+    boundary per record, so more records means a wider gap" — was *falsified*
+    by the data (all three shapes land within 3%), hence the caption states the
+    measured conclusion rather than the expectation.
+    """
+    shapes = [("one", "1 record\n(1 × 100 Mb)"), ("twenty", "20 records\n(20 × 5 Mb)"),
+              ("many", "100,000 records\n(100k × 1 kb)")]
     series = {"rust": (RUST, []), "python": (PYTHON, []), "r": (R_LANG, [])}
     for key, _label in shapes:
-        report_file = reports / f"out-gran-{key}" / "sequence.stats.v1.benchmark.json"
-        if not report_file.is_file():
+        candidates = [reports / f"out-gran-{key}" / "sequence.stats.v1.benchmark.json",
+                      reports / f"{key}.benchmark.json",
+                      reports / f"gran-{key}.benchmark.json"]
+        report_file = next((c for c in candidates if c.is_file()), None)
+        if report_file is None:
             continue
-        times = runs_by_backend(json.loads(report_file.read_text(encoding="utf-8")))
+        backend_runs = runs_by_backend(json.loads(report_file.read_text(encoding="utf-8")))
         for backend in series:
-            series[backend][1].append(min(times.get(backend, [float("nan")])) if times.get(backend) else None)
+            values = backend_runs.get(backend) or []
+            series[backend][1].append(statistics.median(values) if values else None)
     if not any(values for _c, values in series.values()):
         return
-    canvas = Canvas(940, 420, "Why sequence.stats shows almost no gap — record granularity at fixed ~100 Mb",
-                    "Source: repository reports (granularity experiment) · same total bases, same machine, N repeats "
-                    "· python pays a fixed cost per record, the Rust kernel is one pass per line")
-    left, top, right, bottom = 110, 80, 880, 330
+    canvas = Canvas(940, 440, "Record granularity is not what separates the backends — same ~100 Mb, three record shapes",
+                    "Source: repository reports (granularity experiment) · same total bases, same machine, N=10 per point "
+                    "· all three backends move <3% across shapes, so the ≈1× on sequence.stats comes from shared I/O and "
+                    "allocation cost, not from crossing the language boundary once per record")
+    left, top, right, bottom = 110, 96, 880, 330
     values = [v for _c, vals in series.values() for v in vals if v]
     low, high = max(min(values) / 2, 1), max(values) * 1.6
     for decade in range(0, int(math.log10(high)) + 2):
@@ -371,7 +418,8 @@ def figure_granularity(reports: Path, path: Path) -> None:
     for index, (_key, label) in enumerate(shapes):
         x = left + index * step
         canvas.line(x, top, x, bottom, GRID)
-        canvas.text(x, bottom + 22, label, size=12, fill=INK, anchor="middle")
+        for offset, line in enumerate(label.split("\n")):
+            canvas.text(x, bottom + 22 + offset * 13, line, size=12, fill=INK, anchor="middle")
     for backend, (colour, values_) in series.items():
         points = []
         for index, value in enumerate(values_):
@@ -381,6 +429,7 @@ def figure_granularity(reports: Path, path: Path) -> None:
             y = bottom - (math.log10(value) - math.log10(low)) / (math.log10(high) - math.log10(low)) * (bottom - top)
             points.append(f"{x:.1f},{y:.1f}")
             canvas.rect(x - 4, y - 4, 8, 8, colour, radius=4)
+            canvas.text(x + 8, y - 6, f"{value:,.0f}", size=10, fill=colour)
         if len(points) > 1:
             canvas.parts.append(
                 f'<polyline points="{" ".join(points)}" fill="none" stroke="{colour}" stroke-width="2"/>'
@@ -390,7 +439,8 @@ def figure_granularity(reports: Path, path: Path) -> None:
 
 
 def figure_stability(reports: Path, summary: dict, path: Path) -> None:
-    picks = [e for e in summary["entries"] if e["backends"].get("r")][:4]
+    picks = [e for e in summary["entries"]
+             if all(e["backends"].get(b) for b in ("rust", "python", "r"))]
     rows = []
     for entry in picks:
         report_file = reports / entry["report"]
@@ -400,9 +450,15 @@ def figure_stability(reports: Path, summary: dict, path: Path) -> None:
     if not rows:
         return
     row_height = 52
-    canvas = Canvas(940, 130 + row_height * len(rows), "Raw repeats — what the medians are built from",
-                    f"Source: {summary['report_id']} · every recorded wall_ms per backend (N repeats, warm page cache)")
+    canvas = Canvas(940, 150 + row_height * len(rows), "Raw repeats — what the medians are built from",
+                    f"Source: {summary['report_id']} · every recorded wall_ms, 10 timed repeats per backend "
+                    "after one untimed warm-up (warm page cache) · the vertical bar in each row is that "
+                    "backend's median")
     left, right = 250, 880
+    for offset, (backend, colour) in enumerate((("rust", RUST), ("python", PYTHON), ("r", R_LANG))):
+        x = right - 210 + offset * 70
+        canvas.rect(x, 34, 9, 9, colour, radius=2)
+        canvas.text(x + 15, 43, backend, size=12, fill=colour)
     values = [v for _n, times in rows for vals in times.values() for v in vals]
     low, high = max(min(values) / 1.5, 0.5), max(values) * 1.5
     for decade in range(0, int(math.log10(high)) + 2):
@@ -411,7 +467,7 @@ def figure_stability(reports: Path, summary: dict, path: Path) -> None:
             continue
         x = log_scale(value, low, high, left, right)
         canvas.line(x, 60, x, 60 + row_height * len(rows), GRID)
-        canvas.text(x, 54, f"{value:,.0f}", size=11, fill=MUTED, anchor="middle")
+        canvas.text(x, 54, f"{value:,.0f} ms", size=11, fill=MUTED, anchor="middle")
     for index, (name, times) in enumerate(rows):
         y = 60 + index * row_height
         canvas.text(left - 12, y + 22, name, size=12, fill=INK, anchor="end")

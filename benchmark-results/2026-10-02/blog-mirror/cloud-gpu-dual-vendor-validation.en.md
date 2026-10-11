@@ -169,11 +169,11 @@ through each vendor's native compiler.
 git clone https://github.com/Linxira-OS/linxira-bio-sdk.git
 cd linxira-bio-sdk && cargo build --release -p linxira-bio-cli
 
-bash scripts/rental/dock-study.sh                          # docking study + RMSD
-mcc -O3 scripts/rental/bench_suite.mu -o bench_mu -lmusart # GPU kernels (MUSA)
-cp scripts/rental/bench_suite.mu b.cu && nvcc -O3 -arch=sm_89 b.cu -o bench_cu
-bash scripts/rental/rna_analysis.sh                        # signal-injection check
-bash scripts/rental/system_bench.sh                        # storage/RAM bandwidth
+bash scripts/benchmark/rental/dock-study.sh                          # docking study + RMSD
+mcc -O3 scripts/benchmark/rental/bench_suite.mu -o bench_mu -lmusart # GPU kernels (MUSA)
+cp scripts/benchmark/rental/bench_suite.mu b.cu && nvcc -O3 -arch=sm_89 b.cu -o bench_cu
+bash scripts/benchmark/rental/rna_analysis.sh                        # signal-injection check
+bash scripts/benchmark/rental/system_bench.sh                        # storage/RAM bandwidth
 ```
 
 Raw outputs (JSON/TSV/logs/hashes) live in the local archive

@@ -100,7 +100,7 @@ rust 上升平缓（每行一次分配 + 单遍标量循环）→ **比值随粒
 
 ### 7.1 图表（本窗口新增能力）
 
-`scripts/render-benchmark-svgs.py`：从归档 JSON 生成自包含 SVG（确定性、固定重采样种子），
+`scripts/benchmark/figures/render-svgs.py`：从归档 JSON 生成自包含 SVG（确定性、固定重采样种子），
 图形对齐站点深色主题（卡片 `#0a0f1a`、正文 `#e2e8f0`、强调 `#20B8B0`）。当前图集：
 
 | 图 | 回答的问题 |
