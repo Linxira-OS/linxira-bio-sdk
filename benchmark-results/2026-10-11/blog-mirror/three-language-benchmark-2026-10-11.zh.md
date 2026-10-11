@@ -128,6 +128,11 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 （表：[`../statistics-trimmed-medians.tsv`](../statistics-trimmed-medians.tsv)、[`../statistics-trimmed-verdicts.tsv`](../statistics-trimmed-verdicts.tsv)）。
 三种口径下**中位数与判定完全一致**——即头尾各一次的影响不足以改变任何一条结论。
 
+![从一次能力测量到一条判定：协议与判定规则](./figures/fig-method.svg)
+
+图：测量的完整链路——固定并哈希输入 → 1 次不计时预热 → 10 次计时重复 → 中位数/IQR/CV →
+bootstrap 置信区间 → 三段式判定。**预热那次不进报告**，裁剪口径只是稳健性检查。
+
 ## 7. 环境披露
 
 | 项 | 值 |
@@ -168,6 +173,10 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 
 （本轮另有一次 N=3 窗口的同类测量，结论一致；见 §9 与台账 `docs/engine-evals/local-nas-g7400-window-2026-10-04.md`。）
 
+![各后端绝对墙钟时间（对数刻度，ms）](./figures/fig-absolute-medians.svg)
+
+图：各后端的绝对中位数墙钟时间（对数刻度）。同一输入、同一机器、每后端 10 次计时重复。
+
 ### 8.2 内存（峰值 RSS，median-of-10）
 
 | 能力 | rust | python | r |
@@ -180,16 +189,22 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 | `variant.stats.v1` | 6.2 MB | 45.8 MB (7.4×) | 122.4 MB (19.7×) |
 | `fastq.qc.v1` | 6.1 MB | 46.1 MB (7.5×) | 80.0 MB (13.1×) |
 
-图：[`./figures/fig-memory.svg`](./figures/fig-memory.svg)。
+![各后端峰值内存（对数刻度，MB）](./figures/fig-memory.svg)
+
+图：各后端峰值常驻内存（median-of-10，GNU time 的 VmHWM）。
 
 ### 8.3 重复稳定性与比值区间
 
-图：[`./figures/fig-repeat-stability.svg`](./figures/fig-repeat-stability.svg)（逐能力的 10 次散布与 IQR）。
+![逐能力 10 次原始墙钟的散布与中位数](./figures/fig-repeat-stability.svg)
+
+图：逐能力的 10 次原始 `wall_ms` 散布（竖线为各自中位数），用来检查"中位数不是被某一次运行拉出来的"。
 多数能力的中位数在 10 次间落在 ±1 IQR 内；`sequence.stats` 的 rust 档位粒度是 10 ms
 （`time` 的采样分辨），因此其 CV（1.95%）主要是**量化噪声**而不是真实抖动——这点限制了
 小绝对值的分辨力，也是我们把实质性下限放在 1.10 而不是 1.01 的原因之一。
 
-图：[`./figures/fig-ratio-ci.svg`](./figures/fig-ratio-ci.svg)（比值与 95% CI，含 1.00 参考线与 1.10 实质性下限线）。
+![比值与 bootstrap 95% 置信区间（对数刻度）](./figures/fig-ratio-ci.svg)
+
+图：每对后端的比值与 95% CI；虚线为 1.00（无差异）与 1.10（实质性下限），标注给出判定。
 
 ### 8.4 裁剪稳健性
 
@@ -214,6 +229,10 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 （比值 1.037 → 1.036）。在 ~100 MB 量级上，两侧都被 **I/O 与大块内存分配**主导：
 每碱基的活由 C 原语（`str.count`/`str.upper` 一类）承担，而每行的读取与建串两侧都要付。
 
+![同一 ~100 Mb、三种记录形态下的三端中位数](./figures/fig-granularity.svg)
+
+图：记录形态实验——总量不变，记录数从 1 到 10 万，三条线几乎水平，这就是原假设被推翻的直接证据。
+
 更正后的解释（也是本文的分层依据）：真正的分界线不是"记录数"，而是**"每个输入元素是否需要
 解释器参与"**。逐碱基逻辑落在 C 里的能力（`sequence.stats`）≈1×；逐项/逐记录逻辑落在解释器里
 的能力（`set.venn`/`pdb`/`variant`/`enrichment`/`fastq.qc`）从 7.7× 一路到 1097×。
@@ -221,7 +240,9 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 
 ### 8.6 分层速览
 
-图：[`./figures/fig-speedup-layered.svg`](./figures/fig-speedup-layered.svg)。
+![分层速览：Rust 相对两后端的墙钟比值（对数刻度）](./figures/fig-speedup-layered.svg)
+
+图：分层速览——比值按层次排序，左侧是 C 库已覆盖循环的能力，右侧是解释器逐元素迭代的能力。
 
 | 层次 | 能力 | python | r |
 | --- | --- | --- | --- |
@@ -276,6 +297,11 @@ sha256 逐字节一致（如 `ref.fa`、`cell.tsv`、`cell.json`）。
 其中 `variant.stats` 目前唯一的早期数字是一次 Windows 端到端单重复（rust 42 ms / python 301 ms，
 2026-09-19，**无 r 行**），与本轮 200k 变异的大输入不可比，仅作记录：
 `benchmark-results/RECORDS.md` §2026-09-19。
+
+![同能力、两个窗口：小夹具与大输入的比值对比](./figures/fig-series-two-windows.svg)
+
+图：同一能力在两个窗口里的比值（`small` = 九月小夹具，`large` = 本轮大输入）。
+小夹具上三端被启动/常数项拖平，比值反而更大；大输入上才显出真实吞吐。
 
 读法：**小夹具上三端都被启动/常数项拖平**（几十到几百毫秒），量级差距要在大输入上才展开；
 而 `set.venn` 的 R 腿在小夹具上看着"还行"（400 ms），到大输入直接变成 10 975 ms——
