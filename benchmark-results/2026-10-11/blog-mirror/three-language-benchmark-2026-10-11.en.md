@@ -8,8 +8,9 @@ desc: "One low-end x86 machine, one Rust engine, and the idiomatic Biopython and
 
 > Linxira Bio SDK benchmark report · 2026-10-11. A three-backend N=10 repeated measurement of 8 capabilities on one low-end x86 machine: environment, input digests, scripts, tables and figures are all public and can be re-checked item by item. Changes and disclosures are listed in "Versions and disclosures" at the end.
 
-> Draft, written incrementally. **Pending**: the N=10 long runs for `fastq.qc` and `sequence.ssr`
-> (queued; their rows get filled into §8.1, §8.6 and §9 when the runs land).
+> Draft, written incrementally. **Pending**: the N=10 long run for `sequence.ssr` (its R leg needs
+> about 5 h and is scheduled after the host's maintenance window); `fastq.qc` is filled in. The archive
+> and the site publication follow the same deferral.
 > Raw tables live in this repository next to this file (see §12); figures in `./figures/`.
 
 ## 1. Abstract
@@ -181,8 +182,8 @@ ratio, CI, verdict). Excerpt:
 | `enrichment.overrepresentation.v1` | 30 ms | 230 ms | 4470 ms | 7.7× material | 149× material |
 | `structure.pdb.summary.v1` | 30 ms | 790 ms | 20,750 ms | 26× material | 692× material |
 | `variant.stats.v1` | 80 ms | 760 ms | 13,495 ms | 9.5× material | 169× material |
-| `fastq.qc.v1` | pending (N=10) | pending | pending | — | — |
-| `sequence.ssr.v1` | pending (N=10) | pending | pending | — | — |
+| `fastq.qc.v1` | 1570 ms | 49,320 ms | 702,655 ms | 31.4× [30.5, 32.0] material | 447.6× [432.4, 452.1] material |
+| `sequence.ssr.v1` | pending (N=10, after maintenance) | pending | pending | — | — |
 
 (An earlier N=3 window measured the same capabilities with the same conclusion; see §9 and the
 engineering ledger `docs/engine-evals/local-nas-g7400-window-2026-10-04.md`.)
@@ -197,6 +198,7 @@ engineering ledger `docs/engine-evals/local-nas-g7400-window-2026-10-04.md`.)
 | `enrichment.overrepresentation.v1` | 14.8 MB | 61.0 MB (4.1×) | 145.5 MB (9.8×) |
 | `structure.pdb.summary.v1` | 29.7 MB | 66.3 MB (2.2×) | 162.9 MB (5.5×) |
 | `variant.stats.v1` | 6.2 MB | 45.8 MB (7.4×) | 122.4 MB (19.7×) |
+| `fastq.qc.v1` | 6.1 MB | 46.1 MB (7.5×) | 80.0 MB (13.1×) |
 
 Figure: [`./figures/fig-memory.svg`](./figures/fig-memory.svg).
 
@@ -249,7 +251,7 @@ Figure: [`./figures/fig-speedup-layered.svg`](./figures/fig-speedup-layered.svg)
 | Per-gene / per-variant interpreter loop | `enrichment`, `variant` | 7.7× / 9.5× | 149× / 169× |
 | Per-atom interpreter loop | `structure.pdb.summary` | 26× | 692× |
 | Vectorised numeric library | `expression.pca` | 200× | 138× |
-| Per-base interpreter loop (pending) | `fastq.qc` | pending | pending |
+| Per-base interpreter loop | `fastq.qc` | 31× | 448× |
 | Motif scan (pending) | `sequence.ssr` | pending | pending |
 
 Note the `expression.pca` row: Python is *slower* than R there (200× vs 138×) because both arms run a
@@ -286,11 +288,18 @@ generated against `benchmark-results/2026-09-13/summary.json`):
 
 | Capability | September window (N=5, small fixtures) | This window (N=10, large inputs) | Ordering consistent? |
 | --- | --- | --- | --- |
-| `sequence.stats` | rust 40 / py 330 / r 2110 ms | rust 820 / py 840 / r 1840 ms | yes (rust ≤ py < r) |
-| `expression.pca` | rust 40 / py 300 / r 460 ms | rust 20 / py 4010 / r 2760 ms | yes |
-| `set.venn` | rust 40 / py 310 / r 400 ms | rust 10 / py 180 / r 10,975 ms | R moves drastically with scale |
-| `structure.pdb.summary` | rust 40 / py 320 / r 410 ms | rust 30 / py 790 / r 20,750 ms | yes (magnitudes unfold with size) |
-| `variant.stats` | rust 60 / py 660 / r 12,000 ms | rust 80 / py 760 / r 13,495 ms | yes |
+| `sequence.stats` | 40 / 330 / 2110 ms | 820 / 840 / 1840 ms | yes (rust ≤ py < r) |
+| `expression.pca` | 40 / 300 / 460 ms | 20 / 4010 / 2760 ms | yes |
+| `set.venn` | 40 / 310 / 400 ms | 10 / 180 / 10,975 ms | R moves drastically with scale |
+| `structure.pdb.summary` | 40 / 320 / 410 ms | 30 / 790 / 20,750 ms | yes (magnitudes unfold with size) |
+
+**Why only four rows**: the table lists only capabilities that have an archived three-backend row in
+*both* windows (values from `../statistics-comparison.tsv`). `enrichment.overrepresentation`,
+`variant.stats`, `fastq.qc` and `sequence.ssr` have no three-backend row in the September archive, so
+they are not listed — putting differently-scoped numbers side by side is what makes a comparison
+untrue. For `variant.stats` the only earlier number on record is a single-repeat Windows end-to-end
+run (rust 42 ms / python 301 ms, 2026-09-19, **no r row**), not comparable with this window's 200k
+variant input; it is recorded in `benchmark-results/RECORDS.md` §2026-09-19.
 
 Reading: **small fixtures flatten all three backends** (tens to hundreds of ms) because start-up and
 constant terms dominate; magnitude differences only unfold on large inputs. The R arm of `set.venn`

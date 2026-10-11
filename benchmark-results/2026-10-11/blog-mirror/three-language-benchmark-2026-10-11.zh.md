@@ -8,7 +8,7 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 
 > Linxira Bio SDK 基准报告 · 2026-10-11。在一台低端 x86 机器上对 8 项能力做三语言后端的 N=10 重复测量：环境、输入摘要、脚本、表格与图全部公开，可逐项复核。变更与声明见文末「版本与声明」。
 
-> 本文是草稿（增量写作中）。**待补**：`seq.fastq.qc`/`sequence.ssr` 两项的 N=10 长跑（脚本已排队，跑完把数字填进 §8.1、§8.6 与 §9 的表）。
+> 本文是草稿（增量写作中）。**待补**：`sequence.ssr` 的 N=10 长跑（r 腿约 5 h，安排在服务器维护完成后执行）；`fastq.qc` 的数字已填入。归档与站点发布同此顺延。
 > 表格原始文件：本目录同级仓库路径（见 §12）。图：`./figures/`。
 
 ## 1. 摘要
@@ -163,8 +163,8 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 | `enrichment.overrepresentation.v1` | 30 ms | 230 ms | 4470 ms | 7.7× material | 149× material |
 | `structure.pdb.summary.v1` | 30 ms | 790 ms | 20 750 ms | 26× material | 692× material |
 | `variant.stats.v1` | 80 ms | 760 ms | 13 495 ms | 9.5× material | 169× material |
-| `fastq.qc.v1` | 待跑（N=10） | 待跑 | 待跑 | — | — |
-| `sequence.ssr.v1` | 待跑（N=10） | 待跑 | 待跑 | — | — |
+| `fastq.qc.v1` | 1570 ms | 49 320 ms | 702 655 ms | 31.4× [30.5, 32.0] material | 447.6× [432.4, 452.1] material |
+| `sequence.ssr.v1` | 待跑（N=10，维护后） | 待跑 | 待跑 | — | — |
 
 （本轮另有一次 N=3 窗口的同类测量，结论一致；见 §9 与台账 `docs/engine-evals/local-nas-g7400-window-2026-10-04.md`。）
 
@@ -178,6 +178,7 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 | `enrichment.overrepresentation.v1` | 14.8 MB | 61.0 MB (4.1×) | 145.5 MB (9.8×) |
 | `structure.pdb.summary.v1` | 29.7 MB | 66.3 MB (2.2×) | 162.9 MB (5.5×) |
 | `variant.stats.v1` | 6.2 MB | 45.8 MB (7.4×) | 122.4 MB (19.7×) |
+| `fastq.qc.v1` | 6.1 MB | 46.1 MB (7.5×) | 80.0 MB (13.1×) |
 
 图：[`./figures/fig-memory.svg`](./figures/fig-memory.svg)。
 
@@ -229,7 +230,7 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 | 逐基因/逐变异解释器循环 | `enrichment`、`variant` | 7.7× / 9.5× | 149× / 169× |
 | 逐原子解释器循环 | `structure.pdb.summary` | 26× | 692× |
 | 向量化数值库 | `expression.pca` | 200× | 138× |
-| 逐碱基解释器循环（待补） | `fastq.qc` | 待跑 | 待跑 |
+| 逐碱基解释器循环 | `fastq.qc` | 31× | 448× |
 | motif 扫描（待补） | `sequence.ssr` | 待跑 | 待跑 |
 
 注意 `expression.pca` 一行：Python 反而比 R 慢（200× vs 138×），因为两侧走的都是向量化库
@@ -264,11 +265,17 @@ sha256 逐字节一致（如 `ref.fa`、`cell.tsv`、`cell.json`）。
 
 | 能力 | 九月窗口（N=5，小夹具） | 本轮（N=10，大输入） | 排序是否一致 |
 | --- | --- | --- | --- |
-| `sequence.stats` | rust 40 / py 330 / r 2110 ms | rust 820 / py 840 / r 1840 ms | 一致（rust ≤ py < r） |
-| `expression.pca` | rust 40 / py 300 / r 460 ms | rust 20 / py 4010 / r 2760 ms | 一致 |
-| `set.venn` | rust 40 / py 310 / r 400 ms | rust 10 / py 180 / r 10 975 ms | r 的位置随规模剧变 |
-| `structure.pdb.summary` | rust 40 / py 320 / r 410 ms | rust 30 / py 790 / r 20 750 ms | 一致（量级随规模展开） |
-| `variant.stats` | rust 60 / py 660 / r 12 000 ms | rust 80 / py 760 / r 13 495 ms | 一致 |
+| `sequence.stats` | 40 / 330 / 2110 ms | 820 / 840 / 1840 ms | 一致（rust ≤ py < r） |
+| `expression.pca` | 40 / 300 / 460 ms | 20 / 4010 / 2760 ms | 一致 |
+| `set.venn` | 40 / 310 / 400 ms | 10 / 180 / 10 975 ms | r 的位置随规模剧变 |
+| `structure.pdb.summary` | 40 / 320 / 410 ms | 30 / 790 / 20 750 ms | 一致（量级随规模展开） |
+
+**为什么只有四行**：本表只放"两个窗口都有入库三端行"的能力（数据取自
+`../statistics-comparison.tsv`）。`enrichment.overrepresentation`、`variant.stats`、`fastq.qc`、
+`sequence.ssr` 在九月归档里**没有三端行**，因此不列——把不同口径的数字并排放进来才是失实。
+其中 `variant.stats` 目前唯一的早期数字是一次 Windows 端到端单重复（rust 42 ms / python 301 ms，
+2026-09-19，**无 r 行**），与本轮 200k 变异的大输入不可比，仅作记录：
+`benchmark-results/RECORDS.md` §2026-09-19。
 
 读法：**小夹具上三端都被启动/常数项拖平**（几十到几百毫秒），量级差距要在大输入上才展开；
 而 `set.venn` 的 R 腿在小夹具上看着"还行"（400 ms），到大输入直接变成 10 975 ms——

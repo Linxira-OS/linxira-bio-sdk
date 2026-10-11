@@ -138,7 +138,7 @@ Bioconductor 3.23；Arch 的系统库不可写 → 必须用用户库 `$HOME/R/x
 ## 6.2 N=10 复核（同机同输入的第二次跑分，替代 §6.1 的 N=3 数字）
 
 按用户要求，**每项一律 N=10（含 SSR）**，判定规则改为两段式（CI 排除 1.0 = 可分辨；CI 下界 ≥1.10 = **material**）。
-六个"快"能力的 N=10 结果（median-of-10，GNU time 高精度）：
+六个"快"能力 + `fastq.qc` 的 N=10 结果（median-of-10，GNU time 高精度；`sequence.ssr` 因维护窗口顺延）：
 
 | 能力 | rust | python | r | 判定 |
 | --- | --- | --- | --- | --- |
@@ -148,6 +148,7 @@ Bioconductor 3.23；Arch 的系统库不可写 → 必须用用户库 `$HOME/R/x
 | `enrichment.overrepresentation.v1` | 30 ms | 230 ms | 4470 ms | 双 material（7.7× / 149×） |
 | `structure.pdb.summary.v1` | 30 ms | 790 ms | 20,750 ms | 双 material（26.3× / 692×） |
 | `variant.stats.v1` | 80 ms | 760 ms | 13,495 ms | 双 material（9.5× / 169×） |
+| `fastq.qc.v1` | 1570 ms（IQR 7.5） | 49,320 ms（IQR 827.5） | 702,655 ms（IQR 1045） | 双 material（31.4×，CI [30.5, 32.0] / 447.6×，CI [432.4, 452.1]） |
 
 稳健性：全 10 次 / 去第 1 次 / 只取中间 8 次三种口径下，中位数与判定**完全一致**
 （`statistics-trimmed-*.tsv`）。注：`benchmark run` 本身已有 1 次**不计时预热**，报告里 10 条全是计时轮次。

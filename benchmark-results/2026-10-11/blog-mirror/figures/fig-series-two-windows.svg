@@ -45,5 +45,5 @@
 <text x="459.9" y="280.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="10" font-weight="400" text-anchor="start">small 10.25×</text>
 <rect x="250.00" y="284.00" width="540.67" height="9.00" rx="2.0" fill="#34d399" opacity="1.0"/>
 <text x="796.7" y="292.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="10" font-weight="400" text-anchor="start">large 691.67×</text>
-<text x="24" y="376" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="11">September: bench-20260913-001 (small repository fixtures, laptop/WSL) · now: bench-localtest-001 (large inputs, NAS) · python vs rust wall-time ratio</text>
+<text x="24" y="376" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="11">September: bench-20260913-001 (small repository fixtures, laptop/WSL) · now: bench-20261011-001 (large inputs, NAS) · python vs rust wall-time ratio</text>
 </svg>
