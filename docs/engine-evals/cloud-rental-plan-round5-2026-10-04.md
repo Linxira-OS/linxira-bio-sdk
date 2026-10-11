@@ -15,7 +15,7 @@
 | W1 | MTT S4000 / 48GB | 易租，**国产主线** | MUSA 驱动 2.7.0、toolkit 3.1.0（镜像可能更新，窗口内核对） | cudarc-musa Rust 栈首测（G3 唯一未验证环节）、Vulkan 错位复查、k-mer/pearson-v4 MUSA C 内核 | 3h |
 | W2 | 昇腾 910B（优先）/ 910C / 初代 910 | **最难**：价高、时长受限、低价档**无 SSH/不允许远程控制**——窗口最脆，随时可能出现且随时可能被掐断 | CANN toolkit 版本窗口内核对；容器多为 **aarch64（鲲鹏）** | **M5-G4 首测**：torch_npu parity + NPU 带宽/算力 probe + cann-rs probe（内核不动工） | 1.5–3h（按时长限制收缩，优先级 T1>T2>T0>T3） |
 | W5 | **vGPU-32GB（4080S 16G→32G 改装）** | 与 R1 同款，随时可得——**本轮插队窗口** | 驱动 595.71.05、CUDA 13.2、sm_89、32GB；**无功能性 Vulkan ICD（R1 定案）→ GPU 路线仅 CUDA/torch** | ① simulate.cell.v1 跨机字节级 parity；② 批次 G cellpose pack GPU 冒烟；③ AIVC 可行性探针（scvi-tools 小模型推断） | 2–3h |
-| W6 | **本地低档机：NAS / Intel G7400（2C/4T）+ UHD 710 核显** | **零成本，随时可跑**（需先配好接入，见 `docs/proposals/local-low-spec-verification-plan.md` §四） | 无独显；核显走 wgpu/Vulkan（先 probe ICD 与 DRM 节点） | ① 三端速度对比（rust/python/r，同机可控对照）；② `simulate.cell.v1`/`sequence.ssr.v1` 跨机字节级 parity；③ UHD 710 低端回退档 GPU 数据点 | 1–2h |
+| W6 | **本地低档机：NAS / Intel G7400（2C/4T）** | ✅ **2026-10-04 已执行**（接入见 `docs/proposals/local-low-spec-verification-plan.md` §四） | 实测**有两块 GPU**：UHD 710 核显 **+ GTX 750 Ti 独显**（均为 Vulkan ICD）；R 缺失 → r 腿待批 | ① rust/python 同机对照（大/小两档）✅；② `simulate.cell.v1`/`sequence.ssr.v1` 跨机字节 parity ✅；③ 双 GPU 低端回退档 `gpu-bench` ✅；④ 顺手抓到并修掉 wgpu dispatch 越界崩溃 | 实际 3 轮共 ~25 min |
 | — | AMD RX 9060/9070 XT | **无公开租赁平台**——只能找人协助代测 | ROCm/HIP 官方栈 + wgpu/Vulkan 覆盖 | 非窗口：**协助测试工具包**（D7），第三方代跑回传产物 | — |
 | — | 砺算等 | 观察档 | OpenCL+Vulkan | 不在本轮（M5-G3 后置项） | — |
 

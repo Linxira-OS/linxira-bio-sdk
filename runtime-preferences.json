@@ -7,19 +7,33 @@
       "default_backend": "rust",
       "measured": {
         "rust": {
-          "wall_ms": 30.0,
-          "peak_rss_mb": 5.8046875
+          "wall_ms": 800.0,
+          "peak_rss_mb": 5.83984375
         },
         "python": {
-          "wall_ms": 270.0,
-          "peak_rss_mb": 43.69140625
-        },
-        "r": {
-          "wall_ms": 1770.0,
-          "peak_rss_mb": 238.515625
+          "wall_ms": 830.0,
+          "peak_rss_mb": 72.5546875
         }
       },
-      "sampled_on": "2026-09-11T15:27:50Z",
+      "sampled_on": "2026-10-11T06:28:28Z",
+      "speedup": null,
+      "consistency": "consistent"
+    },
+    {
+      "capability": "fastq.qc.v1",
+      "dataset_class": "other",
+      "default_backend": "rust",
+      "measured": {
+        "rust": {
+          "wall_ms": 7760.0,
+          "peak_rss_mb": 6.1171875
+        },
+        "python": {
+          "wall_ms": 249780.0,
+          "peak_rss_mb": 48.921875
+        }
+      },
+      "sampled_on": "2026-10-11T06:46:03Z",
       "speedup": null,
       "consistency": "consistent"
     }
