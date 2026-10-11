@@ -106,7 +106,7 @@ NAS 另需装 GNU `time`（否则报告精度降级、`peak_rss` 为 `null`—�
 > ② **纯 Python 逐记录循环**（`fastq.qc`）→ Rust 优势 **32.2×**；
 > ③ Rust 的**稳定收益是内存**（同任务 1/8–1/12 峰值 RSS）与零解释器启动，而非全局吞吐倍数。
 
-## 6. R 腿（第三个语言后端）——首次真实执行，抓出 4 个缺陷
+## 6. R 腿（第三个语言后端）——首次真实执行，抓出 5 个缺陷
 
 NAS 装好 R 4.6.1 + CRAN/Bioconductor（jsonlite 2.0.0、digest 0.6.39、Biostrings 2.80.2 /
 Bioconductor 3.23；Arch 的系统库不可写 → 必须用用户库 `$HOME/R/x86_64-pc-linux-gnu-library/4.6`）。
@@ -132,6 +132,16 @@ Bioconductor 3.23；Arch 的系统库不可写 → 必须用用户库 `$HOME/R/x
 | 2 | 测试本身 | 断言 22 与字面量不符 | 测试字面量 `"AAAAAAAAAATATATATATATAT"` 实为 **23** 字符（多一个 T） | 待修（测试用例） |
 | 3 | `sequence_ssr_v1.R` | SSR 恒返回 0 条 | `start(...)` **未加前缀** → 命中 `stats::start`（时间序列）返回 `c(1,1)` | 已修（`Biostrings::start`） |
 | 4 | CI | 缺陷长期潜伏 | **CI 从未运行 benchmark 两包的测试**（`benchmark-r`/`benchmark-python` 无任何 step） | 已补（debian 作业新增两包测试；R 侧经 BiocManager 装 Biostrings） |
+| 5 | `sequence_ssr_v1.R` | 无 SSR 的输入被 worker 拒绝：`invalid type: sequence, expected a map` | 空 `list()` 被 jsonlite 序列化成 `[]`，而契约的 `motif_length_counts` 是 map（须 `{}`） | 已修（保留 names 属性；已用「无 SSR 输入」端到端验证 `{}` 与 Rust 一致） |
+
+**修复后验证**（全部在 NAS 上实跑）：
+
+- R 包测试套件：**`benchmark-r harness tests passed (with Biostrings parity)`**（首次全绿）。
+- SSR 三端字节一致：22 bp 夹具上 rust == r == python（A×10、TA×6、compound=1，与 Rust 引擎逐字段相同）；
+  无 SSR 输入上 rust == r，`motif_length_counts` 均为 `{}`。
+- **R 的 SSR 规模化能力（重要结论）**：同一 97 MB 输入，Rust 1.6 s、pytrf 2.3 s，**R 1633 s（≈27 min）**
+  ——`matchPattern` 逐 motif 扫描近似 O(4^k × 序列)，比 Rust 慢约 **1000×**。该次运行结论只在
+  结果序列化处失败（分析本身完成），故时间可作单次观测；三端跑分不应再把 SSR 这项纳入 r 腿。
 
 > 教训：三个语言后端里，只有"真的在机器上跑起来"才暴露实现问题。**测试存在但不在 CI 执行 = 不存在**。
 
@@ -159,6 +169,22 @@ Bioconductor 3.23；Arch 的系统库不可写 → 必须用用户库 `$HOME/R/x
 `gpu-lab` 不在 workspace 图里，所以工作区门禁**不覆盖它**；本轮把它单独拉齐到
 `-D warnings` 干净，避免"载体项目长期带警告"变成盲区。功能性冒烟同时通过：
 `gpu-lab backend-smoke` → `histogram[1]=64 pass=true`。
+
+### 7.1 发布包白名单的端到端验证（提交 `9b9e4fa`）
+
+- CI 的 `ci.yml` 通过了 YAML 解析，且新增的两个 benchmark 包步骤确实在 `debian-bookworm` 作业里。
+- 补齐缺失的 release 二进制后（NAS 上原来只建了 cli/worker）**完整打包成功**：
+  `stage-release.py --platform arch` → **606 个文件**、`docs/` 下 **18 项 = 17 份规范文档 + `capabilities/`**、
+  `engine-evals/` 与 `proposals/` **一个都没有**、`bundle-manifest.lock.json` 正常生成。
+- 顺带数据点：Linux release 二进制 `linxira-bio-ui` **45.4 MB**、`linxira-bio-mcp` 0.93 MB。
+
+### 7.2 NAS 上 pull 静默失败的真因（重要运维教训）
+
+不是网络（网络只抖动过一次）：**NAS 侧被脚本改写的 `runtime-preferences.json` 与
+`workflows/org.linxira.benchmark-r/manifest.json` 让工作区变脏**，`git pull --ff-only` 于是拒绝更新，
+而脚本里 `git pull ... | tail -1` 把错误吞掉了——我因此白白在旧提交上跑了一轮"验证"。
+现已固定为先 `git checkout --` 这两个由工具生成的文件再 pull，并在同步后**断言
+`HEAD == origin/main`**。
 
 ## 8. 文档边界与隐私评估（2026-10-04 追加）
 
@@ -188,5 +214,6 @@ workflows, licenses` —— 即 **`docs/` 整棵树随发布包发给用户**，
 - [ ] R 包测试字面量修正（`"AAAAAAAAAATATATATATATAT"` 多一个 T，断言按 22 写）
 - [ ] R SSR 实现的规模化能力评估（`matchPattern` 逐 motif 扫描在 97 MB 上可能不可行——见 §6）
 - [ ] NAS 侧固定 `performance` governor 或记录并接受 powersave（当前已如实记录）
-- [ ] 文档边界：已改为 bundle 白名单（`docs/capabilities` + 17 份规范文档），`engine-evals`/`proposals` 不再随包 ✅
+- [x] 文档边界：已改为 bundle 白名单（`docs/capabilities` + 17 份规范文档），`engine-evals`/`proposals` 不再随包；**完整打包实测 606 文件、无内部目录**
 - [ ] `docs/research/` 空目录（git 未跟踪、易与 `.research/` 混淆）待清理
+- [ ] 若认可 CI 成本：确认 debian 作业新增的 benchmark 包测试在 GitHub 上首跑通过（Biostrings 需源码编译，预计 +5–10 min）
