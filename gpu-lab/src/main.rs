@@ -149,18 +149,42 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        "gpu-bench" => match gpu_bench::run_gpu_benchmarks() {
-            Ok(report) => {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&report).expect("serialize gpu bench report")
-                );
+        "gpu-bench" => {
+            // Optional `--adapter <index>` selects a specific adapter (e.g. to
+            // benchmark an integrated GPU instead of the first discrete one).
+            let mut adapter_index = None;
+            let mut args = std::env::args().skip(2);
+            while let Some(arg) = args.next() {
+                match arg.as_str() {
+                    "--adapter" => {
+                        let value = args.next().unwrap_or_else(|| {
+                            eprintln!("error: --adapter requires an index");
+                            std::process::exit(2);
+                        });
+                        adapter_index = Some(value.parse::<usize>().unwrap_or_else(|_| {
+                            eprintln!("error: --adapter must be a non-negative integer, got {value:?}");
+                            std::process::exit(2);
+                        }));
+                    }
+                    other => {
+                        eprintln!("error: unknown gpu-bench option {other:?}");
+                        std::process::exit(2);
+                    }
+                }
             }
-            Err(error) => {
-                eprintln!("gpu-bench failed: {error}");
-                std::process::exit(1);
+            match gpu_bench::run_gpu_benchmarks(adapter_index) {
+                Ok(report) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&report).expect("serialize gpu bench report")
+                    );
+                }
+                Err(error) => {
+                    eprintln!("gpu-bench failed: {error}");
+                    std::process::exit(1);
+                }
             }
-        },
+        }
         other => {
             eprintln!("unknown subcommand {other:?}; expected `probe`, `bench`, `backend`, `backend-smoke`, or `gpu-bench`");
             std::process::exit(2);

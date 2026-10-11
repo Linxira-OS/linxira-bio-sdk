@@ -266,17 +266,25 @@ struct GpuContext {
     queue: wgpu::Queue,
 }
 
-pub fn run_gpu_benchmarks() -> Result<GpuBenchReport, String> {
+pub fn run_gpu_benchmarks(adapter_index: Option<usize>) -> Result<GpuBenchReport, String> {
     let descriptor = wgpu::InstanceDescriptor {
         backends: wgpu::Backends::all(),
         ..wgpu::InstanceDescriptor::new_without_display_handle()
     };
     let instance = wgpu::Instance::new(descriptor);
     let adapters = pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()));
-    let adapter = adapters
-        .iter()
-        .find(|adapter| adapter.get_info().device_type != wgpu::DeviceType::Cpu)
-        .ok_or("no non-CPU adapter available")?;
+    let adapter = match adapter_index {
+        Some(index) => adapters.get(index).ok_or_else(|| {
+            format!(
+                "adapter index {index} out of range ({} enumerated; run `probe` for the list)",
+                adapters.len()
+            )
+        })?,
+        None => adapters
+            .iter()
+            .find(|adapter| adapter.get_info().device_type != wgpu::DeviceType::Cpu)
+            .ok_or("no non-CPU adapter available")?,
+    };
     let info = adapter.get_info();
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         required_limits: adapter.limits(),
@@ -510,12 +518,14 @@ fn run_pearson_gpu(context: &GpuContext, seed: u64) -> Vec<GpuKernelReport> {
     });
 
     // Dispatch geometry per variant: a single dispatch dimension caps at
-    // 65536, so larger grids spread over y.
+    // 65535 per the WebGPU limit (some drivers reject 65536 outright), so
+    // larger grids spread over y.
+    const MAX_DISPATCH_DIM: u64 = 65_535;
     let groups_for = |pairs_per_group: u64| -> (u32, u32) {
         let total = (pair_count as u64).div_ceil(pairs_per_group.max(1));
         (
-            total.min(65_536) as u32,
-            total.div_ceil(65_536) as u32,
+            total.min(MAX_DISPATCH_DIM) as u32,
+            total.div_ceil(MAX_DISPATCH_DIM) as u32,
         )
     };
     let variants: [(&str, &str, u32, u32, u32, &str); 3] = [
@@ -530,8 +540,8 @@ fn run_pearson_gpu(context: &GpuContext, seed: u64) -> Vec<GpuKernelReport> {
         (
             "pearson-column-pairs-wgreduce",
             PEARSON_SHADER_WG,
-            65_536,
-            pair_count.div_ceil(65_536) as u32,
+            groups_for(1).0,
+            groups_for(1).1,
             1,
             "v2: one workgroup (64 lanes) per pair, shared-memory tree reduction",
         ),
