@@ -19,8 +19,9 @@ __pycache__/
 CAPABILITY_TRACKING.md
 HANDOFF.md
 logo.html
-scripts/benchmark/run/tier1v2-biolab.sh
+# machine-specific lab run scripts (hardcode local mounts; never commit)
 scripts/*-biolab.sh
+scripts/benchmark/run/*-biolab.sh
 release-artifacts-*/
 .zcode/
 # key material and credential files (never commit; see the history-rewrite incident)
