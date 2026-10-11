@@ -6,6 +6,8 @@ lang: en
 desc: "One low-end x86 machine, one Rust engine, and the idiomatic Biopython and Biostrings implementations measured on the same inputs with 10 timed repeats each — under a pre-registered decision rule with bootstrap confidence intervals: 7 of 8 capabilities show a material gap (7.7×–1097×), one shows no resolvable difference."
 ---
 
+> Linxira Bio SDK benchmark report · 2026-10-11. A three-backend N=10 repeated measurement of 8 capabilities on one low-end x86 machine: environment, input digests, scripts, tables and figures are all public and can be re-checked item by item. Changes and disclosures are listed in "Versions and disclosures" at the end.
+
 > Draft, written incrementally. **Pending**: the N=10 long runs for `fastq.qc` and `sequence.ssr`
 > (queued; their rows get filled into §8.1, §8.6 and §9 when the runs land).
 > Raw tables live in this repository next to this file (see §12); figures in `./figures/`.
@@ -338,6 +340,11 @@ One lesson: **a test that exists but never runs in CI does not exist.**
 
 ## 12. Reproducing
 
+The whole chain for this window — staging the reports, input digests, summary, statistics tables,
+figures and the figure check — is one committed script,
+`scripts/benchmark/windows/2026-10-11/archive.sh`, with the window descriptor and the step scripts
+beside it. Step by step:
+
 ```bash
 # 1) inputs (seeded; writes only to the target directory)
 python scripts/benchmark/inputs/generate-inputs.py --set synthetic --out /tmp/lxn10
@@ -380,3 +387,22 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 | [`../statistics-consistency.tsv`](../statistics-consistency.tsv) | cross-backend consistency, tolerance, precision class, report paths |
 | [`../statistics-comparison.tsv`](../statistics-comparison.tsv) | cross-window comparison against the September archive |
 | [`../summary.json`](../summary.json) / [`../summary.md`](../summary.md) | archive index (schema-validated) |
+
+## 15. Versions and disclosures
+
+- **Versions**: first release 2026-10-11 (the six fast capabilities at N=10 plus the record-granularity
+  experiment; the `fastq.qc` and `sequence.ssr` long runs are filled in with the archive). Item-by-item
+  changes are in the changelog at the top.
+- **Self-report disclosure**: this is an **author-run benchmark**, not independently replicated by a
+  third party. The comparison arms are third-party **library** implementations (Biopython 1.88,
+  Biostrings 2.80.2, …), **not** a third-party benchmark suite; GIAB + hap.py (correctness truth sets)
+  and a public hosted benchmark platform (machine-lineage anchoring) are **planned and not executed in
+  this window**, so they are not evidence here. Every ratio holds only for this machine, these inputs,
+  and this protocol.
+- **Licence**: code AGPL-3.0-or-later; this article CC-BY-4.0.
+- **Author and source**: Linxira-OS maintainers · repository:
+  <https://github.com/Linxira-OS/linxira-bio-sdk> · product page: [Linxira Bio SDK](/bio-sdk/)
+
+---
+
+*Linxira-OS · AGPL-3.0-or-later (code) · this article CC-BY-4.0 · <https://github.com/Linxira-OS/linxira-bio-sdk>*

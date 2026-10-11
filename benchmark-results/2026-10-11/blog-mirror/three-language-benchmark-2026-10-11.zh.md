@@ -6,6 +6,8 @@ lang: zh
 desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、Biostrings 实现放在同一批输入上各跑 10 次，用预注册判定规则与 bootstrap 置信区间逐一给结论：7 项存在实质性差距（7.7×–1097×），1 项测不出可分辨差异。"
 ---
 
+> Linxira Bio SDK 基准报告 · 2026-10-11。在一台低端 x86 机器上对 8 项能力做三语言后端的 N=10 重复测量：环境、输入摘要、脚本、表格与图全部公开，可逐项复核。变更与声明见文末「版本与声明」。
+
 > 本文是草稿（增量写作中）。**待补**：`seq.fastq.qc`/`sequence.ssr` 两项的 N=10 长跑（脚本已排队，跑完把数字填进 §8.1、§8.6 与 §9 的表）。
 > 表格原始文件：本目录同级仓库路径（见 §12）。图：`./figures/`。
 
@@ -310,6 +312,10 @@ sha256 逐字节一致（如 `ref.fa`、`cell.tsv`、`cell.json`）。
 
 ## 12. 复现
 
+本轮窗口的**整链**（暂存报告 → 输入摘要 → summary → 统计表 → 图 → 图校验）是一键脚本，
+入库在 `scripts/benchmark/windows/2026-10-11/archive.sh`，窗口的 descriptor 与逐步脚本同目录。
+分步展开如下：
+
 ```bash
 # 1) 生成输入（固定种子，只写 /tmp）
 python scripts/benchmark/inputs/generate-inputs.py --out /tmp/lxn10   # 见台账内的种子说明
@@ -346,3 +352,19 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 | [`../statistics-consistency.tsv`](../statistics-consistency.tsv) | 跨后端一致性、容差、精度档、报告路径 |
 | [`../statistics-comparison.tsv`](../statistics-comparison.tsv) | 与九月窗口的跨窗口对照 |
 | [`../summary.json`](../summary.json) / [`../summary.md`](../summary.md) | 归档索引（schema 校验通过） |
+
+## 15. 版本与声明
+
+- **版本**：初版 2026-10-11（含 N=10 的六项"快"能力与记录粒度实验；`fastq.qc` 与 `sequence.ssr`
+  的长跑结果随归档补齐）。逐条变动见文首「更新日志」。
+- **自述声明**：本文为**作者自述基准**，未经第三方独立复现。对照臂是第三方**库**实现
+  （Biopython 1.88 / Biostrings 2.80.2 等），**不是**第三方基准套件；GIAB + hap.py（正确性真值）
+  与公开托管基准平台（机器谱系锚定）为**计划中、本轮未执行**，故不作为本文证据。
+  所有比值只在本机、本输入、本协议下成立。
+- **许可**：代码 AGPL-3.0-or-later；本文 CC-BY-4.0。
+- **作者与出处**：Linxira-OS 项目维护者 · 仓库：
+  <https://github.com/Linxira-OS/linxira-bio-sdk> · 产品页：[Linxira Bio SDK](/bio-sdk/)
+
+---
+
+*Linxira-OS · AGPL-3.0-or-later（代码）· 本文 CC-BY-4.0 · <https://github.com/Linxira-OS/linxira-bio-sdk>*
