@@ -80,7 +80,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.R",
-      "sha256": "4b66a04c34bc5fa00666196d7c07cad03107192abc8ed5423d9bdc984740d8d7"
+      "sha256": "08bce2975e487c8829bf9e9b8e511b201ae6eb3d4b589c29bd66244f5707da6f"
     },
     {
       "path": "src/implementations/expression_pca_v1.R",
@@ -88,7 +88,7 @@
     },
     {
       "path": "src/implementations/set_venn_v1.R",
-      "sha256": "ae428b097fa8c9d545d8a7e16c7761a1b10cf8022534f08d04f957777f617417"
+      "sha256": "217d2b16c28d3ae3f06456ee46771e87d09f6ef3793c94bcb4f177a254f88459"
     },
     {
       "path": "tests/reference/expression.pca.v1.k3.json",

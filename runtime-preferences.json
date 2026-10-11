@@ -44,6 +44,116 @@
       "sampled_on": "2026-10-11T08:00:22Z",
       "speedup": null,
       "consistency": "consistent"
+    },
+    {
+      "capability": "expression.pca.v1",
+      "dataset_class": "matrix",
+      "default_backend": "rust",
+      "measured": {
+        "rust": {
+          "wall_ms": 20.0,
+          "peak_rss_mb": 8.4375
+        },
+        "python": {
+          "wall_ms": 4000.0,
+          "peak_rss_mb": 53.20703125
+        },
+        "r": {
+          "wall_ms": 2760.0,
+          "peak_rss_mb": 81.859375
+        }
+      },
+      "sampled_on": "2026-10-11T08:52:32Z",
+      "speedup": null,
+      "consistency": "consistent"
+    },
+    {
+      "capability": "set.venn.v1",
+      "dataset_class": "other",
+      "default_backend": "rust",
+      "measured": {
+        "rust": {
+          "wall_ms": 10.0,
+          "peak_rss_mb": 8.41796875
+        },
+        "python": {
+          "wall_ms": 180.0,
+          "peak_rss_mb": 47.26953125
+        },
+        "r": {
+          "wall_ms": 10880.0,
+          "peak_rss_mb": 125.08984375
+        }
+      },
+      "sampled_on": "2026-10-11T08:53:17Z",
+      "speedup": null,
+      "consistency": "consistent"
+    },
+    {
+      "capability": "enrichment.overrepresentation.v1",
+      "dataset_class": "annotation",
+      "default_backend": "rust",
+      "measured": {
+        "rust": {
+          "wall_ms": 30.0,
+          "peak_rss_mb": 16.12890625
+        },
+        "python": {
+          "wall_ms": 220.0,
+          "peak_rss_mb": 61.04296875
+        },
+        "r": {
+          "wall_ms": 4470.0,
+          "peak_rss_mb": 145.3359375
+        }
+      },
+      "sampled_on": "2026-10-11T08:47:45Z",
+      "speedup": null,
+      "consistency": "consistent"
+    },
+    {
+      "capability": "structure.pdb.summary.v1",
+      "dataset_class": "structure",
+      "default_backend": "rust",
+      "measured": {
+        "rust": {
+          "wall_ms": 40.0,
+          "peak_rss_mb": 29.80859375
+        },
+        "python": {
+          "wall_ms": 820.0,
+          "peak_rss_mb": 68.0625
+        },
+        "r": {
+          "wall_ms": 20700.0,
+          "peak_rss_mb": 162.89453125
+        }
+      },
+      "sampled_on": "2026-10-11T08:46:27Z",
+      "speedup": null,
+      "consistency": "consistent"
+    },
+    {
+      "capability": "variant.stats.v1",
+      "dataset_class": "other",
+      "default_backend": "rust",
+      "measured": {
+        "rust": {
+          "wall_ms": 80.0,
+          "peak_rss_mb": 7.82421875
+        },
+        "python": {
+          "wall_ms": 760.0,
+          "peak_rss_mb": 45.7578125
+        },
+        "r": {
+          "wall_ms": 13880.0,
+          "peak_rss_mb": 122.32421875
+        }
+      },
+      "sampled_on": "2026-10-11T08:47:26Z",
+      "speedup": null,
+      "consistency": "consistent"
     }
   ]
 }
