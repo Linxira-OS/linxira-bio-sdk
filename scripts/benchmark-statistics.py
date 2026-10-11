@@ -28,6 +28,22 @@ from pathlib import Path
 BOOTSTRAP_SEED = 20261011
 BOOTSTRAP_ROUNDS = 10_000
 CONSISTENCY_TOLERANCE = "1e-6 relative (benchmark.run.v1 default)"
+# Two-part decision rule, fixed before looking at the numbers:
+#   1. a gap is *detectable* when the bootstrap 95% CI of the ratio excludes 1.0;
+#   2. it is *material* only when the whole CI sits at or above this ratio.
+# A spread-based "noise band" is reported for transparency but is NOT the
+# decision rule: run-to-run dispersion is not an effect size, so using it as a
+# threshold would label a consistent 2% gap "noise" and a lucky 15% gap
+# "signal".
+MATERIAL_RATIO = 1.10
+
+
+def classify_ratio(ratio_low: float, ratio_high: float) -> str:
+    if ratio_high <= 1.0:
+        return "within-noise"          # CI includes 1.0 (or is entirely below it)
+    if ratio_low <= 1.0:
+        return "within-noise"
+    return "material" if ratio_low >= MATERIAL_RATIO else "detectable-immaterial"
 
 
 def load(path: Path) -> dict:
@@ -103,7 +119,7 @@ def statistics_rows(summary: dict, reports: Path) -> list[list[str]]:
                 ratio = median_of(values) / median_of(baseline)
                 ratio_low, ratio_high = bootstrap_ratio(baseline, values)
                 noise = 2 * (cv_percent(baseline) + cv_percent(values)) / 100
-                verdict = "resolvable" if ratio_low > 1.0 and (ratio - 1) > noise else "inside-noise"
+                verdict = classify_ratio(ratio_low, ratio_high)
             peak = next((b.get("median_peak_rss_mb") for b in report["backends"]
                          if b["backend"] == backend), None)
             rows.append([
@@ -177,6 +193,53 @@ def consistency_rows(summary: dict, reports: Path, archive_dir: Path) -> list[li
     return rows
 
 
+def trimmed_rows(summary: dict, reports: Path) -> tuple[list[list[str]], list[list[str]]]:
+    """Robustness of the headline numbers against the trimming rule.
+
+    `benchmark run` already performs one *untimed* warm-up per backend (the
+    report only ever contains the timed repeats), so the recorded runs are
+    warm. Reviewers may still want the answer to "would dropping the first
+    and/or last repeat change the conclusion?" — these two tables make that
+    check explicit instead of leaving it to trust.
+    """
+    medians, verdicts = [], []
+    for entry in summary["entries"]:
+        report = load(reports / entry["report"])
+        times = runs_per_backend(report)
+        baseline = times.get("rust", [])
+        baseline_variants = {
+            "all_n": baseline,
+            "drop_first": baseline[1:],
+            "middle": baseline[1:-1],
+        }
+        for backend in ("rust", "python", "r"):
+            values = times.get(backend)
+            if not values:
+                continue
+            medians.append([
+                entry["capability"], entry["dataset_class"], backend,
+                f"{median_of(values):.3f}", f"{median_of(values[1:]):.3f}",
+                f"{median_of(values[1:-1]):.3f}",
+                f"{cv_percent(values):.2f}", f"{cv_percent(values[1:]):.2f}",
+                f"{cv_percent(values[1:-1]):.2f}",
+            ])
+            if backend == "rust":
+                continue
+            row = [entry["capability"], backend]
+            labels = []
+            for label in ("all_n", "drop_first", "middle"):
+                reference = baseline_variants[label]
+                sample = {"all_n": values, "drop_first": values[1:], "middle": values[1:-1]}[label]
+                ratio = median_of(sample) / median_of(reference)
+                low, high = bootstrap_ratio(reference, sample)
+                noise = 2 * (cv_percent(reference) + cv_percent(sample)) / 100
+                verdict = classify_ratio(low, high)
+                row += [f"{ratio:.4f}", f"{low:.4f}", f"{high:.4f}", f"{noise:.4f}", verdict]
+                labels.append(label)
+            verdicts.append(row)
+    return medians, verdicts
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--summary", required=True)
@@ -211,7 +274,25 @@ def main() -> None:
              "current_over_earlier"],
             comparison_rows(summary, reports, earlier, None),
         )
-    print("wrote statistics.tsv, statistics-consistency.tsv"
+    trimmed_medians, trimmed_verdicts = trimmed_rows(summary, reports)
+    write_tsv(
+        output / "statistics-trimmed-medians.tsv",
+        ["capability", "dataset_class", "backend",
+         "median_all_n", "median_drop_first", "median_middle",
+         "cv_all", "cv_drop_first", "cv_middle"],
+        trimmed_medians,
+    )
+    write_tsv(
+        output / "statistics-trimmed-verdicts.tsv",
+        ["capability", "backend",
+         "ratio_all_n", "ci_low_all_n", "ci_high_all_n", "noise_all_n", "verdict_all_n",
+         "ratio_drop_first", "ci_low_drop_first", "ci_high_drop_first", "noise_drop_first",
+         "verdict_drop_first",
+         "ratio_middle", "ci_low_middle", "ci_high_middle", "noise_middle", "verdict_middle"],
+        trimmed_verdicts,
+    )
+    print("wrote statistics.tsv, statistics-consistency.tsv, "
+          "statistics-trimmed-medians.tsv, statistics-trimmed-verdicts.tsv"
           + (", statistics-comparison.tsv" if arguments.comparison else ""))
 
 

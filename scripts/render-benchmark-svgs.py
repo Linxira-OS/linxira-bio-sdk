@@ -43,6 +43,9 @@ FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Aria
 
 BOOTSTRAP_SEED = 20261011
 BOOTSTRAP_ROUNDS = 10_000
+# Same pre-registered rule as scripts/benchmark-statistics.py: detectable when
+# the ratio CI excludes 1.0, material only at/above this floor.
+MATERIAL_RATIO = 1.10
 
 
 def esc(text: str) -> str:
@@ -307,26 +310,35 @@ def figure_ratio_ci(summary: dict, reports: Path, path: Path) -> None:
         canvas.line(x, 66, x, 66 + row_height * len(rows), GRID)
         canvas.text(x, 60, f"{value:g}×", size=11, fill=MUTED, anchor="middle")
     one = log_scale(1.0, low, high, left, right)
+    material_line = log_scale(MATERIAL_RATIO, low, high, left, right)
     canvas.line(one, 66, one, 66 + row_height * len(rows), WARN, width=1.5, dash="5 4")
     canvas.text(one, 60, "1.00× (no difference)", size=11, fill=WARN, anchor="middle")
+    canvas.line(material_line, 66, material_line, 66 + row_height * len(rows), ACCENT, width=1.2, dash="3 4")
+    canvas.text(material_line, 74 + row_height * len(rows), f"{MATERIAL_RATIO:.2f}× = materiality floor",
+                size=11, fill=ACCENT, anchor="middle")
     for index, (label, ratio, low_ci, high_ci, noise) in enumerate(rows):
         y = 66 + index * row_height + 16
         canvas.text(left - 12, y + 5, label, size=12, fill=INK, anchor="end")
         x_low = log_scale(low_ci, low, high, left, right)
         x_high = log_scale(high_ci, low, high, left, right)
         x_mid = log_scale(ratio, low, high, left, right)
-        # "not resolvable" band around 1.0
-        band = 1 + noise
-        canvas.rect(log_scale(1.0, low, high, left, right), y - 1,
-                    max(log_scale(min(band, high), low, high, left, right) - one, 0), 12, WARN, opacity=0.16)
+        # Run-to-run dispersion, reported for context only (not a threshold).
+        canvas.rect(one, y - 1,
+                    max(log_scale(min(1 + noise, high), low, high, left, right) - one, 0), 12,
+                    WARN, opacity=0.14)
         canvas.line(x_low, y + 5, x_high, y + 5, MUTED, width=1.5)
         canvas.line(x_low, y + 1, x_low, y + 9, MUTED, width=1.5)
         canvas.line(x_high, y + 1, x_high, y + 9, MUTED, width=1.5)
         colour = PYTHON if label.endswith("python") else R_LANG
-        verdict = "resolvable" if low_ci > 1.0 and ratio - 1 > noise else "inside noise"
-        canvas.rect(x_mid - 3.5, y, 7, 10, colour if verdict == "resolvable" else WARN)
+        if high_ci <= 1.0 or low_ci <= 1.0:
+            verdict, marker = "within-noise", WARN
+        elif low_ci >= MATERIAL_RATIO:
+            verdict, marker = "material", colour
+        else:
+            verdict, marker = "detectable-immaterial", ACCENT
+        canvas.rect(x_mid - 3.5, y, 7, 10, marker)
         canvas.text(x_high + 8, y + 9, f"{ratio:.2f}× [{low_ci:.2f}, {high_ci:.2f}] {verdict}",
-                    size=10, fill=colour if verdict == "resolvable" else MUTED)
+                    size=10, fill=marker)
     canvas.save(path)
 
 
