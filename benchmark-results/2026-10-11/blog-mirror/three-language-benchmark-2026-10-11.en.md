@@ -8,9 +8,10 @@ desc: "One low-end x86 machine, one Rust engine, and the idiomatic Biopython and
 
 > Linxira Bio SDK benchmark report · 2026-10-11. A three-backend N=10 repeated measurement of 8 capabilities on one low-end x86 machine: environment, input digests, scripts, tables and figures are all public and can be re-checked item by item. Changes and disclosures are listed in "Versions and disclosures" at the end.
 
-> Draft, written incrementally. **Pending**: the N=10 long run for `sequence.ssr` (its R leg needs
-> about 5 h and is scheduled after the host's maintenance window); `fastq.qc` is filled in. The archive
-> and the site publication follow the same deferral.
+> Draft, written incrementally. **Pending**: (1) this host also runs a local CI runner and two CI jobs
+> overlapped the R leg of `fastq.qc`, so that leg is re-measured with the runner stopped; (2) the N=10
+> long run for `sequence.ssr` (its R leg needs about 5 h) under the same condition. Every other stage was
+> checked against the CI job windows and shows no overlap. The archive and the site publication follow.
 > Tables and figures ship with this post (index and re-check recipes in §13).
 
 ## 1. Abstract

@@ -47,6 +47,7 @@
 | 后端串行测量（A 的全部重复跑完再跑 B） | 存在系统漂移偏差（热、频点、页缓存） | **分轮次**：每轮都完整跑三端，轮次取中位数（轮间交叉，抗漂移） |
 | GNU time 量化 1 ms | 已有 | 便宜的输入用更多次重复；ms 级结论标注量化下限 |
 | 页缓存 warm/cold 混排 | 已固定 warm（预热 1 次） | 不变；跨缓存状态禁止混排 |
+| **同机 CI runner**（2026-10-11 实测踩中） | Gitea Actions runner 作为用户级服务与跑分同机；原负载闸门只接受 `load ≤ 1.0` 且**只在批次前检查一次**，单线程 CI 作业恰为 `load = 1.0`，会静默通过 | **跑前 `systemctl --user stop gitea-runner`，跑后 `start`**；每阶段前后记录 `loadavg` 与 `systemctl --user is-active gitea-runner` 状态，写入窗口记录 |
 | 窗口内并发负载 | 目前无（构建/工具都停） | 测量期间**不跑任何其它负载**（含 cargo/clippy/归档脚本） |
 
 ## 3. 重复次数与停止规则（`N_min=3`，`N_max=15`）

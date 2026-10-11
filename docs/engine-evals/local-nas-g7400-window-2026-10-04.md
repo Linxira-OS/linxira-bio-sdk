@@ -334,3 +334,27 @@ workflows, licenses` —— 即 **`docs/` 整棵树随发布包发给用户**，
 - [x] 文档边界：已改为 bundle 白名单（`docs/capabilities` + 17 份规范文档），`engine-evals`/`proposals` 不再随包；**完整打包实测 606 文件、无内部目录**
 - [ ] `docs/research/` 空目录（git 未跟踪、易与 `.research/` 混淆）待清理
 - [ ] 若认可 CI 成本：确认 debian 作业新增的 benchmark 包测试在 GitHub 上首跑通过（Biostrings 需源码编译，预计 +5–10 min）
+
+### 6.2.5 污染审计：CI runner 与跑分同机（2026-10-11 晚发现，重要）
+
+**发现**：NAS 上同时运行 `gitea web` 与 `gitea-runner daemon`（用户级服务
+`gitea-runner.service`，`systemctl --user`，`Linger=yes`）——即**本地 CI 作业与基准共用同一台
+2 核/4 线程机器**。用 Gitea 数据库（`action_run`）取出当日作业窗口，与各阶段 `sampled_at` 对表：
+
+| 本窗阶段（UTC） | CI 作业窗口（UTC，时长） | 判定 |
+| --- | --- | --- |
+| 六个"快"能力 09:40:24–09:52 | #538 08:49:57–09:37:08（47m11s） | **干净**（作业先于批次结束） |
+| 记录粒度实验 ≈09:52–09:55 | 下一作业 10:34 起 | **干净** |
+| `fastq.qc` 09:54:25–12:13:06（rust 18 s → python→10:04 → r 腿 10:04–12:13） | #539 10:34:13–10:36:36（2m23s）、#540 10:44:36–10:46:42（2m06s） | **r 腿被撞**（落在 11 次重复中的 2 次） |
+
+**报告本身不含逐次时间戳**（`runs[]` 只有 `wall_ms`/`cpu_ms`/`peak_rss_mb`，无开始时间），
+因此**无法把某一次重复精确对应到某个作业**——这是本轮暴露的可观测性缺口（见下）。
+
+**结论**：不是全窗污染；`fastq.qc` 的 r 腿需在**无人占用**条件下重测，`sequence.ssr` 必须如此。
+
+**协议修补（写进 `docs/proposals/measurement-repeat-protocol.md` §2 的对策列）**：
+1. **跑前暂停 runner**：`systemctl --user stop gitea-runner`（跑完 `start`）；并在窗口记录里写明 CI 状态。
+2. 负载闸门原来只接受 `load ≤ 1.0` 且**只在批次开始前检查一次**——单个单线程 CI 作业恰好是
+   `load = 1.0`，会静默通过。改为：**每阶段前后各记一次 `loadavg`**，并同时记录
+   `systemctl --user is-active gitea-runner`。
+3. 报告应补**逐次开始时间戳**（`runs[].started_at`），否则事后无法做这类污染归因。
