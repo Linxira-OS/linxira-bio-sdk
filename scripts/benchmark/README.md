@@ -50,14 +50,21 @@ repository-development assets. The agent documentation that *does* ship lives in
 | 2026-09-18 | laptop | reproducibility pass written up as the first article | `run/run-linux.sh` | `benchmark-results/2026-09-18/` |
 | 2026-10-02 | rented cloud GPU | dual-vendor GPU validation and docking study | `rental/*` | `benchmark-results/2026-10-02/` |
 | 2026-10-04 | NAS (Pentium Gold G7400) | first real execution of the R backend, N=3, three capabilities' r-leg data written back | `windows/2026-10-04/*` | `docs/engine-evals/local-nas-g7400-window-2026-10-04.md` |
-| 2026-10-11 | NAS (Pentium Gold G7400) | archived N=10 three-backend window: six fast capabilities, `fastq.qc`, `sequence.ssr`, plus the record-granularity experiment | `windows/2026-10-11/*`, `inputs/generate-inputs.py`, `analysis/statistics.py`, `figures/render-svgs.py` | `benchmark-results/2026-10-11/` |
+| 2026-10-11 | NAS (Pentium Gold G7400) | archived N=10 three-backend window: six fast capabilities, `fastq.qc`, `sequence.ssr`, plus the record-granularity experiment | `windows/2026-10-11/*` (`fast.sh`, `fastq.sh`, `ssr.sh`, `granularity.sh`, `descriptor.json`, `archive.sh`), `inputs/generate-inputs.py`, `analysis/statistics-tables.py`, `figures/render-svgs.py` | `benchmark-results/2026-10-11/` |
 
 ## Adding a window
 
 1. Put the day's stage scripts in `windows/<YYYY-MM-DD>/` **as executed** (they
    are evidence, not tidy examples) and add a row to the tables above.
+   A window that produced an archive also keeps its `descriptor.json` (the
+   environment block and entry list the summarizer consumes) and a single
+   `archive.sh` that reproduces the whole assembly — staging, input digests,
+   summary, statistics, figures, figure check — in one command.
 2. Generate inputs with `inputs/` rather than ad-hoc code, so the archive's
    digests can be reproduced.
-3. Archive with `analysis/summarize-reports.py`, then statistics and figures.
-4. Commit inputs, stage scripts, archive and figures in the same change, so the
-   window can be re-checked without the machine it ran on.
+3. Archive with `analysis/summarize-reports.py` (validating against
+   `schemas/benchmark-summary.schema.json`), then statistics and figures.
+4. Re-run `figures/verify-figures.py`: every number a figure shows must be
+   re-derivable from the archive, and the script fails otherwise.
+5. Commit inputs, stage scripts, descriptor, archive and figures in the same
+   change, so the window can be re-checked without the machine it ran on.

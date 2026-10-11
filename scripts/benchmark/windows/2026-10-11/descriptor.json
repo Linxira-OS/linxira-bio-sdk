@@ -1,0 +1,99 @@
+{
+  "purpose": "Archived N=10 three-backend window on a low-end x86 host: eight capabilities measured with the Rust engine against Biopython- and Biostrings-based arms, plus a record-granularity experiment testing whether language-boundary crossings explain the sequence.stats parity. Also the first window in which the R backend executed as a real third arm.",
+  "methodology": {
+    "backends_flag": "--backends rust,python,r",
+    "repeat_flag": "--repeat 10",
+    "warmup": "one untimed warmup per backend before the timed repeats; the warmup is excluded from the report, which holds exactly 10 timed runs (run_index 1..10)",
+    "page_cache": "warm",
+    "disclosure": "Serial execution with no concurrent build, lint or archiving; CPU governor fixed at powersave for the whole window; inputs are staged on tmpfs so no disk latency enters the measurement; backend order fixed at rust->python->r, so cross-backend frequency/thermal drift is a known limitation. Ratios hold for this machine and these inputs only; per-run wall times are archived so they can be re-checked."
+  },
+  "environment": {
+    "os": "linux",
+    "distro": "CachyOS",
+    "kernel": "7.2.9-1-cachyos",
+    "cpu_model": "Intel(R) Pentium(R) Gold G7400 (2 cores / 4 threads; cpufreq governor fixed at powersave for the whole window)",
+    "total_memory_mb": 15756,
+    "in_container": false,
+    "page_cache": "warm",
+    "precision": "high",
+    "gpu": "not used by this benchmark; the host additionally carries a GTX 750 Ti and an integrated UHD 710 (both exercised only by the separate gpu-lab carrier, out of scope here)",
+    "memory": "15756 MB usable host memory; resident per-phase peak recorded per run (VmHWM)",
+    "storage": "root on btrfs over a 512 GB NVMe (Netac); /tmp is tmpfs (7.7 GB) so every benchmark input is RAM-backed; two spinning disks (ST1000DM003, ST500DM002) present and unused by these runs"
+  },
+  "data_sources": [
+    {
+      "id": "generated-synthetic",
+      "origin": "generated",
+      "reference": "scripts/benchmark/inputs/generate-inputs.py --set synthetic",
+      "note": "random.seed(42); matrix.tsv (2000x40), sets.tsv (20k x 4 sets with repeated occupancy masks), structure.pdb (3000 residues / 24k atoms), variants.vcf (200k records), genes.txt + associations.tsv (5k genes / 45k annotations). Digests in inputs.sha256; byte-identical on Windows/Python 3.13 and Linux/Python 3.14."
+    },
+    {
+      "id": "generated-engine",
+      "origin": "generated",
+      "reference": "scripts/benchmark/inputs/generate-inputs.py --set sequence|reads",
+      "note": "big.fa via the engine simulator (--count 20 --length 5000000 --seed 42); reads200.fq via simulate reads on big.fa (--read-length 150 --coverage 100 --seed 42). Digests in inputs.sha256."
+    },
+    {
+      "id": "generated-granularity",
+      "origin": "generated",
+      "reference": "scripts/benchmark/inputs/generate-inputs.py --set granularity",
+      "note": "numpy default_rng(42); the same ~100 Mb of FASTA as 1x100 Mb, 20x5 Mb and 100k x 1 kb. Digests in inputs.sha256."
+    }
+  ],
+  "entries": [
+    {
+      "id": "sequence-stats-100mb",
+      "report": "sequence.stats.v1.benchmark.json",
+      "dataset": "20 x 5 Mb FASTA (~100 MB), engine-simulated",
+      "data_source_id": "generated-engine"
+    },
+    {
+      "id": "expression-pca-2000x40",
+      "report": "expression.pca.v1.benchmark.json",
+      "dataset": "2000 x 40 count matrix (4 groups x 10 samples)",
+      "data_source_id": "generated-synthetic"
+    },
+    {
+      "id": "set-venn-20k",
+      "report": "set.venn.v1.benchmark.json",
+      "dataset": "20k identifiers x 4 sets (repeated occupancy masks)",
+      "data_source_id": "generated-synthetic"
+    },
+    {
+      "id": "enrichment-overrepresentation-5k",
+      "report": "enrichment.overrepresentation.v1.benchmark.json",
+      "dataset": "5k genes / 45k gene-term associations across 300 terms",
+      "data_source_id": "generated-synthetic"
+    },
+    {
+      "id": "structure-pdb-summary-24k",
+      "report": "structure.pdb.summary.v1.benchmark.json",
+      "dataset": "3000 residues / 24k atoms synthetic PDB with pLDDT column",
+      "data_source_id": "generated-synthetic"
+    },
+    {
+      "id": "variant-stats-200k",
+      "report": "variant.stats.v1.benchmark.json",
+      "dataset": "200k VCF records across 5 contigs (SNV/insertion/deletion mix)",
+      "data_source_id": "generated-synthetic"
+    },
+    {
+      "id": "fastq-qc-200mb",
+      "report": "fastq.qc.v1.benchmark.json",
+      "dataset": "200 MB / 646k reads (150 bp, coverage 100)",
+      "data_source_id": "generated-engine"
+    },
+    {
+      "id": "sequence-ssr-100mb",
+      "report": "sequence.ssr.v1.benchmark.json",
+      "dataset": "same ~100 MB FASTA as sequence.stats.v1",
+      "data_source_id": "generated-engine"
+    }
+  ],
+  "side_experiments": [
+    {
+      "id": "granularity",
+      "note": "Record-shape experiment (1 x 100 Mb / 20 x 5 Mb / 100k x 1 kb) run with the same capability but deliberately kept out of the entries above: three runs of sequence.stats.v1 in one summary would collide on the capability key. The reports are archived beside this summary as sequence.stats.v1.granularity-<shape>.benchmark.json for provenance, and the figures read them through --granularity."
+    }
+  ]
+}

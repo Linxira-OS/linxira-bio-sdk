@@ -84,7 +84,7 @@ desc: 在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、Bi
 说明这批输入不依赖生成机器，任何人都能重建。
 
 （生成器只写 `/tmp`，不落仓库；哈希与窗口描述符一并归档，见
-[`../summary.json`](../summary.json) 与 `../statistics.tsv`。）
+[`../summary.json`](../summary.json) 与 [`../statistics.tsv`](../statistics.tsv)。）
 
 ## 6. 方法
 
@@ -123,7 +123,7 @@ desc: 在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、Bi
 ### 6.4 裁剪稳健性
 
 除全 10 次外，另按"去掉第 1 次（9 次）"与"只取中间 8 次"两种口径重算中位数与判定
-（表：`../statistics-trimmed-medians.tsv`、`../statistics-trimmed-verdicts.tsv`）。
+（表：[`../statistics-trimmed-medians.tsv`](../statistics-trimmed-medians.tsv)、[`../statistics-trimmed-verdicts.tsv`](../statistics-trimmed-verdicts.tsv)）。
 三种口径下**中位数与判定完全一致**——即头尾各一次的影响不足以改变任何一条结论。
 
 ## 7. 环境披露
@@ -138,6 +138,7 @@ desc: 在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、Bi
 | Python | CPython 3.14.7；numpy 2.5.4、Biopython 1.88、pytrf |
 | R | 4.6.1；Bioconductor 3.23、Biostrings 2.80.2、jsonlite 2.0.0、digest 0.6.39 |
 | CPUPower 调节器 | `powersave`（全程不变） |
+| 存储 | 根文件系统 btrfs / 512 GB NVMe；**`/tmp` 是 tmpfs（7.7 GB），所有基准输入都在 RAM 上** → 测量里没有磁盘延迟项（另有 2 块机械盘存在，与本轮无关） |
 | 计时 | GNU time 高精度模式 |
 | 引擎版本 | v1.1.3 |
 
@@ -149,7 +150,7 @@ desc: 在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、Bi
 
 ### 8.1 三端中位数与判定（N=10）
 
-表：`../statistics.tsv`（每能力 × 后端一行，含 IQR、CV、min/max、峰值 RSS、比值与 CI、判定）。
+表：[`../statistics.tsv`](../statistics.tsv)（每能力 × 后端一行，含 IQR、CV、min/max、峰值 RSS、比值与 CI、判定）。
 摘录：
 
 | 能力 | rust | python | r | python 判定 | r 判定 |
@@ -176,21 +177,21 @@ desc: 在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、Bi
 | `structure.pdb.summary.v1` | 29.7 MB | 66.3 MB (2.2×) | 162.9 MB (5.5×) |
 | `variant.stats.v1` | 6.2 MB | 45.8 MB (7.4×) | 122.4 MB (19.7×) |
 
-图：`./figures/fig-memory.svg`。
+图：[`./figures/fig-memory.svg`](./figures/fig-memory.svg)。
 
 ### 8.3 重复稳定性与比值区间
 
-图：`./figures/fig-repeat-stability.svg`（逐能力的 10 次散布与 IQR）。
+图：[`./figures/fig-repeat-stability.svg`](./figures/fig-repeat-stability.svg)（逐能力的 10 次散布与 IQR）。
 多数能力的中位数在 10 次间落在 ±1 IQR 内；`sequence.stats` 的 rust 档位粒度是 10 ms
 （`time` 的采样分辨），因此其 CV（1.95%）主要是**量化噪声**而不是真实抖动——这点限制了
 小绝对值的分辨力，也是我们把实质性下限放在 1.10 而不是 1.01 的原因之一。
 
-图：`./figures/fig-ratio-ci.svg`（比值与 95% CI，含 1.00 参考线与 1.10 实质性下限线）。
+图：[`./figures/fig-ratio-ci.svg`](./figures/fig-ratio-ci.svg)（比值与 95% CI，含 1.00 参考线与 1.10 实质性下限线）。
 
 ### 8.4 裁剪稳健性
 
 三种口径（全 10 / 去首 / 中间 8）的中位数与判定完全一致；详见
-`../statistics-trimmed-medians.tsv` 与 `../statistics-trimmed-verdicts.tsv`。
+[`../statistics-trimmed-medians.tsv`](../statistics-trimmed-medians.tsv) 与 [`../statistics-trimmed-verdicts.tsv`](../statistics-trimmed-verdicts.tsv)。
 换言之：**没有哪一条结论是靠"保留某一次运行"得来的。**
 
 ### 8.5 记录粒度实验：一个被推翻的假设
@@ -217,7 +218,7 @@ desc: 在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、Bi
 
 ### 8.6 分层速览
 
-图：`./figures/fig-speedup-layered.svg`。
+图：[`./figures/fig-speedup-layered.svg`](./figures/fig-speedup-layered.svg)。
 
 | 层次 | 能力 | python | r |
 | --- | --- | --- | --- |
@@ -237,7 +238,7 @@ desc: 在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、Bi
 每一份 benchmark 报告都带三端一致性判定：**全部 8 项在 1e-6 相对容差内 `consistent`**，
 精度档 `high`。此外做了跨机确定性核对：同一生成器产物在 NAS 与另一台机器上
 sha256 逐字节一致（如 `ref.fa`、`cell.tsv`、`cell.json`）。
-表：`../statistics-consistency.tsv`。
+表：[`../statistics-consistency.tsv`](../statistics-consistency.tsv)。
 
 **与早期报告记录的精确度量对比**（两个窗口各自记录了什么，如实并列，不混排）：
 
@@ -256,7 +257,7 @@ sha256 逐字节一致（如 `ref.fa`、`cell.tsv`、`cell.json`）。
 
 ## 9. 与九月窗口的对比
 
-同能力、同命令、不同输入规模与不同窗口的对照（`../statistics-comparison.tsv`，生成自
+同能力、同命令、不同输入规模与不同窗口的对照（[`../statistics-comparison.tsv`](../statistics-comparison.tsv)，生成自
 `benchmark-results/2026-09-13/summary.json`）：
 
 | 能力 | 九月窗口（N=5，小夹具） | 本轮（N=10，大输入） | 排序是否一致 |
@@ -339,9 +340,9 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 
 | 文件 | 内容 |
 | --- | --- |
-| `../statistics.tsv` | 每能力 × 后端：N、中位数、IQR、CV、min/max、峰值 RSS、比值、CI、判定 |
-| `../statistics-trimmed-medians.tsv` | 三种裁剪口径下的中位数与 CV |
-| `../statistics-trimmed-verdicts.tsv` | 三种裁剪口径下的比值、CI 与判定 |
-| `../statistics-consistency.tsv` | 跨后端一致性、容差、精度档、报告路径 |
-| `../statistics-comparison.tsv` | 与九月窗口的跨窗口对照 |
-| `../summary.json` / `../summary.md` | 归档索引（schema 校验通过） |
+| [`../statistics.tsv`](../statistics.tsv) | 每能力 × 后端：N、中位数、IQR、CV、min/max、峰值 RSS、比值、CI、判定 |
+| [`../statistics-trimmed-medians.tsv`](../statistics-trimmed-medians.tsv) | 三种裁剪口径下的中位数与 CV |
+| [`../statistics-trimmed-verdicts.tsv`](../statistics-trimmed-verdicts.tsv) | 三种裁剪口径下的比值、CI 与判定 |
+| [`../statistics-consistency.tsv`](../statistics-consistency.tsv) | 跨后端一致性、容差、精度档、报告路径 |
+| [`../statistics-comparison.tsv`](../statistics-comparison.tsv) | 与九月窗口的跨窗口对照 |
+| [`../summary.json`](../summary.json) / [`../summary.md`](../summary.md) | 归档索引（schema 校验通过） |

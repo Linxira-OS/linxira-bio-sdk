@@ -169,6 +169,21 @@ Bioconductor 3.23；Arch 的系统库不可写 → 必须用用户库 `$HOME/R/x
 在解释器里跑（30×–1100×），而 `sequence.stats` 的逐碱基逻辑在 C 里跑（≈1×）。
 小输入上的 ~20× 则是解释器启动（python 约 170 ms）在 10 ms 级工作负载上的占比。
 
+### 6.2.2 归档链路与存储披露（2026-10-11 新增）
+
+- **输入在 tmpfs 上**：`/tmp` 是 tmpfs（7.7 GB），所有基准输入与报告都在 RAM-backed 存储上
+  → 测量中**没有磁盘延迟项**；仓库检出位于 btrfs/NVMe（512 GB Netac），另有两块机械盘
+  （ST1000DM003、ST500DM002）存在且与本轮无关。该事实已写入 descriptor 的 `storage` 字段。
+- **归档一键化**：`scripts/benchmark/windows/2026-10-11/{descriptor.json,archive.sh}`
+  —— 暂存报告（粒度实验的三份重命名以避让同名能力）、记录输入 sha256、生成 summary（过 schema）、
+  统计表、图，并跑 `figures/verify-figures.py` 复算图上的每个数字。
+- **本地端到端演练**：用已取回的 6 项 + 粒度报告空跑整条链路，`198/198` 图数值与表一致、
+  summary 通过 `schemas/benchmark-summary.schema.json` 校验。
+- 演练中修掉两个真缺陷：① 粒度实验的 3 次 `sequence.stats.v1` 若进入 `summary.json` 会与主运行
+  **同名撞键**（图会多画 3 行、校验按 dict 折叠）→ 改为置于 entries 之外、单独归档；
+  ② `verify-figures.py` 的"0 mismatch"曾因正则未匹配 `height="8.00"` 而**空解析假通过**，
+  已修并加"表内 capability/backend 重复键"守卫。
+
 ### 6.3 抓出的缺陷（全部因为该包从未被真正执行过）
 
 | # | 位置 | 症状 | 根因 | 状态 |

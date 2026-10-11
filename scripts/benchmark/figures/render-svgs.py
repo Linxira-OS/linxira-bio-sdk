@@ -389,6 +389,7 @@ def figure_granularity(reports: Path, path: Path) -> None:
     series = {"rust": (RUST, []), "python": (PYTHON, []), "r": (R_LANG, [])}
     for key, _label in shapes:
         candidates = [reports / f"out-gran-{key}" / "sequence.stats.v1.benchmark.json",
+                      reports / f"sequence.stats.v1.granularity-{key}.benchmark.json",
                       reports / f"{key}.benchmark.json",
                       reports / f"gran-{key}.benchmark.json"]
         report_file = next((c for c in candidates if c.is_file()), None)

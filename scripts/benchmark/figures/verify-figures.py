@@ -73,6 +73,18 @@ def classify(low: float, high: float, material: float = 1.10) -> str:
     return "material" if low >= material else "detectable-immaterial"
 
 
+def unique_table(rows: list[dict], column: str) -> tuple[dict, set]:
+    """Key a table by (capability, backend) and report any repeated key."""
+    table: dict = {}
+    duplicates: set = set()
+    for row in rows:
+        key = (row["capability"], row["backend"])
+        if key in table:
+            duplicates.add(key)
+        table[key] = float(row[column])
+    return table, duplicates
+
+
 class Report:
     def __init__(self, name: str) -> None:
         self.name = name
@@ -136,8 +148,13 @@ def main() -> None:
     summary = json.loads(arguments.summary.read_text(encoding="utf-8"))
     stats_path = arguments.stats or (arguments.summary.parent / "statistics.tsv")
     rows = list(csv.DictReader(stats_path.open(encoding="utf-8"), delimiter="\t"))
-    wall = {(row["capability"], row["backend"]): float(row["median_wall_ms"]) for row in rows}
-    rss = {(row["capability"], row["backend"]): float(row["median_peak_rss_mb"]) for row in rows}
+    walls, duplicate_keys = unique_table(rows, "median_wall_ms")
+    rss_table, _ = unique_table(rows, "median_peak_rss_mb")
+    report = Report("values")
+    if duplicate_keys:
+        report.check(False, "the statistics table repeats a capability/backend key, so figures and "
+                            f"checks cannot be matched one-to-one: {sorted(duplicate_keys)}")
+    wall, rss = walls, rss_table
     entries = [entry for entry in summary["entries"] if entry["backends"].get("rust")]
 
     report = Report("values")
@@ -227,6 +244,7 @@ def granularity_medians(directory: Path) -> dict[str, float]:
     result: dict[str, float] = {}
     for shape in ("one", "twenty", "many"):
         candidates = [directory / f"out-gran-{shape}" / "sequence.stats.v1.benchmark.json",
+                      directory / f"sequence.stats.v1.granularity-{shape}.benchmark.json",
                       directory / f"gran-{shape}.benchmark.json",
                       directory / f"{shape}.benchmark.json",
                       directory / f"out-gran-{shape}.json"]

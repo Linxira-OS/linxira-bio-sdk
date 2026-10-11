@@ -139,8 +139,8 @@ CV is still reported per row, but no longer decides anything.
 ### 6.4 Trimming robustness
 
 Besides all 10 repeats, medians and verdicts are recomputed after dropping the first repeat (9) and
-after keeping only the middle 8 (`../statistics-trimmed-medians.tsv`,
-`../statistics-trimmed-verdicts.tsv`). **All three bases agree on every median and every verdict** —
+after keeping only the middle 8 ([`../statistics-trimmed-medians.tsv`](../statistics-trimmed-medians.tsv),
+[`../statistics-trimmed-verdicts.tsv`](../statistics-trimmed-verdicts.tsv)). **All three bases agree on every median and every verdict** —
 no conclusion depends on keeping a particular run.
 
 ## 7. Environment
@@ -155,6 +155,7 @@ no conclusion depends on keeping a particular run.
 | Python | CPython 3.14.7; numpy 2.5.4, Biopython 1.88, pytrf |
 | R | 4.6.1; Bioconductor 3.23, Biostrings 2.80.2, jsonlite 2.0.0, digest 0.6.39 |
 | Governor | `powersave` (unchanged throughout) |
+| Storage | root on btrfs / 512 GB NVMe; **`/tmp` is tmpfs (7.7 GB), so every benchmark input is RAM-backed** — no disk latency enters the measurement (two spinning disks are present and unused) |
 | Timing | GNU time, high-precision mode |
 | Engine | v1.1.3 |
 
@@ -167,7 +168,7 @@ no conclusion depends on keeping a particular run.
 
 ### 8.1 Three-backend medians and verdicts (N=10)
 
-Table: `../statistics.tsv` (one row per capability × backend: N, median, IQR, CV, min/max, peak RSS,
+Table: [`../statistics.tsv`](../statistics.tsv) (one row per capability × backend: N, median, IQR, CV, min/max, peak RSS,
 ratio, CI, verdict). Excerpt:
 
 | Capability | rust | python | r | python verdict | r verdict |
@@ -195,21 +196,21 @@ engineering ledger `docs/engine-evals/local-nas-g7400-window-2026-10-04.md`.)
 | `structure.pdb.summary.v1` | 29.7 MB | 66.3 MB (2.2×) | 162.9 MB (5.5×) |
 | `variant.stats.v1` | 6.2 MB | 45.8 MB (7.4×) | 122.4 MB (19.7×) |
 
-Figure: `./figures/fig-memory.svg`.
+Figure: [`./figures/fig-memory.svg`](./figures/fig-memory.svg).
 
 ### 8.3 Repeat stability and ratio intervals
 
-Figure: `./figures/fig-repeat-stability.svg` (spread of the 10 repeats per capability and backend).
+Figure: [`./figures/fig-repeat-stability.svg`](./figures/fig-repeat-stability.svg) (spread of the 10 repeats per capability and backend).
 Most medians sit within ±1 IQR across repeats. `sequence.stats` — Rust's granularity is 10 ms (the
 timer's resolution), so its CV (1.95%) is dominated by **quantisation**, not real jitter. That limits
 resolution on small absolute values and is one reason the materiality floor is 1.10 rather than 1.01.
 
-Figure: `./figures/fig-ratio-ci.svg` (ratios with 95% CIs, the 1.00 reference line, and the 1.10
+Figure: [`./figures/fig-ratio-ci.svg`](./figures/fig-ratio-ci.svg) (ratios with 95% CIs, the 1.00 reference line, and the 1.10
 materiality floor).
 
 ### 8.4 Trimming robustness
 
-All three bases agree; see `../statistics-trimmed-medians.tsv` and `../statistics-trimmed-verdicts.tsv`.
+All three bases agree; see [`../statistics-trimmed-medians.tsv`](../statistics-trimmed-medians.tsv) and [`../statistics-trimmed-verdicts.tsv`](../statistics-trimmed-verdicts.tsv).
 In other words: **no conclusion survives only because a particular run was kept.**
 
 ### 8.5 The record-granularity experiment: a falsified hypothesis
@@ -237,7 +238,7 @@ seen on tiny inputs is **interpreter start-up (~170 ms)** landing on a 10 ms wor
 
 ### 8.6 Layered overview
 
-Figure: `./figures/fig-speedup-layered.svg`.
+Figure: [`./figures/fig-speedup-layered.svg`](./figures/fig-speedup-layered.svg).
 
 | Layer | Capability | python | r |
 | --- | --- | --- | --- |
@@ -258,7 +259,7 @@ conventions**, not from the language. That is what "whole-stack comparison" mean
 Every benchmark report carries a three-backend consistency verdict: **all 8 capabilities are
 `consistent` within a 1e-6 relative tolerance**, precision class `high`. Additionally, cross-machine
 determinism was checked: generator outputs hash byte-identically on the NAS and on a second machine
-(`ref.fa`, `cell.tsv`, `cell.json`). Table: `../statistics-consistency.tsv`.
+(`ref.fa`, `cell.tsv`, `cell.json`). Table: [`../statistics-consistency.tsv`](../statistics-consistency.tsv).
 
 **Precision comparison against what the earlier window recorded** (each window's own evidence, shown
 side by side, never mixed):
@@ -278,7 +279,7 @@ other, so the table shows both bases rather than moving "0.0 / 2.26e-11" under t
 
 ## 9. Comparison with the September window
 
-Same capabilities, same commands, different input sizes and window (`../statistics-comparison.tsv`,
+Same capabilities, same commands, different input sizes and window ([`../statistics-comparison.tsv`](../statistics-comparison.tsv),
 generated against `benchmark-results/2026-09-13/summary.json`):
 
 | Capability | September window (N=5, small fixtures) | This window (N=10, large inputs) | Ordering consistent? |
@@ -373,9 +374,9 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 
 | File | Contents |
 | --- | --- |
-| `../statistics.tsv` | per capability × backend: N, median, IQR, CV, min/max, peak RSS, ratio, CI, verdict |
-| `../statistics-trimmed-medians.tsv` | medians and CVs under the three trimming bases |
-| `../statistics-trimmed-verdicts.tsv` | ratios, CIs and verdicts under the three trimming bases |
-| `../statistics-consistency.tsv` | cross-backend consistency, tolerance, precision class, report paths |
-| `../statistics-comparison.tsv` | cross-window comparison against the September archive |
-| `../summary.json` / `../summary.md` | archive index (schema-validated) |
+| [`../statistics.tsv`](../statistics.tsv) | per capability × backend: N, median, IQR, CV, min/max, peak RSS, ratio, CI, verdict |
+| [`../statistics-trimmed-medians.tsv`](../statistics-trimmed-medians.tsv) | medians and CVs under the three trimming bases |
+| [`../statistics-trimmed-verdicts.tsv`](../statistics-trimmed-verdicts.tsv) | ratios, CIs and verdicts under the three trimming bases |
+| [`../statistics-consistency.tsv`](../statistics-consistency.tsv) | cross-backend consistency, tolerance, precision class, report paths |
+| [`../statistics-comparison.tsv`](../statistics-comparison.tsv) | cross-window comparison against the September archive |
+| [`../summary.json`](../summary.json) / [`../summary.md`](../summary.md) | archive index (schema-validated) |
