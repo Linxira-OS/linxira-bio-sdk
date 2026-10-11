@@ -148,8 +148,7 @@ CV is still reported per row, but no longer decides anything.
 ### 6.4 Trimming robustness
 
 Besides all 10 repeats, medians and verdicts are recomputed after dropping the first repeat (9) and
-after keeping only the middle 8 ([`../statistics-trimmed-medians.tsv`](../statistics-trimmed-medians.tsv),
-[`../statistics-trimmed-verdicts.tsv`](../statistics-trimmed-verdicts.tsv)). **All three bases agree on every median and every verdict** —
+after keeping only the middle 8 (Tables S2 and S3). **All three bases agree on every median and every verdict** —
 no conclusion depends on keeping a particular run.
 
 ## 7. Environment
@@ -231,7 +230,7 @@ and 1.10 (the materiality floor), and each label carries the verdict.
 
 ### 8.4 Trimming robustness
 
-All three bases agree; see [`../statistics-trimmed-medians.tsv`](../statistics-trimmed-medians.tsv) and [`../statistics-trimmed-verdicts.tsv`](../statistics-trimmed-verdicts.tsv).
+All three bases agree; see Tables S2 and S3.
 In other words: **no conclusion survives only because a particular run was kept.**
 
 ![From one capability measurement to a verdict: protocol and decision rule](./figures/en/fig-method.svg)
@@ -306,7 +305,7 @@ conventions**, not from the language. That is what "whole-stack comparison" mean
 Every benchmark report carries a three-backend consistency verdict: **all 8 capabilities are
 `consistent` within a 1e-6 relative tolerance**, precision class `high`. Additionally, cross-machine
 determinism was checked: generator outputs hash byte-identically on the NAS and on a second machine
-(`ref.fa`, `cell.tsv`, `cell.json`). Table: [`../statistics-consistency.tsv`](../statistics-consistency.tsv).
+(`ref.fa`, `cell.tsv`, `cell.json`). Table S5.
 
 **Precision comparison against what the earlier window recorded** (each window's own evidence, shown
 side by side, never mixed):
@@ -326,7 +325,7 @@ other, so the table shows both bases rather than moving "0.0 / 2.26e-11" under t
 
 ## 9. Comparison with the September window
 
-Same capabilities, same commands, different input sizes and window ([`../statistics-comparison.tsv`](../statistics-comparison.tsv),
+Same capabilities, same commands, different input sizes and window (Table S4,
 generated from the 2026-09-13 archive; Table S4):
 
 | Capability | September window (N=5, small fixtures) | This window (N=10, large inputs) | Ordering consistent? |

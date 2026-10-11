@@ -212,7 +212,7 @@ bootstrap 置信区间 → 三段式判定。**预热那次不进报告**，裁�
 ### 8.4 裁剪稳健性
 
 三种口径（全 10 / 去首 / 中间 8）的中位数与判定完全一致；详见
-[`../statistics-trimmed-medians.tsv`](../statistics-trimmed-medians.tsv) 与 [`../statistics-trimmed-verdicts.tsv`](../statistics-trimmed-verdicts.tsv)。
+附表 S2 与附表 S3。
 换言之：**没有哪一条结论是靠"保留某一次运行"得来的。**
 
 ### 8.5 记录粒度实验：一个被推翻的假设
