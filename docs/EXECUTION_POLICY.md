@@ -26,11 +26,14 @@ quick checks, but it is not a source of official benchmark data.
   this purpose, as does a container or remote Linux host.
 - Treat Linux output as authoritative when a gate behaves differently per
   platform, and record the platform with every measurement.
+- Run the gates from a Linux-native filesystem: a WSL distribution's own
+  filesystem, a container, or a real Linux host. Repository tests that assert
+  paths under `target/` fail when the tree is accessed through a Windows mount
+  (`/mnt/c`), and platform-toolchain quirks differ there too.
 - Keep build caches bounded: after large build or benchmark sessions, report
   and clean the Rust target directory (and any staged release trees) so the
-  working drives do not fill up. Linux-side builds may use a dedicated target
-  directory outside the source tree for speed, but note that repository tests
-  which assert paths under `target/` require the default layout.
+  working drives do not fill up. On WSL the build cache lives inside the
+  distribution's virtual disk, which also consumes the host drive holding it.
 
 ## Local Default
 
