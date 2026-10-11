@@ -1,9 +1,9 @@
 ---
-title: A three-language repeated benchmark of bioinformatics capabilities — Rust vs Python vs R over 8 capabilities at N=10
+title: "A three-language repeated benchmark of bioinformatics capabilities — Rust vs Python vs R over 8 capabilities at N=10"
 date: 2026-10-11
-tag: benchmark
+tag: technical
 lang: en
-desc: One low-end x86 machine, one Rust engine, and the idiomatic Biopython and Biostrings implementations measured on the same inputs with 10 timed repeats each — under a pre-registered decision rule with bootstrap confidence intervals: 7 of 8 capabilities show a material gap (7.7×–1097×), one shows no resolvable difference.
+desc: "One low-end x86 machine, one Rust engine, and the idiomatic Biopython and Biostrings implementations measured on the same inputs with 10 timed repeats each — under a pre-registered decision rule with bootstrap confidence intervals: 7 of 8 capabilities show a material gap (7.7×–1097×), one shows no resolvable difference."
 ---
 
 > Draft, written incrementally. **Pending**: the N=10 long runs for `fastq.qc` and `sequence.ssr`

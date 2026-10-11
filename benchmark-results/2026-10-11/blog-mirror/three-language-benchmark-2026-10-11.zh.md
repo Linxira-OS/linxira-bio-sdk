@@ -1,9 +1,9 @@
 ---
-title: 三语言生物信息实现的三端重复基准：Rust / Python / R 在 8 项能力上的 N=10 测量
+title: "三语言生物信息实现的三端重复基准：Rust / Python / R 在 8 项能力上的 N=10 测量"
 date: 2026-10-11
-tag: benchmark
+tag: technical
 lang: zh
-desc: 在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、Biostrings 实现放在同一批输入上各跑 10 次，用预注册判定规则与 bootstrap 置信区间逐一给结论：7 项存在实质性差距（7.7×–1097×），1 项测不出可分辨差异。
+desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、Biostrings 实现放在同一批输入上各跑 10 次，用预注册判定规则与 bootstrap 置信区间逐一给结论：7 项存在实质性差距（7.7×–1097×），1 项测不出可分辨差异。"
 ---
 
 > 本文是草稿（增量写作中）。**待补**：`seq.fastq.qc`/`sequence.ssr` 两项的 N=10 长跑（脚本已排队，跑完把数字填进 §8.1、§8.6 与 §9 的表）。
