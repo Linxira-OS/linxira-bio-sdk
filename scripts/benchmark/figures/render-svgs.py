@@ -438,6 +438,66 @@ def figure_granularity(reports: Path, path: Path) -> None:
     canvas.save(path)
 
 
+def _box(canvas: Canvas, x: float, y: float, width: float, height: float,
+         lines: list[str], colour: str, *, size: int = 11) -> None:
+    canvas.rect(x, y, width, height, colour, opacity=0.12, radius=6)
+    canvas.parts.append(
+        f'<rect x="{x:.1f}" y="{y:.1f}" width="{width:.1f}" height="{height:.1f}" rx="6" '
+        f'fill="none" stroke="{colour}" stroke-width="1.2"/>'
+    )
+    step = 15
+    start = y + height / 2 - (len(lines) - 1) * step / 2 + 4
+    for index, line in enumerate(lines):
+        canvas.text(x + width / 2, start + index * step, line, size=size, fill=INK, anchor="middle")
+
+
+def _arrow(canvas: Canvas, x1: float, y1: float, x2: float, y2: float, colour: str = MUTED) -> None:
+    canvas.line(x1, y1, x2, y2, colour, width=1.4)
+    if abs(y2 - y1) < 1:  # horizontal arrow head
+        canvas.parts.append(
+            f'<polygon points="{x2:.1f},{y2:.1f} {x2 - 7:.1f},{y2 - 4:.1f} {x2 - 7:.1f},{y2 + 4:.1f}" '
+            f'fill="{colour}"/>'
+        )
+    else:  # vertical arrow head
+        canvas.parts.append(
+            f'<polygon points="{x2:.1f},{y2:.1f} {x2 - 4:.1f},{y2 - 7:.1f} {x2 + 4:.1f},{y2 - 7:.1f}" '
+            f'fill="{colour}"/>'
+        )
+
+
+def figure_method(path: Path) -> None:
+    """Protocol and decision rule — the only figure in the set that is not data."""
+    canvas = Canvas(940, 452, "How one capability measurement becomes a verdict",
+                    "Inputs are fixed and digest-checked; every backend runs one untimed warm-up plus 10 timed "
+                    "repeats, and the report holds only the 10 timed ones · verdicts come from a bootstrap "
+                    "confidence interval on the median ratio, never from a point estimate · the drop-first and "
+                    "middle-8 bases are robustness checks, not alternative headlines")
+    margin, gap = 40, 22
+    box_width = (940 - 2 * margin - 3 * gap) / 4
+    row_one, row_two, row_height = 100, 200, 52
+    stage_one = [["input", "fixed + sha256"], ["1 untimed warm-up", "(excluded from report)"],
+                 ["10 timed repeats", "run_index 1..10"], ["per-run wall_ms", "+ peak RSS"]]
+    stage_two = [["median of the 10", "IQR, CV"], ["10,000 bootstrap", "resamples (seed 20261011)"],
+                 ["95% CI of the", "median ratio vs rust"], ["verdict", "three-way rule"]]
+    for row_y, stage, colour in ((row_one, stage_one, MUTED), (row_two, stage_two, ACCENT)):
+        for index, lines in enumerate(stage):
+            x = margin + index * (box_width + gap)
+            _box(canvas, x, row_y, box_width, row_height, lines, colour)
+            if index:
+                _arrow(canvas, x - gap + 3, row_y + row_height / 2, x - 3, row_y + row_height / 2)
+    _arrow(canvas, margin + box_width / 2, row_one + row_height,
+           margin + box_width / 2, row_two - 3)
+    rules = [(["CI lower bound ≥ 1.10"], "material", PYTHON), 
+             (["CI excludes 1.00,", "lower bound < 1.10"], "detectable-immaterial", ACCENT),
+             (["CI crosses 1.00"], "within-noise", WARN)]
+    chip_width = (940 - 2 * margin - 2 * gap) / 3
+    for index, (condition, label, colour) in enumerate(rules):
+        x = margin + index * (chip_width + gap)
+        _box(canvas, x, 296, chip_width, 58, condition, colour)
+        canvas.text(x + chip_width / 2, 374, label, size=12, fill=colour, anchor="middle", weight="600")
+    canvas.save(path)
+
+
 def figure_stability(reports: Path, summary: dict, path: Path) -> None:
     picks = [e for e in summary["entries"]
              if all(e["backends"].get(b) for b in ("rust", "python", "r"))]
@@ -548,6 +608,7 @@ def main() -> None:
     output.mkdir(parents=True, exist_ok=True)
 
     figure_speedup(summary, output / "fig-speedup-layered.svg")
+    figure_method(output / "fig-method.svg")
     figure_medians(summary, output / "fig-absolute-medians.svg")
     figure_memory(summary, output / "fig-memory.svg")
     figure_ratio_ci(summary, reports, output / "fig-ratio-ci.svg")
