@@ -1,4 +1,5 @@
 {
+  "report_id": "bench-20261011-001",
   "purpose": "Archived N=10 three-backend window on a low-end x86 host: eight capabilities measured with the Rust engine against Biopython- and Biostrings-based arms, plus a record-granularity experiment testing whether language-boundary crossings explain the sequence.stats parity. Also the first window in which the R backend executed as a real third arm.",
   "methodology": {
     "backends_flag": "--backends rust,python,r",

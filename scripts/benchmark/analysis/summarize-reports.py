@@ -136,7 +136,10 @@ def build_summary(
         )
     summary = {
         "schema_version": "1",
-        "report_id": next_report_id(results_root, date),
+        # A descriptor may pin the id so that re-running the archive for the
+        # same window (e.g. after adding a stage that finished later) rewrites
+        # the archive instead of burning the next sequence number.
+        "report_id": descriptor.get("report_id") or next_report_id(results_root, date),
         "generated_at": date,
         "purpose": descriptor["purpose"],
         "methodology": descriptor["methodology"],
