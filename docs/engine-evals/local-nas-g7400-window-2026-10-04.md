@@ -111,18 +111,29 @@ NAS 另需装 GNU `time`（否则报告精度降级、`peak_rss` 为 `null`—�
 NAS 装好 R 4.6.1 + CRAN/Bioconductor（jsonlite 2.0.0、digest 0.6.39、Biostrings 2.80.2 /
 Bioconductor 3.23；Arch 的系统库不可写 → 必须用用户库 `$HOME/R/x86_64-pc-linux-gnu-library/4.6`）。
 
-### 6.1 三端结果（GNU time 高精度，median-of-3）
+### 6.1 三端结果（GNU time 高精度，median-of-3，全部 `consistent`）
 
-| 能力 | 数据集 | rust | python | r | rust:python:r | rust RSS / python RSS / r RSS |
+| 能力 | 数据集（类别） | rust | python | r | 1 : py : r | rust RSS |
 | --- | --- | --- | --- | --- | --- | --- |
-| `sequence.stats.v1` | 97 MB FASTA | **800 ms** | 840 ms | **1820 ms** | 1 : 1.05 : **2.28** | 7.7 / 69.6 / 321.2 MB |
-| `fastq.qc.v1` | 200 MB（646k reads） | **1600 ms** | 49,170 ms | **704,130 ms** | 1 : 30.7 : **440** | 7.6 / 46.0 / 79.6 MB |
+| `sequence.stats.v1` | 97 MB FASTA（sequence） | **800 ms** | 840 ms | 1820 ms | 1 : 1.05 : 2.3 | 7.7 MB |
+| `expression.pca.v1` | 2000×40 矩阵（matrix） | **20 ms** | 4000 ms | 2760 ms | 1 : 200 : 138 | 8.4 MB |
+| `set.venn.v1` | 20k 项 × 4 集合（other） | **10 ms** | 180 ms | 10,880 ms | 1 : 18 : **1088** | 8.4 MB |
+| `enrichment.overrepresentation.v1` | 5k 基因 / 45k 关联（annotation） | **30 ms** | 220 ms | 4470 ms | 1 : 7.3 : 149 | 16.1 MB |
+| `structure.pdb.summary.v1` | 1.1 MB PDB / 24k 原子（structure） | **40 ms** | 820 ms | 20,700 ms | 1 : 20.5 : 518 | 29.8 MB |
+| `variant.stats.v1` | 8.7 MB VCF / 200k 变异（other） | **80 ms** | 760 ms | 13,880 ms | 1 : 9.5 : 174 | 7.8 MB |
+| `fastq.qc.v1` | 200 MB / 646k reads（other） | **1600 ms** | 49,170 ms | 704,130 ms | 1 : 30.7 : **440** | 7.6 MB |
 
-- `precision: high`、`consistency: consistent`（三端结果在 1e-6 内一致）。
-- self_reported（进程内分析耗时）：stats python 471/840 ms（启动占 44%）、r 319/1820 ms
-  （**启动占 82%**，R 解释器 + 包加载）；fastq.qc python 48.6/49.2 s、r 703.4/704.1 s（大规模下启动可忽略）。
-- 结论升级为三层：**C 级原语可覆盖**（stats）→ r 仅 2.3× 慢；**纯解释器逐记录循环**（fastq.qc）
-  → python 30.7×、**r 440×**。R 的用途是"生态唯一实现"（DESeq2/survival 等），不是性能路径。
+- 七项全部三端 `consistent`（1e-6 相对容差内），全部 `default_backend=rust` 已回写
+  `runtime-preferences.json`（**7 条**）。
+- self_reported（进程内分析耗时）把墙钟拆开：stats python 471/840 ms（启动 44%）、r 319/1820 ms（启动 82%）；
+  fastq.qc python 48.6/49.2 s、r 703.4/704.1 s（大规模下启动可忽略）。
+- **分层结论（禁止整体声明）**：C 级原语可覆盖（stats）→ 1.05×；向量化库良好（pca，numpy/prcomp）→
+  100–200×；**逐记录/逐项解释器循环**（fastq.qc、venn、pdb、variant）→ python 10–30×、**r 150–1100×**。
+  Rust 的稳定收益是**内存**（同任务 1/8–1/40 峰值 RSS）与零解释器启动。
+- 复现口径：输入由固定种子的生成器产出（纯 Python，`random.seed(42)`），只落在 `/tmp`，不脏仓库：
+  `matrix.tsv` 2000×40（`273755e5…`）、`sets.tsv` 20k×4（`b1f67693…`）、`structure.pdb` 24k 原子
+  （`ecb30a51…`）、`variants.vcf` 200k（`1dab9c47…`）、`genes.txt`+`associations.tsv`（`84ac1b6e…`/`b523c5b4…`）；
+  FASTQ/FASTA 由 `simulate reads/sequence`（seed 42）产出。
 
 ### 6.2 抓出的缺陷（全部因为该包从未被真正执行过）
 
@@ -133,6 +144,21 @@ Bioconductor 3.23；Arch 的系统库不可写 → 必须用用户库 `$HOME/R/x
 | 3 | `sequence_ssr_v1.R` | SSR 恒返回 0 条 | `start(...)` **未加前缀** → 命中 `stats::start`（时间序列）返回 `c(1,1)` | 已修（`Biostrings::start`） |
 | 4 | CI | 缺陷长期潜伏 | **CI 从未运行 benchmark 两包的测试**（`benchmark-r`/`benchmark-python` 无任何 step） | 已补（debian 作业新增两包测试；R 侧经 BiocManager 装 Biostrings） |
 | 5 | `sequence_ssr_v1.R` | 无 SSR 的输入被 worker 拒绝：`invalid type: sequence, expected a map` | 空 `list()` 被 jsonlite 序列化成 `[]`，而契约的 `motif_length_counts` 是 map（须 `{}`） | 已修（保留 names 属性；已用「无 SSR 输入」端到端验证 `{}` 与 Rust 一致） |
+| 6 | `set_venn_v1.R` | 20k 项输入 `rust != r`：`intersections` 长度 4 vs 20000 | `summarize_memberships` **按 item 逐条**生成 intersections（并按条累加 set_sizes）；小夹具掩码恰好互不相同，所以没抓到 | 已修（按 occupancy mask 分组，与 Rust 的 BTreeMap 语义一致）+ 新增重复掩码回归用例（期望值取自 Rust 真值） |
+
+### 6.3 顺带抓到的**产品**缺陷：宽数值矩阵被误判为 SAM
+
+用 40 个样本的矩阵跑 benchmark 时，worker 直接拒绝：
+`input input-matrix-1 format mismatch: request declares tsv but content identifies sam`。
+
+- **根因**：`linxira-bio-core/src/dataset.rs` 的 `looks_like_sam` 只判
+  `字段数 ≥ 11 && fields[1]:u16 && fields[3]:u64 && fields[4]:u8`。宽计数矩阵的小整数列天然满足
+  （实测边界：**10 列 → tsv，11 列 → sam**），于是任何 ≥11 列的计数矩阵都被判成 SAM——`dataset inspect`
+  与 worker 的输入校验都会错，真实用户的高样本量表达矩阵首当其冲。
+- **修复**（`bfe6fd0`）：要求 SAM 结构证据——FLAG ≤ 0xFFF、RNAME **非纯数字**、CIGAR 符合
+  `(\d+[MIDNSHP=X])+`（或 `*`）、SEQ 为碱基字母（或 `*`）。新增回归测试
+  `wide_numeric_matrix_is_not_mistaken_for_sam`（12 样本矩阵 → `Tsv`；SAM 行 → `Sam`）。
+- 验证：`m10/m11/m12.tsv → tsv`、`alignments.sam → sam`，目标测试与全量 `cargo test` 均绿。
 
 **修复后验证**（全部在 NAS 上实跑）：
 
@@ -184,7 +210,9 @@ Bioconductor 3.23；Arch 的系统库不可写 → 必须用用户库 `$HOME/R/x
 `workflows/org.linxira.benchmark-r/manifest.json` 让工作区变脏**，`git pull --ff-only` 于是拒绝更新，
 而脚本里 `git pull ... | tail -1` 把错误吞掉了——我因此白白在旧提交上跑了一轮"验证"。
 现已固定为先 `git checkout --` 这两个由工具生成的文件再 pull，并在同步后**断言
-`HEAD == origin/main`**。
+`HEAD == origin/main`**。⚠️ 反过来也要注意：`git checkout --` 会**丢掉 NAS 上刚生成的**
+偏好表/清单内容，所以正确顺序是「先在 NAS 上生成 → 取回本机提交 → 再同步」，本窗口因此
+丢过一次 job A 的回写（用全部报告重跑工具即无损恢复，报告本身都在 `/tmp`）。
 
 ## 8. 文档边界与隐私评估（2026-10-04 追加）
 
@@ -210,9 +238,11 @@ workflows, licenses` —— 即 **`docs/` 整棵树随发布包发给用户**，
 - [ ] 对外口径改写：小输入比值标注为"启动开销"，吞吐结论按内核类型分层（C 级原语 ≈1.0×、纯 Python 逐记录 ≈30×）
 - [x] 三端覆盖扩展：R 装到 NAS（用户批准）后补齐 r 腿，`sequence.stats` 的 r 行与 `fastq.qc` 三腿数据已回写（§6.1）
 - [ ] 低档 GPU 扩测：GTX 750 Ti 的 CUDA 12.x 路径（需装 toolkit）与 Vulkan 路径对照
-- [ ] 其余三语言能力（`variant.stats`/`expression.pca`/`set.venn`/`enrichment.overrepresentation`/`structure.pdb.summary`）也补 r 腿
-- [ ] R 包测试字面量修正（`"AAAAAAAAAATATATATATATAT"` 多一个 T，断言按 22 写）
-- [ ] R SSR 实现的规模化能力评估（`matchPattern` 逐 motif 扫描在 97 MB 上可能不可行——见 §6）
+- [x] 其余三语言能力补齐 r 腿：`expression.pca`/`set.venn`/`structure.pdb.summary`/`variant.stats`/`enrichment.overrepresentation` 全部三端 `consistent` 并已回写（§6.1，共 7 条偏好）
+- [ ] `sequence.ssr.v1` 三端长跑（97 MB；r 腿约 27 min/次，用户明确要求"浪费也要做"）——进行中
+- [ ] 对外材料引用三端数据时按 §6.1 的分层口径，不要写"Rust 普遍更快"
+- [x] R 包测试字面量修正（`"AAAAAAAAAATATATATATATAT"` 多一个 T，断言按 22 写）— `c567f94`
+- [x] R SSR 规模化实测：97 MB 输入 R 1633 s（rust 1.6 s / pytrf 2.3 s，≈1000×），结论=SSR 不用 R（§6.2）
 - [ ] NAS 侧固定 `performance` governor 或记录并接受 powersave（当前已如实记录）
 - [x] 文档边界：已改为 bundle 白名单（`docs/capabilities` + 17 份规范文档），`engine-evals`/`proposals` 不再随包；**完整打包实测 606 文件、无内部目录**
 - [ ] `docs/research/` 空目录（git 未跟踪、易与 `.research/` 混淆）待清理
