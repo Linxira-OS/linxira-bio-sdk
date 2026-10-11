@@ -32,6 +32,10 @@ Results use a **two-part, pre-registered rule** (§6.3):
 Boundaries up front: this is a **whole-stack comparison** (our Rust engine vs idiomatic third-party
 library implementations plus their language runtimes, measured by the same harness), not a claim
 about "language speed". Every ratio holds only for this machine, these inputs, and this protocol (§11).
+One scope statement belongs in the abstract too: **this host has 2 cores / 4 threads and all three
+arms' critical paths were single-threaded** (the engine uses no parallel facility today, CPython has
+the GIL, R's evaluator is single-threaded), so this window **does not exhibit Rust's language-level
+parallelism** — we state only what was measured.
 
 ## 2. Changelog relative to the two earlier posts
 
@@ -264,6 +268,17 @@ in C (`sequence.stats`) land at ≈1×; capabilities whose per-item/per-record w
 interpreter (`set.venn`, `pdb`, `variant`, `enrichment`, `fastq.qc`) span 7.7× to 1097×. The ~20×
 seen on tiny inputs is **interpreter start-up (~170 ms)** landing on a 10 ms workload — not throughput.
 
+**What we expected, and what the measurement refuted.** The first intuition was that shuttling data
+across the language boundary would cost real time — Python reads the FASTA, hands the sequence to the
+statistics, receives the result back, and every crossing should add overhead. The data says no: the
+hot loop on the Python side **is not in the interpreter** but in CPython's C primitives
+(`str.count`, `str.upper`, …). Biopython's parser does step through Python per line, but the per-line
+work is tiny, and the large allocations plus file reading that *both* sides must pay for absorb the
+difference. So the 1.02× on `sequence.stats` is not "Rust has no advantage"; it means **both stacks
+execute the critical path in native code** — the first layer of the layering. Conversely, as soon as
+each element's work must run in the interpreter (per-base in `fastq.qc`, per-item in `set.venn`), the
+same boundary costs 31×–1097× (§8.6).
+
 ### 8.6 Layered overview
 
 ![Layered overview: Rust's wall-time ratio against both arms (log scale)](./figures/en/fig-speedup-layered.svg)
@@ -366,6 +381,17 @@ One lesson: **a test that exists but never runs in CI does not exist.**
 
 ## 11. Limitations and honest boundaries
 
+- **This machine only measured a single core (important).** All three arms' critical paths were
+  **single-threaded** in this window: the engine uses no `rayon`/thread pool today (verifiable —
+  no parallel facility anywhere under `engine/crates/**`), CPython's GIL pins a pure-compute Python
+  loop to one core, and R's evaluator is single-threaded too (only libraries that are themselves
+  threaded, e.g. BLAS, are exceptions). This 2-core/4-thread low-end host therefore **never
+  exhibited Rust's language-level parallelism advantage** — Rust can scale across cores safely, while
+  Python and R structurally cannot at that level; we **do not count what we did not measure as an
+  advantage**. Conversely, if the Python arm's vectorised path (numpy/BLAS) did use several threads
+  here, then "Rust is 200× faster *using fewer cores*" only sharpens the point that its **per-core
+  efficiency** deserves the emphasis. Many-core scaling would need a separate measurement on a
+  core-rich host and is future work.
 - **Whole-stack comparison**, not language vs language: the arms are idiomatic Biopython/Biostrings
   code plus their runtimes, under one harness. A faster hand-written Python implementation would change
   the ratios substantially.
