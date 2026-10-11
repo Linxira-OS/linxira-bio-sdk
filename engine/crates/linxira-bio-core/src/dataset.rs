@@ -681,12 +681,55 @@ fn looks_like_sam(lines: &[&str]) -> bool {
             return false;
         }
         let fields = line.split('\t').collect::<Vec<_>>();
+        // A wide numeric table (a 12-sample count matrix, for example) also
+        // yields >= 11 fields whose 2nd/4th/5th columns parse as small
+        // integers, so the field count and numeric parses alone must not
+        // decide. Require SAM structure: a FLAG bitmask, a non-numeric RNAME,
+        // a CIGAR, and a sequence column.
         fields.len() >= 11
-            && fields[1].parse::<u16>().is_ok()
+            && fields[1].parse::<u16>().is_ok_and(|flag| flag <= 0xFFF)
+            && !fields[2].is_empty()
+            && fields[2].parse::<u64>().is_err()
             && fields[3].parse::<u64>().is_ok()
             && fields[4].parse::<u8>().is_ok()
+            && looks_like_cigar(fields[5])
+            && looks_like_sam_sequence(fields[9])
     });
     has_alignment || (has_sam_header && lines.len() > 1)
+}
+
+/// CIGAR grammar `(\d+[MIDNSHP=X])+`, or `*` when the field is unavailable.
+fn looks_like_cigar(value: &str) -> bool {
+    if value == "*" {
+        return true;
+    }
+    let mut saw_digits = false;
+    let mut saw_operation = false;
+    let mut last_was_digit = false;
+    for byte in value.bytes() {
+        match byte {
+            b'0'..=b'9' => {
+                saw_digits = true;
+                last_was_digit = true;
+            }
+            b'M' | b'I' | b'D' | b'N' | b'S' | b'H' | b'P' | b'=' | b'X' => {
+                if !last_was_digit {
+                    return false;
+                }
+                saw_operation = true;
+                last_was_digit = false;
+            }
+            _ => return false,
+        }
+    }
+    saw_digits && saw_operation && !last_was_digit
+}
+
+/// SEQ column: `*` or nucleotide/IUPAC letters (optionally `=`). A numeric
+/// matrix column never matches.
+fn looks_like_sam_sequence(value: &str) -> bool {
+    !value.is_empty()
+        && (value == "*" || value.bytes().all(|byte| byte.is_ascii_alphabetic() || byte == b'='))
 }
 
 fn detect_nine_column_annotation(lines: &[&str], path: &Path) -> Option<DatasetFormat> {
@@ -1723,7 +1766,7 @@ fn decode_line(bytes: &[u8], line: u64, errors: &mut Vec<InspectionIssue>) -> St
 mod tests {
     use super::{
         DatasetCompression, DatasetFormat, DatasetInspectionOptions, DatasetSupport,
-        DetectionConfidence, PreviewKind, detect_compression, inspect_dataset,
+        DetectionConfidence, PreviewKind, detect_compression, detect_from_content, inspect_dataset,
         inspect_dataset_with_options,
     };
     use flate2::Compression;
@@ -1734,6 +1777,30 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEMPORARY_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn wide_numeric_matrix_is_not_mistaken_for_sam() {
+        // 12 samples x 2 genes = 13 tab-separated fields whose 2nd/4th/5th
+        // columns are small integers, which a bare field-count/parse test
+        // reads as FLAG/POS/MAPQ.
+        let mut text =
+            String::from("gene_id\ts1\ts2\ts3\ts4\ts5\ts6\ts7\ts8\ts9\ts10\ts11\ts12\n");
+        text.push_str("gene_a\t4\t9\t3\t7\t8\t2\t5\t1\t6\t4\t2\t3\n");
+        text.push_str("gene_b\t2\t1\t8\t4\t3\t6\t9\t5\t2\t7\t1\t4\n");
+        let detection = detect_from_content(text.as_bytes(), Path::new("matrix.tsv"))
+            .expect("a wide matrix is still a delimited table");
+        assert_eq!(
+            detection.format,
+            DatasetFormat::Tsv,
+            "a 12-sample count matrix must not be read as SAM"
+        );
+
+        // Alignment rows must keep detecting as SAM.
+        let sam = "@HD\tVN:1.6\nread1\t0\tchr1\t10\t60\t4M\t*\t0\t0\tACGT\tIIII\tNM:i:0\n";
+        let detection = detect_from_content(sam.as_bytes(), Path::new("alignments.sam"))
+            .expect("sam rows are detected");
+        assert_eq!(detection.format, DatasetFormat::Sam, "sam alignment row");
+    }
 
     #[test]
     fn detects_and_previews_supported_text_formats() {
