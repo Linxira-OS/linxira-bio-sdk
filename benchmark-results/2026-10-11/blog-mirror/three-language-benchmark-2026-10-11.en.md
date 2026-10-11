@@ -188,7 +188,7 @@ ratio, CI, verdict). Excerpt:
 (An earlier N=3 window measured the same capabilities with the same conclusion; see §9 and the
 engineering ledger `docs/engine-evals/local-nas-g7400-window-2026-10-04.md`.)
 
-![Absolute wall time per backend (log scale, ms)](./figures/fig-absolute-medians.svg)
+![Absolute wall time per backend (log scale, ms)](./figures/en/fig-absolute-medians.svg)
 
 Figure: absolute median wall time per backend (log scale) — same input, same machine, 10 timed
 repeats per backend.
@@ -205,13 +205,13 @@ repeats per backend.
 | `variant.stats.v1` | 6.2 MB | 45.8 MB (7.4×) | 122.4 MB (19.7×) |
 | `fastq.qc.v1` | 6.1 MB | 46.1 MB (7.5×) | 80.0 MB (13.1×) |
 
-![Peak resident memory per backend (log scale, MB)](./figures/fig-memory.svg)
+![Peak resident memory per backend (log scale, MB)](./figures/en/fig-memory.svg)
 
 Figure: peak resident memory per backend (median-of-10, GNU time's VmHWM).
 
 ### 8.3 Repeat stability and ratio intervals
 
-![Raw wall-time spread of the 10 repeats, with each backend's median](./figures/fig-repeat-stability.svg)
+![Raw wall-time spread of the 10 repeats, with each backend's median](./figures/en/fig-repeat-stability.svg)
 
 Figure: every recorded `wall_ms` for the 10 repeats (the vertical bar in each row is that backend's
 median) — a check that no median is produced by a single outlier run.
@@ -219,7 +219,7 @@ Most medians sit within ±1 IQR across repeats. `sequence.stats` — Rust's gran
 timer's resolution), so its CV (1.95%) is dominated by **quantisation**, not real jitter. That limits
 resolution on small absolute values and is one reason the materiality floor is 1.10 rather than 1.01.
 
-![Ratios with bootstrap 95% confidence intervals (log scale)](./figures/fig-ratio-ci.svg)
+![Ratios with bootstrap 95% confidence intervals (log scale)](./figures/en/fig-ratio-ci.svg)
 
 Figure: the ratio with its 95% CI for every backend pair; the dashed lines are 1.00 (no difference)
 and 1.10 (the materiality floor), and each label carries the verdict.
@@ -229,7 +229,7 @@ and 1.10 (the materiality floor), and each label carries the verdict.
 All three bases agree; see [`../statistics-trimmed-medians.tsv`](../statistics-trimmed-medians.tsv) and [`../statistics-trimmed-verdicts.tsv`](../statistics-trimmed-verdicts.tsv).
 In other words: **no conclusion survives only because a particular run was kept.**
 
-![From one capability measurement to a verdict: protocol and decision rule](./figures/fig-method.svg)
+![From one capability measurement to a verdict: protocol and decision rule](./figures/en/fig-method.svg)
 
 Figure: the whole chain — fixed, digest-checked inputs → 1 untimed warm-up → 10 timed repeats →
 median/IQR/CV → bootstrap confidence interval → three-way verdict. **The warm-up never enters the
@@ -252,7 +252,7 @@ because "a language boundary is crossed once per record"; more records should wi
 (ratio 1.037 → 1.036). At ~100 MB both sides are dominated by **I/O and large allocations**: the
 per-base work lives in C primitives, while reading and building each line costs both sides.
 
-![Same ~100 Mb, three record shapes: medians per backend](./figures/fig-granularity.svg)
+![Same ~100 Mb, three record shapes: medians per backend](./figures/en/fig-granularity.svg)
 
 Figure: the record-shape experiment — the total is constant and the record count goes from 1 to
 100,000 while all three lines stay nearly flat, which is the direct evidence that falsified the
@@ -266,7 +266,7 @@ seen on tiny inputs is **interpreter start-up (~170 ms)** landing on a 10 ms wor
 
 ### 8.6 Layered overview
 
-![Layered overview: Rust's wall-time ratio against both arms (log scale)](./figures/fig-speedup-layered.svg)
+![Layered overview: Rust's wall-time ratio against both arms (log scale)](./figures/en/fig-speedup-layered.svg)
 
 Figure: the layered overview — ratios sorted by layer, with C-library-covered loops on the left and
 per-element interpreter iteration on the right.
@@ -328,7 +328,7 @@ untrue. For `variant.stats` the only earlier number on record is a single-repeat
 run (rust 42 ms / python 301 ms, 2026-09-19, **no r row**), not comparable with this window's 200k
 variant input; it is recorded in `benchmark-results/RECORDS.md` §2026-09-19.
 
-![Same capability, two windows: ratios on small fixtures and on large inputs](./figures/fig-series-two-windows.svg)
+![Same capability, two windows: ratios on small fixtures and on large inputs](./figures/en/fig-series-two-windows.svg)
 
 Figure: the same capabilities in both windows (`small` = September fixtures, `large` = this window).
 Small fixtures flatten all three backends, so their ratios are *larger*; real throughput only shows

@@ -32,6 +32,7 @@ import math
 import re
 import statistics
 import sys
+import unicodedata
 from pathlib import Path
 
 TOLERANCE = 0.02  # 2% relative — labels are rendered with limited precision
@@ -111,28 +112,28 @@ def check_value_labels(report: Report, text: str, pattern: str, expected: list[f
 
 def check_bars(report: Report, text: str, table: dict, left: float, right: float,
                order: list[tuple[str, str]], colours: dict[str, str]) -> None:
-    """Bars run from the value's position to the right edge; recover the value from x.
+    """Bars grow from the axis edge; recover each value from the bar's far end.
 
-    The renderer draws one bar per (capability, backend) in ``order``, so the
-    parsed rectangles are matched positionally instead of by re-deriving the
-    layout arithmetic.
+    The renderer draws one bar per (capability, backend) in ``order`` with the
+    bar's right edge at the value's log position, so the parsed rectangles are
+    matched positionally and read from ``x + width``.
     """
     values = list(table.values())
     low, high = max(min(values) / 2, 0.5), max(values) * 2
     span = math.log10(high) - math.log10(low)
-    pattern = (r'<rect x="([\d.]+)" y="[\d.]+" width="[\d.]+" height="(?:7|8)\.00" rx="[\d.]+" '
+    pattern = (r'<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="12\.00" rx="[\d.]+" '
                r'fill="(#[0-9a-f]{6})"')
-    parsed = [(float(x), colour) for x, colour in re.findall(pattern, text)]
+    parsed = [(float(x), float(width), colour) for x, width, colour in re.findall(pattern, text)]
     drawable = [(capability, backend) for capability, backend in order if (capability, backend) in table]
     report.check(len(parsed) == len(drawable),
                  f"{len(parsed)} bars parsed, expected {len(drawable)}")
-    for (x, colour), (capability, backend) in zip(parsed, drawable):
+    for (x, width, colour), (capability, backend) in zip(parsed, drawable):
         report.check(colours.get(colour) == backend,
-                     f"bar {len(parsed) and ''}for {capability}/{backend} drawn in {colour}")
-        predicted = 10 ** (math.log10(low) + (x - left) / (right - left) * span)
+                     f"bar for {capability}/{backend} drawn in {colour}")
+        predicted = 10 ** (math.log10(low) + (x + width - left) / (right - left) * span)
         expected = table[(capability, backend)]
         report.check(close(predicted, expected),
-                     f"bar for {capability}/{backend} at x={x} implies {predicted:g}, table says {expected:g}")
+                     f"bar for {capability}/{backend} ends at x={x + width:.1f}, implies {predicted:g}, table says {expected:g}")
 
 
 def main() -> None:
@@ -170,10 +171,27 @@ def main() -> None:
                                            if (e["capability"], b) in rss])
 
     draw_order = [(e["capability"], b) for e in entries for b in ("rust", "python", "r")]
-    check_bars(report, figures_text(figures, "fig-absolute-medians.svg"), wall, 250.0, 900.0,
+    check_bars(report, figures_text(figures, "fig-absolute-medians.svg"), wall, 260.0, 850.0,
                draw_order, {"#f59e0b": "rust", "#60a5fa": "python", "#34d399": "r"})
-    check_bars(report, figures_text(figures, "fig-memory.svg"), rss, 250.0, 830.0,
+    check_bars(report, figures_text(figures, "fig-memory.svg"), rss, 260.0, 840.0,
                draw_order, {"#f59e0b": "rust", "#60a5fa": "python", "#34d399": "r"})
+
+    # Presentation must stay honest: every figure carries the disclosure that its
+    # numbers are the raw medians with no statistical transformation applied, and
+    # every caption line must fit the canvas (a width-unaware wrapper clipped the
+    # Chinese captions in the first review).
+    for name in sorted(p.name for p in figures.glob("*.svg")):
+        svg = figures_text(figures, name)
+        compact = re.sub(r"\s+", "", re.sub(r"<[^>]+>", "", svg))
+        report.check("nosmoothing" in compact or "无平滑" in compact,
+                     f"{name} is missing the raw-data disclosure line")
+        canvas_height = int(re.search(r'viewBox="0 0 \d+ (\d+)"', svg).group(1))
+        for y, content in re.findall(r'<text x="24" y="([\d.]+)"[^>]*>(.*?)</text>', svg):
+            if float(y) <= canvas_height - 140:
+                continue
+            line = re.sub(r"<[^>]+>", "", content)
+            columns = sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in line)
+            report.check(columns <= 152, f"{name} caption line is {columns} columns wide (max 152)")
 
     # ratio CI: annotation text carries ratio, interval and verdict
     ci_text = figures_text(figures, "fig-ratio-ci.svg")
@@ -222,10 +240,12 @@ def main() -> None:
                 old_base, new_base = entry["backends"].get("rust"), current["backends"].get("rust")
                 if not all((old, new, old_base, new_base)):
                     continue
-                small = f"small {(old['median_wall_ms'] / old_base['median_wall_ms']):.2f}×"
-                large = f"large {(new['median_wall_ms'] / new_base['median_wall_ms']):.2f}×"
-                report.check(f">{small}<" in series_text, f"series label {small} missing ({earlier_capability})")
-                report.check(f">{large}<" in series_text, f"series label {large} missing ({earlier_capability})")
+                small = f"{(old['median_wall_ms'] / old_base['median_wall_ms']):.2f}×"
+                large = f"{(new['median_wall_ms'] / new_base['median_wall_ms']):.2f}×"
+                report.check(any(f">{token} {small}<" in series_text for token in ("small", "小夹具")),
+                             f"series label {small} missing ({earlier_capability})")
+                report.check(any(f">{token} {large}<" in series_text for token in ("large", "大输入")),
+                             f"series label {large} missing ({earlier_capability})")
 
     # granularity: labels are the medians of the three record shapes
     if arguments.granularity:

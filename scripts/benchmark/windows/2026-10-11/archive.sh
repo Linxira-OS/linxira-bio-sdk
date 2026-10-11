@@ -66,22 +66,26 @@ python3 scripts/benchmark/analysis/statistics-tables.py \
   --output-dir benchmark-results/2026-10-11 \
   --comparison benchmark-results/2026-09-13/summary.json
 
-echo "=== figures ==="
-mkdir -p benchmark-results/2026-10-11/blog-mirror/figures
-python3 scripts/benchmark/figures/render-svgs.py \
-  --summary benchmark-results/2026-10-11/summary.json \
-  --reports benchmark-results/2026-10-11 \
-  --comparison benchmark-results/2026-09-13/summary.json \
-  --granularity benchmark-results/2026-10-11 \
-  --output benchmark-results/2026-10-11/blog-mirror/figures
+echo "=== figures (zh + en from the same numbers) ==="
+mkdir -p benchmark-results/2026-10-11/blog-mirror/figures/zh benchmark-results/2026-10-11/blog-mirror/figures/en
+for lang in zh en; do
+  python3 scripts/benchmark/figures/render-svgs.py --lang "$lang" \
+    --summary benchmark-results/2026-10-11/summary.json \
+    --reports benchmark-results/2026-10-11 \
+    --comparison benchmark-results/2026-09-13/summary.json \
+    --granularity benchmark-results/2026-10-11 \
+    --output "benchmark-results/2026-10-11/blog-mirror/figures/$lang"
+done
 
-echo "=== figure/table consistency ==="
-python3 scripts/benchmark/figures/verify-figures.py \
-  --figures benchmark-results/2026-10-11/blog-mirror/figures \
-  --summary benchmark-results/2026-10-11/summary.json \
-  --reports benchmark-results/2026-10-11 \
-  --comparison benchmark-results/2026-09-13/summary.json \
-  --granularity benchmark-results/2026-10-11
+echo "=== figure/table consistency (both languages) ==="
+for lang in zh en; do
+  python3 scripts/benchmark/figures/verify-figures.py \
+    --figures "benchmark-results/2026-10-11/blog-mirror/figures/$lang" \
+    --summary benchmark-results/2026-10-11/summary.json \
+    --reports benchmark-results/2026-10-11 \
+    --comparison benchmark-results/2026-09-13/summary.json \
+    --granularity benchmark-results/2026-10-11
+done
 
 echo "=== archive contents ==="
 ls -la benchmark-results/2026-10-11

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 522" width="940" height="522" role="img" aria-label="记录粒度不是差距的来源——总量同为 ~100 Mb，三种记录形态">
+<rect width="940" height="522" fill="#0a0f1a"/>
+<text x="24" y="34" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="20" font-weight="600">记录粒度不是差距的来源——总量同为 ~100 Mb，三种记录形态</text>
+<text x="916" y="34" fill="#20B8B0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12.5" font-weight="600" text-anchor="end">↓ 越低越好</text>
+<line x1="120.0" y1="222.4" x2="880.0" y2="222.4" stroke="#223046" stroke-width="1.0" opacity="1.0"/>
+<text x="108.0" y="226.4" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="end">1,000 ms</text>
+<rect x="161.67" y="239.64" width="46.00" height="60.36" rx="2.0" fill="#f59e0b" opacity="1.0"/>
+<text x="184.7" y="231.6" fill="#f59e0b" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="middle">820</text>
+<rect x="223.67" y="236.51" width="46.00" height="63.49" rx="2.0" fill="#60a5fa" opacity="1.0"/>
+<text x="246.7" y="228.5" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="middle">850</text>
+<rect x="285.67" y="169.98" width="46.00" height="130.02" rx="2.0" fill="#34d399" opacity="1.0"/>
+<text x="308.7" y="162.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="middle">1,825</text>
+<text x="246.7" y="326.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="middle">1 条记录</text>
+<text x="246.7" y="343.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="middle">(1 × 100 Mb)</text>
+<rect x="415.00" y="239.64" width="46.00" height="60.36" rx="2.0" fill="#f59e0b" opacity="1.0"/>
+<text x="438.0" y="231.6" fill="#f59e0b" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="middle">820</text>
+<rect x="477.00" y="237.54" width="46.00" height="62.46" rx="2.0" fill="#60a5fa" opacity="1.0"/>
+<text x="500.0" y="229.5" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="middle">840</text>
+<rect x="539.00" y="169.74" width="46.00" height="130.26" rx="2.0" fill="#34d399" opacity="1.0"/>
+<text x="562.0" y="161.7" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="middle">1,830</text>
+<text x="500.0" y="326.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="middle">20 条记录</text>
+<text x="500.0" y="343.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="middle">(20 × 5 Mb)</text>
+<rect x="668.33" y="238.59" width="46.00" height="61.41" rx="2.0" fill="#f59e0b" opacity="1.0"/>
+<text x="691.3" y="230.6" fill="#f59e0b" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="middle">830</text>
+<rect x="730.33" y="235.50" width="46.00" height="64.50" rx="2.0" fill="#60a5fa" opacity="1.0"/>
+<text x="753.3" y="227.5" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="middle">860</text>
+<rect x="792.33" y="164.66" width="46.00" height="135.34" rx="2.0" fill="#34d399" opacity="1.0"/>
+<text x="815.3" y="156.7" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="middle">1,940</text>
+<text x="753.3" y="326.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="middle">10 万条记录</text>
+<text x="753.3" y="343.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="middle">(10 万 × 1 kb)</text>
+<rect x="120.00" y="52.00" width="11.00" height="11.00" rx="2" fill="#f59e0b" opacity="1.0"/>
+<text x="137.0" y="62.0" fill="#f59e0b" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="start">rust</text>
+<rect x="240.00" y="52.00" width="11.00" height="11.00" rx="2" fill="#60a5fa" opacity="1.0"/>
+<text x="257.0" y="62.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="start">python</text>
+<rect x="360.00" y="52.00" width="11.00" height="11.00" rx="2" fill="#34d399" opacity="1.0"/>
+<text x="377.0" y="62.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="start">r</text>
+<text x="24" y="493" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="11.5">每根柱 = 该形态下该后端 10 次计时重复的中位数。 三种形态之间每个后端的变化 &lt; 7%，说明语言边界穿越次数不是差距来源。图中数字为 10 次计时重复的原始中位</text>
+<text x="24" y="508" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="11.5">数，仅作呈现：无平滑、无坐标轴截断、无任何统计变换</text>
+</svg>
