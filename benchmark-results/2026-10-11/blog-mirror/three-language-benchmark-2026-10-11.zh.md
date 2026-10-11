@@ -9,7 +9,7 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 > Linxira Bio SDK 基准报告 · 2026-10-11。在一台低端 x86 机器上对 8 项能力做三语言后端的 N=10 重复测量：环境、输入摘要、脚本、表格与图全部公开，可逐项复核。变更与声明见文末「版本与声明」。
 
 > 本文是草稿（增量写作中）。**待补**：`sequence.ssr` 的 N=10 长跑（r 腿约 5 h，安排在服务器维护完成后执行）；`fastq.qc` 的数字已填入。归档与站点发布同此顺延。
-> 表格原始文件：本目录同级仓库路径（见 §12）。图：`./figures/`。
+> 图与表随本篇发布（索引与核查方式见 §13）。
 
 ## 1. 摘要
 
@@ -43,8 +43,8 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 
 ## 3. 背景
 
-三篇脉络：①自己的毕业课题（荞麦基因组）只关心"能不能跑完"；②对一份公开 SRA 数据做了一次
-端到端复现；③本篇——不再挑数据、不再挑指标，按一套事先写死的协议把三语言后端放在同一批输入上跑。
+三篇脉络：①自己的毕业课题（荞麦基因组）只关心"能不能跑完"；②[对一份公开 SRA 数据做了一次端到端复现](/zh/blog/bio-sdk-reproducibility-benchmark/)，
+并紧接着做了[双厂商 GPU 验证](/zh/blog/cloud-gpu-dual-vendor-validation/)；③本篇——不再挑数据、不再挑指标，按一套事先写死的协议把三语言后端放在同一批输入上跑。
 
 动机很具体：这个 SDK 的产品承诺是"**本地优先**"。本地优先意味着用户很可能在没有 GPU、
 内存也不宽裕的机器上跑；如果某个后端在小机器上慢 20 倍、内存吃 10 倍，那它就不是可选项。
@@ -86,7 +86,7 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 | `fastq.qc.v1` | FASTQ | 200 MB / 646k reads | 待补（由 `big.fa` 经 `simulate reads --seed 42` 派生） |
 | `sequence.ssr.v1` | FASTA | ~100 MB | 同 `sequence.stats`（同一文件 `big.fa`） |
 
-生成器脚本随仓库提供（见 §13）。**跨机、跨版本核对**：在 Windows（Python 3.13.15）
+生成器脚本随仓库提供（[`generate-inputs.py`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/scripts/benchmark/inputs/generate-inputs.py)）。**跨机、跨版本核对**：在 Windows（Python 3.13.15）
 与本次测量机（Linux，Python 3.14.7）上分别生成上表六个合成输入，**六个 sha256 全部逐字节一致**——
 说明这批输入不依赖生成机器，任何人都能重建。
 
@@ -306,7 +306,7 @@ sha256 逐字节一致（如 `ref.fa`、`cell.tsv`、`cell.json`）。
 `../statistics-comparison.tsv`）。`enrichment.overrepresentation`、`variant.stats`、`fastq.qc`、
 `sequence.ssr` 在九月归档里**没有三端行**，因此不列——把不同口径的数字并排放进来才是失实。
 其中 `variant.stats` 目前唯一的早期数字是一次 Windows 端到端单重复（rust 42 ms / python 301 ms，
-2026-09-19，**无 r 行**），与本轮 200k 变异的大输入不可比，仅作记录：见仓库的基准记录（2026-09-19 条目，§13）。
+2026-09-19，**无 r 行**），与本轮 200k 变异的大输入不可比，仅作记录：见[`仓库基准记录`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/RECORDS.md)的 2026-09-19 条目。
 
 ![同能力、两个窗口：小夹具与大输入的比值对比](./figures/zh/fig-series-two-windows.svg)
 
@@ -363,8 +363,8 @@ sha256 逐字节一致（如 `ref.fa`、`cell.tsv`、`cell.json`）。
 ## 12. 复现
 
 本轮窗口的**整链**（暂存报告 → 输入摘要 → summary → 统计表 → 图 → 图校验）是一键脚本，
-入库在 `scripts/benchmark/windows/2026-10-11/archive.sh`，窗口的 descriptor 与逐步脚本同目录。
-分步展开如下：
+随仓库发布：[`archive.sh`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/scripts/benchmark/windows/2026-10-11/archive.sh)（同目录另有窗口 descriptor 与逐步脚本）。
+脚本与归档位于 <https://github.com/Linxira-OS/linxira-bio-sdk>，下列命令均以仓库根目录为工作目录：
 
 ```bash
 # 1) 生成输入（固定种子，只写 /tmp）
@@ -397,22 +397,22 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 
 | 编号 | 文件 | 内容 |
 | --- | --- | --- |
-| 附表 S1 | `statistics.tsv` | 每能力 × 后端的 N、中位数、IQR、CV、min/max、峰值 RSS、比值、95% CI、判定 |
-| 附表 S2 | `statistics-trimmed-medians.tsv` | 三种裁剪口径下的中位数与 CV |
-| 附表 S3 | `statistics-trimmed-verdicts.tsv` | 三种裁剪口径下的比值、CI 与判定 |
-| 附表 S4 | `statistics-comparison.tsv` | 与 2026-09-13 归档的跨窗口对照 |
-| 附表 S5 | `statistics-consistency.tsv` | 跨后端一致性、容差、精度档 |
-| 附图 F1–F8 | `blog-mirror/figures/<lang>/fig-*.svg` | 方法与判定、绝对时间、内存、比值 CI、重复稳定性、粒度、分层速览、双窗口对比 |
+| 附表 S1 | [`statistics.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics.tsv) | 每能力 × 后端的 N、中位数、IQR、CV、min/max、峰值 RSS、比值、95% CI、判定 |
+| 附表 S2 | [`statistics-trimmed-medians.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-trimmed-medians.tsv) | 三种裁剪口径下的中位数与 CV |
+| 附表 S3 | [`statistics-trimmed-verdicts.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-trimmed-verdicts.tsv) | 三种裁剪口径下的比值、CI 与判定 |
+| 附表 S4 | [`statistics-comparison.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-comparison.tsv) | 与 2026-09-13 归档的跨窗口对照 |
+| 附表 S5 | [`statistics-consistency.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-consistency.tsv) | 跨后端一致性、容差、精度档 |
+| 附图 F1–F8 | [`blog-mirror/figures/<lang>/`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/blog-mirror/figures) | 方法与判定、绝对时间、内存、比值 CI、重复稳定性、粒度、分层速览、双窗口对比 |
 
 **第三方可核查方式（全部在仓库内）**
 
 | 你想核查什么 | 怎么做 |
 | --- | --- |
-| 输入是否可复现 | 运行 `scripts/benchmark/inputs/generate-inputs.py` 重新生成，与归档的 `inputs.sha256` 逐字节比对 |
-| 统计量是否由图与表一致 | 运行 `scripts/benchmark/figures/verify-figures.py`：它把图上每个数字（含原始重复图的 210 个点）反解回报告里的原始 `wall_ms`，不一致即非零退出 |
+| 输入是否可复现 | 运行 [`generate-inputs.py`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/scripts/benchmark/inputs/generate-inputs.py) 重新生成，与归档的 `inputs.sha256` 逐字节比对 |
+| 统计量是否由图与表一致 | 运行 [`verify-figures.py`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/scripts/benchmark/figures/verify-figures.py)：它把图上每个数字（含原始重复图的 210 个点）反解回报告里的原始 `wall_ms`，不一致即非零退出 |
 | 图是否经过平滑/截断加工 | 每张图注都印有"无平滑、无坐标轴截断、无统计变换"的声明；校验脚本同时检查该声明存在、且图注不超出画布 |
 | 引擎当前是否用到并行 | `grep -rn "rayon\|thread::spawn\|par_iter" engine/crates/` 无命中即为无并行设施（本窗口的核查结果） |
-| 整窗如何一键复现 | `scripts/benchmark/windows/2026-10-11/archive.sh`（暂存报告 → 输入摘要 → 归档 → 统计表 → 双语图 → 图校验） |
+| 整窗如何一键复现 | [`archive.sh`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/scripts/benchmark/windows/2026-10-11/archive.sh)（暂存报告 → 输入摘要 → 归档 → 统计表 → 双语图 → 图校验） |
 
 ## 14. 讨论与展望
 

@@ -11,7 +11,7 @@ desc: "One low-end x86 machine, one Rust engine, and the idiomatic Biopython and
 > Draft, written incrementally. **Pending**: the N=10 long run for `sequence.ssr` (its R leg needs
 > about 5 h and is scheduled after the host's maintenance window); `fastq.qc` is filled in. The archive
 > and the site publication follow the same deferral.
-> Raw tables live in this repository next to this file (see §12); figures in `./figures/`.
+> Tables and figures ship with this post (index and re-check recipes in §13).
 
 ## 1. Abstract
 
@@ -53,7 +53,8 @@ parallelism** — we state only what was measured.
 ## 3. Background
 
 Three posts form a line: ① a graduation project (a buckwheat genome) where only "does it finish"
-mattered; ② a one-off end-to-end reproduction of a public SRA dataset; ③ this one — no cherry-picked
+mattered; ② [a one-off end-to-end reproduction of a public SRA dataset](/en/blog/bio-sdk-reproducibility-benchmark/),
+followed by [a dual-vendor GPU validation](/en/blog/cloud-gpu-dual-vendor-validation/); ③ this one — no cherry-picked
 data, no cherry-picked metric, a protocol written down before the numbers were seen.
 
 The motivation is concrete: the SDK's promise is **local-first**. Local-first means users may well run
@@ -84,7 +85,7 @@ We list both as "planned" rather than "done", because **writing something into a
 
 ## 5. Data
 
-Every input is produced by a committed generator script (see §13):
+Every input is produced by a committed generator script ([`generate-inputs.py`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/scripts/benchmark/inputs/generate-inputs.py)):
 synthetic tables from `random.seed(42)`, sequence inputs from the engine's own seeded simulator
 (`--seed 42`). Anyone can rebuild the exact same bytes.
 
@@ -341,7 +342,7 @@ generated from the 2026-09-13 archive; Table S4):
 they are not listed — putting differently-scoped numbers side by side is what makes a comparison
 untrue. For `variant.stats` the only earlier number on record is a single-repeat Windows end-to-end
 run (rust 42 ms / python 301 ms, 2026-09-19, **no r row**), not comparable with this window's 200k
-variant input; it is recorded in the repository benchmark records (2026-09-19 entry; §13).
+variant input; it is recorded in the [`repository benchmark records`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/RECORDS.md) (2026-09-19 entry).
 
 ![Same capability, two windows: ratios on small fixtures and on large inputs](./figures/en/fig-series-two-windows.svg)
 
@@ -409,9 +410,9 @@ One lesson: **a test that exists but never runs in CI does not exist.**
 ## 12. Reproducing
 
 The whole chain for this window — staging the reports, input digests, summary, statistics tables,
-figures and the figure check — is one committed script,
-`scripts/benchmark/windows/2026-10-11/archive.sh`, with the window descriptor and the step scripts
-beside it. Step by step:
+figures and the figure check — is one committed script, [`archive.sh`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/scripts/benchmark/windows/2026-10-11/archive.sh),
+with the window descriptor and the step scripts beside it. Scripts and archive live at <https://github.com/Linxira-OS/linxira-bio-sdk>;
+the commands below assume the repository root as the working directory. Step by step:
 
 ```bash
 # 1) inputs (seeded; writes only to the target directory)
@@ -449,22 +450,22 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 
 | Label | File | Contents |
 | --- | --- | --- |
-| Table S1 | `statistics.tsv` | per capability × backend: N, median, IQR, CV, min/max, peak RSS, ratio, 95% CI, verdict |
-| Table S2 | `statistics-trimmed-medians.tsv` | medians and CVs under the three trimming bases |
-| Table S3 | `statistics-trimmed-verdicts.tsv` | ratios, CIs and verdicts under the three trimming bases |
-| Table S4 | `statistics-comparison.tsv` | cross-window comparison against the 2026-09-13 archive |
-| Table S5 | `statistics-consistency.tsv` | cross-backend consistency, tolerance, precision class |
-| Figures F1–F8 | `blog-mirror/figures/<lang>/fig-*.svg` | method and decision rule, absolute time, memory, ratio CI, raw repeats, record shapes, layering, two-window comparison |
+| Table S1 | [`statistics.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics.tsv) | per capability × backend: N, median, IQR, CV, min/max, peak RSS, ratio, 95% CI, verdict |
+| Table S2 | [`statistics-trimmed-medians.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-trimmed-medians.tsv) | medians and CVs under the three trimming bases |
+| Table S3 | [`statistics-trimmed-verdicts.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-trimmed-verdicts.tsv) | ratios, CIs and verdicts under the three trimming bases |
+| Table S4 | [`statistics-comparison.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-comparison.tsv) | cross-window comparison against the 2026-09-13 archive |
+| Table S5 | [`statistics-consistency.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-consistency.tsv) | cross-backend consistency, tolerance, precision class |
+| Figures F1–F8 | [`blog-mirror/figures/<lang>/`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/blog-mirror/figures) | method and decision rule, absolute time, memory, ratio CI, raw repeats, record shapes, layering, two-window comparison |
 
 **How a third party can re-check this (everything is in the repository)**
 
 | What you want to check | How |
 | --- | --- |
-| Inputs are reproducible | Run `scripts/benchmark/inputs/generate-inputs.py` and compare byte-for-byte with the archived `inputs.sha256` |
-| Figures agree with the tables | Run `scripts/benchmark/figures/verify-figures.py`: it maps every plotted number (including all 210 dots of the raw-repeat figure) back to the archived `wall_ms` values and exits non-zero on any mismatch |
+| Inputs are reproducible | Run [`generate-inputs.py`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/scripts/benchmark/inputs/generate-inputs.py) and compare byte-for-byte with the archived `inputs.sha256` |
+| Figures agree with the tables | Run [`verify-figures.py`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/scripts/benchmark/figures/verify-figures.py): it maps every plotted number (including all 210 dots of the raw-repeat figure) back to the archived `wall_ms` values and exits non-zero on any mismatch |
 | Figures were not smoothed or axis-truncated for effect | Every caption carries the "no smoothing, no axis truncation, no statistical transformation" disclosure, and the checker also asserts that disclosure is present and that no caption line overflows the canvas |
 | The engine uses no parallelism today | `grep -rn "rayon\|thread::spawn\|par_iter" engine/crates/` returns nothing (this window's check) |
-| The whole window in one command | `scripts/benchmark/windows/2026-10-11/archive.sh` (stage reports → input digests → archive → statistics → bilingual figures → figure check) |
+| The whole window in one command | [`archive.sh`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/scripts/benchmark/windows/2026-10-11/archive.sh) (stage reports → input digests → archive → statistics → bilingual figures → figure check) |
 
 ## 14. Discussion and outlook
 
