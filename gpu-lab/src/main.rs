@@ -132,8 +132,10 @@ fn main() {
                 std::process::exit(1);
             });
             let histogram: Vec<u32> = out
-                .chunks_exact(4)
-                .map(|chunk| u32::from_le_bytes(chunk.try_into().expect("u32 chunk")))
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|chunk| u32::from_le_bytes(*chunk))
                 .collect();
             let expected_bin = histogram.get(1).copied().unwrap_or(0);
             let pass = expected_bin == 64

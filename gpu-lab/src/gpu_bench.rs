@@ -357,7 +357,7 @@ fn run_histogram_gpu(context: &GpuContext, seed: u64) -> GpuKernelReport {
     let params_bytes: [u8; 16] = (words.len() as u32)
         .to_le_bytes()
         .into_iter()
-        .chain([0u8; 12].into_iter())
+        .chain([0u8; 12])
         .collect::<Vec<u8>>()
         .try_into()
         .expect("16 param bytes");

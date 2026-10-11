@@ -66,7 +66,7 @@ pub struct BenchReport {
 
 pub fn run_benchmarks() -> BenchReport {
     let seed = 0x5EED_5EED_5EED_5EEDu64;
-    let mut kernels = Vec::new();
+    let mut kernels = Vec::with_capacity(3);
     kernels.push(run_pearson_bench(&pearson_input(seed)));
     kernels.push(bench_kmer(seed));
     kernels.push(bench_quality_histogram(seed));
@@ -248,12 +248,12 @@ unsafe fn pearson_pairs_avx2(columns: &[Vec<f64>], squares: &[f64]) -> f64 {
         let column_a = &columns[a];
         for b in (a + 1)..cols {
             let column_b = &columns[b];
-            let mut num = unsafe { std::arch::x86_64::_mm256_setzero_pd() };
+            let mut num = std::arch::x86_64::_mm256_setzero_pd();
             let mut row = 0usize;
             while row + 4 <= rows {
                 let va = unsafe { _mm256_loadu_pd(column_a.as_ptr().add(row)) };
                 let vb = unsafe { _mm256_loadu_pd(column_b.as_ptr().add(row)) };
-                num = unsafe { _mm256_fmadd_pd(va, vb, num) };
+                num = _mm256_fmadd_pd(va, vb, num);
                 row += 4;
             }
             let mut tail = 0.0;
@@ -282,12 +282,12 @@ unsafe fn pearson_pairs_avx512(columns: &[Vec<f64>], squares: &[f64]) -> f64 {
         let column_a = &columns[a];
         for b in (a + 1)..cols {
             let column_b = &columns[b];
-            let mut num: __m512d = unsafe { std::arch::x86_64::_mm512_setzero_pd() };
+            let mut num: __m512d = std::arch::x86_64::_mm512_setzero_pd();
             let mut row = 0usize;
             while row + 8 <= rows {
                 let va = unsafe { _mm512_loadu_pd(column_a.as_ptr().add(row)) };
                 let vb = unsafe { _mm512_loadu_pd(column_b.as_ptr().add(row)) };
-                num = unsafe { _mm512_fmadd_pd(va, vb, num) };
+                num = _mm512_fmadd_pd(va, vb, num);
                 row += 8;
             }
             let mut tail = 0.0;
@@ -295,7 +295,7 @@ unsafe fn pearson_pairs_avx512(columns: &[Vec<f64>], squares: &[f64]) -> f64 {
                 tail += column_a[row] * column_b[row];
                 row += 1;
             }
-            let mut partial = unsafe { _mm512_reduce_add_pd(num) };
+            let mut partial = _mm512_reduce_add_pd(num);
             partial += tail;
             let denominator = (squares[a] * squares[b]).sqrt();
             if denominator > 0.0 {
@@ -354,10 +354,10 @@ fn simd_tier() -> (String, bool, bool) {
 fn timed(mut body: impl FnMut() -> f64) -> (f64, f64) {
     let mut walls = [0.0f64; 3];
     let mut result = 0.0;
-    for run in 0..3 {
+    for slot in &mut walls {
         let start = Instant::now();
         result = body();
-        walls[run] = start.elapsed().as_secs_f64() * 1000.0;
+        *slot = start.elapsed().as_secs_f64() * 1000.0;
     }
     walls.sort_by(|a, b| a.total_cmp(b));
     (walls[1], result)

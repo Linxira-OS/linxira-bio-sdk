@@ -16,19 +16,14 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KernelId {
     /// Pearson v3 "multi" semantics: four 64-lane subgroups per workgroup,
-    /// one column pair each, tree reduction per subgroup.
+    /// one column pair each, tree reduction per subgroup. The default harness
+    /// dispatches the pearson variants directly in `gpu_bench`, so nothing
+    /// constructs this id in that build; the wgpu backend still implements the
+    /// translation by id, so the variant stays part of the id set.
+    #[allow(dead_code)]
     PearsonV3Multi,
     /// 256-bin quality histogram over u32-packed lanes; integer-exact.
     QualityHistogram,
-}
-
-impl KernelId {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::PearsonV3Multi => "pearson-v3-multi",
-            Self::QualityHistogram => "quality-histogram",
-        }
-    }
 }
 
 /// Host/device memory relationship of the backend's device. This decides
@@ -125,7 +120,7 @@ pub trait GpuBackend {
 /// Probe order from the proposal: vendor stacks first (each behind its
 /// feature flag and runtime SDK check), wgpu as the permanent floor.
 pub fn backend_chain() -> Vec<Box<dyn GpuBackend>> {
-    let mut chain: Vec<Box<dyn GpuBackend>> = Vec::new();
+    let mut chain: Vec<Box<dyn GpuBackend>> = Vec::with_capacity(4);
     #[cfg(feature = "gpu-cutile")]
     chain.push(crate::backends_cutile::CutileBackend::new_boxed());
     #[cfg(feature = "gpu-musa")]
