@@ -14,6 +14,24 @@ requirements:
 Do not move work off the local machine merely because a remote option exists.
 Record the reason whenever a workflow leaves the local execution boundary.
 
+## Platform And Validation Priority
+
+Linux is the first-class platform. The project baseline targets our Arch-based
+Linux distribution; Debian is the compatibility provider. Windows is a
+**development machine only**: it is fine for editing, desktop preview, and
+quick checks, but it is not a source of official benchmark data.
+
+- Run release gates (`cargo fmt/clippy/test`, repository validation, packaging
+  checks) on Linux whenever possible — a WSL distribution counts as Linux for
+  this purpose, as does a container or remote Linux host.
+- Treat Linux output as authoritative when a gate behaves differently per
+  platform, and record the platform with every measurement.
+- Keep build caches bounded: after large build or benchmark sessions, report
+  and clean the Rust target directory (and any staged release trees) so the
+  working drives do not fill up. Linux-side builds may use a dedicated target
+  directory outside the source tree for speed, but note that repository tests
+  which assert paths under `target/` require the default layout.
+
 ## Local Default
 
 Keep format parsing, QC, filtering, sequence manipulation, interval operations,
