@@ -38,7 +38,9 @@ for shape in one twenty many; do
 done
 
 echo "=== input digests (paths as staged on this host; verify with sha256sum -c) ==="
-sha256sum /tmp/lxg/big.fa \
+REF="$W/big.fa"
+[ -f "$REF" ] || REF=/tmp/lxg/big.fa
+sha256sum "$REF" \
   "$W/matrix.tsv" "$W/sets.tsv" "$W/structure.pdb" "$W/variants.vcf" "$W/genes.txt" "$W/associations.tsv" \
   "$W/g_one.fa" "$W/g_twenty.fa" "$W/g_many.fa" > "$S/inputs.sha256"
 if [ -f "$W/reads200.fq" ]; then
