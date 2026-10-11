@@ -135,7 +135,41 @@ Bioconductor 3.23；Arch 的系统库不可写 → 必须用用户库 `$HOME/R/x
   （`ecb30a51…`）、`variants.vcf` 200k（`1dab9c47…`）、`genes.txt`+`associations.tsv`（`84ac1b6e…`/`b523c5b4…`）；
   FASTQ/FASTA 由 `simulate reads/sequence`（seed 42）产出。
 
-### 6.2 抓出的缺陷（全部因为该包从未被真正执行过）
+## 6.2 N=10 复核（同机同输入的第二次跑分，替代 §6.1 的 N=3 数字）
+
+按用户要求，**每项一律 N=10（含 SSR）**，判定规则改为两段式（CI 排除 1.0 = 可分辨；CI 下界 ≥1.10 = **material**）。
+六个"快"能力的 N=10 结果（median-of-10，GNU time 高精度）：
+
+| 能力 | rust | python | r | 判定 |
+| --- | --- | --- | --- | --- |
+| `sequence.stats.v1` | 820 ms（IQR 27.5） | 840 ms（IQR 10） | 1840 ms | python **within-noise**（1.02×，CI [0.99, 1.04]）；r material（2.24×） |
+| `expression.pca.v1` | 20 ms | 4010 ms | 2760 ms | 双 material（200.5× / 138×） |
+| `set.venn.v1` | 10 ms | 180 ms | 10,975 ms | 双 material（18× / 1097×） |
+| `enrichment.overrepresentation.v1` | 30 ms | 230 ms | 4470 ms | 双 material（7.7× / 149×） |
+| `structure.pdb.summary.v1` | 30 ms | 790 ms | 20,750 ms | 双 material（26.3× / 692×） |
+| `variant.stats.v1` | 80 ms | 760 ms | 13,495 ms | 双 material（9.5× / 169×） |
+
+稳健性：全 10 次 / 去第 1 次 / 只取中间 8 次三种口径下，中位数与判定**完全一致**
+（`statistics-trimmed-*.tsv`）。注：`benchmark run` 本身已有 1 次**不计时预热**，报告里 10 条全是计时轮次。
+
+### 6.2.1 假设被推翻：记录粒度不是 `sequence.stats` 无差异的原因
+
+原假设：python 慢在"每条记录要穿一次语言边界"，因此记录越多差距应越大。实验（同一 ~100 Mb，三种记录形态，各 N=10）：
+
+| 输入形态 | rust | python | r |
+| --- | --- | --- | --- |
+| 1 × 100 Mb | 820 ms | 850 ms | 1825 ms |
+| 20 × 5 Mb | 820 ms | 840 ms | 1830 ms |
+| 100,000 × 1 kb | 830 ms | 860 ms | 1940 ms |
+
+**假设被推翻**：记录数从 1 → 10 万，rust 仅 +10 ms、python 仅 +10 ms（比值从 1.037 变到 1.036）。
+更正后的解释：该能力在 ~100 MB 量级上**两侧都被 I/O 与大块内存分配主导**（每碱基的活在 C 原语里、
+每行的读取与建串两侧都要付），语言边界的穿越次数在这个量级上不是主导项。
+真正拉开差距的是"**每元素是否需要解释器参与**"：`fastq.qc`/`set.venn`/`pdb`/`variant` 的逐碱基或逐项逻辑
+在解释器里跑（30×–1100×），而 `sequence.stats` 的逐碱基逻辑在 C 里跑（≈1×）。
+小输入上的 ~20× 则是解释器启动（python 约 170 ms）在 10 ms 级工作负载上的占比。
+
+### 6.3 抓出的缺陷（全部因为该包从未被真正执行过）
 
 | # | 位置 | 症状 | 根因 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -146,7 +180,7 @@ Bioconductor 3.23；Arch 的系统库不可写 → 必须用用户库 `$HOME/R/x
 | 5 | `sequence_ssr_v1.R` | 无 SSR 的输入被 worker 拒绝：`invalid type: sequence, expected a map` | 空 `list()` 被 jsonlite 序列化成 `[]`，而契约的 `motif_length_counts` 是 map（须 `{}`） | 已修（保留 names 属性；已用「无 SSR 输入」端到端验证 `{}` 与 Rust 一致） |
 | 6 | `set_venn_v1.R` | 20k 项输入 `rust != r`：`intersections` 长度 4 vs 20000 | `summarize_memberships` **按 item 逐条**生成 intersections（并按条累加 set_sizes）；小夹具掩码恰好互不相同，所以没抓到 | 已修（按 occupancy mask 分组，与 Rust 的 BTreeMap 语义一致）+ 新增重复掩码回归用例（期望值取自 Rust 真值） |
 
-### 6.3 顺带抓到的**产品**缺陷：宽数值矩阵被误判为 SAM
+### 6.4 顺带抓到的**产品**缺陷：宽数值矩阵被误判为 SAM
 
 用 40 个样本的矩阵跑 benchmark 时，worker 直接拒绝：
 `input input-matrix-1 format mismatch: request declares tsv but content identifies sam`。
@@ -240,9 +274,10 @@ workflows, licenses` —— 即 **`docs/` 整棵树随发布包发给用户**，
 - [ ] 低档 GPU 扩测：GTX 750 Ti 的 CUDA 12.x 路径（需装 toolkit）与 Vulkan 路径对照
 - [x] 其余三语言能力补齐 r 腿：`expression.pca`/`set.venn`/`structure.pdb.summary`/`variant.stats`/`enrichment.overrepresentation` 全部三端 `consistent` 并已回写（§6.1，共 7 条偏好）
 - [ ] `sequence.ssr.v1` 三端长跑（97 MB；r 腿约 27 min/次，用户明确要求"浪费也要做"）——进行中
-- [ ] 对外材料引用三端数据时按 §6.1 的分层口径，不要写"Rust 普遍更快"
+- [x] N=10 复核：六个"快"能力 + 记录粒度实验完成（§6.2）；`fastq.qc.v1` 与 `sequence.ssr.v1` 的 N=10 长跑在跑
+- [ ] 对外材料引用三端数据时按 §6.1/§6.2 的分层口径，不要写"Rust 普遍更快"
 - [x] R 包测试字面量修正（`"AAAAAAAAAATATATATATATAT"` 多一个 T，断言按 22 写）— `c567f94`
-- [x] R SSR 规模化实测：97 MB 输入 R 1633 s（rust 1.6 s / pytrf 2.3 s，≈1000×），结论=SSR 不用 R（§6.2）
+- [x] R SSR 规模化实测：97 MB 输入 R 1633 s（rust 1.6 s / pytrf 2.3 s，≈1000×），结论=SSR 不用 R（§6.3）
 - [ ] NAS 侧固定 `performance` governor 或记录并接受 powersave（当前已如实记录）
 - [x] 文档边界：已改为 bundle 白名单（`docs/capabilities` + 17 份规范文档），`engine-evals`/`proposals` 不再随包；**完整打包实测 606 文件、无内部目录**
 - [ ] `docs/research/` 空目录（git 未跟踪、易与 `.research/` 混淆）待清理
