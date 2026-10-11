@@ -2,8 +2,7 @@
 
 > **文档定位**：本文件是仓库根目录的**唯一长期计划文档**，具有契约效力——每个任务的
 > 「验收标准」均为可直接执行的命令或可核对的产物，通过 Phase Gate（§11）后才可进入下一里程碑。
-> 能力级增量记录走 `CAPABILITY_TRACKING.md`（不入 Git）；详细设计蓝图见
-> [.trae/documents/unified-output-and-benchmark-blueprint.md](.trae/documents/unified-output-and-benchmark-blueprint.md)。
+> 能力级增量记录走 `CAPABILITY_TRACKING.md`（不入 Git）；设计提案见 `docs/proposals/`。
 > **维护规则**：任务完成时在对应任务行标注 `[x]` 并填入完成日期；验收标准变更需同步修改本文件，
 > 禁止"口头验收"。
 
