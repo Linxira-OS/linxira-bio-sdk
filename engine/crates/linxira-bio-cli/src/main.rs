@@ -7658,7 +7658,11 @@ impl BenchmarkRequest {
     }
 
     fn execute(self, worker: &std::path::Path) -> ExecutedRun {
-        let run = execute_benchmark_run(worker, &self.path);
+        // Stamped before the worker starts, so an audit can align the repeat
+        // with whatever else the host was doing at that instant.
+        let started_at = rfc3339_now().ok();
+        let mut run = execute_benchmark_run(worker, &self.path);
+        run.started_at = started_at;
         let _ = std::fs::remove_file(&self.path);
         if let Some(directory) = &self.output_directory {
             let _ = std::fs::remove_dir_all(directory);
@@ -7679,6 +7683,7 @@ struct ExecutedRun {
     output_bytes: u64,
     ok: bool,
     error_summary: Option<String>,
+    started_at: Option<String>,
     envelope: Option<serde_json::Value>,
     timed_with_time_v: bool,
     self_reported_wall_ms: Option<f64>,
@@ -7702,6 +7707,7 @@ impl ExecutedRun {
             output_bytes: self.output_bytes,
             ok: self.ok,
             error_summary: self.error_summary,
+            started_at: self.started_at,
             self_reported_wall_ms: self.self_reported_wall_ms,
             self_reported_peak_rss_mb: self.self_reported_peak_rss_mb,
         }
@@ -7799,6 +7805,7 @@ fn execute_benchmark_run(worker: &std::path::Path, request_path: &std::path::Pat
                 output_bytes: stdout.len() as u64,
                 ok,
                 error_summary,
+                started_at: None,
                 envelope,
                 timed_with_time_v: timed.is_some(),
                 self_reported_wall_ms,
@@ -7816,6 +7823,7 @@ fn execute_benchmark_run(worker: &std::path::Path, request_path: &std::path::Pat
             output_bytes: 0,
             ok: false,
             error_summary: Some(truncate_error_summary(&error.to_string())),
+            started_at: None,
             envelope: None,
             timed_with_time_v: false,
             self_reported_wall_ms: None,

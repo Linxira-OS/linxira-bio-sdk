@@ -729,7 +729,10 @@ fn looks_like_cigar(value: &str) -> bool {
 /// matrix column never matches.
 fn looks_like_sam_sequence(value: &str) -> bool {
     !value.is_empty()
-        && (value == "*" || value.bytes().all(|byte| byte.is_ascii_alphabetic() || byte == b'='))
+        && (value == "*"
+            || value
+                .bytes()
+                .all(|byte| byte.is_ascii_alphabetic() || byte == b'='))
 }
 
 fn detect_nine_column_annotation(lines: &[&str], path: &Path) -> Option<DatasetFormat> {
@@ -1783,8 +1786,7 @@ mod tests {
         // 12 samples x 2 genes = 13 tab-separated fields whose 2nd/4th/5th
         // columns are small integers, which a bare field-count/parse test
         // reads as FLAG/POS/MAPQ.
-        let mut text =
-            String::from("gene_id\ts1\ts2\ts3\ts4\ts5\ts6\ts7\ts8\ts9\ts10\ts11\ts12\n");
+        let mut text = String::from("gene_id\ts1\ts2\ts3\ts4\ts5\ts6\ts7\ts8\ts9\ts10\ts11\ts12\n");
         text.push_str("gene_a\t4\t9\t3\t7\t8\t2\t5\t1\t6\t4\t2\t3\n");
         text.push_str("gene_b\t2\t1\t8\t4\t3\t6\t9\t5\t2\t7\t1\t4\n");
         let detection = detect_from_content(text.as_bytes(), Path::new("matrix.tsv"))

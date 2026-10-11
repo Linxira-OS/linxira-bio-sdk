@@ -594,6 +594,12 @@ pub struct BenchmarkRun {
     pub ok: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_summary: Option<String>,
+    /// RFC 3339 UTC instant the run started, captured by the harness before the
+    /// worker was invoked. Reports previously carried no per-run timestamps, so
+    /// a later audit could not tell which repeat overlapped an external load
+    /// (a CI job on the same host, for instance); this closes that gap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
     /// Wall time the backend measured around the analysis itself, so the
     /// interpreter start-up share of `wall_ms` is visible; `None` for the
     /// native engine.
@@ -1190,6 +1196,7 @@ mod tests {
                     output_bytes: 2048,
                     ok: true,
                     error_summary: None,
+                    started_at: Some("2026-09-10T00:00:00Z".to_owned()),
                     self_reported_wall_ms: None,
                     self_reported_peak_rss_mb: None,
                 }],
@@ -1228,6 +1235,17 @@ mod tests {
         let parsed: BenchmarkReport = serde_json::from_str(&json).expect("parse benchmark report");
         assert_eq!(parsed, report);
         assert_eq!(parsed.backends[0].runs[0].backend, "rust");
+        // The per-run start stamp is what makes a later contamination audit
+        // possible, so it must survive serialisation and stay optional.
+        assert_eq!(
+            parsed.backends[0].runs[0].started_at.as_deref(),
+            Some("2026-09-10T00:00:00Z")
+        );
+        let without: BenchmarkRun = serde_json::from_str(
+            r#"{"backend":"rust","run_index":1,"wall_ms":1.0,"output_bytes":0,"ok":true}"#,
+        )
+        .expect("older reports without started_at still parse");
+        assert_eq!(without.started_at, None);
     }
 
     #[test]
