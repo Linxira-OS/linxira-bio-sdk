@@ -334,6 +334,8 @@ workflows, licenses` —— 即 **`docs/` 整棵树随发布包发给用户**，
 - [x] 文档边界：已改为 bundle 白名单（`docs/capabilities` + 17 份规范文档），`engine-evals`/`proposals` 不再随包；**完整打包实测 606 文件、无内部目录**
 - [ ] `docs/research/` 空目录（git 未跟踪、易与 `.research/` 混淆）待清理
 - [ ] 若认可 CI 成本：确认 debian 作业新增的 benchmark 包测试在 GitHub 上首跑通过（Biostrings 需源码编译，预计 +5–10 min）
+- [x] 逐次时间戳：`BenchmarkRun.started_at`（RFC 3339 UTC，harness 在 worker 启动前打点）+ schema + 往返测试（`12e9f32`），NAS 门禁 fmt/clippy/18 套件测试/校验全绿
+- [x] 无 CI 重跑入口：`scripts/benchmark/windows/2026-10-11/rerun-clean.sh`（前置拒绝在 runner 活动时开跑；逐阶段记录 loadavg 与 runner 状态到 `window-log.txt` 并随归档）
 
 ### 6.2.5 污染审计：CI runner 与跑分同机（2026-10-11 晚发现，重要）
 
