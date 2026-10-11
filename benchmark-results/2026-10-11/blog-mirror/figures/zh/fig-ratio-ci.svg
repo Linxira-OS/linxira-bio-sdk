@@ -1,117 +1,121 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 872" width="940" height="872" role="img" aria-label="差距是真的吗？比值与 bootstrap 95% 置信区间">
-<rect width="940" height="872" fill="#0a0f1a"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 950" width="940" height="950" role="img" aria-label="差距是真的吗？比值与 bootstrap 95% 置信区间">
+<rect width="940" height="950" fill="#0a0f1a"/>
 <text x="24" y="34" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="20" font-weight="600">差距是真的吗？比值与 bootstrap 95% 置信区间</text>
 <text x="916" y="34" fill="#20B8B0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12.5" font-weight="600" text-anchor="end">↑ 越高越好（对 Rust 而言）</text>
-<line x1="462.3" y1="90.0" x2="462.3" y2="706.0" stroke="#223046" stroke-width="1.0" opacity="1.0"/>
-<text x="462.3" y="82.0" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">10×</text>
-<line x1="608.0" y1="90.0" x2="608.0" y2="706.0" stroke="#223046" stroke-width="1.0" opacity="1.0"/>
-<text x="608.0" y="82.0" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">100×</text>
-<line x1="753.7" y1="90.0" x2="753.7" y2="706.0" stroke="#223046" stroke-width="1.0" opacity="1.0"/>
-<text x="753.7" y="82.0" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">1000×</text>
-<text x="310.0" y="46.0" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="start">相对 Rust 的倍数（对数刻度）</text>
-<line x1="316.7" y1="90.0" x2="316.7" y2="706.0" stroke="#fb7185" stroke-width="1.6" opacity="1.0" stroke-dasharray="6 4"/>
-<text x="316.7" y="76.0" fill="#fb7185" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">1.00×</text>
-<line x1="322.7" y1="90.0" x2="322.7" y2="706.0" stroke="#20B8B0" stroke-width="1.4" opacity="1.0" stroke-dasharray="4 4"/>
-<text x="322.7" y="76.0" fill="#20B8B0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">1.10×</text>
-<text x="294.0" y="111.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">sequence.stats · python</text>
-<rect x="316.67" y="105.00" width="3.16" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="315.9" y1="112.0" x2="318.9" y2="112.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="315.9" y1="107.0" x2="315.9" y2="117.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="318.9" y1="107.0" x2="318.9" y2="117.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="314.19" y="106.00" width="8.00" height="12.00" rx="2.0" fill="#fb7185" opacity="1.0"/>
-<text x="328.9" y="117.0" fill="#fb7185" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">1.02× [0.99, 1.04] within-noise</text>
-<text x="294.0" y="155.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">sequence.stats · r</text>
-<rect x="316.67" y="149.00" width="8.01" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="365.5" y1="156.0" x2="368.1" y2="156.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="365.5" y1="151.0" x2="365.5" y2="161.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="368.1" y1="151.0" x2="368.1" y2="161.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="363.80" y="150.00" width="8.00" height="12.00" rx="2.0" fill="#34d399" opacity="1.0"/>
-<text x="378.1" y="161.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">2.24× [2.16, 2.26] material</text>
-<text x="294.0" y="199.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">enrichment.overrepresentation · python</text>
-<rect x="316.67" y="193.00" width="2.30" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="444.1" y1="200.0" x2="445.5" y2="200.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="444.1" y1="195.0" x2="444.1" y2="205.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="445.5" y1="195.0" x2="445.5" y2="205.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="441.53" y="194.00" width="8.00" height="12.00" rx="2.0" fill="#60a5fa" opacity="1.0"/>
-<text x="455.5" y="205.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">7.67× [7.50, 7.67] material</text>
-<text x="294.0" y="243.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">variant.stats · python</text>
-<rect x="316.67" y="237.00" width="1.16" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="459.1" y1="244.0" x2="459.9" y2="244.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="459.1" y1="239.0" x2="459.1" y2="249.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="459.9" y1="239.0" x2="459.9" y2="249.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="455.09" y="238.00" width="8.00" height="12.00" rx="2.0" fill="#60a5fa" opacity="1.0"/>
-<text x="469.9" y="249.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">9.50× [9.50, 9.62] material</text>
-<text x="294.0" y="287.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">set.venn · python</text>
-<rect x="316.67" y="281.00" width="3.25" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="499.5" y1="288.0" x2="502.9" y2="288.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="499.5" y1="283.0" x2="499.5" y2="293.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="502.9" y1="283.0" x2="502.9" y2="293.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="495.52" y="282.00" width="8.00" height="12.00" rx="2.0" fill="#60a5fa" opacity="1.0"/>
-<text x="512.9" y="293.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">18.00× [18.00, 19.00] material</text>
-<text x="294.0" y="331.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">structure.pdb.summary · python</text>
-<rect x="316.67" y="325.00" width="22.18" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="515.4" y1="332.0" x2="530.4" y2="332.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="515.4" y1="327.0" x2="515.4" y2="337.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="530.4" y1="327.0" x2="530.4" y2="337.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="519.59" y="326.00" width="8.00" height="12.00" rx="2.0" fill="#60a5fa" opacity="1.0"/>
-<text x="540.4" y="337.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">26.33× [23.14, 29.33] material</text>
-<text x="294.0" y="375.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">fastq.qc · python</text>
-<rect x="316.67" y="369.00" width="6.48" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="532.8" y1="376.0" x2="535.9" y2="376.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="532.8" y1="371.0" x2="532.8" y2="381.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="535.9" y1="371.0" x2="535.9" y2="381.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="530.75" y="370.00" width="8.00" height="12.00" rx="2.0" fill="#60a5fa" opacity="1.0"/>
-<text x="545.9" y="381.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">31.41× [30.47, 31.97] material</text>
-<text x="294.0" y="419.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">expression.pca · r</text>
-<rect x="316.67" y="413.00" width="27.84" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="614.4" y1="420.0" x2="629.0" y2="420.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="614.4" y1="415.0" x2="614.4" y2="425.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="629.0" y1="415.0" x2="629.0" y2="425.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="624.38" y="414.00" width="8.00" height="12.00" rx="2.0" fill="#34d399" opacity="1.0"/>
-<text x="639.0" y="425.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">138.00× [110.60, 139.25] material</text>
-<text x="294.0" y="463.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">enrichment.overrepresentation · r</text>
-<rect x="316.67" y="457.00" width="7.13" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="633.1" y1="464.0" x2="637.5" y2="464.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="633.1" y1="459.0" x2="633.1" y2="469.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="637.5" y1="459.0" x2="637.5" y2="469.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="629.23" y="458.00" width="8.00" height="12.00" rx="2.0" fill="#34d399" opacity="1.0"/>
-<text x="647.5" y="469.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">149.00× [148.67, 159.33] material</text>
-<text x="294.0" y="507.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">variant.stats · r</text>
-<rect x="316.67" y="501.00" width="3.50" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="639.3" y1="508.0" x2="642.9" y2="508.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="639.3" y1="503.0" x2="639.3" y2="513.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="642.9" y1="503.0" x2="642.9" y2="513.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="637.08" y="502.00" width="8.00" height="12.00" rx="2.0" fill="#34d399" opacity="1.0"/>
-<text x="652.9" y="513.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">168.69× [164.12, 173.56] material</text>
-<text x="294.0" y="551.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">expression.pca · python</text>
-<rect x="316.67" y="545.00" width="25.84" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="638.1" y1="552.0" x2="656.4" y2="552.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="638.1" y1="547.0" x2="638.1" y2="557.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="656.4" y1="547.0" x2="656.4" y2="557.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="648.01" y="546.00" width="8.00" height="12.00" rx="2.0" fill="#60a5fa" opacity="1.0"/>
-<text x="666.4" y="557.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">200.50× [160.80, 215.00] material</text>
-<text x="294.0" y="595.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">fastq.qc · r</text>
-<rect x="316.67" y="589.00" width="6.24" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="700.6" y1="596.0" x2="703.5" y2="596.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="700.6" y1="591.0" x2="700.6" y2="601.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="703.5" y1="591.0" x2="703.5" y2="601.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="698.81" y="590.00" width="8.00" height="12.00" rx="2.0" fill="#34d399" opacity="1.0"/>
-<text x="690.6" y="601.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="end">447.55× [432.44, 452.08] material</text>
-<text x="294.0" y="639.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">structure.pdb.summary · r</text>
-<rect x="316.67" y="633.00" width="16.31" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="720.6" y1="640.0" x2="730.4" y2="640.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="720.6" y1="635.0" x2="720.6" y2="645.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="730.4" y1="635.0" x2="730.4" y2="645.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="726.35" y="634.00" width="8.00" height="12.00" rx="2.0" fill="#34d399" opacity="1.0"/>
-<text x="710.6" y="645.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="end">691.67× [593.00, 692.67] material</text>
-<text x="294.0" y="683.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">set.venn · r</text>
-<rect x="316.67" y="677.00" width="2.09" height="14.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
-<line x1="759.0" y1="684.0" x2="761.0" y2="684.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="759.0" y1="679.0" x2="759.0" y2="689.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<line x1="761.0" y1="679.0" x2="761.0" y2="689.0" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
-<rect x="755.56" y="678.00" width="8.00" height="12.00" rx="2.0" fill="#34d399" opacity="1.0"/>
-<text x="749.0" y="689.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="end">1097.50× [1087.50, 1123.00] material</text>
-<text x="24" y="828" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="11.5">每条 = 一个后端相对 Rust 的比值中位数与其 95% 区间（10,000 次重采样，种子 20261011）。判定只看区间：区间完全 ≥ 1.10 记为 material；区间跨过 1.00 记为</text>
-<text x="24" y="843" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="11.5">within-noise（测不出可分辨差异）。阴影带为 ±2×(两端 CV 之和)，仅作参考，不参与判定。 图中数字为 10 次计时重复的原始中位数，仅作呈现：无平滑、无坐标轴</text>
-<text x="24" y="858" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="11.5">截断、无任何统计变换</text>
+<line x1="404.78" y1="136.00" x2="404.78" y2="780.00" stroke="#223046" stroke-width="1.0" opacity="1.0"/>
+<text x="404.8" y="128.0" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">200×</text>
+<line x1="479.93" y1="136.00" x2="479.93" y2="780.00" stroke="#223046" stroke-width="1.0" opacity="1.0"/>
+<text x="479.9" y="128.0" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">400×</text>
+<line x1="555.07" y1="136.00" x2="555.07" y2="780.00" stroke="#223046" stroke-width="1.0" opacity="1.0"/>
+<text x="555.1" y="128.0" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">600×</text>
+<line x1="630.21" y1="136.00" x2="630.21" y2="780.00" stroke="#223046" stroke-width="1.0" opacity="1.0"/>
+<text x="630.2" y="128.0" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">800×</text>
+<line x1="705.35" y1="136.00" x2="705.35" y2="780.00" stroke="#223046" stroke-width="1.0" opacity="1.0"/>
+<text x="705.3" y="128.0" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">1,000×</text>
+<text x="24.0" y="128.0" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="start">相对 Rust 的倍数（线性刻度），显示范围 0.95–1,145×</text>
+<line x1="330.02" y1="132.00" x2="330.02" y2="780.00" stroke="#fb7185" stroke-width="1.6" opacity="1.0" stroke-dasharray="6 4"/>
+<line x1="330.06" y1="132.00" x2="330.06" y2="780.00" stroke="#20B8B0" stroke-width="1.4" opacity="1.0" stroke-dasharray="4 4"/>
+<text x="330.0" y="120.0" fill="#fb7185" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">1.00×</text>
+<text x="330.1" y="120.0" fill="#20B8B0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">1.10×</text>
+<text x="314.0" y="157.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">sequence.stats · python</text>
+<rect x="330.02" y="150.00" width="0.02" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="330.01" y1="158.00" x2="330.03" y2="158.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="330.01" y1="153.00" x2="330.01" y2="163.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="330.03" y1="153.00" x2="330.03" y2="163.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="326.03" y="152.00" width="8.00" height="13.00" rx="2" fill="#fb7185" opacity="1.0"/>
+<text x="340.0" y="163.0" fill="#fb7185" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">1.02× [0.99, 1.04] within-noise</text>
+<text x="314.0" y="203.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">sequence.stats · r</text>
+<rect x="330.02" y="196.00" width="0.05" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="330.46" y1="204.00" x2="330.49" y2="204.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="330.46" y1="199.00" x2="330.46" y2="209.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="330.49" y1="199.00" x2="330.49" y2="209.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="326.49" y="198.00" width="8.00" height="13.00" rx="2" fill="#34d399" opacity="1.0"/>
+<text x="340.5" y="209.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">2.24× [2.16, 2.26] material</text>
+<text x="314.0" y="249.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">enrichment.overrepresentation · python</text>
+<rect x="330.02" y="242.00" width="0.01" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="332.46" y1="250.00" x2="332.52" y2="250.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="332.46" y1="245.00" x2="332.46" y2="255.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="332.52" y1="245.00" x2="332.52" y2="255.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="328.52" y="244.00" width="8.00" height="13.00" rx="2" fill="#60a5fa" opacity="1.0"/>
+<text x="342.5" y="255.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">7.67× [7.50, 7.67] material</text>
+<text x="314.0" y="295.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">variant.stats · python</text>
+<rect x="330.02" y="288.00" width="0.01" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="333.21" y1="296.00" x2="333.26" y2="296.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="333.21" y1="291.00" x2="333.21" y2="301.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="333.26" y1="291.00" x2="333.26" y2="301.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="329.21" y="290.00" width="8.00" height="13.00" rx="2" fill="#60a5fa" opacity="1.0"/>
+<text x="343.3" y="301.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">9.50× [9.50, 9.62] material</text>
+<text x="314.0" y="341.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">set.venn · python</text>
+<rect x="330.02" y="334.00" width="0.02" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="336.41" y1="342.00" x2="336.78" y2="342.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="336.41" y1="337.00" x2="336.41" y2="347.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="336.78" y1="337.00" x2="336.78" y2="347.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="332.41" y="336.00" width="8.00" height="13.00" rx="2" fill="#60a5fa" opacity="1.0"/>
+<text x="346.8" y="347.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">18.00× [18.00, 19.00] material</text>
+<text x="314.0" y="387.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">structure.pdb.summary · python</text>
+<rect x="330.02" y="380.00" width="0.16" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="338.34" y1="388.00" x2="340.66" y2="388.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="338.34" y1="383.00" x2="338.34" y2="393.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="340.66" y1="383.00" x2="340.66" y2="393.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="335.54" y="382.00" width="8.00" height="13.00" rx="2" fill="#60a5fa" opacity="1.0"/>
+<text x="350.7" y="393.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">26.33× [23.14, 29.33] material</text>
+<text x="314.0" y="433.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">fastq.qc · python</text>
+<rect x="330.02" y="426.00" width="0.04" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="341.09" y1="434.00" x2="341.66" y2="434.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="341.09" y1="429.00" x2="341.09" y2="439.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="341.66" y1="429.00" x2="341.66" y2="439.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="337.45" y="428.00" width="8.00" height="13.00" rx="2" fill="#60a5fa" opacity="1.0"/>
+<text x="351.7" y="439.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">31.41× [30.47, 31.97] material</text>
+<text x="314.0" y="479.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">expression.pca · r</text>
+<rect x="330.02" y="472.00" width="0.21" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="371.20" y1="480.00" x2="381.96" y2="480.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="371.20" y1="475.00" x2="371.20" y2="485.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="381.96" y1="475.00" x2="381.96" y2="485.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="377.49" y="474.00" width="8.00" height="13.00" rx="2" fill="#34d399" opacity="1.0"/>
+<text x="392.0" y="485.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">138.00× [110.60, 139.25] material</text>
+<text x="314.0" y="525.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">enrichment.overrepresentation · r</text>
+<rect x="330.02" y="518.00" width="0.04" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="385.50" y1="526.00" x2="389.51" y2="526.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="385.50" y1="521.00" x2="385.50" y2="531.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="389.51" y1="521.00" x2="389.51" y2="531.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="381.62" y="520.00" width="8.00" height="13.00" rx="2" fill="#34d399" opacity="1.0"/>
+<text x="399.5" y="531.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">149.00× [148.67, 159.33] material</text>
+<text x="314.0" y="571.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">variant.stats · r</text>
+<rect x="330.02" y="564.00" width="0.02" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="391.31" y1="572.00" x2="394.85" y2="572.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="391.31" y1="567.00" x2="391.31" y2="577.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="394.85" y1="567.00" x2="394.85" y2="577.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="389.02" y="566.00" width="8.00" height="13.00" rx="2" fill="#34d399" opacity="1.0"/>
+<text x="404.9" y="577.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">168.69× [164.12, 173.56] material</text>
+<text x="314.0" y="617.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">expression.pca · python</text>
+<rect x="330.02" y="610.00" width="0.19" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="390.06" y1="618.00" x2="410.42" y2="618.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="390.06" y1="613.00" x2="390.06" y2="623.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="410.42" y1="613.00" x2="410.42" y2="623.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="400.97" y="612.00" width="8.00" height="13.00" rx="2" fill="#60a5fa" opacity="1.0"/>
+<text x="420.4" y="623.0" fill="#60a5fa" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">200.50× [160.80, 215.00] material</text>
+<text x="314.0" y="663.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">fastq.qc · r</text>
+<rect x="330.02" y="656.00" width="0.04" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="492.11" y1="664.00" x2="499.49" y2="664.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="492.11" y1="659.00" x2="492.11" y2="669.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="499.49" y1="659.00" x2="499.49" y2="669.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="493.79" y="658.00" width="8.00" height="13.00" rx="2" fill="#34d399" opacity="1.0"/>
+<text x="509.5" y="669.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">447.55× [432.44, 452.08] material</text>
+<text x="314.0" y="709.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">structure.pdb.summary · r</text>
+<rect x="330.02" y="702.00" width="0.11" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="552.44" y1="710.00" x2="589.88" y2="710.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="552.44" y1="705.00" x2="552.44" y2="715.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="589.88" y1="705.00" x2="589.88" y2="715.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="585.51" y="704.00" width="8.00" height="13.00" rx="2" fill="#34d399" opacity="1.0"/>
+<text x="599.9" y="715.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="start">691.67× [593.00, 692.67] material</text>
+<text x="314.0" y="755.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="400" text-anchor="end">set.venn · r</text>
+<rect x="330.02" y="748.00" width="0.01" height="16.00" rx="2.0" fill="#fb7185" opacity="0.14"/>
+<line x1="738.22" y1="756.00" x2="751.56" y2="756.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="738.22" y1="751.00" x2="738.22" y2="761.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<line x1="751.56" y1="751.00" x2="751.56" y2="761.00" stroke="#94a3b8" stroke-width="2" opacity="1.0"/>
+<rect x="737.98" y="750.00" width="8.00" height="13.00" rx="2" fill="#34d399" opacity="1.0"/>
+<text x="728.2" y="761.0" fill="#34d399" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="13" font-weight="600" text-anchor="end">1097.50× [1087.50, 1123.00] material</text>
+<text x="24" y="906" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="11.5">每条 = 一个后端相对 Rust 的比值中位数与其 95% 区间（10,000 次重采样，种子 20261011）。判定只看区间：区间完全 ≥ 1.10 记为 material；区间跨过 1.00 记为</text>
+<text x="24" y="921" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="11.5">within-noise（测不出可分辨差异）。阴影带为 ±2×(两端 CV 之和)，仅作参考，不参与判定。 图中数字为 10 次计时重复的原始中位数，仅作呈现：无平滑、无坐标轴</text>
+<text x="24" y="936" fill="#94a3b8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="11.5">截断、无任何统计变换</text>
 </svg>

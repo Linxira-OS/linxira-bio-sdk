@@ -101,7 +101,7 @@ class Strings:
     def _zh(self) -> None:
         self._common(
             "↓ 越低越好", "↑ 越高越好（对 Rust 而言）",
-            "墙钟时间（毫秒，对数刻度）", "峰值内存（MB，对数刻度）", "相对 Rust 的倍数（对数刻度）",
+            "墙钟时间（毫秒，线性刻度）", "峰值内存（MB，线性刻度）", "相对 Rust 的倍数（线性刻度）",
             "图中数字为 10 次计时重复的原始中位数，仅作呈现：无平滑、无坐标轴截断、无任何统计变换",
             "ms", "MB")
         self.backend = "后端"
@@ -131,7 +131,7 @@ class Strings:
     def _en(self) -> None:
         self._common(
             "↓ lower is better", "↑ higher is better for Rust",
-            "wall time (ms, log scale)", "peak RSS (MB, log scale)", "ratio vs rust (log scale)",
+            "wall time (ms, linear scale)", "peak RSS (MB, linear scale)", "ratio vs rust (linear scale)",
             "Every number is the raw median of the 10 timed repeats — presentation only: no smoothing, no axis truncation, no statistical transformation",
             "ms", "MB")
         self.backend = "backend"
@@ -260,14 +260,16 @@ class Canvas:
         )
 
     def circle(self, x: float, y: float, r: float, fill: str, *, opacity: float = 1.0) -> None:
-        self.parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r:.1f}" fill="{fill}" '
+        # Two decimals: the figure checker converts positions back to values, and
+        # 0.1 px quantisation was visible on rows with large scales.
+        self.parts.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{r:.2f}" fill="{fill}" '
                           f'opacity="{opacity}"/>')
 
     def line(self, x1: float, y1: float, x2: float, y2: float, stroke: str,
              *, width: float = 1.0, dash: str | None = None, opacity: float = 1.0) -> None:
         dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
         self.parts.append(
-            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'<line x1="{x1:.2f}" y1="{y1:.2f}" x2="{x2:.2f}" y2="{y2:.2f}" '
             f'stroke="{stroke}" stroke-width="{width}" opacity="{opacity}"{dash_attr}/>'
         )
 
@@ -284,11 +286,52 @@ class Canvas:
         path.write_text("\n".join(self.parts) + "\n", encoding="utf-8")
 
 
-def log_scale(value: float, low: float, high: float, start: float, end: float) -> float:
-    if value <= 0:
-        value = low
-    span = math.log10(high) - math.log10(low)
-    return start + (math.log10(value) - math.log10(low)) / span * (end - start)
+def lin_scale(value: float, low: float, high: float, start: float, end: float) -> float:
+    """Uniform (linear) mapping of value onto [start, end].
+
+    Review feedback: log axes make every grid cell a factor of ten (1 -> 10 ->
+    100), which reads as an uneven stretch. Every figure now uses a linear axis
+    over a range truncated to the data it shows; the range is stated on the axis.
+    """
+    if high <= low:
+        return start
+    return start + (value - low) / (high - low) * (end - start)
+
+
+def nice_step(span: float, target_ticks: int = 6) -> float:
+    if span <= 0:
+        return 1.0
+    raw = span / max(target_ticks, 1)
+    magnitude = 10 ** math.floor(math.log10(raw))
+    for factor in (1, 2, 2.5, 5, 10):
+        if magnitude * factor >= raw:
+            return magnitude * factor
+    return magnitude * 10
+
+
+def ticks_for(low: float, high: float, target_ticks: int = 6) -> tuple[list[float], float]:
+    step = nice_step(high - low, target_ticks)
+    start = math.ceil(low / step) * step
+    values = []
+    value = start
+    while value <= high + step * 1e-6:
+        values.append(value)
+        value += step
+    return values, step
+
+
+def legend_row(canvas: Canvas, y: float, entries: list[tuple[str, str]], *, x: float = 24,
+               gap: int = 118) -> None:
+    """One legend line under the title.
+
+    The previous legend was positioned relative to the plot's right edge; when
+    that edge moved, the blue and green entries fell outside the canvas and only
+    "rust" survived. The legend now has its own row and cannot be clipped.
+    """
+    for offset, (label, colour) in enumerate(entries):
+        cursor = x + offset * gap
+        canvas.rect(cursor, y - 10, 11, 11, colour, radius=2)
+        canvas.text(cursor + 17, y, label, size=LEGEND_SIZE, fill=colour)
 
 
 def bootstrap_median_ci(values: list[float], rounds: int = BOOTSTRAP_ROUNDS,
@@ -345,24 +388,13 @@ def median_of(values: list[float]) -> float:
 
 
 def format_number(value: float) -> str:
-    """Group thousands so large values stay readable (49,320 ms)."""
     if value >= 1000:
         return f"{value:,.0f}"
     if value >= 10:
         return f"{value:.0f}"
+    if value >= 1:
+        return f"{value:.2f}".rstrip("0").rstrip(".")
     return f"{value:g}"
-
-
-def axis_ticks(canvas: Canvas, low: float, high: float, left: float, right: float,
-               axis_label: str) -> None:
-    for decade in range(-2, int(math.log10(high)) + 3):
-        value = 10 ** decade
-        if value < low or value > high:
-            continue
-        x = log_scale(value, low, high, left, right)
-        canvas.line(x, 70, x, canvas.height - 74, GRID)
-        canvas.text(x, 62, format_number(value), size=AXIS_SIZE, fill=MUTED, anchor="middle")
-    canvas.text(left, 44, axis_label, size=AXIS_SIZE, fill=MUTED)
 
 
 def figure_speedup(summary: dict, path: Path) -> None:
@@ -378,78 +410,66 @@ def figure_speedup(summary: dict, path: Path) -> None:
             (backends.get("python") or {}).get("median_wall_ms", 0) / baseline,
             ((backends.get("r") or {}).get("median_wall_ms", 0) / baseline) if backends.get("r") else None,
         ))
+    if not rows:
+        return
     rows.sort(key=lambda row: row[1])
-    row_height = 46
-    canvas = Canvas(940, 150 + row_height * len(rows) + CAPTION_SPACE, s.speedup_title,
+    row_height = 50
+    canvas = Canvas(940, 190 + row_height * len(rows) + CAPTION_SPACE, s.speedup_title,
                     f"{s.speedup_caption} {s.raw_note}", s.higher_better)
-    left, right = 260, 820
-    high = max([row[2] or row[1] for row in rows] or [2]) * 1.25
-    low = 1.0
-    for decade in range(0, int(math.log10(high)) + 1):
-        value = 10 ** decade
-        if value < low:
-            continue
-        x = log_scale(value, low, high, left, right)
-        canvas.line(x, 74, x, 74 + row_height * len(rows), GRID)
-        canvas.text(x, 66, f"{value:g}×", size=AXIS_SIZE, fill=MUTED, anchor="middle")
-    canvas.line(left, 74, left, 74 + row_height * len(rows), MUTED, width=1.5)
-    for offset, (backend, colour) in enumerate((("python", PYTHON), ("r", R_LANG))):
-        x = right + 14 + offset * 120
-        canvas.rect(x, 92, 11, 11, colour, radius=2)
-        canvas.text(x + 17, 102, backend, size=LEGEND_SIZE, fill=colour)
+    legend_row(canvas, 96, [("python", PYTHON), ("r", R_LANG)])
+    left, right = 300, 770
+    low = 1.0                      # ratios are relative to rust: truncated floor is 1x
+    high = max([row[2] or row[1] for row in rows] or [2]) * 1.06
+    ticks, _step = ticks_for(low, high, 6)
+    for value in ticks:
+        x = lin_scale(value, low, high, left, right)
+        canvas.line(x, 116, x, 116 + row_height * len(rows), GRID)
+        canvas.text(x, 108, f"{format_number(value)}×", size=AXIS_SIZE, fill=MUTED, anchor="middle")
+    canvas.text(left, 108, "", size=AXIS_SIZE)
+    canvas.text(24, 78, f"{s.ratio_axis}，显示范围 {format_number(low)}–{format_number(high)}×"
+                if s.lang == "zh" else f"{s.ratio_axis}, range shown {format_number(low)}–{format_number(high)}×",
+                size=AXIS_SIZE, fill=MUTED)
     for index, (name, python_ratio, r_ratio) in enumerate(rows):
-        y = 74 + index * row_height
-        canvas.text(left - 14, y + 30, name, size=14, fill=INK, anchor="end")
+        y = 116 + index * row_height
+        canvas.text(left - 16, y + 32, name, size=14, fill=INK, anchor="end")
         for offset, (ratio, colour) in enumerate(((python_ratio, PYTHON), (r_ratio, R_LANG))):
             if ratio is None:
                 continue
-            x = log_scale(ratio, low, high, left, right)
-            canvas.rect(left, y + 6 + offset * 17, x - left, 13, colour)
-            canvas.text(x + 8, y + 17 + offset * 17, f"{ratio:.2f}×", size=VALUE_SIZE,
+            x = lin_scale(ratio, low, high, left, right)
+            canvas.rect(left, y + offset * 18 + 4, x - left, 14, colour, radius=2)
+            canvas.text(x + 8, y + offset * 18 + 16, f"{ratio:.2f}×", size=VALUE_SIZE,
                         fill=colour, weight="600")
     canvas.save(path)
 
 
-def figure_medians(summary: dict, reports: Path, path: Path) -> None:
-    """Bars grow from the axis floor; the value sits at the bar's end."""
+def figure_medians(summary: dict, path: Path) -> None:
+    """Per-capability rows on a truncated linear scale (was: log axis)."""
     s = STRINGS
     entries = [e for e in summary["entries"] if e["backends"].get("rust")]
-    values = []
-    for entry in entries:
-        for backend in ("rust", "python", "r"):
-            value = (entry["backends"].get(backend) or {}).get("median_wall_ms")
-            if value:
-                values.append(value)
-    if not values:
+    if not entries:
         return
-    low, high = max(min(values) / 2, 0.5), max(values) * 2
-    group = 52
-    left, right = 260, 850
-    canvas = Canvas(940, 160 + group * len(entries) + CAPTION_SPACE, s.medians_title,
+    group = 58
+    left, right = 300, 760
+    legend = 96
+    canvas = Canvas(940, 200 + group * len(entries) + CAPTION_SPACE, s.medians_title,
                     f"{s.medians_caption_prefix} {s.raw_note}", s.lower_better)
-    for decade in range(-2, int(math.log10(high)) + 3):
-        value = 10 ** decade
-        if value < low or value > high:
-            continue
-        x = log_scale(value, low, high, left, right)
-        canvas.line(x, 74, x, 74 + group * len(entries), GRID)
-        canvas.text(x, 66, format_number(value), size=AXIS_SIZE, fill=MUTED, anchor="middle")
-    canvas.text(left, 46, f"{s.ms_axis}", size=AXIS_SIZE, fill=MUTED)
-    for offset, (backend, colour) in enumerate((("rust", RUST), ("python", PYTHON), ("r", R_LANG))):
-        x = right + 14 + offset * 100
-        canvas.rect(x, 40, 11, 11, colour, radius=2)
-        canvas.text(x + 17, 50, backend, size=LEGEND_SIZE, fill=colour)
+    legend_row(canvas, legend, [("rust", RUST), ("python", PYTHON), ("r", R_LANG)])
     for index, entry in enumerate(entries):
-        y = 74 + index * group
-        canvas.text(left - 14, y + 34, entry["capability"].replace(".v1", ""), size=14,
+        y = legend + 46 + index * group
+        canvas.text(left - 16, y + 34, entry["capability"].replace(".v1", ""), size=14,
                     fill=INK, anchor="end")
+        row_values = [(entry["backends"].get(b) or {}).get("median_wall_ms") or 0
+                      for b in ("rust", "python", "r")]
+        row_max = max(row_values) * 1.08
+        canvas.text(right + 10, y + 34, f"0 – {format_number(row_max)} {s.unit_ms}",
+                    size=AXIS_SIZE, fill=MUTED)
         for offset, (backend, colour) in enumerate((("rust", RUST), ("python", PYTHON), ("r", R_LANG))):
             value = (entry["backends"].get(backend) or {}).get("median_wall_ms")
             if not value:
                 continue
-            x = log_scale(value, low, high, left, right)
-            canvas.rect(left, y + offset * 15 + 4, x - left, 12, colour)
-            canvas.text(x + 8, y + offset * 15 + 14, f"{format_number(value)} {s.unit_ms}",
+            x = lin_scale(value, 0.0, row_max, left, right)
+            canvas.rect(left, y + offset * 16 + 4, x - left, 14, colour, radius=2)
+            canvas.text(x + 8, y + offset * 16 + 16, f"{format_number(value)} {s.unit_ms}",
                         size=VALUE_SIZE, fill=colour, weight="600")
     canvas.save(path)
 
@@ -461,34 +481,30 @@ def figure_memory(summary: dict, path: Path) -> None:
               if (v := (entry["backends"].get(backend) or {}).get("median_peak_rss_mb"))]
     if not values:
         return
-    low, high = max(min(values) / 2, 0.5), max(values) * 2
-    group = 52
-    left, right = 260, 840
-    canvas = Canvas(940, 160 + group * len(entries) + CAPTION_SPACE, s.memory_title,
+    group = 58
+    left, right = 300, 780
+    legend = 96
+    low, high = 0.0, max(values) * 1.08
+    canvas = Canvas(940, 200 + group * len(entries) + CAPTION_SPACE, s.memory_title,
                     f"{s.memory_caption_prefix} {s.raw_note}", s.lower_better)
-    for decade in range(-2, int(math.log10(high)) + 3):
-        value = 10 ** decade
-        if value < low or value > high:
-            continue
-        x = log_scale(value, low, high, left, right)
-        canvas.line(x, 74, x, 74 + group * len(entries), GRID)
-        canvas.text(x, 66, format_number(value), size=AXIS_SIZE, fill=MUTED, anchor="middle")
-    canvas.text(left, 46, s.mb_axis, size=AXIS_SIZE, fill=MUTED)
-    for offset, (backend, colour) in enumerate((("rust", RUST), ("python", PYTHON), ("r", R_LANG))):
-        x = right + 14 + offset * 100
-        canvas.rect(x, 40, 11, 11, colour, radius=2)
-        canvas.text(x + 17, 50, backend, size=LEGEND_SIZE, fill=colour)
+    legend_row(canvas, legend, [("rust", RUST), ("python", PYTHON), ("r", R_LANG)])
+    ticks, _step = ticks_for(low, high, 6)
+    for value in ticks:
+        x = lin_scale(value, low, high, left, right)
+        canvas.line(x, legend + 46, x, legend + 46 + group * len(entries), GRID)
+        canvas.text(x, legend + 38, format_number(value), size=AXIS_SIZE, fill=MUTED, anchor="middle")
+    canvas.text(24, legend + 38, s.mb_axis, size=AXIS_SIZE, fill=MUTED)
     for index, entry in enumerate(entries):
-        y = 74 + index * group
-        canvas.text(left - 14, y + 34, entry["capability"].replace(".v1", ""), size=14,
+        y = legend + 46 + index * group
+        canvas.text(left - 16, y + 34, entry["capability"].replace(".v1", ""), size=14,
                     fill=INK, anchor="end")
         for offset, (backend, colour) in enumerate((("rust", RUST), ("python", PYTHON), ("r", R_LANG))):
             value = (entry["backends"].get(backend) or {}).get("median_peak_rss_mb")
             if not value:
                 continue
-            x = log_scale(value, low, high, left, right)
-            canvas.rect(left, y + offset * 15 + 4, x - left, 12, colour)
-            canvas.text(x + 8, y + offset * 15 + 14, f"{value:.1f} {s.unit_mb}",
+            x = lin_scale(value, low, high, left, right)
+            canvas.rect(left, y + offset * 16 + 4, x - left, 14, colour, radius=2)
+            canvas.text(x + 8, y + offset * 16 + 16, f"{value:.1f} {s.unit_mb}",
                         size=VALUE_SIZE, fill=colour, weight="600")
     canvas.save(path)
 
@@ -506,45 +522,43 @@ def figure_ratio_ci(summary: dict, reports: Path, path: Path) -> None:
         for backend in ("python", "r"):
             if backend not in times:
                 continue
-            ratio, low, high = ratio_ci(times["rust"], times[backend])
+            ratio, low_ci, high_ci = ratio_ci(times["rust"], times[backend])
             noise = 2 * (coefficient_of_variation(times["rust"]) + coefficient_of_variation(times[backend]))
-            rows.append((f"{entry['capability'].replace('.v1', '')} · {backend}", ratio, low, high, noise))
+            rows.append((f"{entry['capability'].replace('.v1', '')} · {backend}", ratio, low_ci, high_ci, noise))
     if not rows:
         return
     rows.sort(key=lambda row: row[1])
-    row_height = 44
-    canvas = Canvas(940, 160 + row_height * len(rows) + CAPTION_SPACE, s.ratio_title,
+    row_height = 46
+    legend = 96
+    canvas = Canvas(940, 210 + row_height * len(rows) + CAPTION_SPACE, s.ratio_title,
                     f"{s.ratio_caption} {s.raw_note}", s.higher_better)
-    left, right = 310, 780
-    ratios = [row[1] for row in rows] + [row[3] for row in rows]
-    low = min(0.9, min(ratios) * 0.9)
-    high = max(ratios) * 1.35
-    for decade in range(-2, int(math.log10(high)) + 3):
-        value = 10 ** decade
-        if value < low or value > high:
-            continue
-        # 1.00 and 1.10 already carry their own line labels; drawing tick labels
-        # there too produced three overlapping numbers in the corner.
-        if 1.0 <= value < 1.2:
-            continue
-        x = log_scale(value, low, high, left, right)
-        canvas.line(x, 90, x, 90 + row_height * len(rows), GRID)
-        canvas.text(x, 82, f"{value:g}×", size=AXIS_SIZE, fill=MUTED, anchor="middle")
-    canvas.text(left, 46, s.ratio_axis, size=AXIS_SIZE, fill=MUTED)
-    one = log_scale(1.0, low, high, left, right)
-    floor = log_scale(MATERIAL_RATIO, low, high, left, right)
-    canvas.line(one, 90, one, 90 + row_height * len(rows), WARN, width=1.6, dash="6 4")
-    canvas.text(one, 76, "1.00×", size=AXIS_SIZE, fill=WARN, anchor="middle")
-    canvas.line(floor, 90, floor, 90 + row_height * len(rows), ACCENT, width=1.4, dash="4 4")
-    canvas.text(floor, 76, f"{MATERIAL_RATIO:.2f}×", size=AXIS_SIZE, fill=ACCENT, anchor="middle")
+    left, right = 330, 760
+    low = min(1.0, min(row[2] for row in rows))
+    low = math.floor(low * 20) / 20          # truncated floor, stated on the axis
+    high = max(row[3] for row in rows) * 1.02
+    ticks, _step = ticks_for(low, high, 6)
+    for value in ticks:
+        x = lin_scale(value, low, high, left, right)
+        canvas.line(x, legend + 40, x, legend + 40 + row_height * len(rows), GRID)
+        canvas.text(x, legend + 32, f"{format_number(value)}×", size=AXIS_SIZE, fill=MUTED,
+                    anchor="middle")
+    canvas.text(24, legend + 32, f"{s.ratio_axis}，显示范围 {format_number(low)}–{format_number(high)}×"
+                if s.lang == "zh" else f"{s.ratio_axis}, range shown {format_number(low)}–{format_number(high)}×",
+                size=AXIS_SIZE, fill=MUTED)
+    one = lin_scale(1.0, low, high, left, right)
+    floor = lin_scale(MATERIAL_RATIO, low, high, left, right)
+    canvas.line(one, legend + 36, one, legend + 40 + row_height * len(rows), WARN, width=1.6, dash="6 4")
+    canvas.line(floor, legend + 36, floor, legend + 40 + row_height * len(rows), ACCENT, width=1.4, dash="4 4")
+    canvas.text(one, legend + 24, "1.00×", size=AXIS_SIZE, fill=WARN, anchor="middle")
+    canvas.text(floor, legend + 24, f"{MATERIAL_RATIO:.2f}×", size=AXIS_SIZE, fill=ACCENT, anchor="middle")
     for index, (label, ratio, low_ci, high_ci, noise) in enumerate(rows):
-        y = 90 + index * row_height + 16
+        y = legend + 40 + index * row_height + 16
         canvas.text(left - 16, y + 5, label, size=13, fill=INK, anchor="end")
-        x_low = log_scale(low_ci, low, high, left, right)
-        x_high = log_scale(high_ci, low, high, left, right)
-        x_mid = log_scale(ratio, low, high, left, right)
-        canvas.rect(one, y - 1, max(log_scale(min(1 + noise, high), low, high, left, right) - one, 0), 14,
-                    WARN, opacity=0.14)
+        x_low = lin_scale(low_ci, low, high, left, right)
+        x_high = lin_scale(high_ci, low, high, left, right)
+        x_mid = lin_scale(ratio, low, high, left, right)
+        band_end = lin_scale(min(1 + noise, high), low, high, left, right)
+        canvas.rect(one, y - 2, max(band_end - one, 0), 16, WARN, opacity=0.14)
         canvas.line(x_low, y + 6, x_high, y + 6, MUTED, width=2)
         canvas.line(x_low, y + 1, x_low, y + 11, MUTED, width=2)
         canvas.line(x_high, y + 1, x_high, y + 11, MUTED, width=2)
@@ -555,7 +569,7 @@ def figure_ratio_ci(summary: dict, reports: Path, path: Path) -> None:
             verdict, marker = "material", colour
         else:
             verdict, marker = "detectable-immaterial", ACCENT
-        canvas.rect(x_mid - 4, y, 8, 12, marker)
+        canvas.rect(x_mid - 4, y, 8, 13, marker, radius=2)
         annotation = f"{ratio:.2f}× [{low_ci:.2f}, {high_ci:.2f}] {verdict}"
         if x_high + 10 + 7.0 * len(annotation) > canvas.width - 10:
             canvas.text(x_low - 10, y + 11, annotation, size=VALUE_SIZE, fill=marker,
@@ -631,12 +645,7 @@ def figure_method(path: Path) -> None:
 
 
 def figure_granularity(reports: Path, path: Path) -> None:
-    """Record-shape experiment as grouped bars.
-
-    Lines were unreadable here: on a log axis the three backends sit close
-    together across the three shapes. Grouped bars keep every raw median visible
-    and label it; nothing about the measurement changes.
-    """
+    """Record-shape experiment as grouped bars on a truncated linear axis."""
     s = STRINGS
     zh = s.lang == "zh"
     shapes = [("one", ("1 条记录", "(1 × 100 Mb)") if zh else ("1 record", "(1 × 100 Mb)")),
@@ -658,7 +667,6 @@ def figure_granularity(reports: Path, path: Path) -> None:
     values = [v for vals in series.values() for v in vals if v]
     if not values:
         return
-    # The caption states the measured spread instead of asserting flatness.
     spread = 0.0
     for backend, vals in series.items():
         present = [v for v in vals if v]
@@ -671,41 +679,37 @@ def figure_granularity(reports: Path, path: Path) -> None:
         caption = (f"{s.granularity_caption_prefix} Within each backend the three shapes stay within "
                    f"{spread + 0.5:.0f}% of one another, so boundary crossings are not what separates the "
                    f"backends. {s.raw_note}")
-    low, high = max(min(values) / 2, 1), max(values) * 2.2
-    left, right = 120, 880
-    bottom, top = 300, 96
-    canvas = Canvas(940, 470 + CAPTION_SPACE - 44, s.granularity_title, caption, s.lower_better)
-    for decade in range(-2, int(math.log10(high)) + 3):
-        value = 10 ** decade
-        if value < low or value > high:
-            continue
-        y = bottom - (math.log10(value) - math.log10(low)) / (math.log10(high) - math.log10(low)) * (bottom - top)
+    low, high = 0.0, max(values) * 1.14
+    left, right = 130, 860
+    bottom, top = 330, 150
+    canvas = Canvas(940, 500 + CAPTION_SPACE - 44, s.granularity_title, caption, s.lower_better)
+    legend_row(canvas, 96, [("rust", RUST), ("python", PYTHON), ("r", R_LANG)])
+    ticks, _step = ticks_for(low, high, 6)
+    for value in ticks:
+        y = bottom - lin_scale(value, low, high, 0, bottom - top)
         canvas.line(left, y, right, y, GRID)
-        canvas.text(left - 12, y + 4, f"{format_number(value)} {s.unit_ms}", size=AXIS_SIZE,
-                    fill=MUTED, anchor="end")
+        canvas.text(left - 12, y + 4, format_number(value), size=AXIS_SIZE, fill=MUTED, anchor="end")
+    canvas.text(24, 120, s.ms_axis, size=AXIS_SIZE, fill=MUTED)
     group_width = (right - left) / len(shapes)
-    bar_width = 46
+    bar_width = 52
     for index, (_key, labels) in enumerate(shapes):
         centre = left + group_width * (index + 0.5)
         for offset, (backend, colour) in enumerate((("rust", RUST), ("python", PYTHON), ("r", R_LANG))):
             value = series[backend][index] if index < len(series[backend]) else None
             if not value:
                 continue
-            x = centre - (bar_width * 3 + 16 * 2) / 2 + offset * (bar_width + 16)
-            y = bottom - (math.log10(value) - math.log10(low)) / (math.log10(high) - math.log10(low)) * (bottom - top)
-            canvas.rect(x, y, bar_width, bottom - y, colour)
-            canvas.text(x + bar_width / 2, y - 8, format_number(value), size=VALUE_SIZE,
-                        fill=colour, anchor="middle", weight="600")
+            x = centre - (bar_width * 3 + 18 * 2) / 2 + offset * (bar_width + 18)
+            bar_height = lin_scale(value, low, high, 0, bottom - top)
+            canvas.rect(x, bottom - bar_height, bar_width, bar_height, colour, radius=2)
+            canvas.text(x + bar_width / 2, bottom - bar_height - 9, format_number(value),
+                        size=VALUE_SIZE, fill=colour, anchor="middle", weight="600")
         for line_index, text in enumerate(labels):
-            canvas.text(centre, bottom + 26 + line_index * 17, text, size=13, fill=INK, anchor="middle")
-    for offset, (backend, colour) in enumerate((("rust", RUST), ("python", PYTHON), ("r", R_LANG))):
-        x = left + offset * 120
-        canvas.rect(x, 52, 11, 11, colour, radius=2)
-        canvas.text(x + 17, 62, backend, size=LEGEND_SIZE, fill=colour)
+            canvas.text(centre, bottom + 30 + line_index * 18, text, size=13, fill=INK, anchor="middle")
     canvas.save(path)
 
 
 def figure_stability(reports: Path, summary: dict, path: Path) -> None:
+    """Raw repeats per row, each row on its own truncated linear scale."""
     s = STRINGS
     picks = [e for e in summary["entries"]
              if all(e["backends"].get(b) for b in ("rust", "python", "r"))]
@@ -717,42 +721,34 @@ def figure_stability(reports: Path, summary: dict, path: Path) -> None:
                          runs_by_backend(json.loads(report_file.read_text(encoding="utf-8")))))
     if not rows:
         return
-    row_height = 60
-    canvas = Canvas(940, 170 + row_height * len(rows) + CAPTION_SPACE - 44, s.stability_title,
+    group = 66
+    legend = 96
+    left, right = 300, 800
+    canvas = Canvas(940, 200 + group * len(rows) + CAPTION_SPACE, s.stability_title,
                     f"{s.stability_caption} {s.raw_note}", s.lower_better)
-    left, right = 260, 830
-    for offset, (backend, colour) in enumerate((("rust", RUST), ("python", PYTHON), ("r", R_LANG))):
-        x = right - 300 + offset * 110
-        canvas.rect(x, 40, 11, 11, colour, radius=2)
-        canvas.text(x + 17, 50, backend, size=LEGEND_SIZE, fill=colour)
-    values = [v for _n, times in rows for vals in times.values() for v in vals]
-    low, high = max(min(values) / 1.6, 0.5), max(values) * 1.6
-    for decade in range(-2, int(math.log10(high)) + 3):
-        value = 10 ** decade
-        if value < low or value > high:
-            continue
-        x = log_scale(value, low, high, left, right)
-        canvas.line(x, 74, x, 74 + row_height * len(rows), GRID)
-        canvas.text(x, 66, format_number(value), size=AXIS_SIZE, fill=MUTED, anchor="middle")
-    canvas.text(left, 50, f"{s.ms_axis}", size=AXIS_SIZE, fill=MUTED)
+    legend_row(canvas, legend, [("rust", RUST), ("python", PYTHON), ("r", R_LANG)])
     for index, (name, times) in enumerate(rows):
-        y = 74 + index * row_height
-        canvas.text(left - 14, y + 30, name, size=14, fill=INK, anchor="end")
+        y = legend + 46 + index * group
+        canvas.text(left - 16, y + 34, name, size=14, fill=INK, anchor="end")
+        row_values = [v for vals in times.values() for v in vals]
+        row_max = max(row_values) * 1.08
         for offset, (backend, colour) in enumerate((("rust", RUST), ("python", PYTHON), ("r", R_LANG))):
             values_ = times.get(backend)
             if not values_:
                 continue
             for value in values_:
-                canvas.circle(log_scale(value, low, high, left, right), y + offset * 14 + 12, 4.5,
+                canvas.circle(lin_scale(value, 0.0, row_max, left, right), y + offset * 16 + 12, 5,
                               colour, opacity=0.85)
-            canvas.line(log_scale(median_of(values_), low, high, left, right), y + offset * 14 + 4,
-                        log_scale(median_of(values_), low, high, left, right), y + offset * 14 + 20,
+            canvas.line(lin_scale(median_of(values_), 0.0, row_max, left, right), y + offset * 16 + 4,
+                        lin_scale(median_of(values_), 0.0, row_max, left, right), y + offset * 16 + 20,
                         colour, width=2.5)
+        canvas.text(right + 12, y + 34, f"0 – {format_number(row_max)} {s.unit_ms}",
+                    size=AXIS_SIZE, fill=MUTED)
     canvas.save(path)
 
 
 def figure_series(comparison: dict, summary: dict, path: Path) -> None:
-    """Same capabilities in the September fixture window and here."""
+    """Same capabilities in the September fixture window and here (linear axis)."""
     s = STRINGS
     old = {e["capability"]: e for e in comparison["entries"]}
     rows = []
@@ -773,44 +769,29 @@ def figure_series(comparison: dict, summary: dict, path: Path) -> None:
                          then / old_base, now / current_base))
     if not rows:
         return
-    row_height = 48
-    canvas = Canvas(940, 170 + row_height * len(rows) + CAPTION_SPACE - 44 + 30, s.series_title,
+    row_height = 50
+    legend = 96
+    canvas = Canvas(940, 210 + row_height * len(rows) + CAPTION_SPACE, s.series_title,
                     f"{s.series_caption} {s.raw_note}", s.higher_better)
-    left, right = 300, 820
-    high = max(max(row[1], row[2]) for row in rows) * 1.3
+    legend_row(canvas, legend, [(s.legend_small, RUST), (s.legend_large, ACCENT)], gap=200)
+    left, right = 330, 780
     low = 1.0
-    for decade in range(0, int(math.log10(high)) + 1):
-        value = 10 ** decade
-        x = log_scale(value, low, high, left, right)
-        canvas.line(x, 92, x, 92 + row_height * len(rows), GRID)
-        canvas.text(x, 84, f"{value:g}×", size=AXIS_SIZE, fill=MUTED, anchor="middle")
-    canvas.text(left, 48, s.ratio_axis, size=AXIS_SIZE, fill=MUTED)
-    canvas.rect(right - 300, 40, 11, 11, RUST, radius=2)
-    canvas.text(right - 283, 50, s.legend_small, size=LEGEND_SIZE, fill=RUST)
-    canvas.rect(right - 120, 40, 11, 11, ACCENT, radius=2)
-    canvas.text(right - 103, 50, s.legend_large, size=LEGEND_SIZE, fill=ACCENT)
+    high = max(max(row[1], row[2]) for row in rows) * 1.06
+    ticks, _step = ticks_for(low, high, 6)
+    for value in ticks:
+        x = lin_scale(value, low, high, left, right)
+        canvas.line(x, legend + 40, x, legend + 40 + row_height * len(rows), GRID)
+        canvas.text(x, legend + 32, f"{format_number(value)}×", size=AXIS_SIZE, fill=MUTED, anchor="middle")
     for index, (label, small, large) in enumerate(rows):
-        y = 92 + index * row_height
-        canvas.text(left - 16, y + 30, label, size=13, fill=INK, anchor="end")
-        for offset, (ratio, colour) in enumerate(((small, RUST), (large, ACCENT))):
-            x = log_scale(ratio, low, high, left, right)
-            canvas.rect(left, y + offset * 17 + 4, x - left, 13, colour)
-            token = ("小夹具" if s.lang == "zh" else "small") if offset == 0 else ("大输入" if s.lang == "zh" else "large")
-            canvas.text(x + 8, y + 16 + offset * 17, f"{token} {ratio:.2f}×",
-                        size=VALUE_SIZE, fill=colour, weight="600")
+        y = legend + 40 + index * row_height
+        canvas.text(left - 16, y + 32, label, size=13, fill=INK, anchor="end")
+        for offset, (ratio, colour, token) in enumerate(((small, RUST, "小夹具" if s.lang == "zh" else "small"),
+                                                         (large, ACCENT, "大输入" if s.lang == "zh" else "large"))):
+            x = lin_scale(ratio, low, high, left, right)
+            canvas.rect(left, y + offset * 18 + 4, x - left, 14, colour, radius=2)
+            canvas.text(x + 8, y + offset * 18 + 16, f"{token} {ratio:.2f}×", size=VALUE_SIZE,
+                        fill=colour, weight="600")
     canvas.save(path)
-
-
-FIGURES = {
-    "fig-absolute-medians.svg": None,
-    "fig-memory.svg": None,
-    "fig-ratio-ci.svg": None,
-    "fig-method.svg": None,
-    "fig-granularity.svg": None,
-    "fig-repeat-stability.svg": None,
-    "fig-speedup-layered.svg": None,
-    "fig-series-two-windows.svg": None,
-}
 
 
 def main() -> None:
@@ -832,7 +813,7 @@ def main() -> None:
 
     figure_speedup(summary, output / "fig-speedup-layered.svg")
     figure_method(output / "fig-method.svg")
-    figure_medians(summary, reports, output / "fig-absolute-medians.svg")
+    figure_medians(summary, output / "fig-absolute-medians.svg")
     figure_memory(summary, output / "fig-memory.svg")
     figure_ratio_ci(summary, reports, output / "fig-ratio-ci.svg")
     figure_stability(reports, summary, output / "fig-repeat-stability.svg")

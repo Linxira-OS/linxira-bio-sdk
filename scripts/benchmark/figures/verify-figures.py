@@ -9,16 +9,23 @@
 """Check that the rendered SVGs contain exactly the numbers the tables contain.
 
 A figure is a derived artefact: if the archive is regenerated, the figures are
-regenerated from it, and this script is what proves the two agree. It parses the
-figure text (the SVG carries plain ``<text>`` labels), re-derives each value from
-the archive and the raw reports, and exits non-zero on any mismatch.
+regenerated from it, and this script is what proves the two agree. Three kinds of
+check run here:
+
+1. **labels** — every printed number is re-derived from the archive (medians,
+   memory, ratios, intervals, verdict words);
+2. **geometry** — bar ends and dot positions are converted back through the same
+   linear scale the renderer used, so a bar cannot silently disagree with its own
+   label (stability dots are compared against the raw per-run wall times);
+3. **presentation promises** — each figure must carry the "no smoothing, no axis
+   truncation, no statistical transformation" disclosure, and every caption line
+   must fit inside the canvas (a width-unaware wrapper clipped Chinese captions).
 
 Usage:
     python scripts/benchmark/figures/verify-figures.py \
-        --figures benchmark-results/2026-10-11/blog-mirror/figures \
+        --figures benchmark-results/2026-10-11/blog-mirror/figures/zh \
         --summary benchmark-results/2026-10-11/summary.json \
         --reports benchmark-results/2026-10-11 \
-        --stats benchmark-results/2026-10-11/statistics.tsv \
         [--comparison benchmark-results/2026-09-13/summary.json] \
         [--granularity /path/to/granularity-reports]
 """
@@ -35,7 +42,16 @@ import sys
 import unicodedata
 from pathlib import Path
 
-TOLERANCE = 0.02  # 2% relative — labels are rendered with limited precision
+TOLERANCE = 0.02  # 2% relative — the renderer positions at ~1e-3 px precision
+
+# Geometry shared with render-svgs.py; keep in sync (the checker fails loudly if
+# a bar cannot be matched positionally, which is what a mismatch looks like).
+MEDIANS_RIGHT = 760.0
+MEMORY_RIGHT = 780.0
+STABILITY_RIGHT = 800.0
+BARS_LEFT = 300.0
+ROW_MAX_HEADROOM = 1.08
+MATERIAL_RATIO = 1.10
 
 
 def figures_text(directory: Path, name: str) -> str:
@@ -57,7 +73,8 @@ def runs_by_backend(report: dict) -> dict[str, list[float]]:
     return result
 
 
-def ratio_ci(first: list[float], second: list[float], rounds: int = 10_000, seed: int = 20261011) -> tuple[float, float, float]:
+def ratio_ci(first: list[float], second: list[float], rounds: int = 10_000,
+             seed: int = 20261011) -> tuple[float, float, float]:
     generator = __import__("random").Random(seed)
     ratios = []
     for _ in range(rounds):
@@ -68,14 +85,7 @@ def ratio_ci(first: list[float], second: list[float], rounds: int = 10_000, seed
     return (median_of(second) / median_of(first), ratios[int(0.025 * rounds)], ratios[int(0.975 * rounds)])
 
 
-def classify(low: float, high: float, material: float = 1.10) -> str:
-    if high <= 1.0 or low <= 1.0:
-        return "within-noise"
-    return "material" if low >= material else "detectable-immaterial"
-
-
 def unique_table(rows: list[dict], column: str) -> tuple[dict, set]:
-    """Key a table by (capability, backend) and report any repeated key."""
     table: dict = {}
     duplicates: set = set()
     for row in rows:
@@ -102,6 +112,16 @@ def close(a: float, b: float) -> bool:
     return abs(a - b) <= TOLERANCE * max(abs(a), abs(b), 1e-9)
 
 
+def linear(value: float, low: float, high: float, left: float, right: float) -> float:
+    if high <= low:
+        return left
+    return left + (value - low) / (high - low) * (right - left)
+
+
+def recover(x: float, low: float, high: float, left: float, right: float) -> float:
+    return low + (x - left) / (right - left) * (high - low)
+
+
 def check_value_labels(report: Report, text: str, pattern: str, expected: list[float]) -> None:
     got = sorted(float(match.replace(",", "")) for match in re.findall(pattern, text))
     want = sorted(expected)
@@ -110,30 +130,69 @@ def check_value_labels(report: Report, text: str, pattern: str, expected: list[f
         report.check(close(found, predicted), f"label {found:g} != table {predicted:g}")
 
 
-def check_bars(report: Report, text: str, table: dict, left: float, right: float,
-               order: list[tuple[str, str]], colours: dict[str, str]) -> None:
-    """Bars grow from the axis edge; recover each value from the bar's far end.
-
-    The renderer draws one bar per (capability, backend) in ``order`` with the
-    bar's right edge at the value's log position, so the parsed rectangles are
-    matched positionally and read from ``x + width``.
-    """
-    values = list(table.values())
-    low, high = max(min(values) / 2, 0.5), max(values) * 2
-    span = math.log10(high) - math.log10(low)
-    pattern = (r'<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="12\.00" rx="[\d.]+" '
+def check_row_bars(report: Report, text: str, rows: list[tuple[str, dict[str, float]]],
+                   right: float, unit: str) -> None:
+    """Medians figure: every row is its own truncated linear scale (0..max*1.08)."""
+    pattern = (r'<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="14\.00" rx="[\d.]+" '
                r'fill="(#[0-9a-f]{6})"')
-    parsed = [(float(x), float(width), colour) for x, width, colour in re.findall(pattern, text)]
+    parsed = re.findall(pattern, text)
+    expected_sequence = [(capability, backend, values[backend])
+                         for capability, values in rows for backend in ("rust", "python", "r")
+                         if values.get(backend)]
+    report.check(len(parsed) == len(expected_sequence),
+                 f"{len(parsed)} bars parsed, expected {len(expected_sequence)}")
+    colours = {"#f59e0b": "rust", "#60a5fa": "python", "#34d399": "r"}
+    for (x, width, colour), (capability, backend, value) in zip(parsed, expected_sequence):
+        report.check(colours.get(colour) == backend, f"bar drawn for {capability} in {colour}")
+        row_max = max(v for v in rows[[c for c, _v in rows].index(capability)][1].values()) * ROW_MAX_HEADROOM
+        predicted = recover(float(x) + float(width), 0.0, row_max, BARS_LEFT, right)
+        report.check(close(predicted, value),
+                     f"{capability}/{backend} bar implies {predicted:g} {unit}, table says {value:g}")
+
+
+def check_global_bars(report: Report, text: str, table: dict, order: list[tuple[str, str]],
+                      right: float, headroom: float = ROW_MAX_HEADROOM) -> None:
+    """Memory figure: one shared truncated linear scale (0..max*headroom)."""
+    pattern = (r'<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="14\.00" rx="[\d.]+" '
+               r'fill="(#[0-9a-f]{6})"')
+    parsed = re.findall(pattern, text)
     drawable = [(capability, backend) for capability, backend in order if (capability, backend) in table]
-    report.check(len(parsed) == len(drawable),
-                 f"{len(parsed)} bars parsed, expected {len(drawable)}")
+    report.check(len(parsed) == len(drawable), f"{len(parsed)} bars parsed, expected {len(drawable)}")
+    high = max(table.values()) * headroom
+    colours = {"#f59e0b": "rust", "#60a5fa": "python", "#34d399": "r"}
     for (x, width, colour), (capability, backend) in zip(parsed, drawable):
-        report.check(colours.get(colour) == backend,
-                     f"bar for {capability}/{backend} drawn in {colour}")
-        predicted = 10 ** (math.log10(low) + (x + width - left) / (right - left) * span)
+        report.check(colours.get(colour) == backend, f"bar drawn for {capability}/{backend} in {colour}")
+        predicted = recover(float(x) + float(width), 0.0, high, BARS_LEFT, right)
         expected = table[(capability, backend)]
         report.check(close(predicted, expected),
-                     f"bar for {capability}/{backend} ends at x={x + width:.1f}, implies {predicted:g}, table says {expected:g}")
+                     f"{capability}/{backend} bar implies {predicted:g} MB, table says {expected:g}")
+
+
+def check_stability_dots(report: Report, text: str, rows: list[tuple[str, dict[str, list[float]]]],
+                         right: float) -> None:
+    """Every dot is one timed repeat: recover each raw wall_ms from its position.
+
+    This is the strictest geometry check in the set — 10 dots per backend per
+    capability, compared against the runs recorded in the reports themselves.
+    """
+    parsed = re.findall(r'<circle cx="([\d.]+)" cy="[\d.]+" r="5\.00" fill="(#[0-9a-f]{6})"',
+                        text)
+    colours = {"#f59e0b": "rust", "#60a5fa": "python", "#34d399": "r"}
+    expected_sequence = []
+    for capability, times in rows:
+        # The renderer scales every row so that all plotted dots fit, i.e. by the
+        # largest raw run in that row; the checker must use the same reference.
+        row_max = max(v for values in times.values() for v in values) * ROW_MAX_HEADROOM
+        for backend in ("rust", "python", "r"):
+            for value in times.get(backend, []):
+                expected_sequence.append((capability, backend, value, row_max))
+    report.check(len(parsed) == len(expected_sequence),
+                 f"{len(parsed)} dots parsed, expected {len(expected_sequence)}")
+    for (x, colour), (capability, backend, value, row_max) in zip(parsed, expected_sequence):
+        report.check(colours.get(colour) == backend, f"dot drawn for {capability}/{backend} in {colour}")
+        predicted = recover(float(x), 0.0, row_max, BARS_LEFT, right)
+        report.check(close(predicted, value),
+                     f"{capability}/{backend} dot implies {predicted:g} ms, report says {value:g}")
 
 
 def main() -> None:
@@ -149,18 +208,16 @@ def main() -> None:
     summary = json.loads(arguments.summary.read_text(encoding="utf-8"))
     stats_path = arguments.stats or (arguments.summary.parent / "statistics.tsv")
     rows = list(csv.DictReader(stats_path.open(encoding="utf-8"), delimiter="\t"))
-    walls, duplicate_keys = unique_table(rows, "median_wall_ms")
-    rss_table, _ = unique_table(rows, "median_peak_rss_mb")
+    wall, duplicate_keys = unique_table(rows, "median_wall_ms")
+    rss, _ = unique_table(rows, "median_peak_rss_mb")
     report = Report("values")
     if duplicate_keys:
         report.check(False, "the statistics table repeats a capability/backend key, so figures and "
                             f"checks cannot be matched one-to-one: {sorted(duplicate_keys)}")
-    wall, rss = walls, rss_table
     entries = [entry for entry in summary["entries"] if entry["backends"].get("rust")]
-
-    report = Report("values")
     figures = arguments.figures
 
+    # ---- labels ----------------------------------------------------------
     check_value_labels(report, figures_text(figures, "fig-absolute-medians.svg"),
                        r">([\d,]+) ms<", [wall[(e["capability"], b)]
                                           for e in entries for b in ("rust", "python", "r")
@@ -170,16 +227,30 @@ def main() -> None:
                                            for e in entries for b in ("rust", "python", "r")
                                            if (e["capability"], b) in rss])
 
-    draw_order = [(e["capability"], b) for e in entries for b in ("rust", "python", "r")]
-    check_bars(report, figures_text(figures, "fig-absolute-medians.svg"), wall, 260.0, 850.0,
-               draw_order, {"#f59e0b": "rust", "#60a5fa": "python", "#34d399": "r"})
-    check_bars(report, figures_text(figures, "fig-memory.svg"), rss, 260.0, 840.0,
-               draw_order, {"#f59e0b": "rust", "#60a5fa": "python", "#34d399": "r"})
+    # ---- geometry --------------------------------------------------------
+    median_rows = [(e["capability"],
+                    {b: (e["backends"].get(b) or {}).get("median_wall_ms")
+                     for b in ("rust", "python", "r")
+                     if (e["backends"].get(b) or {}).get("median_wall_ms")})
+                   for e in entries]
+    check_row_bars(report, figures_text(figures, "fig-absolute-medians.svg"), median_rows,
+                   MEDIANS_RIGHT, "ms")
 
-    # Presentation must stay honest: every figure carries the disclosure that its
-    # numbers are the raw medians with no statistical transformation applied, and
-    # every caption line must fit the canvas (a width-unaware wrapper clipped the
-    # Chinese captions in the first review).
+    memory_rows = [e["capability"] for e in entries]
+    check_global_bars(report, figures_text(figures, "fig-memory.svg"), rss,
+                      [(capability, backend) for capability in memory_rows
+                       for backend in ("rust", "python", "r")], MEMORY_RIGHT)
+
+    stability_rows = []
+    for entry in entries:
+        report_file = arguments.reports / entry["report"]
+        if report_file.is_file():
+            stability_rows.append((entry["capability"],
+                                   runs_by_backend(json.loads(report_file.read_text(encoding="utf-8")))))
+    check_stability_dots(report, figures_text(figures, "fig-repeat-stability.svg"),
+                         stability_rows, STABILITY_RIGHT)
+
+    # ---- presentation promises ------------------------------------------
     for name in sorted(p.name for p in figures.glob("*.svg")):
         svg = figures_text(figures, name)
         compact = re.sub(r"\s+", "", re.sub(r"<[^>]+>", "", svg))
@@ -200,39 +271,35 @@ def main() -> None:
                  f"{len(annotations)} CI annotations, expected {2 * len(entries)}")
     for capability in [e["capability"] for e in entries]:
         for backend in ("python", "r"):
-            report_row = next((row for row in rows
-                               if row["capability"] == capability and row["backend"] == backend), None)
-            if report_row is None:
+            row = next((r for r in rows if r["capability"] == capability and r["backend"] == backend), None)
+            if row is None:
                 continue
-            match = [a for a in annotations if close(float(a[0]), float(report_row["ratio_vs_rust"]))]
-            report.check(bool(match), f"no annotation for {capability}/{backend} ratio {report_row['ratio_vs_rust']}")
+            match = [a for a in annotations if close(float(a[0]), float(row["ratio_vs_rust"]))]
+            report.check(bool(match), f"no annotation for {capability}/{backend} ratio {row['ratio_vs_rust']}")
             if match:
                 _, low, high, verdict = match[0]
-                report.check(close(float(low), float(report_row["ratio_ci_low"])),
-                             f"{capability}/{backend} CI low {low} != table {report_row['ratio_ci_low']}")
-                report.check(close(float(high), float(report_row["ratio_ci_high"])),
-                             f"{capability}/{backend} CI high {high} != table {report_row['ratio_ci_high']}")
-                report.check(verdict == report_row["verdict"],
-                             f"{capability}/{backend} verdict {verdict} != table {report_row['verdict']}")
+                report.check(close(float(low), float(row["ratio_ci_low"])),
+                             f"{capability}/{backend} CI low {low} != table {row['ratio_ci_low']}")
+                report.check(close(float(high), float(row["ratio_ci_high"])),
+                             f"{capability}/{backend} CI high {high} != table {row['ratio_ci_high']}")
+                report.check(verdict == row["verdict"],
+                             f"{capability}/{backend} verdict {verdict} != table {row['verdict']}")
 
-    # layered speedup figure: one ratio label per (capability, backend)
+    # layered speedup + series: ratio labels must exist for every plotted pair
     speed_text = figures_text(figures, "fig-speedup-layered.svg")
     for capability in [e["capability"] for e in entries]:
         for backend in ("python", "r"):
-            expected = wall.get((capability, backend))
-            baseline = wall.get((capability, "rust"))
+            expected, baseline = wall.get((capability, backend)), wall.get((capability, "rust"))
             if expected is None or not baseline:
                 continue
             wanted = f"{(expected / baseline):.2f}×"
             report.check(f">{wanted}<" in speed_text, f"{capability}/{backend} label {wanted} missing")
 
-    # two-window series: "small X×" from the earlier archive, "large Y×" from this one
     if arguments.comparison:
         earlier = json.loads(arguments.comparison.read_text(encoding="utf-8"))
         series_text = figures_text(figures, "fig-series-two-windows.svg")
         for entry in earlier["entries"]:
-            earlier_capability = entry["capability"]
-            current = next((e for e in entries if e["capability"] == earlier_capability), None)
+            current = next((e for e in entries if e["capability"] == entry["capability"]), None)
             if current is None:
                 continue
             for backend in ("python", "r"):
@@ -243,16 +310,16 @@ def main() -> None:
                 small = f"{(old['median_wall_ms'] / old_base['median_wall_ms']):.2f}×"
                 large = f"{(new['median_wall_ms'] / new_base['median_wall_ms']):.2f}×"
                 report.check(any(f">{token} {small}<" in series_text for token in ("small", "小夹具")),
-                             f"series label {small} missing ({earlier_capability})")
+                             f"series label {small} missing ({entry['capability']})")
                 report.check(any(f">{token} {large}<" in series_text for token in ("large", "大输入")),
-                             f"series label {large} missing ({earlier_capability})")
+                             f"series label {large} missing ({entry['capability']})")
 
-    # granularity: labels are the medians of the three record shapes
+    # granularity: bar-top labels are the medians of the three record shapes
     if arguments.granularity:
         gran_text = figures_text(figures, "fig-granularity.svg")
         for key, median in granularity_medians(arguments.granularity).items():
-            wanted = f">{median:,.0f}<"
-            report.check(wanted in gran_text, f"granularity label {wanted} missing ({key})")
+            report.check(f">{median:,.0f}<" in gran_text, f"granularity label {median:,.0f} missing ({key})")
+
     for failure in report.failures:
         print(f"FAIL {failure}")
     print(f"{report.name}: {report.checks - len(report.failures)}/{report.checks} figure numbers agree "
