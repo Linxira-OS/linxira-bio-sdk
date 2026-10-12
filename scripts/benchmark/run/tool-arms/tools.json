@@ -34,6 +34,22 @@
         "{input}"
       ],
       "notes": "The R parity arm deliberately hand-writes its power iteration; this arm is the call a user would actually make. Both read the same matrix file, so the difference is the implementation, not the input handling."
+    },
+    "py-sklearn-pca": {
+      "capability": "expression.pca.v1",
+      "dataset_class": "matrix",
+      "tool_name": "scikit-learn PCA",
+      "version_command": [
+        "python3",
+        "-c",
+        "import sklearn; print('scikit-learn', sklearn.__version__)"
+      ],
+      "run_command": [
+        "python3",
+        "{script_dir}/tool-arms/commands/py-sklearn-pca.py",
+        "{input}"
+      ],
+      "notes": "The Python parity arm hand-writes the power iteration with stdlib only; this arm is the import a user would actually make. `python3` must be the interpreter that has scikit-learn installed (the pack venv on the measurement host), which the report's version string makes checkable."
     }
   }
 }
