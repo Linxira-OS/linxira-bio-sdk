@@ -6,6 +6,8 @@ lang: en
 desc: "One low-end x86 machine, one Rust engine, and the idiomatic Biopython and Biostrings implementations measured on the same inputs with 10 timed repeats each — under a pre-registered decision rule with bootstrap confidence intervals: 7 of 8 capabilities show a material gap (1.4×–200× against the Python arm, 2.2×–1382× against the R arm); one is detectable but immaterial."
 ---
 
+# A three-language repeated benchmark of bioinformatics capabilities — Rust vs Python vs R over 8 capabilities at N=10
+
 > Linxira Bio SDK benchmark report · 2026-10-11. A three-backend N=10 repeated measurement of 8 capabilities on one low-end x86 machine: environment, input digests, scripts, tables and figures are all public and can be re-checked item by item. Changes and disclosures are listed in "Versions and disclosures" at the end.
 
 > **Data status**: all eight capabilities were re-run at N=10 in a **window with no
