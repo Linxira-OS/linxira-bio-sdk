@@ -84,6 +84,7 @@ M0 统一输出框架 ──┬──> M1 双后端绘图（依赖 OutputSpec/Pl
 | G GPU 前沿包装（插队特批，2026-10-04） | cellpose pack（gpu 契约首发，AIVC 包装范式模板）→ trajectory.analysis.v1 | 进行中（用户点名插队：AIVC/虚拟细胞面试叙事；首发验证窗口 = vGPU-32GB，见 cloud-rental-plan-round5 W5） |
 | H 工具层收尾 | 报告层一期 → 模拟器二期（群体遗传）→ 参考基因组管理 | 未开始 |
 | I 机制细胞模拟（插队特批，2026-10-04） | simulate.cell.v1（最小全细胞机制模拟：Telegraph 随机基因表达 + Monod 代谢耦合生长 + 种子化分裂；Gillespie 精确算法、xoshiro256、字节级复现；纯 Rust 无 DL 依赖） | **已完成**（2026-10-12 记：`simulate.cell.v1` 在 `capabilities/catalog.json` 为 `available`，schema + CLI + 双语文档 + `skill-pack.json` 登记齐备；Gillespie/xoshiro256 字节级复现） |
+| J M5 多核/IO + benchmark 收口（2026-10-12 用户选定） | BGZF 按规范块并行解压 → 解码后端替换（`zlib-rs`）→ 自研 `std::thread`+`sync_channel` 流水线替代 `thread_io`；纯 gzip **不做**分块并行。benchmark 侧收口：tool arm 余项（seqkit/fastp）、机器谱系锚点余项、求骂配套 | **未开始**（待用户发令；方向与验收见 `docs/proposals/m5-concurrency-direction-review-2026-10-12.md`） |
 
 长期池（H 后按需提级）：AMR 分型套件、16S DADA2、MACS2、Evo2/Borzoi/RFdiffusion pack、
 批次 Tier2 各项、单细胞 M4 大件。
@@ -528,6 +529,27 @@ C4 带宽并行 / C5 重型原生编排 / C6 DL 推理 / C7 仅云**。
   GPU 实现均为必须交付项**——CPU（scalar+SIMD）是传统方法与 f64 audit 档，GPU（wgpu
   通用层 + G3 厂商栈）是强制加速项；**只交 CPU 版不算完成**。哈希等 WGSL 不适配的结构
   （k-mer）其 GPU 化同为必须项，落点为 G3 厂商栈（CUDA/MUSA 有动态内存），不得豁免。
+
+### 9.7 验收重定（2026-10-12，依公开方向调查）
+
+2026-10-12 的四路公开调查（压缩/解压规范与实现、Rust crate 现状、基准方法学、公开套件与数据集）
+推翻了 §9.1 的若干默认栈判断，验收随之重定；完整论证见
+`docs/proposals/m5-concurrency-direction-review-2026-10-12.md`。要点：
+
+- **BGZF 是唯一"构造上可并行"的解压路径**（按规范块边界分块，块内独立解压），且 htslib 的
+  `bgzf_mt` 已证明可行；**纯 gzip 不做分块并行**（格式上无块边界，只能换更快后端 + 可选索引）。
+- **不引入 `libdeflater`**：windows-gnu 上风险最高且不能流式；解码后端替换为 `zlib-rs`（默认纯
+  Rust，MSRV 1.91，满足本仓 `rust-version`）。
+- **自研流水线替代 `thread_io`**（该 crate 已休眠）：`std::thread` + `sync_channel`，线程数与缓冲
+  大小显式给定；若用 rayon，必须固定线程数与确定性归约。
+- **线程曲线**：1/2/4 线程 + 强扩展 efficiency + 分布 + 机器块；2C/4T 上 3、4 线程是 SMT 硬线程，
+  必须标注；`RAYON_NUM_THREADS` 固定后再测。
+- **`governor=powersave` 的语义**：请求最低频；绝对值标注为下界，并报实测频率
+  （2026-10-12 实测负载下 3.7 GHz，见 `benchmark-results/2026-10-12/machine-anchor/`）。
+- **判定规则两段式**（沿用 M2）：①CI 排除 1.0 = 可分辨；②CI 下界 ≥ 1.10 = material。
+- **换解码后端本身约有 2–2.3× 收益，优先于引入线程**：先拿这部分，再谈并行。
+- 交付物：`docs/engine-evals/` 条目（中位数取 ≥3 次、GPU 阶段拆分）+ 归档 `report_id` + 双语文章
+  数字同步；预注册点集，避免事后挑选。
 
 ## 10. M6 —— CLI 契约加固 · 安装器与环境变量 · Agent 打通
 
