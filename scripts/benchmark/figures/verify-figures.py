@@ -298,10 +298,35 @@ def check_condition(report: Report, text: str, expected: list[tuple[str, str, fl
         report.check(close(abs(predicted), 1.0), f"decision line implies {predicted:+g}, expected ±1.0")
 
 
+def load_report(path: object) -> dict:
+    target = Path(path)
+    if not target.is_file():
+        return {}
+    return json.loads(target.read_text(encoding="utf-8"))
+
+
+def require_arm_class(report: dict, path: object, expected: str) -> None:
+    """Refuse to plot a report whose arm class is not the one this figure set declares."""
+    arm_class = report.get("arm_class", "parity")
+    if arm_class != expected:
+        raise SystemExit(
+            f"{path} is arm_class={arm_class!r} but this figure set declares "
+            f"--expected-class {expected}: mixing arm classes in one figure is forbidden "
+            "(ROADMAP 7.1)"
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--figures", required=True, type=Path)
     parser.add_argument("--summary", required=True, type=Path)
+    parser.add_argument(
+        "--expected-class",
+        choices=["parity", "tool"],
+        default="parity",
+        help="arm class these figures are allowed to plot; a report of the other class "
+             "would put two arm classes in one figure (ROADMAP 7.1), so it is an error",
+    )
     parser.add_argument("--reports", required=True, type=Path)
     parser.add_argument("--stats", type=Path, help="statistics TSV; defaults to the archive directory")
     parser.add_argument("--comparison", type=Path, help="earlier summary.json for the two-window figure")
@@ -348,6 +373,7 @@ def main() -> None:
     stability_rows = []
     for entry in entries:
         report_file = arguments.reports / entry["report"]
+        require_arm_class(load_report(report_file), report_file, arguments.expected_class)
         if report_file.is_file():
             stability_rows.append((entry["capability"],
                                    runs_by_backend(json.loads(report_file.read_text(encoding="utf-8")))))
@@ -401,6 +427,7 @@ def main() -> None:
     dispersion, dispersion_values = [], []
     for entry in entries:
         report_file = arguments.reports / entry["report"]
+        require_arm_class(load_report(report_file), report_file, arguments.expected_class)
         if not report_file.is_file():
             continue
         times = runs_by_backend(json.loads(report_file.read_text(encoding="utf-8")))

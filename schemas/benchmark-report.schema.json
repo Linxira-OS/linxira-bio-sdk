@@ -181,8 +181,10 @@
       "enum": [
         "consistent",
         "inconsistent",
-        "failed"
-      ]
+        "failed",
+        "not-applicable"
+      ],
+      "description": "Cross-implementation verdict from the structural diff engine; not-applicable for a tool arm, which has no cross-language twin to compare against."
     },
     "findings": {
       "type": "array",
@@ -358,6 +360,71 @@
     "sampled_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "arm_class": {
+      "enum": [
+        "parity",
+        "tool"
+      ],
+      "default": "parity",
+      "description": "Which arm class this report belongs to. parity = the same algorithm written in three languages to isolate the language runtime (default, so every report written before this field existed keeps its meaning). tool = an ecosystem-standard tool (pyfastx, seqkit, fastp, prcomp) measured on the same machine, input and protocol. ROADMAP 7.1 forbids rendering the two classes in one table, so the class travels with the number."
+    },
+    "tool": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "invocation"
+      ],
+      "additionalProperties": false,
+      "description": "Present exactly for tool arms: what was run, which version, and the verbatim argv, so a disagreement can be attributed to the call rather than guessed.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "invocation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "arm_class": {
+            "const": "tool"
+          }
+        },
+        "required": [
+          "arm_class"
+        ]
+      },
+      "then": {
+        "required": [
+          "tool"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "tool"
+        ]
+      },
+      "then": {
+        "properties": {
+          "arm_class": {
+            "const": "tool"
+          }
+        }
+      }
+    }
+  ]
 }

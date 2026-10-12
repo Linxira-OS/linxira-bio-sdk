@@ -1,0 +1,177 @@
+{
+  "schema_version": "1",
+  "capability": "expression.pca.v1",
+  "dataset_class": "matrix",
+  "arm_class": "tool",
+  "tool": {
+    "name": "R prcomp (stats package)",
+    "version": "4.6.1",
+    "invocation": "Rscript --vanilla /home/bhys/linxira-bio-sdk/scripts/benchmark/run/tool-arms/commands/r-prcomp.R /tmp/lxn-tool-arms/matrix.tsv"
+  },
+  "backends": [
+    {
+      "backend": "r-prcomp",
+      "repeats": 10,
+      "median_wall_ms": 150.0,
+      "min_wall_ms": 130.0,
+      "max_wall_ms": 150.0,
+      "iqr_wall_ms": 20.0,
+      "median_peak_rss_mb": 81.931640625,
+      "median_cpu_ms": 145.0,
+      "runs": [
+        {
+          "backend": "r-prcomp",
+          "run_index": 1,
+          "wall_ms": 130.0,
+          "cpu_ms": 130.0,
+          "peak_rss_mb": 82.12109375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 917,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "r-prcomp",
+          "run_index": 2,
+          "wall_ms": 130.0,
+          "cpu_ms": 130.0,
+          "peak_rss_mb": 81.9609375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 919,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "r-prcomp",
+          "run_index": 3,
+          "wall_ms": 130.0,
+          "cpu_ms": 120.00000000000001,
+          "peak_rss_mb": 81.99609375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 919,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "r-prcomp",
+          "run_index": 4,
+          "wall_ms": 150.0,
+          "cpu_ms": 150.0,
+          "peak_rss_mb": 81.73828125,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 918,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "r-prcomp",
+          "run_index": 5,
+          "wall_ms": 150.0,
+          "cpu_ms": 150.0,
+          "peak_rss_mb": 82.01953125,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 918,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "r-prcomp",
+          "run_index": 6,
+          "wall_ms": 150.0,
+          "cpu_ms": 139.99999999999997,
+          "peak_rss_mb": 81.90234375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 918,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "r-prcomp",
+          "run_index": 7,
+          "wall_ms": 150.0,
+          "cpu_ms": 150.0,
+          "peak_rss_mb": 81.83984375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 919,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "r-prcomp",
+          "run_index": 8,
+          "wall_ms": 150.0,
+          "cpu_ms": 150.0,
+          "peak_rss_mb": 81.78515625,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 918,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "r-prcomp",
+          "run_index": 9,
+          "wall_ms": 140.0,
+          "cpu_ms": 130.0,
+          "peak_rss_mb": 81.84375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 917,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "r-prcomp",
+          "run_index": 10,
+          "wall_ms": 150.0,
+          "cpu_ms": 150.0,
+          "peak_rss_mb": 81.99609375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 919,
+          "ok": true,
+          "error_summary": null
+        }
+      ]
+    }
+  ],
+  "speedup": null,
+  "memory_saving": null,
+  "consistency": "not-applicable",
+  "findings": [
+    {
+      "field": "arm_class",
+      "detail": "tool arm: an ecosystem tool measured on the same machine, input and protocol as the parity arms. No cross-implementation comparison is stored in this report (speedup/memory_saving are null) because ROADMAP 7.1 keeps the two arm classes in separate, labelled tables."
+    },
+    {
+      "field": "engine_version",
+      "detail": "names the tool-arm runner, not the analysis engine, for this report"
+    },
+    {
+      "field": "parity_comparison",
+      "detail": "the arm this tool stands in for is `expression.pca.v1`; the parity implementation of that capability is hand-written in each language"
+    }
+  ],
+  "environment": {
+    "os": "linux",
+    "kernel": "7.2.9-1-cachyos",
+    "cpu_model": "Intel(R) Pentium(R) Gold G7400",
+    "total_memory_mb": 15756,
+    "distro": "CachyOS",
+    "engine_version": "tool-arm-runner/1",
+    "python_version": "3.14.7",
+    "r_version": null,
+    "in_container": false,
+    "page_cache": "warm",
+    "precision": "high",
+    "code_revision": "e4355f2d4aabfb3a6e2ad8eb340976f2b8b8e061"
+  },
+  "sampled_at": "2026-10-12T13:43:15.858769Z"
+}

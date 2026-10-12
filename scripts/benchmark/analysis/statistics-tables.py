@@ -110,10 +110,66 @@ def write_tsv(path: Path, header: list[str], rows: list[list[str]]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def report_arm_class(report: dict) -> str:
+    """Arm class of a report; reports written before the field existed are parity arms."""
+    return report.get("arm_class", "parity")
+
+
+def load_parity_report(reports: Path, entry: dict) -> dict:
+    """Load a report for the parity tables, refusing a tool arm.
+
+    ROADMAP 7.1: parity arms (same algorithm, three languages) and tool arms
+    (ecosystem tooling) must never be rendered in one table, because their numbers
+    answer different questions. A tool report reaching this path would silently
+    corrupt the comparison, so it is an error, not a warning.
+    """
+    report = load(reports / entry["report"])
+    arm_class = report_arm_class(report)
+    if arm_class != "parity":
+        raise SystemExit(
+            f"{reports / entry['report']} is arm_class={arm_class!r}; tool arms are never "
+            "rendered in the parity tables (ROADMAP 7.1). Pass their directory to "
+            "--tool-arms to get the labelled tool-arm table instead."
+        )
+    return report
+
+
+def tool_arm_rows(directory: Path) -> list[list[str]]:
+    """Rows for the tool-arm table: one row per tool report, class named in the row."""
+    rows: list[list[str]] = []
+    for path in sorted(directory.glob("*.tool-arm.json")):
+        report = load(path)
+        arm_class = report_arm_class(report)
+        if arm_class != "tool":
+            raise SystemExit(f"{path} is arm_class={arm_class!r}; expected a tool arm")
+        tool = report.get("tool") or {}
+        for backend in report.get("backends", []):
+            values = [run["wall_ms"] for run in backend.get("runs", []) if run.get("ok")]
+            if not values:
+                continue
+            lower, upper = quartiles(values)
+            peak = backend.get("median_peak_rss_mb")
+            rows.append([
+                report["capability"],
+                report["dataset_class"],
+                arm_class,
+                tool.get("name", backend["backend"]),
+                tool.get("version", ""),
+                str(len(values)),
+                f"{median_of(values):.3f}",
+                f"{upper - lower:.3f}",
+                f"{cv_percent(values):.2f}",
+                "" if peak is None else f"{peak:.3f}",
+                report.get("sampled_at", ""),
+                tool.get("invocation", ""),
+            ])
+    return rows
+
+
 def statistics_rows(summary: dict, reports: Path) -> list[list[str]]:
     rows = []
     for entry in summary["entries"]:
-        report = load(reports / entry["report"])
+        report = load_parity_report(reports, entry)
         times = runs_per_backend(report)
         baseline = times.get("rust", [])
         for backend in ("rust", "python", "r"):
@@ -182,7 +238,7 @@ def comparison_rows(summary: dict, reports: Path, earlier: dict,
 def consistency_rows(summary: dict, reports: Path, archive_dir: Path) -> list[list[str]]:
     rows = []
     for entry in summary["entries"]:
-        report = load(reports / entry["report"])
+        report = load_parity_report(reports, entry)
         backends = ",".join(b["backend"] for b in report.get("backends", []) if
                             any(run.get("ok") for run in b.get("runs", [])))
         relative = f"{archive_dir.as_posix().rstrip('/')}/{entry['report']}"
@@ -211,7 +267,7 @@ def trimmed_rows(summary: dict, reports: Path) -> tuple[list[list[str]], list[li
     """
     medians, verdicts = [], []
     for entry in summary["entries"]:
-        report = load(reports / entry["report"])
+        report = load_parity_report(reports, entry)
         times = runs_per_backend(report)
         baseline = times.get("rust", [])
         baseline_variants = {
@@ -317,6 +373,11 @@ def main() -> None:
     parser.add_argument("--reports", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--comparison", help="earlier summary.json for the comparison table")
+    parser.add_argument(
+        "--tool-arms",
+        help="directory of *.tool-arm.json reports; rendered as a separate "
+             "class-labelled table and never merged into the parity tables",
+    )
     arguments = parser.parse_args()
 
     summary = load(Path(arguments.summary))
@@ -368,9 +429,21 @@ def main() -> None:
         markdown_report(summary, rows, trimmed_medians, trimmed_verdicts, consistency),
         encoding="utf-8",
     )
-    print("wrote statistics.tsv, statistics-consistency.tsv, statistics.md, "
-          "statistics-trimmed-medians.tsv, statistics-trimmed-verdicts.tsv"
-          + (", statistics-comparison.tsv" if arguments.comparison else ""))
+    written = ["statistics.tsv", "statistics-consistency.tsv", "statistics.md",
+               "statistics-trimmed-medians.tsv", "statistics-trimmed-verdicts.tsv"]
+    if arguments.comparison:
+        written.append("statistics-comparison.tsv")
+    if arguments.tool_arms:
+        rows = tool_arm_rows(Path(arguments.tool_arms))
+        write_tsv(
+            output / "tool-arms.tsv",
+            ["capability", "dataset_class", "arm_class", "tool", "tool_version", "n",
+             "median_wall_ms", "iqr_wall_ms", "cv_percent", "median_peak_rss_mb",
+             "sampled_at", "invocation"],
+            rows,
+        )
+        written.append(f"tool-arms.tsv ({len(rows)} rows)")
+    print("wrote " + ", ".join(written))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,9 @@
 # Tool arms: how the second arm class gets represented
 
-2026-10-12. Status: proposal, needs a decision on the three points at the end. This
+2026-10-12. **Status: implemented** — option A was chosen, the field vocabulary is
+`arm_class` + `"parity" | "tool"`, and the first two arms are `pyfastx stat` and R
+`prcomp` (see `benchmark-results/2026-10-12/README.md`). The three decisions at the end
+are recorded here as resolved rather than deleted. This
 closes the mechanism gap left by the ROADMAP rule ("parity and tool arms must be labelled
 per row and never mixed") and unblocks the tool-arm round.
 
@@ -111,3 +114,37 @@ arms, which answer the language-runtime question.
    throughput), `fastp` (FASTQ QC/trim), `prcomp` (PCA) — i.e. one per capability family
    where an ecosystem standard exists, and *none* where it does not (we will not invent a
    tool to fill a row).
+
+## Outcome (2026-10-12)
+
+Implemented as option A:
+
+- `schemas/benchmark-report.schema.json`: `arm_class` (`parity` default, so every earlier
+  report keeps its meaning), `tool` (`name`/`version`/`invocation`, required exactly when
+  the class is `tool`, enforced by JSON-Schema conditionals), and `consistency` gained
+  `not-applicable` for arms with no cross-language twin.
+- `scripts/benchmark/run/tool-arms.py` + `scripts/benchmark/run/tool-arms/tools.json`:
+  the producer. It refuses fewer than 10 repeats without `--allow-short`, refuses to run a
+  tool that is not on PATH, records the tool's own version string, and validates its report
+  against the schema before writing it.
+- Enforcement: `statistics-tables.py` refuses a tool report in the parity tables and writes
+  a class-labelled `tool-arms.tsv` instead; `verify-figures.py` takes `--expected-class` and
+  refuses the other class.
+- Tests (`tests/python/test_tool_arms.py`, 9 cases): report is schema-valid and declares the
+  class, short runs refused, an always-failing tool is an error, `stdout` is not smuggled
+  into the report, the class guard fires in both the table and the figure path, and every
+  `{script_dir}` path in the registry exists.
+
+Acceptance criteria, checked:
+
+| Criterion | Result |
+| --- | --- |
+| synthetic tool report validates; a report without `arm_class` still validates | pass |
+| table builder given a tool report exits non-zero naming both, and the figure path too | pass |
+| one real tool arm measured end to end, medians reproducible on a rerun | pass — `pyfastx stat` 30.0 ms, R `prcomp` 150.0 ms |
+| nothing in the published archive or figures changes | pass — all five parity tables are numerically identical after the change |
+
+Two defects were found by running it for real, both now fixed and covered: the GNU `time -v`
+parser split the elapsed line on the first colon (the label contains colons, so the wall time
+came back `None`), and the registry pointed `{script_dir}` one level above the command
+scripts.

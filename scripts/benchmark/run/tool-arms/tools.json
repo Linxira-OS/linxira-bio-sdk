@@ -1,0 +1,39 @@
+{
+  "schema_version": "1",
+  "comment": "Ecosystem-tool arms (the second arm class). Every entry is a tool a user would reach for, listed with the exact argv the runner executes - no shell, no string interpolation beyond {input} and {script_dir}. Reports produced from here carry arm_class=tool and are never rendered in the same table as a parity arm (ROADMAP 7.1). A tool is added only after its argv has been verified against the installed version and recorded here.",
+  "tools": {
+    "pyfastx-stat": {
+      "capability": "sequence.stats.v1",
+      "dataset_class": "sequence",
+      "tool_name": "pyfastx",
+      "version_command": [
+        "pyfastx",
+        "--version"
+      ],
+      "run_command": [
+        "pyfastx",
+        "stat",
+        "{input}"
+      ],
+      "notes": "The CLI subcommand is `stat`, not `stats` (checked against pyfastx 2.3.1 with `pyfastx --help`); it prints per-file statistics to stdout."
+    },
+    "r-prcomp": {
+      "capability": "expression.pca.v1",
+      "dataset_class": "matrix",
+      "tool_name": "R prcomp (stats package)",
+      "version_command": [
+        "Rscript",
+        "--vanilla",
+        "-e",
+        "cat(as.character(getRversion()))"
+      ],
+      "run_command": [
+        "Rscript",
+        "--vanilla",
+        "{script_dir}/tool-arms/commands/r-prcomp.R",
+        "{input}"
+      ],
+      "notes": "The R parity arm deliberately hand-writes its power iteration; this arm is the call a user would actually make. Both read the same matrix file, so the difference is the implementation, not the input handling."
+    }
+  }
+}

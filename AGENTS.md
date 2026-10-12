@@ -194,6 +194,15 @@ benchmark scripts do not belong loose in `scripts/`.
 | `scripts/benchmark/rental/` | cloud-rental provisioning material |
 | `scripts/benchmark/reproduce.sh` | one-command reproduction entry point; `REPRODUCE.md` is the human version |
 | `scripts/benchmark/analysis/verify-lock-env.py` | lock/environment gate |
+| `scripts/benchmark/run/tool-arms.py` | ecosystem-tool arm producer (the second arm class) |
+
+**Two arm classes, mechanically separated.** A report carries `arm_class`: `parity` (the
+default, same algorithm in three languages, isolates the runtime) or `tool` (an ecosystem
+tool such as pyfastx or `prcomp`, produced by `scripts/benchmark/run/tool-arms.py`). The
+table builder refuses to render the two classes in one table and writes `tool-arms.tsv`
+instead; the figure verifier takes `--expected-class` and refuses the other one. A tool arm
+stores no ratio against our own engine (`speedup`/`memory_saving` stay null) because that
+comparison belongs in labelled prose, not in a column.
 
 **Lock policy (enforced, not aspirational).** A window measurement is reproducible only if the
 interpreter environment is the one the pack lock describes: `verify-lock-env.py` compares installed
