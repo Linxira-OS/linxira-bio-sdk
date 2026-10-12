@@ -28,7 +28,7 @@ Arc 130T 的 Xe-LPG+ 带 DPAS 矩阵引擎，SYCL 矩阵负载可吃硬件加速
 | --- | --- | --- |
 | NVIDIA GTX 750 Ti（Maxwell sm_50，2GB） | 待测 | **双路径（2026-09-30 修正）**：wgpu/Vulkan + cudarc/CUDA 12.x（sm_50 仍受支持；Linux R580 驱动分支支持 Maxwell，仅老 Kepler 700 系落 490 legacy）；cutile-rs 不可用（需 CUDA 13.2+/sm_80） |
 | AMD RX 580（Polaris，8GB） | 待测 | wgpu/Vulkan（RADV/AMDVLK 支持良好） |
-| 摩尔线程 S80 / S90（16GB） | 待购/待租 | 原生 `mcc` 工具链 + wgpu/Vulkan 1.3（Rust 侧无官方绑定；原记 `cudarc-musa` 已于 2026-10-12 复核撤销，见 `vendor-rust-status-2026-10-12.md`） |
+| 摩尔线程 S80 / S90（16GB） | 待购/待租 | `cudarc-musa`（官方 fork，Rust 调用层，feature `musa-50200`）+ 内核实测走原生 `mcc`（MUSA C++）+ wgpu/Vulkan 1.3（见 `vendor-rust-status-2026-10-12.md` §1/§6） |
 | 云租 RTX 4090（sm_89） | 待租 | cutile-rs（NVIDIA 官方 Rust，Tile 轨） |
 | 云租 RX 9060/9070 XT | 待租 | ROCm/HIP 官方栈 + wgpu/Vulkan |
 | 云租昇腾 910B | 待租 | 社区 cann-rs |

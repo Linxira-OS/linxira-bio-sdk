@@ -98,7 +98,7 @@ and CI) that exists precisely so newcomers can break things safely:
    template, including how precision tolerances are declared per metric.
 4. **Vendor-stack comparisons** (M5-G3, see
    `docs/proposals/m5-g3-vendor-track-plan.md`) — same kernels through
-   cutile-rs / sycl-rs / native MUSA (mcc, or our own thin FFI) with the fallback-to-wgpu trait layer.
+   cutile-rs / cudarc-musa / sycl-rs with the fallback-to-wgpu trait layer.
 
 Growth path = the milestone ladder itself: M5-G0 → G3. Your lab notebook is
 `docs/engine-evals/` — measurement discipline (median of ≥3, phased timing,
@@ -109,8 +109,8 @@ explicit tolerance) is the skill being taught.
 The vendor Rust stacks are days-to-months old; first reports from real
 workloads get maintainer attention and build visible track record:
 
-- **Native MUSA stack** (Moore Threads; no official Rust binding, re-checked 2026-10-12) — ABI notes
-  and documentation-gap reports from our own thin FFI (see proposal §2.2).
+- **cudarc-musa** (Moore Threads official maintained fork; `musa-50200` = MUSA 5.2 Driver ABI) —
+  first-developer window issues (see proposal §2.2).
 - **cutile-rs** (NVIDIA official) — consumer-GPU sm_89 workload reports.
 - **sycl-rs** (Intel oneapi-rs) — Windows untested upstream; your Windows
   experiment is itself the contribution.

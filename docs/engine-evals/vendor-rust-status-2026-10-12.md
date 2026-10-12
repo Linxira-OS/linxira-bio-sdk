@@ -1,105 +1,132 @@
-# 厂商 Rust/加速器支持状态复核 —— Intel / AMD / NVIDIA / 摩尔线程（2026-10-12）
+# 厂商 Rust 支持状态复核 —— NVIDIA / Intel / AMD / 摩尔线程（2026-10-12）
 
-> 起因：本仓库 `ROADMAP.md` §9.5（2026-09-29 记录）断言「**AMD：官方零 Rust 计算路径**」，
-> 用户质疑该断言。本次按"外部声明必须有可点开出处"的口径重新核实，结论**修正 §9.5 三处**，
-> 并撤回一条无法找到公开出处的声明。核实手段：GitHub 组织/仓库/代码检索（`org:`、`language:`
-> 限定）、各仓库 README 一手文本、crates.io 与 docs.rs 页面。
+> 目的：查清"GPU/NPU 编程里，哪些**真能用 Rust 写**、哪些**必须走 C++**"，并作为本仓库 GPU 轨
+> 选型与对外声明的唯一依据。
+>
+> 起因与自我更正：`ROADMAP.md` §9.5 原记"摩尔线程 2026-09-23 官方发布 `cudarc-musa`"。本台账
+> **第一版把该声明误判为"查不到出处"并撤回**——错的。复核方法本身有盲点（见 §2），实际两个官方
+> fork 都在，本文 §6 恢复原结论并补齐证据；§7 同时记录本仓库自己的真实状态。
 
-## 1. 结论速览
+## 1. 结论矩阵（要的就是这张表）
 
-| 厂商 | 官方 Rust 是否存在 | 能否**编写内核** | 一手出处 |
+三个层次必须分开：**① Rust 能否驱动/调用 GPU**（host 绑定）、**② Rust 能否编写内核**（device 代码）、
+**③ 什么仍必须 C++**。
+
+| 厂商 | ① Rust 调 GPU（host） | ② Rust 写内核（device） | ③ 仍需 C++ 的部分 | 一手出处 |
+| --- | --- | --- | --- | --- |
+| **NVIDIA** | ✅ 官方运行时 crate：`cuda-bindings`、`cuda-core`（含 `cuda-core-derive`）、`cuda-async` | ✅ **官方支持**：`cuda-oxide`（SIMT；自研 rustc codegen 后端 → PTX；固定 nightly）与 `cutile-rs`（Tile DSL；proc-macro；stable Rust 1.89+；JIT → Tile IR → cubin） | 成熟产量路径仍是 CUDA C++；官方自述 "early-stage research project… expect API breakage" | `NVIDIA/cuda-rust`（3694★，2026-10-11 推送）；2026-09-08 官方博客 |
+| **Intel** | ✅ `intel/openvino-rs`（推理，覆盖 CPU/GPU/**NPU**；含 `openvino-genai`）；`oneapi-src/oneapi-rs`（SYCL 运行时）；`intel/ittapi`（插桩） | ❌ **不能**：`sycl-rs` 的内核是**内嵌 C++ SYCL 源码字符串**（官方示例 `IOTA_SRC`，经 `create_kernel_bundle_from_source` 交给 DPC++ 编译） | **内核体**（C++ SYCL，DPC++ 编译）；`sycl-rs` 自述 experimental、**未发布 0.1.0**、仅 Linux + oneAPI 2026.1 测试配置 | `oneapi-src/oneapi-rs`（`sycl/sycl-rs/examples/kernel_launch.rs` + README）；`intel/openvino-rs` |
+| **AMD** | ✅ 但**仅主机/管理**：`ROCm/amdsmi` 自带官方 `rust-interface/` crate；`ROCm` 组织下 5 个 Rust 仓库（`spur` 132★ 调度器、`rocm-cli` Tech Preview、`spur-cloud`、`axis`、`cm`）。**无任何计算/内核绑定** | ❌ 官方无。**第三方可**：`CubeCL`（Rust `#[cube]` 内核 → LLVM → PTX/AMDGPU；HIP 后端）/ `wgpu`+SPIR-V | HIP C++ 内核；官方无 HIP Rust 绑定（社区 `rocm-rs`、`rocmrc`、`cubecl-hip-sys`）；**XDNA NPU 各层均无 Rust**（官方 `amd/xdna-driver` C++/Python） | `org:ROCm language:Rust`（5 库）+ `fork:true` 复核；`tracel-ai/cubecl` |
+| **摩尔线程** | ✅ **官方两个 fork**：`cudarc-musa`（Driver 层，feature **`musa-50200`** = MUSA 5.2 Driver ABI；示例 `musa-driver-vector-add`）；`sppark-musa`（crate `sppark` 的 **`musa`** feature；`MCC`/`MUSA_ARCH=mp_31`；另带 Go 桥） | ❌ 内核仍是 C++/MUSA（`.musa`/`.hpp`，由 `mcc` = clang-14 派生编译） | **内核体**（MUSA C++） | `MooreThreads/cudarc-musa`、`MooreThreads/sppark-musa`（README + `rust/Cargo.toml`） |
+
+**一句话判据**：**"用 Rust 写 GPU 内核"目前只有 NVIDIA 有官方支持**（Rust → PTX / Tile IR → cubin）；
+Intel、AMD、摩尔线程的官方 Rust 都停在 **host 层**，内核体一律是 C++ 家族（SYCL C++ / HIP C++ /
+MUSA C++）。想在 AMD 上写 Rust 内核，当前唯一现实路径是第三方 `CubeCL`（alpha，Burn 在用）或
+`wgpu`/SPIR-V；Intel 侧同理走 Vulkan/SPIR-V。
+
+## 2. 检索方法与**三个盲点**（本台账第一版就栽在这里）
+
+正确做法（缺一不可）：
+
+1. **必须显式包含 fork**：`org:<X> fork:true`。GitHub 仓库搜索**默认排除 fork**，而厂商的适配层
+   常常正是 fork（`cudarc-musa`、`sppark-musa` 都是）。
+2. **不要信 `language: Rust`**：该限定只反映**主语言**。`sppark-musa`（主体 Cuda/C++，Rust 绑定层）
+   不会出现在 `language:Rust` 结果里；`cudarc-musa` 同理。
+3. **org 级代码搜索不可靠**：`org:MooreThreads Cargo.toml` 返回 0 命中，但仓库内确有 `rust/Cargo.toml`。
+   代码搜索不是仓库清单工具——**枚举清单要用 `search_repos`（含 fork），再逐仓库读 README/清单**。
+4. 辅以命名级检索：`org:<X> <keyword>`（如 `musa`、`rust`）、crates.io/docs.rs 页面、各仓库 README
+   逐字引用。
+
+**教训**：一次"查不到"只能说明**检索式不完整**，不能直接推"不存在"；对外声明前若必须下"不存在"的
+结论，至少要做 fork 包含 + 主语言突破 + 清单枚举三重检查，并在台账写明检索式。
+
+## 3. NVIDIA（官方，且唯一能"Rust 写内核"）
+
+`NVIDIA/cuda-rust` 是一个仓库承载三层：
+
+- **运行时（host）**：`cuda-bindings`（driver API 绑定）、`cuda-core`（context/stream/内存/事件/发射）、
+  `cuda-async`（惰性算子、future、图）。
+- **`cuda-oxide`（SIMT）**：自研 rustc codegen 后端 + cargo 辅助工具，AOT 编译 Rust → PTX；需要
+  **固定 nightly**（`cargo oxide` 管理）；能直接控制线程/共享内存/TMA/cluster。
+- **`cutile-rs`（Tile）**：proc-macro 式瓦片 DSL，Rust **stable 1.89+**；首次发射时 JIT（Rust → Tile IR
+  → cubin），由编译器决定瓦片到架构的映射。
+- 两种模型的内核**可互操作**（同一 stream、共享 device buffer）；两者都把 Rust 的所有权规则延伸过
+  launch 边界。
+- 定位：官方自述早期研究项目，允许 breakage；与"成熟 CUDA C++"相比是新轨。
+
+## 4. Intel（host 很完整，内核仍是 C++ SYCL）
+
+| 仓库 | 层 | 状态 |
+| --- | --- | --- |
+| `intel/openvino-rs` | 推理（host）；OpenVINO 本身覆盖 CPU/GPU/**NPU** | Apache-2.0；crate：`openvino`、`openvino-sys`、`openvino-genai`/`-sys`、`openvino-finder`；持续更新 |
+| `oneapi-src/oneapi-rs` | SYCL 运行时（host）+ **内核提交** | `sycl-rs`；示例含 `kernel_launch`（分配→运行时内核编译→提交→回拷）；**内核源为 C++ SYCL 字符串**；自述 experimental、未发布 0.1.0、仅 Linux + oneAPI 2026.1 |
+| `intel/ittapi` | 性能插桩（host） | 官方 ITT/JIT API，主语言 Rust |
+
+**对内核的含义**：Intel 目前**没有**"用 Rust 写内核"的官方路径；Rust 能做的是准备好缓冲区、提交
+一个由 DPC++ 编译的 C++ SYCL 内核。想纯 Rust 内核在 Intel GPU 上跑，只能靠第三方 SPIR-V 路线
+（`wgpu`/`CubeCL`，见 §1）。
+
+## 5. AMD（主机侧真用 Rust；内核侧零官方）
+
+`org:ROCm language:Rust` = 5 个仓库，全部**非**计算绑定：`spur`（Slurm CLI/REST/C FFI 兼容的 AI
+作业调度器，132★）、`rocm-cli`（AMD GPU 本地 AI CLI/TUI，官方自述 Tech Preview）、`spur-cloud`、
+`axis`、`cm`；另 `ROCm/amdsmi` 内含官方 `rust-interface/`（Cargo 包 `amdsmi`，bindgen + 示例）。
+`org:amd fork:true language:Rust` 仅 `amd/tock`（嵌入式 RTOS fork，与 GPU 无关）。
+
+- **无官方内核路径**；HIP 的 Rust 绑定均为社区（`rocm-rs`、`rocmrc`、`cubecl-hip-sys`）。
+- **XDNA NPU**：官方用户态 `amd/xdna-driver` 是 C++（另有 Python 侧工具），无 Rust；第三方
+  `yijunyu/tile-rs`（Rust 内核 → MLIR → 多后端，声称含 Ryzen AI）尚未被我们验证。
+- 所以 AMD 若要用 Rust：host 走 wgpu/Vulkan（可移植层）或社区 HIP 绑定；**想写 Rust 内核走 `CubeCL`**。
+
+## 6. 摩尔线程（**恢复并补充**：确实有官方 Rust 工件）
+
+| 仓库 | 上游 / 版本 | Rust 集成 | 时间 |
 | --- | --- | --- | --- |
-| NVIDIA | 是（官方博客 2026-09-08 双轨） | 是（官方自述早期，未生产可用） | developer.nvidia.com 官方博客 |
-| Intel | 是（三条：推理绑定、SYCL 绑定、插桩绑定） | 是（`sycl-rs` 可提交内核，experimental） | `intel/openvino-rs`、`oneapi-src/oneapi-rs`、`intel/ittapi` |
-| AMD | 是（主机侧：ROCm 组织 5 个 Rust 仓库 + `amdsmi` 官方 Rust crate） | **否**（内核/HIP 绑定仅社区） | `ROCm/spur`、`ROCm/rocm-cli`、`ROCm/amdsmi` |
-| 摩尔线程 | **未能核实** | 未能核实 | 见 §5（撤回声明） |
+| `MooreThreads/cudarc-musa` | fork 自 `cudarc` **v0.19.8**（commit `e1ab1e5`） | feature **`musa-50200`** 选择 MUSA 5.2 Driver ABI，动态链接 MUSA driver 库；`MUSA_HOME`/`MUSA_DRIVER_LIB` 环境变量；示例 `musa-driver-vector-add`（"a small driver example and a **MUSA device kernel**"）；MUSA 路径**仅 driver 层**，CUDA 库包装不静默映射 | 2026-09-23 |
+| `MooreThreads/sppark-musa` | fork 自 `supranational/sppark` **v0.1.15**（baseline `17278d7`） | crate `sppark` 的 features `cuda`/`rocm`/**`musa`**；`MCC`/`MUSA_ARCH`（默认 `mp_31`）；`ff/gl64_t.musa`（Goldilocks 域）；Go 桥 `SPPARK_BACKEND=musa` | 2026-09-24 |
 
-## 2. 检索方法（可复现）
+**性质**：两者都是**厂商维护的 fork**（不是原创独立项目），提供**host 层 Rust 调用**；内核体是
+C++/MUSA 模板，由 `mcc`（clang-14 派生）编译。国产厂商第一个官方 Rust GPU 工件——**原 §9.5 记录
+成立**，措辞应为"官方维护的 fork，Rust 调用层 + MUSA C++ 内核"。
 
-- 组织级：`org:ROCm language:Rust`、`org:amd language:Rust`、`org:intel language:Rust`、
-  `org:oneapi-src language:Rust`、`org:MooreThreads language:Rust`。
-- 代码级：在具体仓库内检索 `musa`、`rust`（如 `repo:chelsea0x3b/cudarc`、`repo:ROCm/amdsmi`）。
-- 命名级：`cudarc musa`、`musa language:Rust`、`amdsmi rust` 等关键词组合。
-- 一手文本：相关仓库 `README.md`（本次逐字引用其自述状态）。
+## 7. 我们自己的状态（关键，避免自欺）
 
-## 3. Intel（原记录只提 `sycl-rs`，实际少记了两条）
+| 项 | 事实 |
+| --- | --- |
+| 我们的 Rust MUSA 后端 | `gpu-lab/src/backends_musa.rs` = **stub**：`is_available() == false`，`upload`/`dispatch`/`readback` 全部返回 `Err("musa backend not yet wired")`，由 feature `gpu-musa` 门控 |
+| 我们在 MUSA 上真正跑过的 GPU 代码 | **C/MUSA**：`scripts/benchmark/rental/bench_suite.mu`、`pearson_bandwidth.mu`（`#include <musa_runtime.h>`，`mcc -O3 … -lmusart`）——这是 F1/F2 两张表的来源 |
+| 我们在 MUSA 机器上跑的 Rust | 我们的 **SDK CLI**（`linxira-bio`），做的是 CPU 任务（SSR parity、矩阵流水线、分子对接）——"在 MUSA 机器上跑 Rust" ≠ "用 Rust 跑 MUSA" |
+| wgpu/Vulkan 路线 | MUSA 侧**失败**（驱动内部 `vkCreateInstance` 失败）；NVIDIA vGPU 侧同样失败（ICD 缺入口）——两侧记录一致 |
+| `cudarc-musa` 实测 | **从未执行**（`cloud-rental-plan-round5-2026-10-04.md` 仍为计划态） |
 
-- **`intel/openvino-rs`** —— 官方组织 `intel/` 下的 OpenVINO™ Rust 绑定，Apache-2.0，最近推送
-  2026-10-09。crate 分层：`openvino`（高层推理）、`openvino-sys`（C API FFI，bindgen）、
-  `openvino-genai` / `openvino-genai-sys`（LLM/VLM/Whisper 管线）、`openvino-finder`（库发现）。
-  OpenVINO 本身面向 CPU/GPU/**NPU**，故这是"官方 Rust 触达 NPU"的实际路径。
-- **`oneapi-src/oneapi-rs`** —— Intel 的 oneAPI 开源组织（`oneapi-src`，Hillsboro OR，
-  webadmin@linux.intel.com）下，crate 名 `sycl-rs`；README 自述"Rust bindings for SYCL and the
-  Intel oneAPI programming environment"，示例包含 **kernel launch**（分配、运行时内核编译、
-  提交、回拷）；同时明示 "experimental, has not released version 0.1.0, and is not ready for
-  production use"，测试配置仅 Linux + oneAPI Toolkit 2026.1。
-- **`intel/ittapi`** —— Intel® Instrumentation and Tracing Technology (ITT) 与 JIT API 仓库，
-  主语言 Rust，最近推送 2026-10-07；即官方性能插桩的 Rust 绑定。
+所以：**"我们用 Rust 写的 MUSA GPU 推理"这个说法在本仓库没有对应实现**。若记忆来自真实经历，最可能
+是上述"Rust SDK 跑在 MUSA 机器上"，或把 MUSA 侧的 **C/MUSA 内核**与 Rust 记混了。任何对外表述都必须
+按本表分辨。
 
-**修正**：原记录"Intel 有官方 `sycl-rs`（实验性）"**不完整**——推理侧已有持续维护的官方绑定
-（`openvino-rs`），且插桩侧也有官方 Rust 工件。
+## 8. 后期开发方向（本次调研的落地结论）
 
-## 4. AMD（原记录"官方零 Rust 计算路径"表述错误）
+**原则**：官方 Rust 优先；官方只有 host 层时，采用"**Rust host + C++ 内核工件**"的组合，并把工具链
+门槛写进清单；不自造 DSL，不假设内核二进制跨厂商可移植（PTX ≠ MUSA ≠ SPIR-V）。
 
-`org:ROCm language:Rust` 命中 **5 个官方仓库**（均非内核/计算绑定，属主机侧工具与系统软件）：
+1. **NVIDIA 轨（唯一可全 Rust）**：`cuda-rust` 的 `cutile-rs`（stable）优先做瓦片式内核（Pearson/直方图），
+   `cuda-oxide`（nightly）留给需要显式线程控制的场景；运行时统一走 `cuda-core`/`cuda-async`。仍按
+   `sm_80+`、官方"early-stage"定性记录风险。
+2. **摩尔线程轨**：`gpu-lab` 的 `gpu-musa` stub 按 §6 接 `cudarc-musa`（feature `musa-50200`），
+   内核沿用既有 `bench_suite.mu`/`pearson_bandwidth.mu`（MUSA C++，`mcc`）；窗口期（S80 民用机或
+   S4000 云租）一次跑通即向上游提 issue/PR（driver ABI 初始化、错误分类、文档缺口）。
+3. **Intel 轨**：host 用 `openvino-rs`（推理）或 `sycl-rs`（自研内核提交）；内核体写 **C++ SYCL**，
+   明确"这不是 Rust 内核"；`sycl-rs` 仅 Linux + oneAPI 2026.1，Windows 实测反馈即上游贡献。
+4. **AMD 轨**：官方无内核路径 → 分两级：**(a) 可移植层** wgpu/Vulkan（WGSL，走旧卡 gfx803 与 RDNA4）；
+   **(b) 若必须 Rust 内核**，评估 `CubeCL`（alpha，HIP 后端）作为实验轨，不进引擎依赖。XDNA NPU 不纳入
+   本期（无 Rust 路径）。
+5. **抽象层契约**（`gpu-lab/src/backend.rs` 的 `GpuBackend`）：必须显式建模"**内核来源**"——
+   `RustKernel`（NVIDIA）vs `ForeignKernel{toolchain, arch, source}`（Intel/AMD/摩尔线程），
+   并要求**清单里记录工具链版本 + 目标架构 + 源文件哈希**，否则跨机复现无法验证。
+6. **对外声明纪律**：任何"某厂商支持/不支持 Rust"的句子，必须附本台账 §1 的三层区分与出处；检索式
+   按 §2 的三重检查执行，不重犯第一版的错误。
 
-| 仓库 | 定位 | 星标 | 最近推送 |
-| --- | --- | --- | --- |
-| `ROCm/spur` | "An AI-native job scheduler written in Rust"，Slurm CLI/REST/C FFI 兼容 | 132 | 2026-10-10 |
-| `ROCm/rocm-cli` | 面向用户的 AMD GPU 本地 AI CLI/TUI，README 自述 "Tech Preview"，锁定 Rust 1.96.0 | 45 | 2026-10-10 |
-| `ROCm/spur-cloud` | 基于 Spur 的 GPU 即服务平台 | 7 | 2026-07-01 |
-| `ROCm/axis` | Agent 执行隔离沙箱运行时 | 6 | 2026-10-09 |
-| `ROCm/cm` | CMake 工程配置/构建/测试前端 | 4 | 2026-10-08 |
+## 9. 变更记录
 
-此外 **`ROCm/amdsmi` 内含 `rust-interface/`**：官方 Cargo 包 `amdsmi`（bindgen 生成绑定 + 示例
-`amdsmi_exporter`），即 GPU 管理/遥测的官方 Rust 绑定。
-
-**内核/计算侧仍无官方路径**（社区项目，非 AMD 托管）：`RustNSparks/rocm-rs`（ROCm 库安全封装）、
-`Reis-McMillan/rocmrc`（"based off cudarc"的 ROCm 封装）、`tracel-ai/cubecl-hip-sys`（CubeCL 的
-HIP 运行时绑定）。
-
-**XDNA NPU**：`amd/xdna-driver`（官方，C++/Python）未见 Rust；`org:amd language:Rust` 命中 **0**。
-第三方 `yijunyu/tile-rs` 自称把 Rust 内核经 MLIR 编到多后端（含 Ryzen AI、CUDA、MUSA），但为
-第三方项目，非厂商支持范围。
-
-**修正**：应表述为"AMD **主机侧**官方大量使用 Rust（调度器、CLI、管理绑定），**但无官方 GPU/NPU
-内核编写路径**；内核侧仍属社区"。
-
-## 5. 摩尔线程（**撤回**原记录的 `cudarc-musa` 声明）
-
-原记录（ROADMAP §9.5，2026-09-29）："2026-09-23 官方发布 `cudarc-musa`（cudarc 官方 fork，MUSA 5.2
-driver ABI，crates.io 发布准备中）——国产厂商第一个官方 Rust GPU 工件"。本次核实**找不到任何公开
-出处**：
-
-- `repo:chelsea0x3b/cudarc` 内检索 `musa`：**0 命中**；该仓库 issue 检索 `musa`：**0 命中**；
-  crates.io `cudarc`（0.19.10）自述为 "Safe and minimal CUDA bindings"，无 MUSA 说明。
-- `org:MooreThreads language:Rust`：**0 命中**（该组织公开仓库以 Python/C++/Go 为主，如
-  `torch_musa`、`vllm-musa`、`mate`、`tutorial_on_musa`）。
-- 关键词 `cudarc musa`、`musa rust`、中文检索均未命中对应官方发布物；命中的 `musa language:Rust`
-  结果均为无关同名项目或第三方实验（如 `ZhaoShanBiune/musapy`、`InfiniTensor/mudrv`（2024 年停更））。
-
-**易混淆点（必读）**：`gpu-rental-round2-s4000-2026-10-02.md` 写道"cudarc-musa 的**前置可行性**当场验证"——
-它验证的是**前提**（S4000 上 `musaMalloc/musaMemcpy/musaLaunchKernel` 与 CUDA 同构，因此"一份 cudarc 式绑定
-在 MUSA 上可行"），**并非**验证了该绑定本身存在或跑通。前提可行 ≠ 工件存在，两者不可互相替证。
-
-**处置**：该声明从 ROADMAP 与文章撤下，改为"厂商渠道声明，无可核实公开链接"。MUSA 生态侧**可核实**
-的现状是：官方提供 PyTorch (`torch_musa`)、vLLM (`vllm-musa`)、算子库 (`mate`)、MUSA SDK/工具链
-（`mcc`，clang-14 派生）等 **C++/Python** 路径；Rust 侧暂无官方工件。
-
-## 6. 与本仓库实测证据的关系（避免混谈）
-
-- **已执行**：`docs/engine-evals/gpu-rental-round3-dual-vendor-2026-10-02.md` —— 同一份 **C/C++**
-  内核套件（`bench_suite.mu`，仅扩展名不同）分别由 `nvcc`（RTX 4080S，sm_89）与 `mcc`（MTT S4000）
-  编译，median-of-3，逐项正确性门全过。这是"单源内核、两家原生工具链"的证据。
-- **未执行**：Rust 工具链路径。`docs/engine-evals/gpu-rental-2026-10-02.md` T3 记录 `cutile-rs`
-  当时不在 crates.io（仅 `cutile 0.0.0-alpha`），依赖链与驱动门槛使其**未进入执行**，`gpu-lab` 侧
-  保持 feature-gated stub；MUSA 侧 Rust 绑定从未进入实测（`cloud-rental-plan-round5-2026-10-04.md`
-  T1 仍为计划态）。
-
-因此对外只能声明"**原生 C/C++ 单源内核跨两家可复现**"，不能声明"一份 Rust 源码已跨两家跑通"。
-
-## 7. 后续动作
-
-- [x] 修正 `ROADMAP.md` §9.5 的 Intel / AMD / 摩尔线程三处表述（本台账为依据）。
-- [x] 修正博客中英稿 §14 段落与 §16 文献表。
-- [ ] 若厂商获得公开稳定链接（尤其摩尔线程 Rust 工件），按本台账 §2 方法复核后回填。
+- 2026-10-12 第一版：建成并修正 ROADMAP/文章，**误将摩尔线程 `cudarc-musa` 撤回**（检索式未含 fork）。
+- 2026-10-12 第二版（本文）：加入 §1 矩阵与 §2 方法学，**恢复**摩尔线程两条官方 Rust 工件，补齐
+  §7 我方状态与 §8 开发方向。

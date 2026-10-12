@@ -44,12 +44,12 @@ wgpu 回退 / 厂商栈 四路对照 → 台账（3 次中位、分相、容差�
 | 台账 | `docs/engine-evals/gpu-cutile-<日期>.md`，表式沿用 gpu-wgpu-2026-09-30.md |
 | 上游产出 | 见 §2.3 |
 
-### 1.2 摩尔线程 —— MUSA 原生栈（民购 S80 优先；Rust 绑定经复核不存在）
+### 1.2 摩尔线程 —— cudarc-musa + 原生 mcc（民购 S80 优先；标记最优先）
 
 | 项 | 内容 |
 | --- | --- |
 | 硬件 | 民购 S80 16GB（¥1499 档）优先，KUAE 云租备选；MUSA 5.2 driver ABI |
-| 栈 | **原生 `mcc` 工具链**（本仓库已在 MTT S4000 实测，见 `gpu-rental-round2/round3`）；Rust 侧**无已核实的官方绑定**——2026-10-12 复核后撤销 `cudarc-musa` 声明（`docs/engine-evals/vendor-rust-status-2026-10-12.md` §5）。需要 Rust 时自行在 `gpu-lab` 内做薄 FFI（`libmusart`；API 与 CUDA 同构已在实机验证） |
+| 栈 | `cudarc-musa`（**官方维护 fork**，feature `musa-50200` = MUSA 5.2 Driver ABI；2026-09-23）+ `sppark-musa`（官方 fork，crate `sppark` 的 `musa` feature；2026-09-24）；**内核体**走原生 `mcc`（MUSA C++，本仓库已在 MTT S4000 实测） |
 | 内核移植 | host 侧形如 `musaMalloc/musaMemcpy/musaLaunchKernel`（与 CUDA 同构，实机已验证），内核源码级重编译（cu-bridge/musify 语义） |
 | 对照组 | 同 §1.1；另与官方 Vulkan 1.3 驱动的 wgpu 回退对照（S80 Vulkan compute 已被 ollama-musa 实用） |
 | 首批窗口 | 窗口期改判为**自建绑定**：MUSA 5.2 ABI 初始化、错误分类、文档缺口都是上游反馈素材 |
@@ -94,8 +94,8 @@ wgpu 回退 / 厂商栈 四路对照 → 台账（3 次中位、分相、容差�
 
 ### 2.2 摩尔线程 MUSA —— 原生栈与自建绑定反馈（无官方 Rust 仓库可提交）
 
-- **对象**：MUSA SDK 原生工具链（`mcc`）与我们自建的 `libmusart` 薄 FFI；2026-10-12 复核确认**不存在**可提交的官方 Rust 仓库。
-- **提案标题**：`Binding a CUDA-shaped vendor runtime (MUSA) from Rust: ABI notes and gaps`。
+- **对象**：`MooreThreads/cudarc-musa`（feature `musa-50200`）与 `MooreThreads/sppark-musa`（`musa` feature）；内核侧走 `mcc`。
+- **提案标题**：`First-developer window report: cudarc-musa (MUSA 5.2 driver ABI) under a real workload`。
 - **内容要点**：MUSA 5.2 driver ABI 初始化序列、`musaMalloc/musaMemcpy/musaLaunchKernel` 与 CUDA 的差异清单、
   错误分类（ABI 错位 vs 设备缺失）、文档缺口；附 gpu-lab 最小示例与分相计时。
 - **时机**：拿到 S80 当周；首批窗口问题密度最高、响应最快。
@@ -121,8 +121,17 @@ wgpu 回退 / 厂商栈 四路对照 → 台账（3 次中位、分相、容差�
 
 ## 3. Host 抽象层设计草案（§3.1 批次 D 第 2 项）
 
-**目标**：一套 trait，同一内核逻辑在 wgpu / cutile-rs / sycl-rs / MUSA 原生（`mcc` 或自建薄 FFI） /
+**目标**：一套 trait，同一内核逻辑在 wgpu / cutile-rs / sycl-rs / cudarc-musa（+`mcc` 内核） /
 HIP-C++ 对照间切换；厂商栈未就绪时自动回退 wgpu。
+
+**内核来源契约（2026-10-12 复核后新增）**：trait 只统一 host 协议，**不统一内核来源**——必须显式建模，否则跨机复现无法核对（内核二进制不跨厂商复用：PTX ≠ MUSA ≠ SPIR-V）：
+
+| 来源 | 厂商 | 编译者 | 清单必记 |
+| --- | --- | --- | --- |
+| `RustKernel` | NVIDIA | `cuda-oxide`（rustc→PTX）/ `cutile-rs`（JIT→cubin） | Rust 工具链版本、是否 nightly、目标 sm |
+| `ForeignKernel` | Intel | DPC++（C++ SYCL 源串） | oneAPI 版本、目标设备 |
+| `ForeignKernel` | AMD | HIP C++（社区绑定）或 `CubeCL`（实验轨） | ROCm 版本、gfx 目标 |
+| `ForeignKernel` | 摩尔线程 | `mcc`（MUSA C++） | MUSA SDK 版本、`MUSA_ARCH`（如 `mp_31`） |
 
 ```rust
 // gpu-lab 内原型，成熟后迁 engine（gpu:optional 能力层只消费 trait 对象）
@@ -170,7 +179,7 @@ pub trait GpuBackend {
 | 旧卡 CUDA 版本边界（750 Ti sm_50） | 中 | 750 Ti 双路径拆分：wgpu/Vulkan + cudarc/CUDA 12.x；cutile-rs 仅 sm_80+；对照表分列 |
 | 国产兼容为源码级（PTX/cubin 不通用） | 中 | 不做二进制复用假设；每家内核独立编译，trait 层只统一 host 协议 |
 | 云租窗口短（4090/ROCm/910B） | 中 | 执行卡预演：本地 gpu-lab 流程先跑通 wgpu 档，云租只补厂商栈档；脚本离线可重放 |
-| Rust 侧无官方 MUSA 绑定（2026-10-12 复核） | 中 | 自建薄 FFI 仅留在 `gpu-lab` 原型层；对外不宣称官方支持，引擎不依赖；若出现公开官方工件再按台账 §2 复核 |
+| 摩尔线程 Rust 层为 fork、MUSA 路径仅 driver 级（CUDA 库包装不映射） | 中 | 只用 driver 级 API（分配/拷贝/发射）；NVRTC 等价物与库级包装缺失时退回 `mcc` 预编译内核；不假设 CUDA 库 API 可用 |
 | 上游 issue 无人响应 | 低 | issue 即交付（M5-G3 验收线）；每季度复查一次状态，不做无限等待 |
 
 ## 5. 交付序列（对齐 §3.1 批次 D 顺序）

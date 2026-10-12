@@ -388,8 +388,8 @@ async fn main() -> std::io::Result<()> {
 ### 9.5 M5-G —— Rust GPU 内核首批开发者轨（2026-09-29 增补；同日按厂商一手资料修订）
 
 **厂商官方一手结论**（2026-09-29 核验；**2026-10-12 复核修订**，依据
-`docs/engine-evals/vendor-rust-status-2026-10-12.md`）。**凡涉及 `cudarc-musa` 的条目均属未核实声明，
-使用前须按该台账 §2 的方法重新取证**：
+`docs/engine-evals/vendor-rust-status-2026-10-12.md`；含四家「Rust 调 GPU / Rust 写内核 / 仍需 C++」
+三层矩阵、检索方法学（fork 默认排除等盲点）与开发方向 §8）：
 - **NVIDIA**：2026-09-08 官宣 CUDA Rust 双轨——cutile-rs（瓦片 DSL，**stable Rust 1.89+**，
   CUDA 13.3 推荐，**仅 Linux（Ubuntu 24.04 测试），sm_80+，官方明文"sm_70/75 及以下不支持"**，
   "reach for Tile first"）与 cuda-oxide（SIMT，nightly，Linux）。官方自认"both early-stage,
@@ -407,11 +407,11 @@ async fn main() -> std::io::Result<()> {
   **GPU/NPU 内核侧仍无官方路径**（社区：`rocm-rs`、`rocmrc`、`cubecl-hip-sys`），XDNA NPU 侧官方仅
   C++/Python（`amd/xdna-driver`），`org:amd` 无 Rust 仓库。hip-rs 为社区停更项目；Polaris
   级老卡官方全栈不支持。AMD 卡走 wgpu/Vulkan 覆盖。
-- **摩尔线程**：~~2026-09-23 官方发布 cudarc-musa（cudarc 官方 fork，MUSA 5.2 driver ABI）~~ ——
-  **2026-10-12 复核后撤回**：上游 `cudarc` 无 MUSA 代码（仓库内 `musa` 检索 0 命中）、MooreThreads
-  组织无 Rust 仓库、crates.io 无对应发布，公开渠道查不到出处（见复核台账 §5）。可核实的现状为
-  **C++/Python 路径**：MUSA SDK（`mcc`，clang-14 派生）、`torch_musa`、`vllm-musa`、算子库 `mate`、
-  `tutorial_on_musa`；Rust 侧暂无官方工件。硬件/驱动侧事实不变：民用零售全系可购（S80 16GB/¥1499、
+- **摩尔线程**：**2026-09-23 官方发布 `cudarc-musa`**（fork 自 `cudarc` v0.19.8；feature `musa-50200`
+  = MUSA 5.2 Driver ABI；示例 `musa-driver-vector-add`），**2026-09-24 另有 `sppark-musa`**（fork 自
+  `sppark` v0.1.15；crate `sppark` 的 `musa` feature，`MCC`/`MUSA_ARCH=mp_31`，带 Go 桥）——国产厂商
+  第一个官方 Rust GPU 工件，性质是**厂商维护的 fork + host 层 Rust 调用**，内核体仍是 C++/MUSA（`mcc`）。
+  （注：本文件 2026-10-12 曾因检索式未含 fork 而误撤回，已恢复；方法学见复核台账 §2。）硬件/驱动侧事实不变：民用零售全系可购（S80 16GB/¥1499、
   S90 16GB/4060 级、X300 专业卡，下一代"庐山"最高 64GB），官方 Vulkan 1.3 驱动（Vulkan compute 已被
   ollama-musa 实用），KUAE 与京东云（10 万卡集群计划）云租可期；本仓库已在 MTT S4000 上实测**原生
   `mcc` 工具链**（`gpu-rental-round2/round3`）。
@@ -422,6 +422,12 @@ async fn main() -> std::io::Result<()> {
 - **华为昇腾**：官方零 Rust；社区 cann-rs（2026-08 活跃）、ruda-driver-cann；云租 910B 可行。
 - **架构事实**：国产卡 CUDA 兼容全部为**源码级**（musify/cu-bridge 重编译），PTX/cubin 二进制
   不通用——跨厂商可复用的是 host 侧 driver FFI 与 WGSL，不是内核二进制。
+- **开发方向（2026-10-12 定，依据复核台账 §1 三层矩阵与 §8）**：官方 Rust 优先——**四家里只有
+  NVIDIA 能"用 Rust 写内核"**（`cuda-oxide` SIMT / `cutile-rs` Tile）；Intel/AMD/摩尔线程的官方 Rust
+  均止于 host 层，故采用「**Rust host + C++ 内核工件**」。`GpuBackend` 须显式区分内核来源：
+  `RustKernel`（NVIDIA）vs `ForeignKernel{toolchain, arch, source_hash}`（Intel=C++ SYCL/DPC++、
+  AMD=HIP C++、摩尔线程=MUSA C++/`mcc`），清单须记工具链版本+目标架构+源哈希；AMD 若必须 Rust 内核
+  只走实验轨 `CubeCL`，不进引擎依赖。
 
 **硬件与叙事策略**（2026-09-30 定案，含本机实测；750 Ti CUDA 结论同日修正）：**Linux 为优先工作场景（优先工况）：正式基准数据一律以 Linux 复现为准，其他主机数据为临时值；
 以旧卡档位为兼容基线**——GTX 750 Ti 与 RX 580（Polaris gfx803，ROCm 官方不支持）为最低兼容档，
