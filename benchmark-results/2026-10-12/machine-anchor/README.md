@@ -70,12 +70,24 @@ Cross-check worth noting: lzbench's `zstd -1` figure (242 MB/s) matches the GNU-
 Workload 1 to the megabyte, by a completely different timing path — the two instruments agree
 on this machine.
 
-Still missing: the **Silesia corpus**, which the published comparison needs (zstd's table was
-measured on Silesia with an i7-9700K). The official corpus lives on a university mirror
-(`sun.aei.polsl.pl`), which is being fetched separately; GitHub-hosted mirrors are unusable
-here (release and archive downloads stall or reset from both the server and the development
-machine). Until it arrives, workload 3 is a validated instrument and not yet an anchor, and
-nothing in this section is compared against published numbers.
+**The Silesia corpus is not obtainable from this network**, which is why workload 3 stops here:
+
+| source | measured | extrapolated to 68 MB |
+| --- | --- | --- |
+| `sun.aei.polsl.pl` (official) | 32 KB in 60 s after a resume — and the earlier 17 MB attempt did not survive, the partial resets | ~36 h, with stalls short of completion |
+| `mattmahoney.net` (long-standing mirror) | 327 KB in 20 s | ~70 min at best, stalling in practice |
+
+GitHub-hosted mirrors and archives are unusable from both the server and the development
+machine. Three ways to finish it, in order of preference: (1) drop `silesia.zip` onto the
+measurement host by any working channel — the run itself takes about two minutes with the
+validated invocation above; (2) accept the anchor as it stands, which is defensible: workload 1
+already compares against zstd's *published* table and lands at 0.47x / 0.69x where this
+hardware class belongs, which is the question the anchor exists to answer; (3) leave it open
+and revisit if the network changes.
+
+What workload 3 would add is a second reference point on the same corpus as the published
+table rather than a different answer to the same question. It is not needed for the anchor's
+conclusion, and no comparison against published numbers is claimed from the 20 MB slice above.
 
 ## What this does not establish
 
