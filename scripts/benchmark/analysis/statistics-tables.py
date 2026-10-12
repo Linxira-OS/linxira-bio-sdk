@@ -105,9 +105,12 @@ def runs_per_backend(report: dict) -> dict[str, list[float]]:
 
 
 def write_tsv(path: Path, header: list[str], rows: list[list[str]]) -> None:
+    # LF explicitly: on Windows the default translation writes CRLF into the working copy,
+    # .gitattributes normalises it back to LF, and every regenerated table then shows up as a
+    # line-ending warning instead of a data diff.
     lines = ["\t".join(header)]
     lines += ["\t".join(row) for row in rows]
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
 def report_arm_class(report: dict) -> str:
@@ -428,6 +431,7 @@ def main() -> None:
     (output / "statistics.md").write_text(
         markdown_report(summary, rows, trimmed_medians, trimmed_verdicts, consistency),
         encoding="utf-8",
+        newline="\n",
     )
     written = ["statistics.tsv", "statistics-consistency.tsv", "statistics.md",
                "statistics-trimmed-medians.tsv", "statistics-trimmed-verdicts.tsv"]
