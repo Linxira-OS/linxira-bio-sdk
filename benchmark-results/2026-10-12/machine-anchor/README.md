@@ -53,6 +53,30 @@ publish one, and inventing a "typical" figure would defeat the purpose of an anc
 number is here because it is a widely reproduced workload, so anyone can run the same
 command on their own hardware and compare.
 
+## Workload 3 — lzbench (partial: tool ready, corpus pending)
+
+`lzbench` is the tool zstd's own reference table was measured with, which makes it the right
+instrument for a like-for-like comparison. It is built here from source at revision
+`9ca711ce574d1ac56b803db4292b8797283575b3` (lzbench 2.4.1, GCC 16.2.1; needs
+`LD_LIBRARY_PATH` pointing at its build directory for `liblzbench_rust.so`), and its
+invocation is validated on a 20 MB slice of our own input:
+
+| selection | compress | decompress | ratio |
+| --- | --- | --- | --- |
+| `zstd 1.5.7 -1` | 242 MB/s | 954 MB/s | 32.33 |
+| `zstd 1.5.7 -3` | 251 MB/s | 958 MB/s | 32.69 |
+
+Cross-check worth noting: lzbench's `zstd -1` figure (242 MB/s) matches the GNU-time figure in
+Workload 1 to the megabyte, by a completely different timing path — the two instruments agree
+on this machine.
+
+Still missing: the **Silesia corpus**, which the published comparison needs (zstd's table was
+measured on Silesia with an i7-9700K). The official corpus lives on a university mirror
+(`sun.aei.polsl.pl`), which is being fetched separately; GitHub-hosted mirrors are unusable
+here (release and archive downloads stall or reset from both the server and the development
+machine). Until it arrives, workload 3 is a validated instrument and not yet an anchor, and
+nothing in this section is compared against published numbers.
+
 ## What this does not establish
 
 - It does not validate the project's performance claims; nothing in the articles is derived
