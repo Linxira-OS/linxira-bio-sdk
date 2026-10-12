@@ -374,6 +374,49 @@ jobs:
             -s workflows/org.linxira.benchmark-python/tests -p "test_*.py"
           Rscript -e 'lib <- Sys.getenv("LINXIRA_BIO_WORKFLOW_R_LIBRARY"); dir.create(lib, recursive = TRUE, showWarnings = FALSE); install.packages(c("jsonlite", "digest"), lib = lib, repos = "https://cloud.r-project.org"); if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager", lib = lib, repos = "https://cloud.r-project.org"); BiocManager::install("Biostrings", lib = lib, ask = FALSE, update = FALSE)'
           Rscript workflows/org.linxira.benchmark-r/tests/test_benchmark_harness.R
+      - name: Benchmark smoke (three backends on a tiny fixture, consistency asserted)
+        run: |
+          export LINXIRA_BIO_WORKFLOW_PYTHON="$GITHUB_WORKSPACE/.venv-benchmark/bin/python"
+          ./target/release/linxira-bio benchmark run sequence.stats.v1 \
+            fasta=tests/fixtures/sequences/tiny.fa \
+            --backends rust,python,r --repeat 2 \
+            --output "$GITHUB_WORKSPACE/target/benchmark-smoke" \
+            --dataset-class smoke --json > /tmp/benchmark-smoke.json
+          python3 - <<'PY'
+          import json, pathlib, sys
+          report_path = pathlib.Path("target/benchmark-smoke/sequence.stats.v1.benchmark.json")
+          if not report_path.is_file():
+              sys.exit("benchmark smoke: report was not written")
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          problems = []
+          if report.get("consistency") != "consistent":
+              problems.append(f"consistency={report.get('consistency')!r}")
+          seen = {backend["backend"] for backend in report.get("backends", [])}
+          for wanted in ("rust", "python", "r"):
+              if wanted not in seen:
+                  problems.append(f"backend {wanted} missing")
+          for backend in report.get("backends", []):
+              ok = [run for run in backend.get("runs", []) if run.get("ok")]
+              if not ok:
+                  problems.append(f"{backend['backend']}: no successful run")
+                  continue
+              if any(run.get("wall_ms") is None for run in ok):
+                  problems.append(f"{backend['backend']}: wall_ms not recorded")
+              if not any(run.get("peak_rss_mb") for run in ok):
+                  problems.append(f"{backend['backend']}: peak_rss_mb not recorded")
+              # The harness clock ticks at 10 ms, so a sub-10 ms native run is
+              # legitimately recorded as 0.0. The interpreter arms start a process,
+              # so they must exceed the tick and act as the clock witness.
+              if backend["backend"] != "rust" and not any((run.get("wall_ms") or 0) > 0 for run in ok):
+                  problems.append(f"{backend['backend']}: wall_ms never exceeded the 10 ms harness clock")
+          environment = report.get("environment") or {}
+          if not environment.get("code_revision"):
+              problems.append("environment.code_revision not recorded")
+          if problems:
+              sys.exit("benchmark smoke failed: " + "; ".join(problems))
+          print("benchmark smoke: three backends consistent, wall_ms/peak_rss_mb recorded, "
+                f"revision {environment['code_revision'][:8]}")
+          PY
       - run: .venv-ci/bin/python scripts/validate-repository.py
       - run: .venv-ci/bin/python -m unittest discover -s tests/python -p "test_*.py"
       - run: .venv-ci/bin/python -m unittest discover -s workflows/tests -p "test_*.py"

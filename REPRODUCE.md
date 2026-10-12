@@ -65,6 +65,15 @@ articles and in `summary.json`): same inputs (digests above), same machine class
 pinned (`powersave` in this window — a conservative floor, disclosed as such), warm page cache,
 one untimed warm-up plus 10 timed repeats, medians (not means) with bootstrap CIs.
 
+### Timing resolution (read this before judging a small fixture run)
+
+The harness measures wall time with a 10 ms clock, so on a tiny fixture the native arm can be
+recorded as `wall_ms: 0.0` while the interpreter arms show ~160 ms (Python) and ~1260 ms (R) —
+the interpreter arms start a process, the native arm finishes inside one tick. That is why every
+value in `statistics.tsv` is a multiple of 10 ms, and it is why the articles say a `sequence.stats`
+CV of 1.95% is quantisation rather than jitter. A `0.0` here means "faster than one tick", not
+"not measured" (a missing measurement is `null`, never `0.0`).
+
 ## 3. Known gaps (stated here rather than discovered by you)
 
 | Gap | Status |
