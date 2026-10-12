@@ -121,7 +121,10 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1
-    manifest_path.write_text(render(desired), encoding="utf-8")
+    # Write LF explicitly: on Windows the default translation would put CRLF in the
+    # working copy, and .gitattributes normalises it back to LF, which turns every
+    # pack commit into a line-ending warning.
+    manifest_path.write_text(render(desired), encoding="utf-8", newline="\n")
     print(f"{manifest_path}: refreshed ({len(desired['files'])} files)")
     return 0
 
