@@ -8,7 +8,7 @@ desc: "One low-end x86 machine, one Rust engine, and the idiomatic Biopython and
 
 > Linxira Bio SDK benchmark report · 2026-10-11. A three-backend N=10 repeated measurement of 8 capabilities on one low-end x86 machine: environment, input digests, scripts, tables and figures are all public and can be re-checked item by item. Changes and disclosures are listed in "Versions and disclosures" at the end.
 
-> Draft, written incrementally. **Data status**: all eight capabilities were re-run at N=10 in a **window with no
+> **Data status**: all eight capabilities were re-run at N=10 in a **window with no
 > CI jobs** (archive `bench-20261011-001`; the per-stage CI job count and loadavg are in `window-log.txt`).
 > The comparison against the first batch (this host also ran a CI runner) is in §8.7: **all 30
 > per-capability/per-backend rows fall inside the noise band, none beyond it, so no row was excluded**.
