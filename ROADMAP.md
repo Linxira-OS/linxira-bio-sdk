@@ -83,7 +83,7 @@ M0 统一输出框架 ──┬──> M1 双后端绘图（依赖 OutputSpec/Pl
 | F 化学二+长读长 | chemistry.screen.v1 → 长读 QC → quantum.semiempirical.v1 | 未开始 |
 | G GPU 前沿包装（插队特批，2026-10-04） | cellpose pack（gpu 契约首发，AIVC 包装范式模板）→ trajectory.analysis.v1 | 进行中（用户点名插队：AIVC/虚拟细胞面试叙事；首发验证窗口 = vGPU-32GB，见 cloud-rental-plan-round5 W5） |
 | H 工具层收尾 | 报告层一期 → 模拟器二期（群体遗传）→ 参考基因组管理 | 未开始 |
-| I 机制细胞模拟（插队特批，2026-10-04） | simulate.cell.v1（最小全细胞机制模拟：Telegraph 随机基因表达 + Monod 代谢耦合生长 + 种子化分裂；Gillespie 精确算法、xoshiro256、字节级复现；纯 Rust 无 DL 依赖） | 进行中（用户点名插队：求职展示优先级） |
+| I 机制细胞模拟（插队特批，2026-10-04） | simulate.cell.v1（最小全细胞机制模拟：Telegraph 随机基因表达 + Monod 代谢耦合生长 + 种子化分裂；Gillespie 精确算法、xoshiro256、字节级复现；纯 Rust 无 DL 依赖） | **已完成**（2026-10-12 记：`simulate.cell.v1` 在 `capabilities/catalog.json` 为 `available`，schema + CLI + 双语文档 + `skill-pack.json` 登记齐备；Gillespie/xoshiro256 字节级复现） |
 
 长期池（H 后按需提级）：AMR 分型套件、16S DADA2、MACS2、Evo2/Borzoi/RFdiffusion pack、
 批次 Tier2 各项、单细胞 M4 大件。
@@ -226,7 +226,13 @@ BED 0-based 半开区间；GFF3/GTF/VCF 1-based 闭区间；JSON 内部统一 1-
 | 磁盘 I/O     | 优先读 `/proc/<pid>/io` 的 `read_bytes/write_bytes`；不可得时标 `null`，禁止伪造                                                                                                                  |
 | 环境 pinning | 报告必须记录：OS/kernel、CPU 型号、内存总量、Rust/Python/R 版本、关键依赖版本（如 DESeq2 版本）、是否容器内                                                                                                            |
 | 一致性判据      | 结构化字段逐项 diff：数值相对误差 ≤1e-6 判 `consistent`；字符串全等；表格类 sha256 相等（排序规范化后）。任一超差 → `inconsistent` 并记录差异字段清单                                                                               |
-| 加速比定义      | `speedup = median_wall(native) / median_wall(rust)`；内存节省 `= 1 - peak_rss(rust)/peak_rss(native)`。**对照臂分两类，必须逐行标注、禁止混排**（2026-10-12 修订）：① **parity arm**——同算法三语言实现，用于测语言运行时边界（须在报告与文章写明"同算法"）；② **tool arm**——各语言/生态的对标工具（如 DESeq2、fastp、seqkit、pyfastx、scikit-learn、prcomp），用于答"用户真实会拿到什么"。两类臂的数字不得放在同一张对比表里比较 |
+| 加速比定义      | `speedup = median_wall(native) / median_wall(rust)`；内存节省 `= 1 - peak_rss(rust)/peak_rss(native)`。**对照臂分两类，必须逐行标注、禁止混排**（2026-10-12 修订）：① **parity arm**——同算法三语言实现，用于测语言运行时边界（须在报告与文章写明"同算法"）；② **tool arm**——各语言/生态的对标工具（如 DESeq2、fastp、seqkit、pyfastx、scikit-learn、prcomp），用于答"用户真实会拿到什么"。两类臂的数字不得放在同一张对比表里比较。**机制（2026-10-12 落地）**：报告字段
+`arm_class`（缺省 `parity`）+ `tool` 块（name/version/invocation）；tool arm 由
+`scripts/benchmark/run/tool-arms.py` 与注册表 `scripts/benchmark/run/tool-arms/tools.json`
+生产，协议与 parity 臂一致（GNU `time -v`、1 次热身、N≥10）；`statistics-tables.py` 拒绝
+tool 报告进 parity 表并另出 `tool-arms.tsv`，`verify-figures.py` 以 `--expected-class` 拒绝异类。
+tool arm 报告内不存跨类比值（`speedup`/`memory_saving` 为 null），跨类比较只允许以标注类别的
+散文出现 |
 | 失败隔离       | 单个能力 benchmark 失败不阻塞整批；`summary.json` 记 `status: failed` + stderr 摘要（截断至 4KB）                                                                                                      |
 
 ### 7.2 任务清单
@@ -683,7 +689,7 @@ C4 带宽并行 / C5 重型原生编排 / C6 DL 推理 / C7 仅云**。
 | --- | --- | --- |
 | 模拟器层（序列/读段/群体遗传合成数据+黄金真值） | M2 benchmark 与 GPU 一致性对照的燃料 | 一期 [x] 2026-09-30：序列+读段合成已发布（simulate.sequence.v1 / simulate.reads.v1，xoshiro256 种子、字节级可复现）；二期（群体遗传）构思中 |
 | 模拟器三期：qPCR 反应模拟（`simulate.qpcr.v1` 构思：扩增效率/熔解曲线/Ct 真值合成，benchmark 燃料） | 云租赁第 4 轮用户点名（2026-10-01）；对标 MIQE 规范的合成数据 | 未开始（先定 schema 再动工） |
-| 模拟器四期：机制型全细胞模拟（`simulate.cell.v1`：Telegraph 随机基因表达 + Monod 代谢耦合 + 分裂二项分区；Gillespie 精确模拟、xoshiro256 种子、字节级可复现；GPU 加速内核后置登记） | 用户点名插队（2026-10-04，求职展示优先；AIVC 讨论裁决走机制路线，AI 封装行维持观察档）；黄金真值作 M2 benchmark 与 GPU 内核对照燃料 | 进行中（2026-10-04 起，插队批次 I） |
+| 模拟器四期：机制型全细胞模拟（`simulate.cell.v1`：Telegraph 随机基因表达 + Monod 代谢耦合 + 分裂二项分区；Gillespie 精确模拟、xoshiro256 种子、字节级可复现；GPU 加速内核后置登记） | 用户点名插队（2026-10-04，求职展示优先；AIVC 讨论裁决走机制路线，AI 封装行维持观察档）；黄金真值作 M2 benchmark 与 GPU 内核对照燃料 | **已完成**（2026-10-12：registry/schema/docs 全绿，见批次 I 行） |
 | 虚拟细胞/全细胞模型包装（开放权重推断封装，不写内核） | 长期池观察项；依赖 GPU 前沿批次包装范式成熟 | 未开始（仅登记） |
 | 可复现报告层（capability 结果 → 带 manifest 的分析报告） | 高级工作台体验胶水：独立小步推进（先 manifest 汇编，再模板渲染），不绑里程碑 | **独立小步** |
 
