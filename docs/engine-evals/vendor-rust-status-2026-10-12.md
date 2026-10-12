@@ -130,3 +130,41 @@ C++/MUSA 模板，由 `mcc`（clang-14 派生）编译。国产厂商第一个�
 - 2026-10-12 第一版：建成并修正 ROADMAP/文章，**误将摩尔线程 `cudarc-musa` 撤回**（检索式未含 fork）。
 - 2026-10-12 第二版（本文）：加入 §1 矩阵与 §2 方法学，**恢复**摩尔线程两条官方 Rust 工件，补齐
   §7 我方状态与 §8 开发方向。
+- 2026-10-12 第三版：§10 固化对外表述口径（Rust 编排 + 厂商原生内核，三层硬规则）；旧文
+  `cloud-gpu-dual-vendor-validation`（站点稿 + 仓库镜像）补分层说明并**加勘误**（顶部勘误行、文首
+  更新日志、版本与声明条目），数据与结论未变。
+
+## 10. 对外表述口径（Rust 编排 + 厂商原生内核）
+
+**硬规则：任何同时出现"Rust"与"GPU/内核"的句子，必须写明是哪一层。** 三层固定说法：
+
+| 层 | 语言 | 归属 | 谁说这一层 |
+| --- | --- | --- | --- |
+| 编排层（读数据、建缓冲区、发射、取回、校验、写报告） | **Rust** | 我们的引擎/CLI | "我们的实现"默认指这一层 |
+| 内核层（拷贝/triad/直方图/相关性/自定义算子） | **C/C++ 家族**，由**厂商原生工具链**编译：NVIDIA `nvcc`、摩尔线程 `mcc`、Intel DPC++（C++ SYCL）、AMD HIP C++ | 厂商工具链 | 除非 NVIDIA 轨（`cuda-oxide`/`cutile-rs`），否则**不写"Rust 内核"** |
+| 可移植层 | **WGSL**（wgpu/Vulkan），host 侧 Rust | 跨厂商回退 | 标明"WGSL 内核，非 Rust" |
+
+一句话模板（中）：
+> GPU 内核由厂商原生编译器编译（NVIDIA `nvcc` / 摩尔线程 `mcc` / Intel DPC++ / AMD HIP C++），
+> 我们的 **Rust 侧只做编排**：读数据、建缓冲区、发射、取回、校验。**"用 Rust 写内核"目前只有
+> NVIDIA 有官方路径**（`cuda-oxide`/`cutile-rs`，早期研究项目），其余三家厂商的官方 Rust 都停在
+> host 层。
+
+一句话模板（英）：
+> GPU kernels are compiled by the vendors' native compilers (`nvcc`, `mcc`, DPC++ or HIP C++);
+> our **Rust side only orchestrates** — read data, allocate, launch, read back, verify. Writing
+> kernels *in Rust* has an official path only on NVIDIA (`cuda-oxide`/`cutile-rs`, early-stage).
+
+**已发表/在写文章的适用情况（2026-10-12 审计）**：
+
+| 文章 | 现状 | 处理 |
+| --- | --- | --- |
+| `bio-sdk-reproducibility-benchmark`（2026-09-18） | 不涉及 GPU 内核，口径本就是"Rust 确定性引擎 + 受控外调原生工具" | ✅ 无需改 |
+| `cloud-gpu-dual-vendor-validation`（2026-10-02） | 原稿从未说明内核语言，易被读成"Rust 写 GPU 内核" | ✅ 已补四处：摘要第 5 条、§五首段、§五末"本文口径"表、§六尾句限定"（C/C++，不是 Rust）"；**站点稿与仓库镜像均已同步**，并各加：顶部勘误行、文首「更新日志/Changelog」段（2026-10-12）、「版本与声明」勘误条目 |
+| `three-language-benchmark-2026-10-11`（草稿） | §14 已带四家三层矩阵与"我们从未实测 `cudarc-musa`"声明 | ✅ 无需改 |
+| 站点其它文章（arch-adoption、fork-pain-changelog-2026-09、omarchy-*、kde-*、ai-contribution-policy） | 未涉及 GPU 内核（出现的"内核"均指 OS kernel） | ✅ 无需改 |
+
+**历史更正留痕**：`cloud-gpu-dual-vendor-validation` 的"同一份内核源码/两家编译器"结论**不变**
+（仍是已执行、可复算的证据），变的只是**把语言归属写清楚**；当时（2026-10-02）两家都还不能用 Rust
+写内核——NVIDIA 的 CUDA Rust 2026-09-08 才公布且未进入执行，摩尔线程的官方 Rust 工件（`cudarc-musa`，
+2026-09-23）属 host 层。

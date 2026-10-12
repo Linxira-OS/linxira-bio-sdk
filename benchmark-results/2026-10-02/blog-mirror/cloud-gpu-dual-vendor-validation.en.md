@@ -30,9 +30,27 @@ desc: "Pre-launch validation for GPU vendor support in the Linxira Bio SDK, run 
 4. **The Rust implementation holds a steady 3.6–4.0× over the traditional
    Python tool** (1 M-base SSR mining, re-measured on three different
    CPUs), with byte-identical output to the reference implementation.
-5. **The domestic card runs our stack**: the same kernel source compiled
-   first-try under Moore Threads' mcc with correct results, and its
-   memory bandwidth utilization is in the same band as the NVIDIA card.
+5. **The domestic card runs our stack**: the same **C/C++ kernel source** (one file; the MUSA and
+   CUDA builds differ only in extension and macros) compiled first-try under Moore Threads' `mcc` with
+   correct results, and its memory bandwidth utilization is in the same band as the NVIDIA card.
+   **The kernels are compiled by the vendors' native compilers; our Rust side only orchestrates**
+   (allocate buffers, launch, read back, verify).
+
+> **Erratum (2026-10-12)**: added the Rust-versus-C++ attribution — this round's GPU kernels are
+> compiled by the vendors' native compilers (`nvcc`/`mcc`) while our Rust side only orchestrates them;
+> see the table at the end of §5 and the changelog above. **Data and conclusions are unchanged.**
+
+## Changelog
+
+- **2026-10-02** first release.
+- **2026-10-12 erratum**: added the Rust-versus-C++ attribution — this round's GPU kernels are
+  compiled by the vendors' native compilers (NVIDIA `nvcc` / Moore Threads `mcc`) while our Rust
+  side only orchestrates them (allocate, launch, read back, verify); a comparison table was added at
+  the end of §5, and abstract item 5, the §5 opening and the §6 closing sentence were narrowed to
+  match. **Data and conclusions are unchanged** (one kernel source, two native compilers remains this
+  article's measured result; neither vendor could be used to write kernels in Rust back then).
+- **Maintenance rule**: new content goes into its logical section with a dated line here; errata are
+  recorded here too.
 
 ## 1 Who ran this, and why
 
@@ -138,9 +156,10 @@ algorithm itself — this round proves our orchestration adds no bias.
 
 ## 5 The two GPUs, side by side
 
-One kernel source, each vendor's compiler, four kernels (copy, triad,
-histogram, correlation), all through their correctness gates (bit-level
-or < 10⁻⁴ vs an f64 reference):
+One **C/C++ kernel source** (`bench_suite.mu`; the CUDA build is just a `.cu` copy) through each
+vendor's **native** compiler (`nvcc` / `mcc`), with the Rust side handling only buffer setup and
+launch. Four kernels (copy, triad, histogram, correlation), all through their correctness gates
+(bit-level or < 10⁻⁴ vs an f64 reference):
 
 | Kernel | RTX 4080 SUPER | MTT S4000 | Note |
 | --- | --- | --- | --- |
@@ -152,6 +171,26 @@ or < 10⁻⁴ vs an f64 reference):
 Conclusion: **same bandwidth league** (both ~90% of spec), equivalent for
 data-movement-bound bioinformatics kernels; the atomics gap is worth
 coding around on MUSA (bucketed reductions instead of atomic counters).
+
+> **Which parts are Rust and which are C++ (note added 2026-10-12)**
+>
+> This article (and the same batch of GPU experiments) can easily be read as "we wrote GPU kernels in
+> Rust". We did not. The split is:
+>
+> | Layer | Language | Who does it | Note |
+> | --- | --- | --- | --- |
+> | Orchestration: read data, allocate buffers, launch, read back, verify, write reports | **Rust** | this SDK's engine and CLI | every "our implementation" in this article means this layer |
+> | Kernels: copy, triad, histogram, correlation | **C/C++** (the CUDA C++ and MUSA C++ builds are one source file) | the vendors' native toolchains `nvcc` / `mcc` | the timing table comes from this layer |
+> | CPU baseline: SSR mining, docking, the five-step expression chain | **Rust** | this SDK | unrelated to the GPU kernels |
+>
+> **Why the kernels were C++ back then**: as of 2026-10-02, **neither vendor could be used to write
+> kernels in Rust**. NVIDIA's CUDA Rust (`cuda-oxide` / `cutile-rs`) was announced only on 2026-09-08 and
+> did not reach execution on the instances we rented; Moore Threads' official Rust artefact
+> (`cudarc-musa`, 2026-09-23) is a **host-side** binding, and its kernels still compile as MUSA C++.
+> So "one Rust source, two vendors" did not hold then; what held was **"one kernel source, two native
+> compilers"**. The per-vendor layers (who can call a GPU from Rust, who can write kernels in Rust, and
+> what still requires C++) are recorded in the repository ledger:
+> <https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/docs/engine-evals/vendor-rust-status-2026-10-12.md>
 
 ## 6 Two driver-layer facts found along the way
 
@@ -226,7 +265,9 @@ biology. *Nat. Genet.* 25(1), 25–29 (2000). doi:10.1038/75556
 
 ## Version & Declarations
 
-- **Version**: initial release 2026-10-02.
+- **Version**: initial release 2026-10-02; **2026-10-12 erratum**: added the Rust-versus-C++
+  attribution (Rust orchestrates, C++ kernels), with data and conclusions unchanged; details in the
+  changelog above.
 - **Self-assessment**: an author-reported validation, not third-party
   verified; one instance per card, one window; boundaries in §8.
   Third-party replication is planned follow-up.
