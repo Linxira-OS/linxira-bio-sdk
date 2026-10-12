@@ -35,6 +35,7 @@ repository-development assets. The agent documentation that *does* ship lives in
 | `run/quantify-bench.sh` | Single-sample quantify cross-check (identifier parity, NumReads within 1%, TPM Pearson ≥ 0.995). | 2026-09-14 |
 | `run/tier1v2-biolab.sh` | tier1_v2 batch `bench-20260914-002` against the thesis pipeline's own salmon 2.7.0 outputs. Git-ignored: hardcodes that lab machine's mounts. | 2026-09-14 |
 | `analysis/summarize-reports.py` | Builds `summary.json` + `summary.md` from per-capability reports and an environment descriptor; validates against the summary schema. | 2026-09-13, 2026-09-14, 2026-09-18, 2026-10-02, 2026-10-11 |
+| `analysis/compare-conditions.py` | Repository-side stopgap for cross-condition/cross-window comparison; superseded by ROADMAP M2-T11 (`benchmark compare`). | 2026-10-11 |
 | `analysis/statistics.py` | Standalone TSV statistics: N, median, IQR, CV, ratio, bootstrap 95% CI, two-part verdict, plus trimming-robustness and cross-window tables. | 2026-10-11 |
 | `analysis/tier23-summarize.py` | Aggregates the tier23-bench CSV into a comparison table. | 2026-09-14 |
 | `analysis/update-runtime-preferences.py` | Writes the measured backend rows of `runtime-preferences.json` from reports. | 2026-10-04, 2026-10-11 |
