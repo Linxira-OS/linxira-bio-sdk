@@ -39,6 +39,7 @@ repository-development assets. The agent documentation that *does* ship lives in
 | `analysis/statistics.py` | Standalone TSV statistics: N, median, IQR, CV, ratio, bootstrap 95% CI, two-part verdict, plus trimming-robustness and cross-window tables. | 2026-10-11 |
 | `analysis/tier23-summarize.py` | Aggregates the tier23-bench CSV into a comparison table. | 2026-09-14 |
 | `analysis/update-runtime-preferences.py` | Writes the measured backend rows of `runtime-preferences.json` from reports. | 2026-10-04, 2026-10-11 |
+| `reproduce.sh` | One-command reproduction entry point for a published window: `--smoke` checks revision identity, regenerates the archived inputs and compares sha256 against `inputs.sha256`, and diffs installed interpreter packages against the pack locks (verified 9/9 inputs byte-identical); `--full` prints the scheduled window commands and the expected medians. Documented in `REPRODUCE.md`. | 2026-10-12 (archive `bench-20261011-001`) |
 | `figures/render-svgs.py` | Renders the publication figure set — 12 per language: absolute medians, memory, ratio CI, repeat stability, dispersion (CV), layered speedup, the 1.10× ladder, memory ratio, two-window series, record granularity, condition comparison (needs `--contended`), and the protocol/decision diagram. | 2026-10-11 (compares against 2026-09-13; ladder/memory-ratio/dispersion/condition added 2026-10-12) |
 | `rental/prepare-bundle.py` | Assembles the upload bundle for a rented GPU instance. | 2026-10-02 |
 
