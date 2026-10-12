@@ -66,19 +66,25 @@ at all if it fails validation against `schemas/benchmark-report.schema.json`.
 
 ## Not done in this round
 
-- `seqkit` and `fastp` arms: **blocked on provisioning, not on intent.** Neither tool ships a
-  worked download path here: fastp publishes no binary assets at all (they must come from a
-  package manager or a source build), and the measurement host has no Go toolchain to build
-  seqkit from source; release-CDN downloads stall or reset from both the server and the
-  development machine (one attempt truncated at 7.6 MB of 8.8 MB, another returned a 0-byte
-  file). No registry row exists, because the registry carries only argv verified against the
-  installed version. Options, for the maintainer to pick: install Go (or `pacman -S seqkit`)
-  on the measurement host, fetch the binaries over a working network and verify them by
-  checksum, or substitute a pip-installable ecosystem standard (`cutadapt` for adapter
-  trimming) where one covers the same capability.
-- The `seqkit` case is worth one note: it is the *streaming* comparator to our own Rust scan
-  (pyfastx indexes instead), so it is the arm that would say whether our `sequence.stats`
-  implementation is slow or the whole streaming approach is.
+- `seqkit`: **download succeeded; installation waits on the host.** Correcting an earlier claim
+  in this file: I reported the download as failed, but I had checked
+  `target/toolprov/seqkit.tar.gz` while the completed file was
+  `target/toolprov/seqkit_linux_amd64.tar.gz` — 8,847,827 bytes, the exact size the GitHub API
+  reports, containing a single `seqkit` member. Provenance is verified against the API's own
+  asset digest: `sha256:3d664ffb48438d1fbd3f3cfc060c71d00368a26435f1c876944aea7fcdff86b5`, which
+  matches the local file byte for byte, so no mirror trust is involved. The tarball is staged
+  in `target/toolprov/` (gitignored) and the measurement host is currently unreachable
+  (`ssh` timeout, no ping answer), so install + `seqkit version` + argv verification are
+  pending host availability rather than anything else. No registry row exists until that
+  verification happens, because the registry carries only argv checked against an installed
+  version.
+- `seqkit` is the *streaming* comparator to our own Rust scan (pyfastx indexes instead), so it
+  is the arm that says whether our `sequence.stats` implementation is slow or whether streaming
+  a FASTA is simply expensive. Worth getting right rather than replacing with another tool.
+- `fastp`: **still a real decision.** It publishes no binary release assets at all, so it needs
+  a package manager, a source build (C++ with isa-l/libdeflate), or a substitute. The
+  pip-installable ecosystem standard for the same capability (adapter trimming) is `cutadapt`;
+  swapping it in is the maintainer's call, not a silent substitution.
 - Tool-arm figures and the article update: the article currently claims nothing from tool
   arms, so nothing published is wrong by omission; the finding above is the first candidate
   for a text change.
