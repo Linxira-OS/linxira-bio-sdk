@@ -438,7 +438,7 @@ Level Zero loader 与 OpenCL 运行时均在**——核显走 **oneAPI/SYCL/sycl
 AVX-512（H2 留云租）。云租：RTX 4090（sm_89，cutile-rs）、昇腾 910B。**"旧卡与核显上跑出
 性能"是核心宣传叙事**；Rust 内存安全对照 C++ 内核的内存泄露/任务中断为第二条叙事主线；
 CPU 型任务（如 Vina 编排的多核/AVX 加速，AVX2 实测 2.55×）同轨发声。**国产顺序摩尔线程
-优先**（cudarc-musa 首批窗口，S80/S90 民用可购）＞华为昇腾（云租好租，cann-rs，后置）。
+优先**（MUSA 原生栈窗口，S80/S90 民用可购）＞华为昇腾（云租好租，cann-rs，后置）。
 
 **统一内存与 ARM 策略（2026-10-01 增补）**：统一内存设备已大量进入民用/教育/企业采购
 ——Apple Silicon（Mac mini/MacBook/Mac Studio）、AMD AI Max 395 级超级核显、Intel
@@ -458,7 +458,7 @@ aarch64 交叉检查（2026-10-01）。
 | M5-G0    | 本地三卡环境审计：nvidia-smi 探测已有，补厂商中立 Vulkan（vulkaninfo，覆盖 AMD/Intel）探测入 tools/catalog；wgpu adapter 枚举 + hello-compute 冒烟（Intel 核显 / RX 580 / 750 Ti Vulkan 逐卡记录可用性，`gpu-lab/` 独立探针已就绪） | 硬件台账（型号/显存/驱动/枚举结果）记入本地 `docs/engine-evals/`（**不入仓库**）；750 Ti 与 RX 580 的 wgpu 可用性有明确结论 |
 | M5-G1    | 首批内核选型与 CPU 基线：① 大矩阵 Pearson/Spearman 相关 + PCA（f64、内存驻留，与 expression.pca/cluster CPU 实现直接对照）；② k-mer 计数与质量直方图（u32，wgpu 友善） | benchmark.run.v1 产出 CPU 基线（wall/RSS/一致性），入 benchmark-results        |
 | M5-G2    | wgpu/WGSL 实现（Vulkan/DX12）：目标为**旧卡档**（750 Ti、RX 580）与各卡回退路径；核显仅作交叉验证（主栈走 G3 sycl-rs）；WGSL 无 f64——相关系数以 f32 或 double-single 评估并记录精度结论 | 与 CPU 基线同输入对照：wall/RSS/数值一致性（相关系数容差单独定义）三表齐；逐卡结果记入本地台账（不入仓库）      |
-| M5-G3    | 厂商切入（**摩尔线程最优先**）：**cudarc-musa**（S80 真机民用可购或 KUAE 云租，首批窗口）+ **cutile-rs**（云租 RTX 4090，sm_89）+ **sycl-rs**（本机 Arc 130T，oneAPI 2025.3 已装，Windows 非官方测试配置——实测反馈即上游贡献）+ **AMD ROCm/HIP**（云租 RX 9060/9070 XT；Vulkan 为旧卡回退层）同内核实现与对照；各向上游提 issue/PR | 对照数据记入本地台账（不入仓库）；**每家至少 1 个上游 issue/PR**        |
+| M5-G3    | 厂商切入（**摩尔线程最优先**）：**MUSA 原生栈**（S80 真机或 KUAE 云租；`mcc` 工具链已实测，Rust 侧无官方绑定→自建薄 FFI 或走原生）+ **cutile-rs**（云租 RTX 4090，sm_89）+ **sycl-rs**（本机 Arc 130T，oneAPI 2025.3 已装，Windows 非官方测试配置——实测反馈即上游贡献）+ **AMD ROCm/HIP**（云租 RX 9060/9070 XT；Vulkan 为旧卡回退层）同内核实现与对照；各向上游提 issue/PR | 对照数据记入本地台账（不入仓库）；**每家至少 1 个上游 issue/PR**        |
 | M5-G4    | 昇腾（云租 910B + 社区 cann-rs，好租、后置）；砺算等其公开 SDK（观察档）；沐曦/壁仞/天数/燧原只记录结论不动工 | 本地台账各一页结论（不入仓库）                                       |
 | M5-G5    | 发声：**仅在用户允许的量化测试完成后**撰写双语技术文章（Linux 优先工况实测 + Rust 内存安全叙事 + 多厂商覆盖），走 benchmark-results 博客镜像；阶段性成果只做本地开发报告            | 文章入镜像目录且数值可复现                                                   |
 
@@ -486,7 +486,7 @@ GPU/NPU：
 | G-I 现代核显 | Arc 130T（Xe-LPG+，DPAS） | **oneAPI/SYCL/sycl-rs**（L0 原生；Vulkan 仅回退） | f64 低比率→f32/double-single |
 | G-L 旧卡 | 750 Ti（Maxwell）、RX 580（Polaris） | **wgpu/WGSL 唯一路径** | f32/u32 |
 | G1 现代消费卡 | RTX 40 系、RX 9060/9070（云租） | wgpu + CUDA/ROCm 官方栈 | f64 可用 |
-| G2 数据中心 | 4090/A100 级、MTT X300、昇腾 910B | cutile-rs / cudarc-musa / cann-rs / ROCm | 全精度 |
+| G2 数据中心 | 4090/A100 级、MTT X300、昇腾 910B | cutile-rs / MUSA 原生（`mcc`）/ cann-rs / ROCm | 全精度 |
 
 计算类别（能力声明的粒度）：**C1 轻量确定性 / C2 浮点 SIMD / C3 内存驻留 /
 C4 带宽并行 / C5 重型原生编排 / C6 DL 推理 / C7 仅云**。

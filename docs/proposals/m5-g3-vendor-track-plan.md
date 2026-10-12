@@ -121,7 +121,7 @@ wgpu 回退 / 厂商栈 四路对照 → 台账（3 次中位、分相、容差�
 
 ## 3. Host 抽象层设计草案（§3.1 批次 D 第 2 项）
 
-**目标**：一套 trait，同一内核逻辑在 wgpu / cutile-rs / cudarc-musa / sycl-rs /
+**目标**：一套 trait，同一内核逻辑在 wgpu / cutile-rs / sycl-rs / MUSA 原生（`mcc` 或自建薄 FFI） /
 HIP-C++ 对照间切换；厂商栈未就绪时自动回退 wgpu。
 
 ```rust
