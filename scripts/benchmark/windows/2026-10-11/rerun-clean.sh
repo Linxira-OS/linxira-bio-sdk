@@ -12,8 +12,13 @@
 # §6.2.5). The fast batch and the granularity experiment were verified clean
 # against the CI job windows, so they are not repeated here.
 #
-# Run from a checkout on the measuring host:
-#     cat scripts/benchmark/windows/2026-10-11/rerun-clean.sh | ssh <host> bash -s
+# Run from a checkout on the measuring host. Long windows must NOT be tied to the
+# ssh session (a dropped connection killed the driver on 2026-10-12 while its child
+# kept running), so upload and detach:
+#     cat scripts/benchmark/windows/2026-10-11/rerun-clean.sh \
+#       | ssh <host> 'cat > /tmp/rerun-clean.sh && chmod +x /tmp/rerun-clean.sh &&
+#                     setsid nohup /tmp/rerun-clean.sh > /tmp/rerun-clean.log 2>&1 & echo detached'
+#     ssh <host> 'while ! grep -q RERUN-CLEAN-DONE /tmp/rerun-clean.log; do sleep 60; done; tail -40 /tmp/rerun-clean.log'
 #
 # ALLOW_CI=1      proceed even if a CI job is running or queued (records the fact)
 # SSR_REPEATS=N   timed repeats for sequence.ssr (default 10)
@@ -121,7 +126,7 @@ case "$STAGES" in *granularity*)
 echo "=== fastq.qc.v1 N=10 (the R leg is what the CI jobs overlapped) ==="
 log "start fastq.qc.v1 N=10"
 case "$STAGES" in *fastq*)
-  $BIN benchmark run fastq.qc.v1 fasta="$W/reads200.fq" --backends rust,python,r --repeat 10 \
+  $BIN benchmark run fastq.qc.v1 fastq="$W/reads200.fq" --backends rust,python,r --repeat 10 \
     --output "$W/out-fastq.qc.v1" --dataset-class other --json 2>/dev/null | show
   log "end fastq.qc.v1 loadavg=$(cut -d' ' -f1-3 /proc/loadavg) jobs=$(job_state)"
 ;; esac
