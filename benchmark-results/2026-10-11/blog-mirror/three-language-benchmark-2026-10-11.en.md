@@ -3,15 +3,15 @@ title: "A three-language repeated benchmark of bioinformatics capabilities — R
 date: 2026-10-11
 tag: technical
 lang: en
-desc: "One low-end x86 machine, one Rust engine, and the idiomatic Biopython and Biostrings implementations measured on the same inputs with 10 timed repeats each — under a pre-registered decision rule with bootstrap confidence intervals: 7 of 8 capabilities show a material gap (7.7×–1097×), one shows no resolvable difference."
+desc: "One low-end x86 machine, one Rust engine, and the idiomatic Biopython and Biostrings implementations measured on the same inputs with 10 timed repeats each — under a pre-registered decision rule with bootstrap confidence intervals: 7 of 8 capabilities show a material gap (1.4×–200× against the Python arm, 2.2×–1382× against the R arm); one is detectable but immaterial."
 ---
 
 > Linxira Bio SDK benchmark report · 2026-10-11. A three-backend N=10 repeated measurement of 8 capabilities on one low-end x86 machine: environment, input digests, scripts, tables and figures are all public and can be re-checked item by item. Changes and disclosures are listed in "Versions and disclosures" at the end.
 
-> Draft, written incrementally. **Pending**: (1) this host also runs a local CI runner and two CI jobs
-> overlapped the R leg of `fastq.qc`, so that leg is re-measured with the runner stopped; (2) the N=10
-> long run for `sequence.ssr` (its R leg needs about 5 h) under the same condition. Every other stage was
-> checked against the CI job windows and shows no overlap. The archive and the site publication follow.
+> Draft, written incrementally. **Data status**: all eight capabilities were re-run at N=10 in a **window with no
+> CI jobs** (archive `bench-20261011-001`; the per-stage CI job count and loadavg are in `window-log.txt`).
+> The comparison against the first batch (this host also ran a CI runner) is in §8.7: **all 30
+> per-capability/per-backend rows fall inside the noise band, none beyond it, so no row was excluded**.
 > Tables and figures ship with this post (index and re-check recipes in §13).
 
 ## 1. Abstract
@@ -24,11 +24,13 @@ fixed inputs and commands, serial execution, and an unchanged `powersave` govern
 
 Results use a **two-part, pre-registered rule** (§6.3):
 
-- **7 of 8 capabilities show a material gap** (bootstrap 95% CI lower bound ≥ 1.10): Rust is
-  **7.7×–200×** faster than the Python arm and **2.2×–1097×** faster than the R arm.
-- **One capability (`sequence.stats`) shows no resolvable difference**: Rust 820 ms, Python 840 ms,
-  ratio 1.02×, CI [0.99, 1.04] — the interval **crosses 1.00, so we do not claim "faster" here**.
-- Rust's **consistent win is memory**: peak RSS is 1/2.2–1/12 of Python's and 1/5.5–1/55 of R's.
+- **Seven of the eight capabilities show a material gap against the Python arm** (bootstrap 95% CI
+  lower bound ≥ 1.10): Rust is **1.4×–200×** faster than the Python arm and **2.2×–1382×** faster than
+  the R arm.
+- **One capability (`sequence.stats`) is detectable but immaterial**: Rust 810 ms, Python 825 ms,
+  ratio 1.02×, CI [1.01, 1.11] — the interval **excludes 1.00 (the difference is resolvable) but its
+  lower bound stays below the pre-registered 1.10**, so it is **not counted as an advantage**.
+- Rust's **consistent win is memory**: peak RSS is 1/2.3–1/11.8 of Python's and 1/5.7–1/54.5 of R's.
 
 Boundaries up front: this is a **whole-stack comparison** (our Rust engine vs idiomatic third-party
 library implementations plus their language runtimes, measured by the same harness), not a claim
@@ -92,15 +94,15 @@ synthetic tables from `random.seed(42)`, sequence inputs from the engine's own s
 
 | Capability | Input | Size | sha256 |
 | --- | --- | --- | --- |
-| `sequence.stats.v1` | FASTA (20 × 5 Mb) | ~100 MB | pending (from `simulate sequence --seed 42`) |
+| `sequence.stats.v1` | FASTA (20 × 5 Mb) | ~100 MB | `9f8a4cb46eb11eca49ad40108648541d13d03a50a79889a90977fe505c044e78` |
 | `expression.pca.v1` | TSV matrix | 2000 × 40 | `273755e5eca0ae14d150365271dda778666109341ec0826baa01b7dc7bd76345` |
 | `set.venn.v1` | TSV set table | 20k items × 4 sets | `484dffd240e46a4de6995ae935107e464185ca93c9a8025e79856e1fa5234531` |
 | `enrichment.overrepresentation.v1` | `genes.txt` | 5k genes | `84ac1b6eec0a96798aa39b905c654faa6156dc4f4af4d4eb5f672faf8d1f98db` |
 | `enrichment.overrepresentation.v1` | `associations.tsv` | 45k associations | `b523c5b4509487186461e8bc29adcdce910551ed1c4b88d4768c220c5ff9d781` |
 | `structure.pdb.summary.v1` | PDB | 3000 residues / 24k atoms | `ecb30a5181b376760ceab330d9244f79b28195b54a4a8cac26a8ca23e2559afe` |
 | `variant.stats.v1` | VCF | 200k variants | `1dab9c47535f9b3552cd3cfae1fa70ac4fccc5ff7518d4c9cf5b76950861ce53` |
-| `fastq.qc.v1` | FASTQ | 200 MB / 646k reads | pending (derived from `big.fa` via `simulate reads --seed 42`) |
-| `sequence.ssr.v1` | FASTA | ~100 MB | same file as `sequence.stats` (`big.fa`) |
+| `fastq.qc.v1` | FASTQ | 200 MB / 646k reads | `5697241ba2c6da89e89bd860eee8b18ba370e2725e63a2b4ccda9339fed13fb9` |
+| `sequence.ssr.v1` | FASTA | ~100 MB | same file as `sequence.stats` (`big.fa`; sha256 `9f8a4cb4…44e78`) |
 
 **Cross-machine, cross-version check**: generating those six synthetic inputs on Windows
 (Python 3.13.15) and on the measuring machine (Linux, Python 3.14.7) yields **six identical sha256
@@ -181,36 +183,36 @@ Full statistics in Table S1 (§13 lists every supplementary table and figure). E
 
 | Capability | rust | python | r | python verdict | r verdict |
 | --- | --- | --- | --- | --- | --- |
-| `sequence.stats.v1` | 820 ms | 840 ms | 1840 ms | 1.02× [0.99, 1.04] **within-noise** | 2.24× [2.16, 2.26] **material** |
-| `expression.pca.v1` | 20 ms | 4010 ms | 2760 ms | 200× [161, 215] material | 138× material |
-| `set.venn.v1` | 10 ms | 180 ms | 10,975 ms | 18× material | **1097×** material |
-| `enrichment.overrepresentation.v1` | 30 ms | 230 ms | 4470 ms | 7.7× material | 149× material |
-| `structure.pdb.summary.v1` | 30 ms | 790 ms | 20,750 ms | 26× material | 692× material |
-| `variant.stats.v1` | 80 ms | 760 ms | 13,495 ms | 9.5× material | 169× material |
-| `fastq.qc.v1` | 1570 ms | 49,320 ms | 702,655 ms | 31.4× [30.5, 32.0] material | 447.6× [432.4, 452.1] material |
-| `sequence.ssr.v1` | pending (N=10, after maintenance) | pending | pending | — | — |
+| `sequence.stats.v1` | 810 ms | 825 ms | 1,815 ms | 1.02× [1.01, 1.11] **detectable, immaterial** | 2.24× [2.23, 2.30] material |
+| `expression.pca.v1` | 20 ms | 4,010 ms | 2,770 ms | 200× [133, 208] material | 138× [92.3, 140] material |
+| `set.venn.v1` | 10 ms | 180 ms | 11,075 ms | 18.0× [18.0, 19.0] material | 1108× [1090, 1128] material |
+| `enrichment.overrepresentation.v1` | 30 ms | 230 ms | 4,480 ms | 7.67× [7.33, 7.67] material | 149× [149, 157] material |
+| `structure.pdb.summary.v1` | 30 ms | 780 ms | 20,680 ms | 26.0× [26.0, 30.0] material | 689× [683, 692] material |
+| `variant.stats.v1` | 80 ms | 760 ms | 13,500 ms | 9.50× [9.50, 9.56] material | 169× [164, 174] material |
+| `fastq.qc.v1` | 1,570 ms | 49,345 ms | 702,190 ms | 31.4× [31.1, 31.8] material | 447× [444, 447] material |
+| `sequence.ssr.v1` | 1,600 ms | 2,280 ms | 2,211,405 ms | 1.43× [1.33, 1.45] material | 1382× [1290, 1391] material |
 
 (An earlier N=3 window measured the same capabilities with the same conclusion; see §9 and the
 engineering ledger `docs/engine-evals/local-nas-g7400-window-2026-10-04.md`.)
 
-![Absolute wall time per backend (log scale, ms)](./figures/en/fig-absolute-medians.svg)
+![Absolute wall time per backend (linear scale, ms)](./figures/en/fig-absolute-medians.svg)
 
-Figure: absolute median wall time per backend (log scale) — same input, same machine, 10 timed
+Figure: absolute median wall time per backend (linear scale) — same input, same machine, 10 timed
 repeats per backend.
 
 ### 8.2 Memory (peak RSS, median-of-10)
 
 | Capability | rust | python | r |
 | --- | --- | --- | --- |
-| `sequence.stats.v1` | 5.9 MB | 69.7 MB (11.9×) | 321.1 MB (54.8×) |
-| `expression.pca.v1` | 8.5 MB | 53.3 MB (6.3×) | 81.9 MB (9.7×) |
-| `set.venn.v1` | 8.3 MB | 47.3 MB (5.7×) | 124.6 MB (15.0×) |
-| `enrichment.overrepresentation.v1` | 14.8 MB | 61.0 MB (4.1×) | 145.5 MB (9.8×) |
-| `structure.pdb.summary.v1` | 29.7 MB | 66.3 MB (2.2×) | 162.9 MB (5.5×) |
-| `variant.stats.v1` | 6.2 MB | 45.8 MB (7.4×) | 122.4 MB (19.7×) |
-| `fastq.qc.v1` | 6.1 MB | 46.1 MB (7.5×) | 80.0 MB (13.1×) |
-
-![Peak resident memory per backend (log scale, MB)](./figures/en/fig-memory.svg)
+| `sequence.stats.v1` | 5.9 MB | 69.6 MB (11.8×) | 321.1 MB (54.5×) |
+| `expression.pca.v1` | 8.5 MB | 53.4 MB (6.3×) | 81.9 MB (9.6×) |
+| `set.venn.v1` | 8.3 MB | 47.3 MB (5.7×) | 124.7 MB (15.1×) |
+| `enrichment.overrepresentation.v1` | 15.0 MB | 61.0 MB (4.1×) | 145.4 MB (9.7×) |
+| `structure.pdb.summary.v1` | 28.4 MB | 66.3 MB (2.3×) | 162.8 MB (5.7×) |
+| `variant.stats.v1` | 6.2 MB | 45.9 MB (7.4×) | 122.3 MB (19.8×) |
+| `fastq.qc.v1` | 6.2 MB | 46.0 MB (7.4×) | 79.4 MB (12.8×) |
+| `sequence.ssr.v1` | 21.0 MB | 150.7 MB (7.2×) | 667.5 MB (31.8×) |
+![Peak resident memory per backend (linear scale, MB)](./figures/en/fig-memory.svg)
 
 Figure: peak resident memory per backend (median-of-10, GNU time's VmHWM).
 
@@ -224,7 +226,7 @@ Most medians sit within ±1 IQR across repeats. `sequence.stats` — Rust's gran
 timer's resolution), so its CV (1.95%) is dominated by **quantisation**, not real jitter. That limits
 resolution on small absolute values and is one reason the materiality floor is 1.10 rather than 1.01.
 
-![Ratios with bootstrap 95% confidence intervals (log scale)](./figures/en/fig-ratio-ci.svg)
+![Ratios with bootstrap 95% confidence intervals (linear scale)](./figures/en/fig-ratio-ci.svg)
 
 Figure: the ratio with its 95% CI for every backend pair; the dashed lines are 1.00 (no difference)
 and 1.10 (the materiality floor), and each label carries the verdict.
@@ -249,9 +251,9 @@ because "a language boundary is crossed once per record"; more records should wi
 
 | Input shape | rust | python | r |
 | --- | --- | --- | --- |
-| 1 × 100 Mb (one record) | 820 ms | 850 ms | 1825 ms |
-| 20 × 5 Mb | 820 ms | 840 ms | 1830 ms |
-| 100,000 × 1 kb | 830 ms | 860 ms | 1940 ms |
+| 1 × 100 Mb (one record) | 810 ms | 850 ms | 1,820 ms |
+| 20 × 5 Mb | 810 ms | 835 ms | 1,820 ms |
+| 100,000 × 1 kb | 820 ms | 860 ms | 1,930 ms |
 
 **Falsified.** Going from 1 to 100,000 records moves Rust by 10 ms and Python by 10 ms
 (ratio 1.037 → 1.036). At ~100 MB both sides are dominated by **I/O and large allocations**: the
@@ -266,7 +268,8 @@ original hypothesis.
 Corrected explanation (which is also the layering used throughout this post): the dividing line is not
 record count but **"does the interpreter touch each element?"**. Capabilities whose per-base work lives
 in C (`sequence.stats`) land at ≈1×; capabilities whose per-item/per-record work lives in the
-interpreter (`set.venn`, `pdb`, `variant`, `enrichment`, `fastq.qc`) span 7.7× to 1097×. The ~20×
+interpreter (`set.venn`, `pdb`, `variant`, `enrichment`, `fastq.qc`) span 7.67× (`enrichment`'s
+Python leg) to 1108× (`set.venn`'s R leg). The ~20×
 seen on tiny inputs is **interpreter start-up (~170 ms)** landing on a 10 ms workload — not throughput.
 
 **What we expected, and what the measurement refuted.** The first intuition was that shuttling data
@@ -278,24 +281,24 @@ work is tiny, and the large allocations plus file reading that *both* sides must
 difference. So the 1.02× on `sequence.stats` is not "Rust has no advantage"; it means **both stacks
 execute the critical path in native code** — the first layer of the layering. Conversely, as soon as
 each element's work must run in the interpreter (per-base in `fastq.qc`, per-item in `set.venn`), the
-same boundary costs 31×–1097× (§8.6).
+same boundary costs 31.4×–1382× (§8.6).
 
 ### 8.6 Layered overview
 
-![Layered overview: Rust's wall-time ratio against both arms (log scale)](./figures/en/fig-speedup-layered.svg)
+![Layered overview: Rust's wall-time ratio against both arms (linear scale)](./figures/en/fig-speedup-layered.svg)
 
 Figure: the layered overview — ratios sorted by layer, with C-library-covered loops on the left and
 per-element interpreter iteration on the right.
 
 | Layer | Capability | python | r |
 | --- | --- | --- | --- |
-| Linear scan covered by C primitives | `sequence.stats` | 1.02× (not resolvable) | 2.24× |
-| Per-item interpreter loop (small in-memory objects) | `set.venn` | 18× | 1097× |
-| Per-gene / per-variant interpreter loop | `enrichment`, `variant` | 7.7× / 9.5× | 149× / 169× |
-| Per-atom interpreter loop | `structure.pdb.summary` | 26× | 692× |
+| Linear scan covered by C primitives | `sequence.stats` | 1.02× (detectable, immaterial) | 2.24× |
+| Per-position scan (Python arm is `pytrf`, a C extension) | `sequence.ssr` | 1.43× | 1382× |
+| Per-base interpreter loop | `fastq.qc` | 31.4× | 447× |
+| Per-item interpreter loop (small in-memory objects) | `set.venn` | 18.0× | 1108× |
+| Per-gene / per-variant interpreter loop | `enrichment`, `variant` | 7.67× / 9.50× | 149× / 169× |
+| Per-atom interpreter loop | `structure.pdb.summary` | 26.0× | 689× |
 | Vectorised numeric library | `expression.pca` | 200× | 138× |
-| Per-base interpreter loop | `fastq.qc` | 31× | 448× |
-| Motif scan (pending) | `sequence.ssr` | pending | pending |
 
 Note the `expression.pca` row: Python is *slower* than R there (200× vs 138×) because both arms run a
 vectorised library (numpy vs `prcomp`) — the gap comes from **the library and its calling
@@ -324,6 +327,26 @@ Stated honestly: the earlier window recorded **numeric** parity errors (2.26e-11
 records **verdict-level** evidence (within 1e-6, no differing fields). Neither substitutes for the
 other, so the table shows both bases rather than moving "0.0 / 2.26e-11" under this window's name.
 
+
+### 8.7 Condition comparison: before and after the CI co-tenant (same protocol, same machine)
+
+This host also runs a local CI runner. In the first batch two jobs landed inside the R leg of
+`fastq.qc`; with the jobs stopped we re-ran the **whole window** under the same protocol
+(`window-log.txt` records the CI job count as 0 at every stage boundary, `jobs=0`). The two batches,
+per capability and per backend (`condition-comparison.tsv`, 30 rows):
+
+| Row | Contended batch | Clean batch | Δ | Noise band |
+| --- | --- | --- | --- | --- |
+| `sequence.stats` / python | 840 ms | 825 ms | −1.79% | ±10.47% |
+| `sequence.stats` / r | 1,840 ms | 1,815 ms | −1.36% | ±20.28% |
+| `sequence.stats` / rust | 820 ms | 810 ms | −1.22% | ±4.67% |
+| `fastq.qc` / r | 702,655 ms | 702,190 ms | −0.07% | ±1.92% |
+
+- **All 30 rows fall inside the noise band; none beyond it** (the band is 2×(CV_contended + CV_clean),
+  computed per row); the largest shift is −1.79%.
+- **No row was excluded**: this article uses the clean batch (archive `bench-20261011-001`) and publishes
+  both batches' raw reports (the `contended-window/` directory and the archive root) for anyone to check.
+
 ## 9. Comparison with the September window
 
 Same capabilities, same commands, different input sizes and window (Table S4,
@@ -331,10 +354,10 @@ generated from the 2026-09-13 archive; Table S4):
 
 | Capability | September window (N=5, small fixtures) | This window (N=10, large inputs) | Ordering consistent? |
 | --- | --- | --- | --- |
-| `sequence.stats` | 40 / 330 / 2110 ms | 820 / 840 / 1840 ms | yes (rust ≤ py < r) |
-| `expression.pca` | 40 / 300 / 460 ms | 20 / 4010 / 2760 ms | yes |
-| `set.venn` | 40 / 310 / 400 ms | 10 / 180 / 10,975 ms | R moves drastically with scale |
-| `structure.pdb.summary` | 40 / 320 / 410 ms | 30 / 790 / 20,750 ms | yes (magnitudes unfold with size) |
+| `sequence.stats` | 40 / 330 / 2110 ms | 810 / 825 / 1,815 ms | yes (rust ≤ py < r) |
+| `expression.pca` | 40 / 300 / 460 ms | 20 / 4,010 / 2,770 ms | yes |
+| `set.venn` | 40 / 310 / 400 ms | 10 / 180 / 11,075 ms | R moves drastically with scale |
+| `structure.pdb.summary` | 40 / 320 / 410 ms | 30 / 780 / 20,680 ms | yes (magnitudes unfold with size) |
 
 **Why only four rows**: the table lists only capabilities that have an archived three-backend row in
 *both* windows (values in Table S4). `enrichment.overrepresentation`,
@@ -352,7 +375,7 @@ at scale.
 
 Reading: **small fixtures flatten all three backends** (tens to hundreds of ms) because start-up and
 constant terms dominate; magnitude differences only unfold on large inputs. The R arm of `set.venn`
-looks "fine" on the small fixture (400 ms) and becomes 10,975 ms at scale — consistent with §8.5.
+looks "fine" on the small fixture (400 ms) and becomes 11,075 ms at scale — consistent with §8.5.
 
 For identical inputs, cross-window **absolute** numbers agree to <3% median difference, so this
 machine's measurements are themselves reproducible; the rows that must not be compared directly are
@@ -465,6 +488,7 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 | Figures agree with the tables | Run [`verify-figures.py`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/scripts/benchmark/figures/verify-figures.py): it maps every plotted number (including all 210 dots of the raw-repeat figure) back to the archived `wall_ms` values and exits non-zero on any mismatch |
 | Figures were not smoothed or axis-truncated for effect | Every caption carries the "no smoothing, no axis truncation, no statistical transformation" disclosure, and the checker also asserts that disclosure is present and that no caption line overflows the canvas |
 | The engine uses no parallelism today | `grep -rn "rayon\|thread::spawn\|par_iter" engine/crates/` returns nothing (this window's check) |
+| Can the rerun and the condition comparison be checked? | `condition-comparison.tsv` (30 per-capability, per-backend rows) plus `window-log.txt` (CI job count and loadavg at each stage boundary), both in the archive |
 | The whole window in one command | [`archive.sh`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/scripts/benchmark/windows/2026-10-11/archive.sh) (stage reports → input digests → archive → statistics → bilingual figures → figure check) |
 
 ## 14. Discussion and outlook
@@ -475,15 +499,15 @@ Read eight capabilities on one sheet and a stable pattern appears: **Rust's adva
 per-element work happens**. When the critical path already runs inside a C library or a vectorised
 numerical library — per-base counting in `sequence.stats`, the matrix factorisation in
 `expression.pca` — the three arms collapse to 1.0×–2.2×, and the Python arm of `sequence.stats` is not
-even distinguishable from this host's noise. When every element has to pass through the interpreter —
+only 1.02× away (CI lower bound 1.01, short of the 1.10 material threshold). When every element has to pass through the interpreter —
 per record, per item, per atom, per base — the gap unfolds as 7.7× → 26× → 31×, with the R arm reaching
-149×–1097×. This is not a language ranking; it is **a function of the workload's shape**. It predicts
+149×–1382×. This is not a language ranking; it is **a function of the workload's shape**. It predicts
 whether a given piece of code spends its time in an interpreter or in native code, and nothing more.
 
 Three practical consequences follow. **First**, if the bottleneck is a linear scan over a large file,
 the three arms may genuinely be indistinguishable, and the interesting differences become memory
 footprint and start-up cost — where Rust leads consistently here (the two interpreter arms use
-2.2×–12× and 5.5×–55× the peak resident memory). **Second**, if the bottleneck is a loop that makes a
+2.3×–11.8× and 5.7×–54.5× the peak resident memory). **Second**, if the bottleneck is a loop that makes a
 small decision per element — quality control, set operations, annotation parsing, variant traversal —
 the difference becomes one to three orders of magnitude. **Third**, once a third-party numerical
 library is involved, the language difference is masked by library quality: `expression.pca` is the
@@ -503,7 +527,7 @@ terabyte-scale gzip data its distance from native Python/R is absorbed by IO and
 The decided direction is: parallel decompression (block-parallel BGZF reads, a SIMD decompression
 library for plain gzip), a pipeline that overlaps decompression with computation, Rayon for
 multi-core work, and Tokio for IO concurrency across large file and process fan-outs.
-**This window's 1.02×–1097× are single-core numbers**; once parallelism lands, the gap for very large
+**This window's 1.02×–1382× are single-core numbers**; once parallelism lands, the gap for very large
 sequence comparison and multi-trajectory simulation should widen with the core count. The measurement
 will then extend the same protocol with a **core-count scaling curve** (parallel efficiency and the
 knee point) and record the frozen thread count for every measurement point, so that a reader can tell
@@ -560,7 +584,7 @@ skill documentation, bilingual docs); **no timeline is promised here**.
 
 **Q1. Is Rust's lead simply an artefact of comparing against interpreters?**
 Not exactly, and the framing is refuted by the data: `sequence.stats` differs by 1.02× (interval
-crossing 1.00, classified as no resolvable difference) because that capability's per-base work happens
+CI [1.01, 1.11], excluding 1.00 but below the 1.10 material threshold) because that capability's per-base work happens
 in C primitives; interpreter cost appears only where every element must pass through the interpreter.
 The advantage follows the workload's shape, not the mere fact that the other arms are interpreted.
 
@@ -586,11 +610,13 @@ A single host and a single scale are this window's deliberate scope; the inputs 
 above start-up magnitude. Cross-machine anchoring (a public hosted benchmark platform) and correctness
 truth sets (GIAB with hap.py) are planned, and are not evidence until they are executed.
 
-**Q6. Is R's ~27-minute SSR leg a deliberately slow library choice?**
+**Q6. Is R's ~37-minute SSR leg a deliberately slow library choice?**
 That leg uses Biostrings' `matchPattern`, the standard approach in that ecosystem, whose cost grows
-with the motif space; we report the absolute time and explain that this is an algorithmic property,
-not a tuning artefact. The three-backend SSR run at N=10 is deferred by a machine-maintenance window
-and lands with the archive.
+with the input and the motif space; we report the absolute time (N=10 median **2,211,405 ms**, about
+36.9 min per run) and explain that this is an algorithmic property, not a tuning artefact. The Python
+arm of that capability uses **`pytrf`, a C extension (not pure Python)**, which is why its gap is only
+1.43× — a direct illustration of what "whole-stack comparison" means: small against a C extension,
+three orders of magnitude against R's per-position interpreter loop.
 
 **Q7. Is the memory comparison fair?**
 Same tool (GNU `/usr/bin/time -v`'s VmHWM), same definition of the instant, median over 10 repeats;
@@ -636,9 +662,11 @@ transformation" disclosure, and axes are linear with the truncated range printed
 
 ## 17. Versions and disclosures
 
-- **Versions**: first release 2026-10-11 (the six fast capabilities at N=10, `fastq.qc`, and the
-  record-granularity experiment; the `sequence.ssr` long run is filled in with the archive). Item-by-item
-  changes are in the changelog at the top.
+- **Versions**: first release 2026-10-11; **2026-10-12 rerun**: all eight capabilities re-measured in a
+  window with **no CI jobs** (archive `bench-20261011-001`), and every number in this article now comes
+  from that clean batch; adds §8.7 (condition comparison: 30 rows inside the noise band, no row excluded)
+  and the `sequence.ssr` N=10 result (R median about 36.9 min per run). Item-by-item changes are in the
+  changelog at the top.
 - **Self-report disclosure**: this is an **author-run benchmark**, not independently replicated by a
   third party. The comparison arms are third-party **library** implementations (Biopython 1.88,
   Biostrings 2.80.2, …), **not** a third-party benchmark suite; GIAB + hap.py (correctness truth sets)

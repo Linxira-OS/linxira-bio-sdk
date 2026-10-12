@@ -63,8 +63,11 @@ def report_key(path: Path, report: dict) -> str:
     so the three record shapes stay distinct instead of colliding on the id.
     """
     capability = report["capability"]
-    stem = path.name
-    marker = stem.replace(f"{capability}.", "").replace(".benchmark.json", "")
+    marker = path.stem.removeprefix(capability).removeprefix(".")
+    if marker == "benchmark":
+        marker = ""
+    elif marker.endswith(".benchmark"):
+        marker = marker[: -len(".benchmark")]
     return f"{capability}#{marker}" if marker else capability
 
 
