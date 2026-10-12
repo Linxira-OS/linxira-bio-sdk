@@ -1,0 +1,29 @@
+--- 与官方表同级：zstd -1（N=3）---
+	User time (seconds): 0.43
+	System time (seconds): 0.04
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.42
+	Maximum resident set size (kbytes): 14708
+run 1 size: 32847929
+	User time (seconds): 0.43
+	System time (seconds): 0.03
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.41
+	Maximum resident set size (kbytes): 14368
+run 2 size: 32847929
+	User time (seconds): 0.44
+	System time (seconds): 0.03
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.43
+	Maximum resident set size (kbytes): 16168
+run 3 size: 32847929
+--- 解压（N=2）---
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.09
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.10
+--- 频率（powersave 下的实际值）---
+CPU(s) scaling MHz:                      100%
+CPU 最大 MHz：                           3700.0000
+CPU 最小 MHz：                           800.0000
+cpu0: 3700000 MHz
+cpu1: 3699707 MHz
+cpu2: 3628499 MHz
+cpu3: 3613886 MHz
+--- 压缩比 ---
+input 101667131 -> -1 32847929 / -19 32847929

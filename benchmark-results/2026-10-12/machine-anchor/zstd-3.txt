@@ -1,0 +1,75 @@
+/tmp/lxn-tool-arms/big.fa : 32.69%   (  97.0 MiB =>   31.7 MiB, /tmp/lxn-tool-arms/big.fa.zst) 
+	Command being timed: "zstd -3 -k -f /tmp/lxn-tool-arms/big.fa -o /tmp/lxn-tool-arms/big.fa.zst"
+	User time (seconds): 0.48
+	System time (seconds): 0.05
+	Percent of CPU this job got: 112%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.47
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 47072
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 6483
+	Voluntary context switches: 903
+	Involuntary context switches: 35
+	Swaps: 0
+	File system inputs: 288
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+--- run 1 size: 33238950
+/tmp/lxn-tool-arms/big.fa : 32.69%   (  97.0 MiB =>   31.7 MiB, /tmp/lxn-tool-arms/big.fa.zst) 
+	Command being timed: "zstd -3 -k -f /tmp/lxn-tool-arms/big.fa -o /tmp/lxn-tool-arms/big.fa.zst"
+	User time (seconds): 0.46
+	System time (seconds): 0.04
+	Percent of CPU this job got: 112%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.44
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 45688
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 2042
+	Voluntary context switches: 900
+	Involuntary context switches: 16
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+--- run 2 size: 33238950
+/tmp/lxn-tool-arms/big.fa : 32.69%   (  97.0 MiB =>   31.7 MiB, /tmp/lxn-tool-arms/big.fa.zst) 
+	Command being timed: "zstd -3 -k -f /tmp/lxn-tool-arms/big.fa -o /tmp/lxn-tool-arms/big.fa.zst"
+	User time (seconds): 0.46
+	System time (seconds): 0.04
+	Percent of CPU this job got: 112%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.44
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 45148
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 1395
+	Voluntary context switches: 876
+	Involuntary context switches: 20
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+--- run 3 size: 33238950

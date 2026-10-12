@@ -17,7 +17,7 @@ The verbatim argv sits in each report (`tool.invocation`), `tool-arms.tsv` is wr
 table builder with `arm_class=tool` in every row, and the inputs are the same files the
 parity window used — regenerated from the same seeds against `inputs.sha256`
 (`big.fa 9f8a4cb4…`, `matrix.tsv 273755e5…`). Machine and environment are recorded in each
-report; this is the same 2-core/4-thread host as the window, `powernow` governor, GNU `time`
+report; this is the same 2-core/4-thread host as the window, `powersave` governor, GNU `time`
 present so peak RSS is measured rather than assumed.
 
 ## What they say, and why it is uncomfortable

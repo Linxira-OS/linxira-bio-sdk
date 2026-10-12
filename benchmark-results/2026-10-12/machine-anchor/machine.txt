@@ -1,0 +1,8 @@
+host: Linux 7.2.9-1-cachyos x86_64
+cpu: Intel(R) Pentium(R) Gold G7400
+cores: 4
+mem: 
+governor: powersave
+zstd: *** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***
+openssl: OpenSSL 3.6.5 29 Sep 2026 (Library: OpenSSL 3.6.5 29 Sep 2026)
+kernel: 7.2.9-1-cachyos
