@@ -1,0 +1,86 @@
+name: I cannot reproduce a result
+description: A number, figure or claim in an article or archive did not reproduce on your machine.
+title: "reproduction: <what did not reproduce>"
+labels: ["reproduction"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you — this is the most valuable issue you can open here. Two requests before
+        you start: run the command you are reporting against the **archived revision**, and
+        paste raw output rather than a summary. `REPRODUCE.md` is the long version of what
+        a reviewer needs, and `docs/outreach/corrections-log.md` lists what we have already
+        got wrong.
+
+  - type: input
+    id: claim
+    attributes:
+      label: Which claim?
+      description: Article title and section or figure number, or the archive table and row.
+      placeholder: e.g. "three-language benchmark, figure F7, sequence.ssr ratio for r"
+    validations:
+      required: true
+
+  - type: input
+    id: revision
+    attributes:
+      label: Revision you ran
+      description: Commit hash you checked out (the archive records its own revision).
+      placeholder: 89882a5a31714e12e0dee4333d20f2b50b0c99c5
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command
+      description: Copy-pasteable, including flags. If it came from REPRODUCE.md or a window script, say which file.
+      render: bash
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what you got
+      description: Paste both raw outputs. If a number differs, give the value you saw.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: |
+        OS and version; CPU and core count; RAM; whether GNU `time` is installed (without it
+        `peak_rss_mb` is null by construction); interpreter versions and whether they came
+        from the pack lock; filesystem the working directory is on (tmpfs, ext4, drvfs…).
+        Mention if the machine was doing anything else at the time.
+    validations:
+      required: true
+
+  - type: input
+    id: sha256
+    attributes:
+      label: Input sha256 (if inputs are involved)
+      description: Output of `sha256sum` on the input file, to compare against `inputs.sha256`.
+    validations:
+      required: false
+
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: What you think is wrong
+      description: Bug, misstatement, unfair comparison, wrong baseline, missing precondition — your reading, including "I may be misusing the tool".
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Before submitting
+      options:
+        - label: I ran the command on the archived revision (or I note why I could not).
+          required: true
+        - label: I am not including confidential data or credentials in this issue.
+          required: true

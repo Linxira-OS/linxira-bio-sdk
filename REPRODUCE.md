@@ -96,7 +96,18 @@ CV of 1.95% is quantisation rather than jitter. A `0.0` here means "faster than 
 | The arms are same-algorithm parity implementations, not each language's idiomatic tooling | by design; tool arms (fastp/seqkit/pyfastx/scikit-learn) are the next pass |
 | CI does not yet run `benchmark.run.v1` end-to-end | open — only the harness unit tests run today |
 
-## 4. What this file is not
+## 4. Before or while you report
+
+- `docs/outreach/reviewer-brief.md` — the shortest path from a clone to a verdict, with the
+  exact commands and the values to expect.
+- `docs/outreach/corrections-log.md` — every error we have found in our own published
+  claims, including a retracted vendor statement, with the commit that fixed each one.
+- [`.github/ISSUE_TEMPLATE/reproduction-failure.yml`](.github/ISSUE_TEMPLATE/reproduction-failure.yml)
+  — the issue form: it asks for the revision, the command, both outputs, and your
+  environment, because those four things decide whether the difference is ours or the
+  machine's.
+
+## 5. What this file is not
 
 It is not a claim that our numbers generalise beyond this machine, these inputs and this protocol,
 and it is not a substitute for the articles' limitations sections. If you find that a claim in the
