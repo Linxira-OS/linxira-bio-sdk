@@ -78,7 +78,10 @@ CV of 1.95% is quantisation rather than jitter. A `0.0` here means "faster than 
 
 | Gap | Status |
 | --- | --- |
-| `requirements.lock` pins `biopython==1.85` / `numpy==2.2.4` while the archived environment reports 1.88 / 2.5.4 | open — the lock must govern the run; being reconciled in the next pass |
+| The archived environment reports `biopython 1.88` / `numpy 2.5.4` while the lock pins 1.85 / 2.2.4 | open — the lock states the intended environment; the next window installs from it, so lock == environment |
+| **The lock in the archived revision could not be installed at all** | fixed on `main` (2026-10-12): the `pytrf` block held an escaped line-break sequence instead of real line breaks, and the pin set omitted `pyfastx`, which `pytrf` declares, so `uv pip install --require-hashes -r …` stopped at `pyfastx` — the CI step that installs this lock never reached the tests behind it |
+| The lock is now generated, not hand-edited: `scripts/generate-python-lock.py` resolves `requirements.in` with `uv pip compile --generate-hashes` for x86_64-manylinux and x86_64-windows and merges the hash sets | verified by a real `--require-hashes` install on Windows (`pytrf 1.5.0`, `pyfastx 2.3.1`, `biopython 1.85`, `numpy 2.2.4` import) and by a platform-targeted dry-run for manylinux |
+| CI does not yet run `benchmark.run.v1` end-to-end | fixed 2026-10-12: the debian job runs a three-backend smoke on the tiny fixture and asserts consistency + recorded wall_ms/peak_rss_mb |
 | No installer and no published package | open — `cargo install --git …` is the current path; installers are planned |
 | No third-party benchmark suite was run (PTS/OpenBenchmarking/SPEC/GIAB+hap.py) | open — anchors are scheduled; every number published so far comes from our own harness |
 | The arms are same-algorithm parity implementations, not each language's idiomatic tooling | by design; tool arms (fastp/seqkit/pyfastx/scikit-learn) are the next pass |

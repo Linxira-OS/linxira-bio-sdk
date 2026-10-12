@@ -23,7 +23,7 @@
     "core_compatibility": ">=0.1.0,<2.0.0",
     "dependency_lock": {
       "path": "requirements.lock",
-      "sha256": "69e4e4399efeb722ea09b2e36862a584af4e1cf6e32392eaaa36c125bcdffc22"
+      "sha256": "9b396669f36620825f657b9859dc8b82baa6fd8c9fbf6561f2ef95573da484bb"
     }
   },
   "input_schema": {
@@ -60,7 +60,7 @@
     },
     {
       "path": "requirements.lock",
-      "sha256": "69e4e4399efeb722ea09b2e36862a584af4e1cf6e32392eaaa36c125bcdffc22"
+      "sha256": "9b396669f36620825f657b9859dc8b82baa6fd8c9fbf6561f2ef95573da484bb"
     },
     {
       "path": "schemas/input.schema.json",
@@ -157,6 +157,10 @@
     {
       "path": "src/implementations/sequence_ssr_v1.py",
       "sha256": "4501b15e259930e4512a2dfd75967d7996cb4cf174f6f769010efb767478456a"
+    },
+    {
+      "path": "requirements.in",
+      "sha256": "95236996e6825bbdbd707265c75ade46b1823335b243e0372618368d181d0727"
     }
   ],
   "contract": {

@@ -1,0 +1,6 @@
+# Intent of the benchmark python pack environment. The lock is generated from
+# this file (scripts/generate-python-lock.py); transitive pins such as pyfastx
+# (declared by pytrf) appear only in the lock.
+biopython==1.85
+numpy==2.2.4
+pytrf==1.5.0
