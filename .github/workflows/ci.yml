@@ -183,7 +183,7 @@ jobs:
     steps:
       - run: apt-get update
       - run: >-
-          apt-get install -y build-essential curl dirmngr git gnupg
+          apt-get install -y build-essential curl dirmngr git gnupg time
           libgl1-mesa-dev libwayland-dev libx11-dev libxcursor-dev libxi-dev
           libxinerama-dev libxkbcommon-dev libxrandr-dev pkg-config python3
           python3-venv nodejs npm
@@ -406,7 +406,13 @@ jobs:
               if any(run.get("wall_ms") is None for run in ok):
                   problems.append(f"{backend['backend']}: wall_ms not recorded")
               if not any(run.get("peak_rss_mb") for run in ok):
-                  problems.append(f"{backend['backend']}: peak_rss_mb not recorded")
+                  # `peak_rss_mb` comes from GNU time; without /usr/bin/time the harness
+                  # falls back to in-process timing and records timed_with_time_v=false.
+                  witness = ok[0].get("timed_with_time_v")
+                  problems.append(
+                      f"{backend['backend']}: peak_rss_mb not recorded "
+                      f"(timed_with_time_v={witness}; install the `time` package)"
+                  )
               # The harness clock ticks at 10 ms, so a sub-10 ms native run is
               # legitimately recorded as 0.0. The interpreter arms start a process,
               # so they must exceed the tick and act as the clock witness.

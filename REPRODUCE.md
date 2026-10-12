@@ -65,6 +65,15 @@ articles and in `summary.json`): same inputs (digests above), same machine class
 pinned (`powersave` in this window — a conservative floor, disclosed as such), warm page cache,
 one untimed warm-up plus 10 timed repeats, medians (not means) with bootstrap CIs.
 
+### Peak memory needs GNU `time`
+
+`peak_rss_mb` and the disk-throughput columns come from `/usr/bin/time -v`. Without the
+`time` package installed, the harness automatically falls back to in-process timing: wall
+time is still recorded, `peak_rss_mb` is `null`, and every run says so in
+`timed_with_time_v: false`. Every memory number we publish comes from a machine with
+`time` installed. If you compare our RSS numbers with your own, install `time` first —
+otherwise you are comparing a measurement against the absence of one.
+
 ### Timing resolution (read this before judging a small fixture run)
 
 The harness measures wall time with a 10 ms clock, so on a tiny fixture the native arm can be
