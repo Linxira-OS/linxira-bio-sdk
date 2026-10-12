@@ -5,6 +5,8 @@
     "README.md",
     "LICENSE",
     "THIRD_PARTY.md",
+    "COMMERCIAL.md",
+    "CONTRIBUTING.md",
     "Cargo.lock",
     "deny.toml",
     "AGENTS.md",

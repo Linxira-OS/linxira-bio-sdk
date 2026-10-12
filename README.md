@@ -217,6 +217,13 @@ network must provide the corresponding source as required by the AGPL.
 Third-party components retain their own notices and terms; see
 `THIRD_PARTY.md`.
 
+Using the project at work is covered by the AGPL and needs no conversation with
+us. Organisations that cannot accept the AGPL — typically because AGPL §13's
+source-provision duty conflicts with a closed-source product or a hosting policy
+— can license the same code under separate commercial terms; see `COMMERCIAL.md`.
+The released build is identical either way: no license keys, no gating, no
+telemetry. Contributions require the terms in `CONTRIBUTING.md`.
+
 ---
 
 ## 简体中文
@@ -406,3 +413,8 @@ AGPL-3.0-or-later 许可证的一部分，不增加任何使用限制，也不�
 项目自有代码、技能、GUI、SDK、worker 以及面向网络的服务以
 `AGPL-3.0-or-later` 发布。通过网络向用户提供修改版本时，必须按 AGPL 要求
 提供相应源代码。第三方组件保留其自身的声明与条款，见 `THIRD_PARTY.md`。
+
+在公司内使用本项目已由 AGPL 授权，无需与维护者沟通。若组织无法接受 AGPL
+（通常是 AGPL §13 的源代码提供义务与闭源产品或托管政策冲突），可就**同一份
+代码**另行签订商业授权条款，见 `COMMERCIAL.md`。两条路径下发布的构建完全
+相同：没有许可证密钥、没有功能门控、没有遥测。贡献条款见 `CONTRIBUTING.md`。

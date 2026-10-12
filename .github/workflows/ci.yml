@@ -377,7 +377,10 @@ jobs:
       - name: Benchmark smoke (three backends on a tiny fixture, consistency asserted)
         run: |
           export LINXIRA_BIO_WORKFLOW_PYTHON="$GITHUB_WORKSPACE/.venv-benchmark/bin/python"
-          ./target/release/linxira-bio benchmark run sequence.stats.v1 \
+          # Debug binaries: this job already compiles the workspace for its tests, and the
+          # smoke asserts consistency and metric capture, not absolute speed.
+          cargo build --locked -p linxira-bio-cli -p linxira-bio-worker
+          ./target/debug/linxira-bio benchmark run sequence.stats.v1 \
             fasta=tests/fixtures/sequences/tiny.fa \
             --backends rust,python,r --repeat 2 \
             --output "$GITHUB_WORKSPACE/target/benchmark-smoke" \
