@@ -444,12 +444,26 @@ R 腿进一步到 149×–1097×。这不是"语言排名"，而是**工作负�
 届时的测量会在同一协议之上扩展：加入**核数—加速比曲线**（含并行效率与拐点），
 并把每个测点的线程数固定在报告里，否则读者无法区分收益来自算法还是来自核数。
 
-**GPU 的 Rust 官方入口在 2026 年 9 月同时被两家厂商打开。** NVIDIA 于 2026-09-08 公布 CUDA Rust 双轨：
-`cutile-rs`（瓦片式 DSL，stable Rust 1.89+）与 `cuda-oxide`（SIMT，nightly），官方自述两者均处早期、
-尚未生产可用；摩尔线程于 2026-09-23 发布了基于 MUSA 5.2 驱动 ABI 的 Rust 绑定（`cudarc` 的官方分支），
-是国产厂商第一个官方 Rust GPU 工件；Intel 有官方 `sycl-rs`（实验性）；AMD 目前没有官方 Rust 计算路径。
-我们自己的证据是：在 GPU 实验载体中，**同一份内核源码**已经分别通过摩尔线程与 NVIDIA 两条工具链编译，
-并在两张卡上得到一致结果——也就是说，"一份 Rust 源码、两家厂商"这条路线我们已经走通一次，
+**各家在"Rust 写加速器"上的官方进度并不一样（本文按 2026-10-12 复核，出处见 §16）。** NVIDIA 于
+2026-09-08 公布 CUDA Rust 双轨：`cutile-rs`（瓦片式 DSL，stable Rust 1.89+）与 `cuda-oxide`（SIMT，
+nightly），官方自述两者均处早期、尚未生产可用。Intel 的官方 Rust 工作有三条：`intel/openvino-rs`
+（官方组织下的推理绑定，覆盖 CPU/GPU/NPU，含 `openvino-genai` 的 LLM 管线，仓库持续更新）、
+`oneapi-src/oneapi-rs` 的 `sycl-rs`（**可提交内核**，但官方自述 experimental、未发布 0.1.0、只在
+Linux + oneAPI 2026.1 上测过）、`intel/ittapi`（性能插桩绑定）。AMD 在**主机侧**已经大量使用 Rust：
+ROCm 官方组织下有 5 个 Rust 仓库，其中 Slurm 兼容的作业调度器 `spur` 132 星、面向用户的 `rocm-cli`
+以单个 Rust 二进制发布（官方自述 Tech Preview），`amdsmi` 亦自带官方 Rust crate；但**没有官方的
+内核（GPU 内核/HIP 绑定）编写路径**——那部分仍是社区项目（`rocm-rs`、`rocmrc`、`cubecl-hip-sys`），
+XDNA NPU 侧官方也只有 C++/Python。摩尔线程的 MUSA 生态同样以 Python/C++（`torch_musa`、`vllm-musa`、
+算子库 `mate`、`mcc` 工具链）为主；我们早前记录的"基于 MUSA 5.2 的官方 Rust 绑定"在本次复核中
+**找不到公开出处**，因此本稿不再把它当作既成事实。
+
+我们自己的执行记录需要分清两件事：**已经跑通的是"一份 C/C++ 内核源码、两家原生工具链"**——同一份
+内核套件分别用 `nvcc`（RTX 4080S，sm_89）与 `mcc`（MTT S4000）编译，median-of-3、逐项正确性门全过，
+两卡在各内核上的比值可复算（§16 出处）；**Rust 工具链那一步没有跑通**：`cutile-rs` 当时不在
+crates.io 上，依赖链与驱动门槛使其未能进入执行，MUSA 侧的 Rust 绑定也未进入实测。所以"一份 Rust
+源码、两家厂商"目前是**待验证路线**，已完成的结论是**单源内核的可移植性**；剩下的是工具链成熟度，
+不是架构问题。
+
 剩下的是工具链成熟度，而不是架构问题。〔出处见 §16〕
 
 **虚拟细胞为什么两者都需要。** 我们实现的机制型细胞模拟（Gillespie 精确法、转录爆发、Monod 生长、
@@ -506,10 +520,17 @@ R 腿进一步到 149×–1097×。这不是"语言排名"，而是**工作负�
 
 1. NVIDIA. *Introducing CUDA Rust: Two Tracks for Writing GPU Kernels.* NVIDIA Technical Blog, 2026-09-08.
    <https://developer.nvidia.com/blog/introducing-cuda-rust-two-tracks-for-writing-gpu-kernels>
-2. Moore Threads. *MUSA SDK / `cudarc-musa`（MUSA 5.2 驱动 ABI 的 Rust 绑定，2026-09-23 发布）*，
-   官方 GitHub 组织：<https://github.com/MooreThreads>（发布公告在本文写作时尚未提供稳定公开链接，故按厂商公告记录）
-3. Intel. *oneapi-rs（`sycl-rs`，实验性）*：<https://github.com/oneapi-src/oneapi-rs>
-4. 本文引用的全部软件版本见 §7 环境披露；Biopython、Biostrings、numpy、R 与 CPython 均为各自项目发布版本。
+2. Intel. *openvino-rs（官方 OpenVINO 推理绑定，覆盖 CPU/GPU/NPU）*：<https://github.com/intel/openvino-rs>；
+   *oneapi-rs（`sycl-rs`，实验性、可提交内核）*：<https://github.com/oneapi-src/oneapi-rs>；
+   *ittapi（性能插桩 Rust 绑定）*：<https://github.com/intel/ittapi>
+3. AMD. *ROCm 官方组织下的 Rust 工程*：<https://github.com/ROCm/spur>（Slurm 兼容调度器）、
+   <https://github.com/ROCm/rocm-cli>（官方自述 Tech Preview）、<https://github.com/ROCm/amdsmi>
+   （含官方 `rust-interface/`）
+4. 本仓库的双厂内核实测（同一份 C/C++ 内核，`nvcc` 与 `mcc` 两条原生工具链，RTX 4080S 与 MTT S4000）：
+   <https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/docs/engine-evals/gpu-rental-round3-dual-vendor-2026-10-02.md>
+5. 本文对厂商 Rust 支持状态的复核记录（2026-10-12，含检索方法与全部出处）：
+   <https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/docs/engine-evals/vendor-rust-status-2026-10-12.md>
+6. 本文引用的全部软件版本见 §7 环境披露；Biopython、Biostrings、numpy、R 与 CPython 均为各自项目发布版本。
 
 ## 17. 版本与声明
 

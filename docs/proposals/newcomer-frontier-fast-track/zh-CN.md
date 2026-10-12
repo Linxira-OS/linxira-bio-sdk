@@ -89,7 +89,7 @@ linxira-bio variant call aligned.bam ref.fa calls.vcf
    `docs/engine-evals/gpu-wgpu-2026-09-30.md`：它是台账的格式模板，包括逐指标
    精度容差的显式声明方式。
 4. **厂商栈对照**（M5-G3，见 `docs/proposals/m5-g3-vendor-track-plan.md`）—
-   同一内核走 cutile-rs / cudarc-musa / sycl-rs，trait 层负责回退 wgpu。
+   同一内核走 cutile-rs / sycl-rs / MUSA 原生（`mcc` 或自建薄 FFI），trait 层负责回退 wgpu。
 
 成长路径 = 里程碑阶梯本身：M5-G0 → G3。你的实验笔记就是 `docs/engine-evals/`——
 测量纪律（≥3 次取中位、分相计时、容差显式）正是要学的技能。
@@ -99,7 +99,7 @@ linxira-bio variant call aligned.bam ref.fa calls.vcf
 各家厂商 Rust 栈都是数天到数月的新事物；来自真实工作负载的首批实测报告能获得
 维护者关注，并积累个人可见度：
 
-- **cudarc-musa**（摩尔线程官方 fork）— 首批开发者窗口 issue（见提案 §2.2）。
+- **MUSA 原生栈**（摩尔线程；Rust 侧无官方绑定，2026-10-12 复核）— 自建薄 FFI 的 ABI 笔记与文档缺口报告（见提案 §2.2）。
 - **cutile-rs**（NVIDIA 官方）— 消费级 sm_89 工作负载报告。
 - **sycl-rs**（Intel oneapi-rs）— 上游未测 Windows；你的 Windows 实验本身就是
   贡献。

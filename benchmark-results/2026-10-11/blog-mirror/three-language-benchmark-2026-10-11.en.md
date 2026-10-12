@@ -509,15 +509,32 @@ will then extend the same protocol with a **core-count scaling curve** (parallel
 knee point) and record the frozen thread count for every measurement point, so that a reader can tell
 an algorithmic gain from a core-count gain.
 
-**Two vendors opened official Rust entry points to the GPU in September 2026.** NVIDIA announced its
-CUDA Rust dual track on 2026-09-08 — `cutile-rs` (a tile DSL on stable Rust 1.89+) and `cuda-oxide`
-(SIMT, nightly) — describing both as early-stage and not production-ready; Moore Threads released a
-Rust binding against the MUSA 5.2 driver ABI on 2026-09-23 (an official fork of `cudarc`), the first
-official Rust GPU artefact from a domestic vendor; Intel publishes an official `sycl-rs`
-(experimental); AMD has no official Rust compute path today. Our own evidence: in our GPU experiment
-carrier, **one kernel source file** has been compiled through both the Moore Threads and the NVIDIA
-toolchains and produced matching results on both cards. In other words, "one Rust source, two vendors"
-has already been walked once here; what remains is toolchain maturity, not architecture. (Sources in
+**Vendors are not equally far along in Rust-for-accelerator support (re-checked 2026-10-12; sources in §16).**
+NVIDIA announced its CUDA Rust dual track on 2026-09-08 — `cutile-rs` (a tile DSL on stable Rust 1.89+)
+and `cuda-oxide` (SIMT, nightly) — describing both as early-stage and not production-ready. Intel's
+official Rust work comes in three parts: `intel/openvino-rs` (official inference bindings covering
+CPU/GPU/NPU, including the `openvino-genai` LLM path, actively updated); `oneapi-src/oneapi-rs`
+(`sycl-rs`, which **can submit kernels**, but is self-described as experimental, has not released 0.1.0,
+and is tested only on Linux with oneAPI 2026.1); and `intel/ittapi` (instrumentation bindings). AMD
+already uses Rust heavily on the **host** side: the ROCm organisation hosts five Rust repositories,
+including the Slurm-compatible scheduler `spur` (132 stars) and `rocm-cli`, shipped as a single Rust
+binary and self-described as a Tech Preview, while `amdsmi` contains an official `rust-interface/` crate.
+What AMD does **not** have is an official **kernel-authoring** path (GPU kernel / HIP bindings remain
+community work: `rocm-rs`, `rocmrc`, `cubecl-hip-sys`), and on the XDNA NPU side the official route is
+C++/Python only. Moore Threads' MUSA ecosystem is likewise Python/C++ (`torch_musa`, `vllm-musa`, the
+`mate` operator library, the `mcc` toolchain); the "MUSA 5.2 official Rust binding" we recorded earlier
+**has no public source we could find on re-check**, so it is no longer stated as fact here.
+
+Our own execution record needs to distinguish two things: **what has been run is "one C/C++ kernel
+source, two native toolchains"** — the same kernel suite compiled by `nvcc` (RTX 4080S, sm_89) and `mcc`
+(MTT S4000), median-of-3, passing every correctness gate, with per-kernel ratios anyone can recompute
+(source in §16); **the Rust toolchain step has not been run**: `cutile-rs` was not on crates.io at the
+time, and its dependency chain plus driver gates kept it out of execution, while the MUSA-side Rust
+binding never reached measurement. "One Rust source, two vendors" is therefore a **route awaiting
+verification**; what is established is **single-source kernel portability**. What remains is toolchain
+maturity, not architecture.
+
+what remains is toolchain maturity, not architecture. (Sources in
 §16.)
 
 **Why the virtual cell needs both.** Our mechanism-level cell simulation (exact Gillespie,
@@ -591,12 +608,19 @@ transformation" disclosure, and axes are linear with the truncated range printed
 
 1. NVIDIA. *Introducing CUDA Rust: Two Tracks for Writing GPU Kernels.* NVIDIA Technical Blog,
    2026-09-08. <https://developer.nvidia.com/blog/introducing-cuda-rust-two-tracks-for-writing-gpu-kernels>
-2. Moore Threads. *MUSA SDK / `cudarc-musa`* — a Rust binding against the MUSA 5.2 driver ABI,
-   announced 2026-09-23; official GitHub organisation: <https://github.com/MooreThreads> (no stable
-   public link for the announcement existed when this was written, so it is recorded as a vendor
-   announcement).
-3. Intel. *oneapi-rs (`sycl-rs`, experimental)*: <https://github.com/oneapi-src/oneapi-rs>
-4. Software versions used throughout are disclosed in §7; Biopython, Biostrings, numpy, R and CPython
+2. Intel. *openvino-rs (official OpenVINO inference bindings, CPU/GPU/NPU)*:
+   <https://github.com/intel/openvino-rs>; *oneapi-rs (`sycl-rs`, experimental, can submit kernels)*:
+   <https://github.com/oneapi-src/oneapi-rs>; *ittapi (instrumentation bindings for Rust)*:
+   <https://github.com/intel/ittapi>
+3. AMD. *Rust projects in the official ROCm organisation*: <https://github.com/ROCm/spur> (Slurm-compatible
+   scheduler), <https://github.com/ROCm/rocm-cli> (self-described Tech Preview),
+   <https://github.com/ROCm/amdsmi> (contains the official `rust-interface/`)
+4. Our own dual-vendor kernel measurements (one C/C++ kernel source through two native toolchains,
+   `nvcc` and `mcc`, on an RTX 4080S and an MTT S4000):
+   <https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/docs/engine-evals/gpu-rental-round3-dual-vendor-2026-10-02.md>
+5. Our re-check of vendor Rust support (2026-10-12, with search method and every source):
+   <https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/docs/engine-evals/vendor-rust-status-2026-10-12.md>
+6. Software versions used throughout are disclosed in §7; Biopython, Biostrings, numpy, R and CPython
    are cited there as their own project releases.
 
 ## 17. Versions and disclosures

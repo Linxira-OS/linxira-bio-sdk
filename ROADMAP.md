@@ -387,22 +387,34 @@ async fn main() -> std::io::Result<()> {
 
 ### 9.5 M5-G —— Rust GPU 内核首批开发者轨（2026-09-29 增补；同日按厂商一手资料修订）
 
-**厂商官方一手结论**（2026-09-29 核验，来源均为官方博客/官方 GitHub/官方文档）：
+**厂商官方一手结论**（2026-09-29 核验；**2026-10-12 复核修订**，依据
+`docs/engine-evals/vendor-rust-status-2026-10-12.md`）。**凡涉及 `cudarc-musa` 的条目均属未核实声明，
+使用前须按该台账 §2 的方法重新取证**：
 - **NVIDIA**：2026-09-08 官宣 CUDA Rust 双轨——cutile-rs（瓦片 DSL，**stable Rust 1.89+**，
   CUDA 13.3 推荐，**仅 Linux（Ubuntu 24.04 测试），sm_80+，官方明文"sm_70/75 及以下不支持"**，
   "reach for Tile first"）与 cuda-oxide（SIMT，nightly，Linux）。官方自认"both early-stage,
   neither production-ready"，承诺"maturing CUDA Rust into 2027 and beyond"；NVIDIA 已成
   Rust Foundation Platinum 会员。已获 HF Grout、mistral.rs 采用——**首批开发者窗口正开**。
-- **Intel**：官方 oneapi-src/oneapi-rs（`sycl-rs` v0.1.0，"experimental…not ready for
-  production"，**仅 Linux 测试配置**）。**iGPU（11 代酷睿+）是完整官方 oneAPI 目标**——本机核显
+- **Intel**：官方 Rust 侧共三条（2026-10-12 复核补记）——`intel/openvino-rs`（官方 OpenVINO 推理
+  绑定，覆盖 CPU/GPU/**NPU**，含 `openvino-genai` 的 LLM 管线，仓库持续更新）；`oneapi-src/oneapi-rs`
+  的 `sycl-rs`（**可提交内核**，但官方自述 "experimental…not ready for production"、**未发布 0.1.0**、
+  **仅 Linux + oneAPI 2026.1 测试配置**）；`intel/ittapi`（ITT/JIT 性能插桩的 Rust 绑定）。**iGPU（11 代酷睿+）是完整官方 oneAPI 目标**——本机核显
   即为合法开发环境；Gen9-11 走 legacy 包。
-- **AMD**：**官方零 Rust 计算路径**（仅 amdsmi 管理类绑定）；hip-rs 为社区停更项目；Polaris
+- **AMD**：**主机侧官方大量使用 Rust，但没有内核编写路径**（2026-10-12 复核；原"官方零 Rust 计算
+  路径"表述有误）——ROCm 官方组织下有 **5 个 Rust 仓库**：`ROCm/spur`（Slurm CLI/REST/C FFI 兼容的
+  作业调度器，132★）、`ROCm/rocm-cli`（面向用户的 AMD GPU 本地 AI CLI/TUI，官方自述 Tech Preview）、
+  `ROCm/spur-cloud`、`ROCm/axis`、`ROCm/cm`；`ROCm/amdsmi` 亦自带官方 `rust-interface/` crate。
+  **GPU/NPU 内核侧仍无官方路径**（社区：`rocm-rs`、`rocmrc`、`cubecl-hip-sys`），XDNA NPU 侧官方仅
+  C++/Python（`amd/xdna-driver`），`org:amd` 无 Rust 仓库。hip-rs 为社区停更项目；Polaris
   级老卡官方全栈不支持。AMD 卡走 wgpu/Vulkan 覆盖。
-- **摩尔线程**：**2026-09-23 官方发布 cudarc-musa**（cudarc 官方 fork，MUSA 5.2 driver ABI，
-  crates.io 发布准备中）——国产厂商第一个官方 Rust GPU 工件，此刻入场即绝对首批；民用零售
-  全系可购（S80 16GB/¥1499、S90 16GB/4060 级、X300 专业卡，下一代"庐山"最高 64GB），官方
-  Vulkan 1.3 驱动（Vulkan compute 已被 ollama-musa 实用），KUAE 与京东云（10 万卡集群计划）
-  云租可期。
+- **摩尔线程**：~~2026-09-23 官方发布 cudarc-musa（cudarc 官方 fork，MUSA 5.2 driver ABI）~~ ——
+  **2026-10-12 复核后撤回**：上游 `cudarc` 无 MUSA 代码（仓库内 `musa` 检索 0 命中）、MooreThreads
+  组织无 Rust 仓库、crates.io 无对应发布，公开渠道查不到出处（见复核台账 §5）。可核实的现状为
+  **C++/Python 路径**：MUSA SDK（`mcc`，clang-14 派生）、`torch_musa`、`vllm-musa`、算子库 `mate`、
+  `tutorial_on_musa`；Rust 侧暂无官方工件。硬件/驱动侧事实不变：民用零售全系可购（S80 16GB/¥1499、
+  S90 16GB/4060 级、X300 专业卡，下一代"庐山"最高 64GB），官方 Vulkan 1.3 驱动（Vulkan compute 已被
+  ollama-musa 实用），KUAE 与京东云（10 万卡集群计划）云租可期；本仓库已在 MTT S4000 上实测**原生
+  `mcc` 工具链**（`gpu-rental-round2/round3`）。
 - **砺算科技**：民用卡 LX 7G100（12GB/¥2688 京东现货）+ 专业卡 LX ULTRA/PRO（24GB，企业
   渠道）；计算路径仅 OpenCL 3.0 + Vulkan 1.3（无 CUDA/ROCm，**无公开 SDK**，GitHub org 空，
   驱动 Pilot Release 节奏，无独立 compute 验证）——**观察档**：若入卡仅走 ash/wgpu-on-Vulkan

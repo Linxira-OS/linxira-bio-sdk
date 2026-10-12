@@ -44,15 +44,15 @@ wgpu 回退 / 厂商栈 四路对照 → 台账（3 次中位、分相、容差�
 | 台账 | `docs/engine-evals/gpu-cutile-<日期>.md`，表式沿用 gpu-wgpu-2026-09-30.md |
 | 上游产出 | 见 §2.3 |
 
-### 1.2 摩尔线程 —— cudarc-musa（民购 S80 优先；标记最优先）
+### 1.2 摩尔线程 —— MUSA 原生栈（民购 S80 优先；Rust 绑定经复核不存在）
 
 | 项 | 内容 |
 | --- | --- |
 | 硬件 | 民购 S80 16GB（¥1499 档）优先，KUAE 云租备选；MUSA 5.2 driver ABI |
-| 栈 | cudarc-musa（官方 fork，2026-09-23 发布；§9.5 定为"国产最优先"） |
-| 内核移植 | host 侧走 cudarc 同形 API（fork 兼容），内核源码级重编译（cu-bridge/musify 语义） |
+| 栈 | **原生 `mcc` 工具链**（本仓库已在 MTT S4000 实测，见 `gpu-rental-round2/round3`）；Rust 侧**无已核实的官方绑定**——2026-10-12 复核后撤销 `cudarc-musa` 声明（`docs/engine-evals/vendor-rust-status-2026-10-12.md` §5）。需要 Rust 时自行在 `gpu-lab` 内做薄 FFI（`libmusart`；API 与 CUDA 同构已在实机验证） |
+| 内核移植 | host 侧形如 `musaMalloc/musaMemcpy/musaLaunchKernel`（与 CUDA 同构，实机已验证），内核源码级重编译（cu-bridge/musify 语义） |
 | 对照组 | 同 §1.1；另与官方 Vulkan 1.3 驱动的 wgpu 回退对照（S80 Vulkan compute 已被 ollama-musa 实用） |
-| 首批窗口 | crates.io 发布准备中即窗口期：环境问题、文档缺口、ABI 假设都是 issue 素材 |
+| 首批窗口 | 窗口期改判为**自建绑定**：MUSA 5.2 ABI 初始化、错误分类、文档缺口都是上游反馈素材 |
 | 台账 | `docs/engine-evals/gpu-musa-<日期>.md` |
 | 上游产出 | 见 §2.2 |
 
@@ -68,12 +68,12 @@ wgpu 回退 / 厂商栈 四路对照 → 台账（3 次中位、分相、容差�
 | 台账 | `docs/engine-evals/gpu-sycl-<日期>.md`（Windows 行单独标注） |
 | 上游产出 | 见 §2.1 |
 
-### 1.4 AMD —— ROCm/HIP（云租 RX 9060/9070 XT；无官方 Rust 是既定事实）
+### 1.4 AMD —— ROCm/HIP（云租 RX 9060/9070 XT；无官方**内核**编写路径，主机侧官方已有 Rust）
 
 | 项 | 内容 |
 | --- | --- |
 | 硬件 | 云租 RX 9060 / 9070 XT（RDNA4）；旧卡 RX 580（gfx803）官方 ROCm 不支持，走 Vulkan 档 |
-| 栈 | 无官方 Rust 计算路径（§9.5：hip-rs 社区停更）→ 方案 = **Vulkan 持平层 + amdsmi 观测**：内核统一在 wgpu/Vulkan 基线层，ROCm 档用 HIP C++ 内核对照 + amdsmi 采集功耗/时钟 |
+| 栈 | 无官方内核编写路径（GPU 内核/HIP 绑定仅社区：`rocm-rs`/`rocmrc`/`cubecl-hip-sys`）；主机侧 ROCm 官方有 5 个 Rust 仓库（`spur`、`rocm-cli` 等）与官方 `amdsmi` Rust crate（见 §9.5 与复核台账）→ 方案 = **Vulkan 持平层 + amdsmi 观测**：内核统一在 wgpu/Vulkan 基线层，ROCm 档用 HIP C++ 内核对照 + amdsmi 采集功耗/时钟 |
 | 内核移植 | Pearson v3 / histogram 写一份 HIP C++ 对照内核（单独目录，不入 engine），验证 Vulkan 层数值与性能差距 |
 | 对照组 | 同卡 wgpu（Vulkan）vs HIP C++（ROCm）vs CPU audit；差距即"持平层"结论 |
 | 台账 | `docs/engine-evals/gpu-rocm-<日期>.md` |
@@ -92,14 +92,12 @@ wgpu 回退 / 厂商栈 四路对照 → 台账（3 次中位、分相、容差�
 - **时机**：本机 sycl-rs 首次跑通或明确失败后立即提（失败也是贡献：上游缺 Windows CI
   的证据）。
 
-### 2.2 摩尔线程 cudarc-musa —— 首批窗口 issue
+### 2.2 摩尔线程 MUSA —— 原生栈与自建绑定反馈（无官方 Rust 仓库可提交）
 
-- **仓库**：摩尔线程官方 cudarc-musa fork（crates.io 发布准备中）。
-- **提案标题**：`First-developer window report: cudarc-musa on S80 (MUSA 5.2) with a
-  real workload (Pearson correlation kernel)`。
-- **内容要点**：从 crates.io 占位/文档缺口入手——driver ABI 初始化在 MUSA 5.2 的实测
-  差异、cu-bridge/musify 重编译流程对 Rust 侧 kernel 字符串的要求、S80 16GB 显存下的
-  buffer 策略；附 gpu-lab 最小示例与分相计时。
+- **对象**：MUSA SDK 原生工具链（`mcc`）与我们自建的 `libmusart` 薄 FFI；2026-10-12 复核确认**不存在**可提交的官方 Rust 仓库。
+- **提案标题**：`Binding a CUDA-shaped vendor runtime (MUSA) from Rust: ABI notes and gaps`。
+- **内容要点**：MUSA 5.2 driver ABI 初始化序列、`musaMalloc/musaMemcpy/musaLaunchKernel` 与 CUDA 的差异清单、
+  错误分类（ABI 错位 vs 设备缺失）、文档缺口；附 gpu-lab 最小示例与分相计时。
 - **时机**：拿到 S80 当周；首批窗口问题密度最高、响应最快。
 
 ### 2.3 NVIDIA cutile-rs —— sm_89 用例（issue 或 PR）
@@ -167,12 +165,12 @@ pub trait GpuBackend {
 
 | 风险 | 等级 | 应对 |
 | --- | --- | --- |
-| AMD 无官方 Rust 计算路径 | 高（既定） | Vulkan 持平层为正式 AMD 路线（§1.4）；ROCm 档仅做 HIP C++ 对照 + amdsmi 观测，不承诺 Rust on ROCm |
+| AMD 无官方**内核**编写路径（主机侧有官方 Rust） | 高（既定） | Vulkan 持平层为正式 AMD 路线（§1.4）；ROCm 档仅做 HIP C++ 对照 + amdsmi 观测，不承诺 Rust on ROCm |
 | sycl-rs v0.1.0 实验性（Windows 未测） | 中 | 失败即产出：Windows 实测报告本身是 §2.1 的 issue 素材；主线不依赖 sycl-rs |
 | 旧卡 CUDA 版本边界（750 Ti sm_50） | 中 | 750 Ti 双路径拆分：wgpu/Vulkan + cudarc/CUDA 12.x；cutile-rs 仅 sm_80+；对照表分列 |
 | 国产兼容为源码级（PTX/cubin 不通用） | 中 | 不做二进制复用假设；每家内核独立编译，trait 层只统一 host 协议 |
 | 云租窗口短（4090/ROCm/910B） | 中 | 执行卡预演：本地 gpu-lab 流程先跑通 wgpu 档，云租只补厂商栈档；脚本离线可重放 |
-| cudarc-musa crates.io 未发布 | 低 | 持续跟踪官方仓库；发布前以 git 依赖在 gpu-lab 内验证，不进 engine |
+| Rust 侧无官方 MUSA 绑定（2026-10-12 复核） | 中 | 自建薄 FFI 仅留在 `gpu-lab` 原型层；对外不宣称官方支持，引擎不依赖；若出现公开官方工件再按台账 §2 复核 |
 | 上游 issue 无人响应 | 低 | issue 即交付（M5-G3 验收线）；每季度复查一次状态，不做无限等待 |
 
 ## 5. 交付序列（对齐 §3.1 批次 D 顺序）
