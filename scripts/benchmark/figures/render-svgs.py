@@ -48,6 +48,10 @@ CARD = "#0a0f1a"
 INK = "#e2e8f0"
 MUTED = "#94a3b8"
 GRID = "#223046"
+PANEL = "#0e1526"          # plot panel: a touch above the card, below the text
+PANEL_EDGE = "rgba(51,65,85,0.45)"
+ZEBRA = "#ffffff"           # 2% white row band: reading aid, not data
+TRACK = "#ffffff"           # bar lane behind each value, 4% white
 RUST = "#f59e0b"
 PYTHON = "#60a5fa"
 R_LANG = "#34d399"
@@ -104,6 +108,7 @@ class Strings:
             "墙钟时间（毫秒，线性刻度）", "峰值内存（MB，线性刻度）", "相对 Rust 的倍数（线性刻度）",
             "图中数字为 10 次计时重复的原始中位数，仅作呈现：无平滑、无坐标轴截断、无任何统计变换",
             "ms", "MB")
+        self.band_word = "带"
         self.backend = "后端"
         self.median = "中位数"
         self.method_title = "一次能力测量如何变成一条结论"
@@ -127,6 +132,24 @@ class Strings:
         self.legend_small = "小夹具（九月窗口）"
         self.legend_large = "大输入（本窗口）"
         self.records_label = "记录"
+        self.ladder_title = "按判定规则排序：哪些行真的够到 1.10× 实质线"
+        self.ladder_caption = ("每条 = 一个后端相对 Rust 的比值中位数，按比值降序；虚线为 1.00×（无差别）与 1.10×（预注册的实质性下限）。"
+                               "跨度达三个数量级，故纵轴分两段、均为线性：下段 1–10×（判定线在此，16 行全列，无省略），上段从 10× 起。"
+                               "规则只看区间，本图只看点位，用于定位'够到线'与'没够到线'的行。")
+        self.memory_ratio_title = "内存倍率：解释器后端相对 Rust 的峰值内存倍数"
+        self.memory_ratio_caption = "每条 = 该后端峰值 RSS 中位数 ÷ Rust 的同一统计量；1.0× 为参考线。"
+        self.dispersion_title = "重复离散度：10 次计时之间的相对波动（CV）"
+        self.dispersion_caption = "每根柱 = 该后端 10 次计时重复的变异系数（样本标准差 ÷ 均值）。数值越小表示重复越稳；它是稳定性证据，不参与比值判定。"
+        self.condition_title = "条件对照：每行的位移 ÷ 它自己的噪声带（信噪比）"
+        self.condition_caption = ("纵轴是派生的信噪比 |Δ| ÷ 噪声带，不是新统计量：Δ% 与 ±带宽（2×(两批 CV 之和)）逐行原样标注。"
+                                  "±1.0 为判定线：柱落在带内（|比值| < 1）即'n=10 无法分辨'，据此判定该行是否需要排除"
+                                  "（本窗口 10 个能力/形态 × 3 后端 = 30 行均在带内）。")
+        self.condition_clean = "干净批"
+        self.condition_contended = "有并发批"
+        self.condition_snr_axis = "信噪比 |Δ| ÷ 噪声带（线性刻度，±1.0 = 判定线）"
+        self.condition_resolved = "超出带宽"
+        self.condition_within = "落在带宽内"
+
 
     def _en(self) -> None:
         self._common(
@@ -134,6 +157,7 @@ class Strings:
             "wall time (ms, linear scale)", "peak RSS (MB, linear scale)", "ratio vs rust (linear scale)",
             "Every number is the raw median of the 10 timed repeats — presentation only: no smoothing, no axis truncation, no statistical transformation",
             "ms", "MB")
+        self.band_word = "band"
         self.backend = "backend"
         self.median = "median"
         self.method_title = "How one capability measurement becomes a verdict"
@@ -158,6 +182,27 @@ class Strings:
         self.legend_small = "small fixtures (September)"
         self.legend_large = "large inputs (this window)"
         self.records_label = "records"
+        self.ladder_title = "Sorted by the decision rule: which rows actually reach the 1.10× material line"
+        self.ladder_caption = ("Each bar is one backend's median ratio against Rust, sorted descending; the dashed lines mark "
+                               "1.00× (no difference) and 1.10× (the pre-registered material floor). The span covers three orders of "
+                               "magnitude, so the axis is split into two linear panels: the lower one runs 1–10× (the decision line "
+                               "lives there; all 16 rows are plotted, none omitted) and the upper one starts at 10×. The rule reads "
+                               "intervals; this view reads points, to locate the rows that reach the line and those that do not.")
+        self.memory_ratio_title = "Memory ratio: interpreter backends against Rust"
+        self.memory_ratio_caption = "Each bar is that backend's median peak RSS over Rust's median; the 1.0× line is the reference."
+        self.dispersion_title = "Repeat dispersion: relative spread across the 10 timed repeats (CV)"
+        self.dispersion_caption = "Each bar is one backend's coefficient of variation over its 10 timed repeats (sample SD ÷ mean). Smaller is steadier; this is stability evidence and takes no part in the ratio verdict."
+        self.condition_title = "Condition comparison: each row's shift divided by its own noise band"
+        self.condition_caption = ("The axis is the derived signal-to-noise ratio |Δ| ÷ band (2×(CV sum)) — not a new statistic: the raw Δ% "
+                                  "and the ±band are printed at the end of every row and match condition-comparison.tsv. The ±1.0 line is the "
+                                  "decision boundary: inside it (|ratio| < 1) means 'indistinguishable at n=10', which is how each row was "
+                                  "judged for exclusion (all 10 capabilities/shapes × 3 backends = 30 rows of this window are inside).")
+        self.condition_clean = "clean batch"
+        self.condition_contended = "contended batch"
+        self.condition_snr_axis = "signal-to-noise |Δ| ÷ band (linear scale, ±1.0 = decision line)"
+        self.condition_resolved = "beyond band"
+        self.condition_within = "inside band"
+
 
 
 STRINGS: Strings = Strings("en")  # replaced by --lang in main()
@@ -236,6 +281,9 @@ class Canvas:
             f'<text x="24" y="34" fill="{INK}" font-family="{FONT}" '
             f'font-size="20" font-weight="600">{esc(title)}</text>',
         ]
+        # A short accent rule anchors the title; editorial, carries no data.
+        self.parts.append(
+            f'<rect x="24" y="46" width="34" height="3" rx="1.5" fill="{ACCENT}"/>')
         if direction:
             # "lower is better" / "higher is better" is a property of the metric,
             # not a claim about the result, so it is stated on every data figure.
@@ -253,10 +301,13 @@ class Canvas:
         )
 
     def rect(self, x: float, y: float, w: float, h: float, fill: str,
-             *, opacity: float = 1.0, radius: float = 2.0) -> None:
+             *, opacity: float = 1.0, radius: float = 2.0, deco: bool = False) -> None:
+        # deco=True marks a presentation-only rect (panel, row band, bar lane). The
+        # figure checker skips those, so decoration can never be mistaken for data.
+        marker = ' class="deco"' if deco else ""
         self.parts.append(
             f'<rect x="{x:.2f}" y="{y:.2f}" width="{max(w, 0):.2f}" height="{max(h, 0):.2f}" '
-            f'rx="{radius}" fill="{fill}" opacity="{opacity}"/>'
+            f'rx="{radius}" fill="{fill}" opacity="{opacity}"{marker}/>'
         )
 
     def circle(self, x: float, y: float, r: float, fill: str, *, opacity: float = 1.0) -> None:
@@ -273,6 +324,23 @@ class Canvas:
             f'stroke="{stroke}" stroke-width="{width}" opacity="{opacity}"{dash_attr}/>'
         )
 
+    def panel(self, x: float, y: float, w: float, h: float) -> None:
+        """Plot panel: one rounded surface behind the rows, so they read as a table."""
+        self.rect(x, y, w, h, PANEL, radius=10, deco=True)
+        self.parts.append(
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" rx="10" '
+            f'fill="none" stroke="{PANEL_EDGE}" stroke-width="1"/>')
+
+    def rowband(self, x: float, y: float, w: float, h: float) -> None:
+        self.rect(x, y, w, h, ZEBRA, opacity=0.02, radius=8, deco=True)
+
+    def bar(self, x: float, y: float, w: float, h: float, colour: str,
+            *, track_to: float | None = None) -> None:
+        """Rounded bar over a faint full-width lane; the lane shows the scale's extent."""
+        if track_to is not None:
+            self.rect(x, y, max(track_to - x, 0), h, TRACK, opacity=0.04, radius=h / 2, deco=True)
+        self.rect(x, y, w, h, colour, radius=h / 2)
+
     def save(self, path: Path) -> None:
         # Captions carry the disclosure line; wrap them so nothing is clipped.
         for index, line in enumerate(_wrap(self.caption, CAPTION_COLUMNS)):
@@ -283,7 +351,9 @@ class Canvas:
                 f'font-size="{CAPTION_SIZE}">{esc(line)}</text>'
             )
         self.parts.append("</svg>")
-        path.write_text("\n".join(self.parts) + "\n", encoding="utf-8")
+        # newline='\n' keeps figures byte-identical across platforms (the archive,
+        # the site copy and git are all compared byte-for-byte).
+        path.write_text("\n".join(self.parts) + "\n", encoding="utf-8", newline="\n")
 
 
 def lin_scale(value: float, low: float, high: float, start: float, end: float) -> float:
@@ -417,6 +487,10 @@ def figure_speedup(summary: dict, path: Path) -> None:
     canvas = Canvas(940, 190 + row_height * len(rows) + CAPTION_SPACE, s.speedup_title,
                     f"{s.speedup_caption} {s.raw_note}", s.higher_better)
     legend_row(canvas, 96, [("python", PYTHON), ("r", R_LANG)])
+    canvas.panel(292, 118, 486, row_height * len(rows) - 8)
+    for index in range(len(rows)):
+        if index % 2:
+            canvas.rowband(292, 118 + index * row_height, 486, row_height)
     left, right = 300, 770
     low = 1.0                      # ratios are relative to rust: truncated floor is 1x
     high = max([row[2] or row[1] for row in rows] or [2]) * 1.06
@@ -436,7 +510,7 @@ def figure_speedup(summary: dict, path: Path) -> None:
             if ratio is None:
                 continue
             x = lin_scale(ratio, low, high, left, right)
-            canvas.rect(left, y + offset * 18 + 4, x - left, 14, colour, radius=2)
+            canvas.bar(left, y + offset * 18 + 4, x - left, 14, colour, track_to=right)
             canvas.text(x + 8, y + offset * 18 + 16, f"{ratio:.2f}×", size=VALUE_SIZE,
                         fill=colour, weight="600")
     canvas.save(path)
@@ -454,6 +528,10 @@ def figure_medians(summary: dict, path: Path) -> None:
     canvas = Canvas(940, 200 + group * len(entries) + CAPTION_SPACE, s.medians_title,
                     f"{s.medians_caption_prefix} {s.raw_note}", s.lower_better)
     legend_row(canvas, legend, [("rust", RUST), ("python", PYTHON), ("r", R_LANG)])
+    canvas.panel(292, legend + 42, 478, group * len(entries) - 4)
+    for index in range(len(entries)):
+        if index % 2:
+            canvas.rowband(292, legend + 42 + index * group, 478, group)
     for index, entry in enumerate(entries):
         y = legend + 46 + index * group
         canvas.text(left - 16, y + 34, entry["capability"].replace(".v1", ""), size=14,
@@ -468,7 +546,7 @@ def figure_medians(summary: dict, path: Path) -> None:
             if not value:
                 continue
             x = lin_scale(value, 0.0, row_max, left, right)
-            canvas.rect(left, y + offset * 16 + 4, x - left, 14, colour, radius=2)
+            canvas.bar(left, y + offset * 16 + 4, x - left, 14, colour, track_to=right)
             canvas.text(x + 8, y + offset * 16 + 16, f"{format_number(value)} {s.unit_ms}",
                         size=VALUE_SIZE, fill=colour, weight="600")
     canvas.save(path)
@@ -488,6 +566,10 @@ def figure_memory(summary: dict, path: Path) -> None:
     canvas = Canvas(940, 200 + group * len(entries) + CAPTION_SPACE, s.memory_title,
                     f"{s.memory_caption_prefix} {s.raw_note}", s.lower_better)
     legend_row(canvas, legend, [("rust", RUST), ("python", PYTHON), ("r", R_LANG)])
+    canvas.panel(292, legend + 42, 498, group * len(entries) - 4)
+    for index in range(len(entries)):
+        if index % 2:
+            canvas.rowband(292, legend + 42 + index * group, 498, group)
     ticks, _step = ticks_for(low, high, 6)
     for value in ticks:
         x = lin_scale(value, low, high, left, right)
@@ -503,7 +585,7 @@ def figure_memory(summary: dict, path: Path) -> None:
             if not value:
                 continue
             x = lin_scale(value, low, high, left, right)
-            canvas.rect(left, y + offset * 16 + 4, x - left, 14, colour, radius=2)
+            canvas.bar(left, y + offset * 16 + 4, x - left, 14, colour, track_to=right)
             canvas.text(x + 8, y + offset * 16 + 16, f"{value:.1f} {s.unit_mb}",
                         size=VALUE_SIZE, fill=colour, weight="600")
     canvas.save(path)
@@ -545,6 +627,9 @@ def figure_ratio_ci(summary: dict, reports: Path, path: Path) -> None:
     canvas.text(24, legend + 32, f"{s.ratio_axis}，显示范围 {format_number(low)}–{format_number(high)}×"
                 if s.lang == "zh" else f"{s.ratio_axis}, range shown {format_number(low)}–{format_number(high)}×",
                 size=AXIS_SIZE, fill=MUTED)
+    for index in range(len(rows)):
+        if index % 2:
+            canvas.rowband(322, legend + 40 + index * row_height, 602, row_height)
     one = lin_scale(1.0, low, high, left, right)
     floor = lin_scale(MATERIAL_RATIO, low, high, left, right)
     canvas.line(one, legend + 36, one, legend + 40 + row_height * len(rows), WARN, width=1.6, dash="6 4")
@@ -700,7 +785,7 @@ def figure_granularity(reports: Path, path: Path) -> None:
                 continue
             x = centre - (bar_width * 3 + 18 * 2) / 2 + offset * (bar_width + 18)
             bar_height = lin_scale(value, low, high, 0, bottom - top)
-            canvas.rect(x, bottom - bar_height, bar_width, bar_height, colour, radius=2)
+            canvas.rect(x, bottom - bar_height, bar_width, bar_height, colour, radius=5)
             canvas.text(x + bar_width / 2, bottom - bar_height - 9, format_number(value),
                         size=VALUE_SIZE, fill=colour, anchor="middle", weight="600")
         for line_index, text in enumerate(labels):
@@ -727,6 +812,10 @@ def figure_stability(reports: Path, summary: dict, path: Path) -> None:
     canvas = Canvas(940, 200 + group * len(rows) + CAPTION_SPACE, s.stability_title,
                     f"{s.stability_caption} {s.raw_note}", s.lower_better)
     legend_row(canvas, legend, [("rust", RUST), ("python", PYTHON), ("r", R_LANG)])
+    canvas.panel(292, legend + 42, 518, group * len(rows) - 4)
+    for index in range(len(rows)):
+        if index % 2:
+            canvas.rowband(292, legend + 42 + index * group, 518, group)
     for index, (name, times) in enumerate(rows):
         y = legend + 46 + index * group
         canvas.text(left - 16, y + 34, name, size=14, fill=INK, anchor="end")
@@ -774,6 +863,10 @@ def figure_series(comparison: dict, summary: dict, path: Path) -> None:
     canvas = Canvas(940, 210 + row_height * len(rows) + CAPTION_SPACE, s.series_title,
                     f"{s.series_caption} {s.raw_note}", s.higher_better)
     legend_row(canvas, legend, [(s.legend_small, RUST), (s.legend_large, ACCENT)], gap=200)
+    canvas.panel(322, legend + 40, 470, row_height * len(rows) - 6)
+    for index in range(len(rows)):
+        if index % 2:
+            canvas.rowband(322, legend + 40 + index * row_height, 470, row_height)
     left, right = 330, 780
     low = 1.0
     high = max(max(row[1], row[2]) for row in rows) * 1.06
@@ -788,9 +881,254 @@ def figure_series(comparison: dict, summary: dict, path: Path) -> None:
         for offset, (ratio, colour, token) in enumerate(((small, RUST, "小夹具" if s.lang == "zh" else "small"),
                                                          (large, ACCENT, "大输入" if s.lang == "zh" else "large"))):
             x = lin_scale(ratio, low, high, left, right)
-            canvas.rect(left, y + offset * 18 + 4, x - left, 14, colour, radius=2)
+            canvas.bar(left, y + offset * 18 + 4, x - left, 14, colour, track_to=right)
             canvas.text(x + 8, y + offset * 18 + 16, f"{token} {ratio:.2f}×", size=VALUE_SIZE,
                         fill=colour, weight="600")
+    canvas.save(path)
+
+
+def _cap_label(capability: str) -> str:
+    return capability.replace(".v1", "")
+
+
+def figure_speedup_ladder(summary: dict, path: Path) -> None:
+    """Rule-centric ladder in two linear panels.
+
+    The ratios span three orders of magnitude (1.02× .. 1382×), so one linear axis
+    would leave the 1.10× decision line and every small row fused at the origin.
+    Nothing is dropped or re-scaled: the rows below 10× get a 1–10× panel where the
+    decision line is readable, and everything above gets a panel that starts at 10×.
+    Both panels are linear and labelled; the split is stated on the axis and in the
+    caption.
+    """
+    s = STRINGS
+    rows = []
+    for entry in summary["entries"]:
+        backends = entry["backends"]
+        baseline = (backends.get("rust") or {}).get("median_wall_ms")
+        if not baseline:
+            continue
+        for backend, colour in (("python", PYTHON), ("r", R_LANG)):
+            value = (backends.get(backend) or {}).get("median_wall_ms")
+            if value:
+                rows.append((f"{_cap_label(entry['capability'])} · {backend}", value / baseline, colour))
+    if not rows:
+        return
+    rows.sort(key=lambda row: row[1], reverse=True)
+    split = 10.0
+    upper = [row for row in rows if row[1] >= split]
+    lower = [row for row in rows if row[1] < split]
+    left, right = 330, 800
+    row_height = 34
+    gap = 74
+    top = 128
+    upper_height = row_height * len(upper)
+    lower_top = top + upper_height + gap
+    height = lower_top + row_height * len(lower) + 40 + CAPTION_SPACE
+    canvas = Canvas(940, height, s.ladder_title, f"{s.ladder_caption} {s.raw_note}", s.higher_better)
+    if upper:
+        canvas.panel(left - 8, top - 8, (right - left) + 96, upper_height + 8)
+    if lower:
+        canvas.panel(left - 8, lower_top - 8, (right - left) + 96, row_height * len(lower) + 8)
+    for panel_rows, panel_top, low, high, axis_label in (
+            (upper, top, split, max(row[1] for row in upper) * 1.05 if upper else split,
+             f"≥ {format_number(split)}×" if s.lang == "zh" else f"≥ {format_number(split)}×"),
+            (lower, lower_top, 1.0, split, f"1 – {format_number(split)}×")):
+        if not panel_rows:
+            continue
+        ticks, _step = ticks_for(low, high, 5)
+        for value in ticks:
+            x = lin_scale(value, low, high, left, right)
+            canvas.line(x, panel_top - 4, x, panel_top + row_height * len(panel_rows), GRID)
+            canvas.text(x, panel_top - 14, f"{format_number(value)}×", size=AXIS_SIZE, fill=MUTED,
+                        anchor="middle")
+        for value, colour, label in ((1.0, WARN, "1.00×"), (MATERIAL_RATIO, ACCENT, f"{MATERIAL_RATIO:.2f}×")):
+            if low <= value <= high:
+                x = lin_scale(value, low, high, left, right)
+                canvas.line(x, panel_top - 4, x, panel_top + row_height * len(panel_rows), colour,
+                            width=1.4, dash="5 4")
+                # On the 1-10x panel the two lines sit a few pixels apart, so their
+                # labels grow outwards from the lines instead of stacking on top.
+                outward = "end" if value == 1.0 else "start"
+                canvas.text(x - 5 if value == 1.0 else x + 5, panel_top - 24, label,
+                            size=AXIS_SIZE, fill=colour, anchor=outward)
+        canvas.text(left, panel_top - 40, axis_label, size=AXIS_SIZE, fill=MUTED)
+        for index, (label, ratio, colour) in enumerate(panel_rows):
+            y = panel_top + index * row_height
+            if index % 2:
+                canvas.rowband(left - 8, y, (right - left) + 96, row_height)
+            canvas.text(left - 16, y + 22, label, size=13, fill=INK, anchor="end")
+            x = lin_scale(ratio, low, high, left, right)
+            canvas.bar(left, y + 6, x - left, 16, colour, track_to=right)
+            verdict = "material" if ratio >= MATERIAL_RATIO else "below line"
+            canvas.text(x + 10, y + 19, f"{ratio:.2f}× · {verdict}", size=VALUE_SIZE, fill=colour,
+                        weight="600")
+    canvas.save(path)
+
+
+def figure_memory_ratio(summary: dict, path: Path) -> None:
+    """Peak-RSS multiplier per backend against Rust, sorted descending."""
+    s = STRINGS
+    rows = []
+    for entry in summary["entries"]:
+        backends = entry["backends"]
+        base = (backends.get("rust") or {}).get("median_peak_rss_mb")
+        if not base:
+            continue
+        for backend, colour in (("python", PYTHON), ("r", R_LANG)):
+            value = (backends.get(backend) or {}).get("median_peak_rss_mb")
+            if value:
+                rows.append((f"{_cap_label(entry['capability'])} · {backend}", value / base, colour))
+    if not rows:
+        return
+    rows.sort(key=lambda row: row[1], reverse=True)
+    row_height = 34
+    legend = 96
+    left, right = 330, 800
+    low, high = 1.0, max(row[1] for row in rows) * 1.05
+    canvas = Canvas(940, 150 + row_height * len(rows) + CAPTION_SPACE, s.memory_ratio_title,
+                    f"{s.memory_ratio_caption} {s.raw_note}", s.lower_better)
+    canvas.panel(left - 8, legend + 24, (right - left) + 96, row_height * len(rows) + 6)
+    ticks, _step = ticks_for(low, high, 6)
+    for value in ticks:
+        x = lin_scale(value, low, high, left, right)
+        canvas.line(x, legend + 28, x, legend + 30 + row_height * len(rows), GRID)
+        canvas.text(x, legend + 18, f"{format_number(value)}×", size=AXIS_SIZE, fill=MUTED, anchor="middle")
+    x_one = lin_scale(1.0, low, high, left, right)
+    canvas.line(x_one, legend + 28, x_one, legend + 30 + row_height * len(rows), WARN, width=1.4, dash="5 4")
+    for index, (label, ratio, colour) in enumerate(rows):
+        y = legend + 30 + index * row_height
+        if index % 2:
+            canvas.rowband(left - 8, y, (right - left) + 96, row_height)
+        canvas.text(left - 16, y + 22, label, size=13, fill=INK, anchor="end")
+        x = lin_scale(ratio, low, high, left, right)
+        canvas.bar(left, y + 6, x - left, 16, colour, track_to=right)
+        canvas.text(x + 10, y + 19, f"{ratio:.1f}×", size=VALUE_SIZE, fill=colour, weight="600")
+    canvas.save(path)
+
+
+def figure_dispersion(summary: dict, reports: Path, path: Path) -> None:
+    """CV of the 10 timed repeats per capability and backend on a shared linear scale."""
+    s = STRINGS
+    entries = [e for e in summary["entries"] if e["backends"].get("rust")]
+    rows = []
+    for entry in entries:
+        report_file = reports / entry["report"]
+        if not report_file.is_file():
+            continue
+        times = runs_by_backend(json.loads(report_file.read_text(encoding="utf-8")))
+        values = {b: coefficient_of_variation(times[b]) * 100 for b in ("rust", "python", "r") if times.get(b)}
+        if values:
+            rows.append((_cap_label(entry["capability"]), values))
+    if not rows:
+        return
+    group = 58
+    legend = 96
+    left, right = 300, 780
+    high = max(v for _n, values in rows for v in values.values()) * 1.12
+    canvas = Canvas(940, 160 + group * len(rows) + CAPTION_SPACE, s.dispersion_title,
+                    f"{s.dispersion_caption} {s.raw_note}", s.lower_better)
+    legend_row(canvas, legend, [("rust", RUST), ("python", PYTHON), ("r", R_LANG)])
+    canvas.panel(left - 8, legend + 42, (right - left) + 78, group * len(rows) - 4)
+    ticks, _step = ticks_for(0.0, high, 6)
+    for value in ticks:
+        x = lin_scale(value, 0.0, high, left, right)
+        canvas.line(x, legend + 46, x, legend + 46 + group * len(rows), GRID)
+        canvas.text(x, legend + 38, f"{value:g}", size=AXIS_SIZE, fill=MUTED, anchor="middle")
+    canvas.text(24, legend + 38, "CV %", size=AXIS_SIZE, fill=MUTED)
+    for index, (name, values) in enumerate(rows):
+        y = legend + 46 + index * group
+        if index % 2:
+            canvas.rowband(left - 8, y, (right - left) + 78, group)
+        canvas.text(left - 16, y + 34, name, size=14, fill=INK, anchor="end")
+        for offset, (backend, colour) in enumerate((("rust", RUST), ("python", PYTHON), ("r", R_LANG))):
+            value = values.get(backend)
+            if value is None:
+                continue
+            x = lin_scale(value, 0.0, high, left, right)
+            canvas.bar(left, y + offset * 16 + 4, x - left, 14, colour, track_to=right)
+            canvas.text(x + 8, y + offset * 16 + 16, f"{value:.2f}%", size=VALUE_SIZE, fill=colour, weight="600")
+    canvas.save(path)
+
+
+def figure_condition(contended: Path, clean: Path, path: Path) -> None:
+    """Median shift per row, divided by that row's own noise band.
+
+    Rows are read from the report files rather than from the summary: the
+    condition comparison covers every measured key in both batches, including the
+    three granularity shapes, so the figure and condition-comparison.tsv answer
+    the same 30 questions. The bar is a signed ratio, so direction and "inside the
+    band" read from one position; the raw Δ% and ±band travel in the row label.
+    """
+    s = STRINGS
+    rows = []
+    for other in sorted(contended.glob("*.benchmark.json")):
+        report_file = clean / other.name
+        if not report_file.is_file():
+            continue
+        other_report = json.loads(other.read_text(encoding="utf-8"))
+        clean_report = json.loads(report_file.read_text(encoding="utf-8"))
+        label = _cap_label(other_report["capability"])
+        marker = other.name.replace(other_report["capability"] + ".", "").replace(".benchmark.json", "")
+        if marker and marker != "benchmark":
+            label = f"{label} ({marker})"
+        a_runs = runs_by_backend(other_report)
+        b_runs = runs_by_backend(clean_report)
+        for backend in ("rust", "python", "r"):
+            if not a_runs.get(backend) or not b_runs.get(backend):
+                continue
+            a, b = median_of(a_runs[backend]), median_of(b_runs[backend])
+            delta = (b - a) / a * 100 if a else 0.0
+            band = 2 * (coefficient_of_variation(a_runs[backend]) + coefficient_of_variation(b_runs[backend])) * 100
+            if band == 0:
+                # Both batches are perfectly flat for this backend. A zero band with a
+                # non-zero shift would have no finite ratio to draw, and capping it would
+                # understate the result, so that case is refused instead of faked.
+                if abs(delta) > 0:
+                    raise ValueError(f"{label}/{backend}: zero noise band with a {delta:+.2f}% shift; "
+                                     "the ratio view cannot represent it honestly")
+                ratio = 0.0
+            else:
+                ratio = abs(delta) / band
+            rows.append((f"{label} · {backend}", delta, band, ratio))
+    if not rows:
+        return
+    rows.sort(key=lambda row: row[3], reverse=True)
+    row_height = 32
+    legend = 96
+    left, right = 340, 820
+    zero = (left + right) / 2
+    span = max(max(row[3] for row in rows), 1.0) * 1.12
+    canvas = Canvas(940, 150 + row_height * len(rows) + CAPTION_SPACE, s.condition_title,
+                    f"{s.condition_caption} {s.raw_note}", s.lower_better)
+    canvas.panel(left - 8, legend + 24, (right - left) + 96, row_height * len(rows) + 6)
+    ticks, _step = ticks_for(0.0, span, 4)
+    for value in ticks:
+        if value == 0:
+            continue
+        for signed in (-value, value):
+            x = zero + (signed / span) * ((right - left) / 2)
+            canvas.line(x, legend + 28, x, legend + 30 + row_height * len(rows), GRID)
+            canvas.text(x, legend + 18, f"±{value:g}", size=AXIS_SIZE, fill=MUTED, anchor="middle")
+    # the decision boundary gets its own line, drawn in the accent colour
+    for signed in (-1.0, 1.0):
+        x = zero + (signed / span) * ((right - left) / 2)
+        canvas.line(x, legend + 28, x, legend + 30 + row_height * len(rows), ACCENT, width=1.4, dash="5 4")
+    canvas.text(zero, legend + 18, "0", size=AXIS_SIZE, fill=MUTED, anchor="middle")
+    canvas.line(zero, legend + 28, zero, legend + 30 + row_height * len(rows), MUTED, width=1.2)
+    canvas.text(left, legend + 8, s.condition_snr_axis, size=AXIS_SIZE, fill=MUTED)
+    for index, (label, delta, band, ratio) in enumerate(rows):
+        y = legend + 30 + index * row_height
+        if index % 2:
+            canvas.rowband(left - 8, y, (right - left) + 96, row_height)
+        canvas.text(left - 16, y + 21, label, size=13, fill=INK, anchor="end")
+        x_value = zero + ((delta / band if band else 0.0) / span) * ((right - left) / 2)
+        beyond = band > 0 and abs(delta) > band
+        colour = WARN if beyond else ACCENT
+        canvas.rect(min(zero, x_value), y + 6, max(abs(x_value - zero), 1.5), 14, colour, radius=7)
+        verdict = s.condition_resolved if beyond else s.condition_within
+        canvas.text(right + 10, y + 19, f"{delta:+.2f}% · {s.band_word} ±{band:.2f}% · {verdict}",
+                    size=VALUE_SIZE, fill=colour, weight="600")
     canvas.save(path)
 
 
@@ -802,6 +1140,7 @@ def main() -> None:
     parser.add_argument("--comparison", help="an earlier summary.json to compare against")
     parser.add_argument("--granularity", help="directory with the granularity experiment reports")
     parser.add_argument("--lang", default="en", choices=["en", "zh"])
+    parser.add_argument("--contended", help="report directory of the earlier contended batch")
     parser.add_argument("--output", required=True)
     arguments = parser.parse_args()
 
@@ -817,6 +1156,11 @@ def main() -> None:
     figure_memory(summary, output / "fig-memory.svg")
     figure_ratio_ci(summary, reports, output / "fig-ratio-ci.svg")
     figure_stability(reports, summary, output / "fig-repeat-stability.svg")
+    figure_speedup_ladder(summary, output / "fig-speedup-ladder.svg")
+    figure_memory_ratio(summary, output / "fig-memory-ratio.svg")
+    figure_dispersion(summary, reports, output / "fig-dispersion.svg")
+    if arguments.contended:
+        figure_condition(Path(arguments.contended), reports, output / "fig-condition.svg")
     if arguments.comparison:
         figure_series(json.loads(Path(arguments.comparison).read_text(encoding="utf-8")),
                       summary, output / "fig-series-two-windows.svg")

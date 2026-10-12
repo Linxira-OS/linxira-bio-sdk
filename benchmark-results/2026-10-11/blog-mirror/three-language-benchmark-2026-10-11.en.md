@@ -12,7 +12,7 @@ desc: "One low-end x86 machine, one Rust engine, and the idiomatic Biopython and
 
 > **Data status**: all eight capabilities were re-run at N=10 in a **window with no
 > CI jobs** (archive `bench-20261011-001`; the per-stage CI job count and loadavg are in `window-log.txt`).
-> The comparison against the first batch (this host also ran a CI runner) is in §8.7: **all 30
+> The comparison against the first batch (this host also ran a CI runner) is in §8.8: **all 30
 > per-capability/per-backend rows fall inside the noise band, none beyond it, so no row was excluded**.
 > Tables and figures ship with this post (index and re-check recipes in §13).
 
@@ -51,6 +51,10 @@ parallelism** — we state only what was measured.
 - A **record-granularity experiment** was added to explain the ≈1× on `sequence.stats` — the original
   hypothesis was **falsified** (§8.5).
 - Data, scripts, tables and figures ship with the repository and can be re-checked item by item (§12).
+- **2026-10-12 figure revision**: the set grew from 8 to 12 figures, adding **dispersion (CV)**, the
+  **decision ladder** (with the 1.10× material line on a two-panel linear axis), the **memory multiplier**
+  and the **condition signal-to-noise** view, under one shared visual system (panels, row bands, rounded
+  bars over lanes). Presentation only: no statistic and no decision rule changed.
 - Two sections added: **§14 where this goes next** (multi-core is the roadmap's first priority, the
   vendors' official Rust GPU paths, why the virtual cell needs both) and **§15 expected objections**
   (the attacks a sceptical reader would make, with the evidence that answers them).
@@ -218,6 +222,11 @@ repeats per backend.
 
 Figure: peak resident memory per backend (median-of-10, GNU time's VmHWM).
 
+![Peak-RSS multiplier of the interpreter backends against Rust](./figures/en/fig-memory-ratio.svg)
+
+Figure: memory multipliers — 2.3×–11.8× on the Python arm and 5.7×–54.5× on the R arm; the only row
+below 2× is `structure.pdb.summary`/python (2.3×) and the largest is `sequence.stats`/r (54.5×).
+
 ### 8.3 Repeat stability and ratio intervals
 
 ![Raw wall-time spread of the 10 repeats, with each backend's median](./figures/en/fig-repeat-stability.svg)
@@ -227,6 +236,13 @@ median) — a check that no median is produced by a single outlier run.
 Most medians sit within ±1 IQR across repeats. `sequence.stats` — Rust's granularity is 10 ms (the
 timer's resolution), so its CV (1.95%) is dominated by **quantisation**, not real jitter. That limits
 resolution on small absolute values and is one reason the materiality floor is 1.10 rather than 1.01.
+
+![Relative spread across the 10 timed repeats (CV)](./figures/en/fig-dispersion.svg)
+
+Figure: repeat dispersion — four Rust rows are bit-identical across all 10 repeats (CV 0.00%) and the
+highest value is 21.52% (`expression.pca`, whose median is only 20 ms, so the timer's step dominates);
+the Python arm spans 0.75%–8.97% and the R arm 0.08%–5.93%. Dispersion is stability evidence and takes
+no part in the ratio verdict.
 
 ![Ratios with bootstrap 95% confidence intervals (linear scale)](./figures/en/fig-ratio-ci.svg)
 
@@ -292,6 +308,12 @@ same boundary costs 31.4×–1382× (§8.6).
 Figure: the layered overview — ratios sorted by layer, with C-library-covered loops on the left and
 per-element interpreter iteration on the right.
 
+![Sorted by the decision rule: which rows actually reach the 1.10× material line](./figures/en/fig-speedup-ladder.svg)
+
+Figure: the ladder from the decision's point of view — 15 of 16 rows are ≥ 1.10×; the only exception is
+`sequence.stats`/python (1.02×). The span covers three orders of magnitude, so the axis is split into two
+linear panels (1–10× and ≥10×), and the decision line falls in the lower one.
+
 | Layer | Capability | python | r |
 | --- | --- | --- | --- |
 | Linear scan covered by C primitives | `sequence.stats` | 1.02× (detectable, immaterial) | 2.24× |
@@ -330,7 +352,7 @@ records **verdict-level** evidence (within 1e-6, no differing fields). Neither s
 other, so the table shows both bases rather than moving "0.0 / 2.26e-11" under this window's name.
 
 
-### 8.7 Condition comparison: before and after the CI co-tenant (same protocol, same machine)
+### 8.8 Condition comparison: before and after the CI co-tenant (same protocol, same machine)
 
 This host also runs a local CI runner. In the first batch two jobs landed inside the R leg of
 `fastq.qc`; with the jobs stopped we re-ran the **whole window** under the same protocol
@@ -348,6 +370,12 @@ per capability and per backend (`condition-comparison.tsv`, 30 rows):
   computed per row); the largest shift is −1.79%.
 - **No row was excluded**: this article uses the clean batch (archive `bench-20261011-001`) and publishes
   both batches' raw reports (the `contended-window/` directory and the archive root) for anyone to check.
+
+![Condition comparison: each row's shift divided by its own band](./figures/en/fig-condition.svg)
+
+Figure: the signal-to-noise view of the condition comparison — all 30 rows sit below |Δ| ÷ band = 1 (the
+maximum is 0.26, `sequence.stats`/rust: −1.22% against ±4.67%), so no row is beyond its band and none had
+to be excluded; the raw Δ% and ±band are printed on every row.
 
 ## 9. Comparison with the September window
 
@@ -468,8 +496,10 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 - Raw per-run wall times: `backends[].runs[]` in each capability report (10 entries per backend with
   `wall_ms`, `peak_rss_mb`, `ok`).
 - Input digests: `data_sources[]` in `summary.json` (recorded for this window at archive time).
-- Figures: `benchmark-results/2026-10-11/blog-mirror/figures/zh/` and `figures/en/` (8 self-contained
-  SVGs each, no scripts, no external references; both languages are rendered from the same numbers).
+- Figures: `benchmark-results/2026-10-11/blog-mirror/figures/zh/` and `figures/en/` (12 self-contained
+  SVGs each — the 2026-10-12 revision added the dispersion, decision-ladder, memory-multiplier and
+  condition signal-to-noise views — with no scripts and no external references; both languages are
+  rendered from the same numbers).
 
 **Supplementary index (the body cites these by label)**
 
@@ -480,7 +510,7 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 | Table S3 | [`statistics-trimmed-verdicts.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-trimmed-verdicts.tsv) | ratios, CIs and verdicts under the three trimming bases |
 | Table S4 | [`statistics-comparison.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-comparison.tsv) | cross-window comparison against the 2026-09-13 archive |
 | Table S5 | [`statistics-consistency.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-consistency.tsv) | cross-backend consistency, tolerance, precision class |
-| Figures F1–F8 | [`blog-mirror/figures/<lang>/`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/blog-mirror/figures) | method and decision rule, absolute time, memory, ratio CI, raw repeats, record shapes, layering, two-window comparison |
+| Figures F1–F12 | [`blog-mirror/figures/<lang>/`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/blog-mirror/figures) | method and decision rule, absolute time, memory (absolute and multiplier), ratio CI, raw repeats, dispersion, record shapes, layering, decision ladder, two-window comparison, condition signal-to-noise |
 
 **How a third party can re-check this (everything is in the repository)**
 
@@ -666,9 +696,12 @@ transformation" disclosure, and axes are linear with the truncated range printed
 
 - **Versions**: first release 2026-10-11; **2026-10-12 rerun**: all eight capabilities re-measured in a
   window with **no CI jobs** (archive `bench-20261011-001`), and every number in this article now comes
-  from that clean batch; adds §8.7 (condition comparison: 30 rows inside the noise band, no row excluded)
-  and the `sequence.ssr` N=10 result (R median about 36.9 min per run). Item-by-item changes are in the
-  changelog at the top.
+  from that clean batch; adds §8.8 (condition comparison: 30 rows inside the noise band, no row excluded)
+  and the `sequence.ssr` N=10 result (R median about 36.9 min per run). **2026-10-12 figure revision**: the
+  set grew from 8 to 12 figures per language (adding dispersion/CV, the decision ladder, the memory
+  multiplier, and the condition signal-to-noise view) under one shared visual system; every number is
+  still re-derived from the same data, and the figure/table check reads 1055/1055 (zh) and 1067/1067 (en).
+  Item-by-item changes are in the changelog at the top.
 - **Self-report disclosure**: this is an **author-run benchmark**, not independently replicated by a
   third party. The comparison arms are third-party **library** implementations (Biopython 1.88,
   Biostrings 2.80.2, …), **not** a third-party benchmark suite; GIAB + hap.py (correctness truth sets)

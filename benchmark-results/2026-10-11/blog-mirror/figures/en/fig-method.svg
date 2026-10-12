@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 522" width="940" height="522" role="img" aria-label="How one capability measurement becomes a verdict">
 <rect width="940" height="522" fill="#0a0f1a"/>
 <text x="24" y="34" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="20" font-weight="600">How one capability measurement becomes a verdict</text>
+<rect x="24" y="46" width="34" height="3" rx="1.5" fill="#20B8B0"/>
 <rect x="40.00" y="110.00" width="198.50" height="56.00" rx="6" fill="#94a3b8" opacity="0.12"/>
 <rect x="40.0" y="110.0" width="198.5" height="56.0" rx="6" fill="none" stroke="#94a3b8" stroke-width="1.3"/>
 <text x="139.2" y="135.0" fill="#e2e8f0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans SC',sans-serif" font-size="12" font-weight="400" text-anchor="middle">input</text>

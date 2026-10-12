@@ -199,4 +199,7 @@ Condition comparison (`condition-comparison.tsv`, 30 per-capability/per-backend 
 2x(CV_A + CV_B)): **0 rows beyond the band** — the largest shift is -1.79% (`sequence.stats` Python
 leg, band +-10.47%) — so no row was excluded and the article uses the clean batch. Clean medians
 (rust/python/r, ms): `fastq.qc` 1570 / 49 345 / 702 190; `sequence.ssr` 1600 / 2280 / 2 211 405.
-Figure check reproduces locally and on the host: 758/758 (zh), 765/765 (en).
+Figure check reproduces locally and on the host: **1055/1055 (zh), 1067/1067 (en)** after the
+2026-10-12 figure revision, which widened the set to 12 figures per language (dispersion, decision
+ladder, memory multiplier, condition signal-to-noise) and re-derived every one of them from the
+archive; the earlier 8-figure set read 758/758 (zh) and 765/765 (en).

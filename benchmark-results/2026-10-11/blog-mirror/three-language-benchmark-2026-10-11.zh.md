@@ -12,7 +12,7 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 
 > **数据状态**：八项能力的 N=10 测量已在**无 CI 作业的空闲窗口**整窗重跑完成
 > （归档 `bench-20261011-001`；逐阶段的 CI 作业计数与 loadavg 记在 `window-log.txt`）。与首次（本机同时承载
-> CI runner）那批的对照见 §8.7：**30 条逐能力/后端对照全部落在噪声带内，0 行超噪，因此没有排除任何行**。
+> CI runner）那批的对照见 §8.8：**30 条逐能力/后端对照全部落在噪声带内，0 行超噪，因此没有排除任何行**。
 > 图与表随本篇发布（索引与核查方式见 §13）。
 
 ## 1. 摘要
@@ -42,6 +42,9 @@ desc: "在一台低端 x86 机器上，把同一个 Rust 引擎与 Biopython、B
 - 判定规则从"点估计"改为**置信区间 + 实质性下限**（§6.3），并给出裁剪稳健性（§8.4）。
 - 新增**记录粒度对照实验**，用来解释 `sequence.stats` 的 ≈1×（结论：原假设被推翻，§8.5）。
 - 数据、脚本、表格、图全部**随仓库发布**，可逐项复核（§12）。
+- **2026-10-12 图表改版**：附图由 8 张扩为 12 张，新增**离散度（CV）**、**判定阶梯（含 1.10× 实质线，
+  纵轴分两段线性）**、**内存倍率**与**条件对照信噪比**四张图，并统一版式（面板、斑马行、圆角条+轨道）；
+  改版只动呈现，统计口径与判定规则未变。
 - 新增两节：**§14 后续计划**（多核是路线图第一优先；GPU 的 Rust 官方路线；虚拟细胞为什么两者都要）
   与 **§15 可能的反驳与回应**（把质疑与证据提前摆出来）。
 
@@ -201,6 +204,11 @@ bootstrap 置信区间 → 三段式判定。**预热那次不进报告**，裁�
 
 图：各后端峰值常驻内存（median-of-10，GNU time 的 VmHWM）。
 
+![解释器后端相对 Rust 的峰值内存倍率](./figures/zh/fig-memory-ratio.svg)
+
+图：内存倍率——Python 腿 2.3×–11.8×，R 腿 5.7×–54.5×；唯一低于 2× 的行是 `structure.pdb.summary` 的 Python 腿（2.3×），
+最高的是 `sequence.stats` 的 R 腿（54.5×）。
+
 ### 8.3 重复稳定性与比值区间
 
 ![逐能力 10 次原始墙钟的散布与中位数](./figures/zh/fig-repeat-stability.svg)
@@ -209,6 +217,11 @@ bootstrap 置信区间 → 三段式判定。**预热那次不进报告**，裁�
 多数能力的中位数在 10 次间落在 ±1 IQR 内；`sequence.stats` 的 rust 档位粒度是 10 ms
 （`time` 的采样分辨），因此其 CV（1.95%）主要是**量化噪声**而不是真实抖动——这点限制了
 小绝对值的分辨力，也是我们把实质性下限放在 1.10 而不是 1.01 的原因之一。
+
+![10 次计时的相对离散度（CV）](./figures/zh/fig-dispersion.svg)
+
+图：重复离散度——Rust 腿有 4 项在 10 次之间逐位相同（CV 0.00%），最高 21.52%（`expression.pca`，中位数仅 20 ms，
+量化步长在其中的占比最大）；Python 腿 0.75%–8.97%，R 腿 0.08%–5.93%。离散度是稳定性证据，不参与比值判定。
 
 ![比值与 bootstrap 95% 置信区间（线性刻度）](./figures/zh/fig-ratio-ci.svg)
 
@@ -262,6 +275,11 @@ Biopython 的解析循环虽然逐行穿过解释器，但每行的工作量很�
 
 图：分层速览——比值按层次排序，左侧是 C 库已覆盖循环的能力，右侧是解释器逐元素迭代的能力。
 
+![按判定规则排序：哪些行真的够到 1.10× 实质线](./figures/zh/fig-speedup-ladder.svg)
+
+图：判定视角的阶梯——16 行中 15 行 ≥ 1.10×；唯一例外是 `sequence.stats` 的 Python 腿（1.02×）。
+跨度达三个数量级，故纵轴分两段（1–10× 与 ≥10×）、均为线性，判定线落在下段。
+
 | 层次 | 能力 | python | r |
 | --- | --- | --- | --- |
 | C 原语可覆盖的线性扫描 | `sequence.stats` | 1.02×（可分辨，非实质） | 2.24× |
@@ -298,7 +316,7 @@ sha256 逐字节一致（如 `ref.fa`、`cell.tsv`、`cell.json`）。
 并列展示，而不是把"0.0 / 2.26e-11"挪到本轮名下。
 
 
-### 8.7 条件对照：CI 抢核前后（同一协议、同一机器）
+### 8.8 条件对照：CI 抢核前后（同一协议、同一机器）
 
 本机同时承载本地 CI runner。首次那批测量期间有两次作业落在 `fastq.qc` 的 R 腿窗口内；停用作业后按同一
 协议**整窗重跑**（`window-log.txt` 逐阶段记录 CI 作业计数为 0，`jobs=0`）。两批逐能力、逐后端对照
@@ -314,6 +332,11 @@ sha256 逐字节一致（如 `ref.fa`、`cell.tsv`、`cell.json`）。
 - **30 行全部落在噪声带内，0 行超噪**（噪声带取 2×(CV_有并发 + CV_干净)，逐行计算）；最大位移仅 −1.79%。
 - 因此**没有任何行被排除**：本文采用重跑批数字（归档 `bench-20261011-001`），并同时公开两批原始报告
   （`contended-window/` 与归档根目录）供任何人复核。
+
+![条件对照：每行的位移 ÷ 自身噪声带](./figures/zh/fig-condition.svg)
+
+图：条件对照的信噪比视图——30 行的 |Δ| ÷ 噪声带全部小于 1（最大 0.26，`sequence.stats` 的 Rust 腿：−1.22% 对 ±4.67%），
+因此 0 行超噪、无需排除任何行；原始 Δ% 与 ±带宽逐行标注。
 
 ## 9. 与九月窗口的对比
 
@@ -414,7 +437,7 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 - 归档：`benchmark-results/2026-10-11/`（`summary.json` / `summary.md` / 每能力报告 / 统计 TSV）。
 - 原始逐次墙钟：各能力报告的 `backends[].runs[]`（每后端 10 条，含 `wall_ms`、`peak_rss_mb`、`ok`）。
 - 输入哈希：见 `summary.json` 的 `data_sources[]`（本窗口生成的输入在归档时记录）。
-- 图表：`benchmark-results/2026-10-11/blog-mirror/figures/zh/` 与 `figures/en/`（各 8 张自包含 SVG，
+- 图表：`benchmark-results/2026-10-11/blog-mirror/figures/zh/` 与 `figures/en/`（各 12 张自包含 SVG，
   无脚本、无外链；中英两套由同一份数据一次生成）。
 
 **附表与附图索引（正文按编号引用）**
@@ -426,7 +449,7 @@ python scripts/benchmark/figures/render-svgs.py --summary benchmark-results/2026
 | 附表 S3 | [`statistics-trimmed-verdicts.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-trimmed-verdicts.tsv) | 三种裁剪口径下的比值、CI 与判定 |
 | 附表 S4 | [`statistics-comparison.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-comparison.tsv) | 与 2026-09-13 归档的跨窗口对照 |
 | 附表 S5 | [`statistics-consistency.tsv`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/statistics-consistency.tsv) | 跨后端一致性、容差、精度档 |
-| 附图 F1–F8 | [`blog-mirror/figures/<lang>/`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/blog-mirror/figures) | 方法与判定、绝对时间、内存、比值 CI、重复稳定性、粒度、分层速览、双窗口对比 |
+| 附图 F1–F12 | [`blog-mirror/figures/<lang>/`](https://github.com/Linxira-OS/linxira-bio-sdk/blob/main/benchmark-results/2026-10-11/blog-mirror/figures) | 方法与判定、绝对时间、内存（绝对值与倍率）、比值 CI、重复稳定性、离散度（CV）、粒度、分层速览、判定阶梯、双窗口对比、条件对照信噪比 |
 
 **第三方可核查方式（全部在仓库内）**
 
@@ -570,8 +593,8 @@ median-of-3、逐项正确性门全过，两卡在各内核上的比值可复算
 ## 17. 版本与声明
 
 - **版本**：初版 2026-10-11；**2026-10-12 重跑**：八项能力在**无 CI 作业的空闲窗口**整窗重跑
-  （归档 `bench-20261011-001`），全文数字改用干净批；新增 §8.7 条件对照（30 行全部落在噪声带内、
-  无行被排除）与 `sequence.ssr` 的 N=10 结果（R 腿中位数约 36.9 min/次）。逐条变动见文首「更新日志」。
+  （归档 `bench-20261011-001`），全文数字改用干净批；新增 §8.8 条件对照（30 行全部落在噪声带内、
+  无行被排除）与 `sequence.ssr` 的 N=10 结果（R 腿中位数约 36.9 min/次）。**2026-10-12 图表改版**：附图由 8 张扩为 12 张（新增离散度 CV、判定阶梯、内存倍率、条件对照信噪比）并统一版式；所有数字仍由同一份数据重算，图/表一致性检查 1055/1055（中）与 1067/1067（英）。逐条变动见文首「更新日志」。
 - **自述声明**：本文为**作者自述基准**，未经第三方独立复现。对照臂是第三方**库**实现
   （Biopython 1.88 / Biostrings 2.80.2 等），**不是**第三方基准套件；GIAB + hap.py（正确性真值）
   与公开托管基准平台（机器谱系锚定）为**计划中、本轮未执行**，故不作为本文证据。

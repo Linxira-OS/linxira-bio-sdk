@@ -76,6 +76,7 @@ for lang in zh en; do
     --reports benchmark-results/2026-10-11 \
     --comparison benchmark-results/2026-09-13/summary.json \
     --granularity benchmark-results/2026-10-11 \
+    --contended benchmark-results/2026-10-11/contended-window \
     --output "benchmark-results/2026-10-11/blog-mirror/figures/$lang"
 done
 
@@ -86,7 +87,8 @@ for lang in zh en; do
     --summary benchmark-results/2026-10-11/summary.json \
     --reports benchmark-results/2026-10-11 \
     --comparison benchmark-results/2026-09-13/summary.json \
-    --granularity benchmark-results/2026-10-11
+    --granularity benchmark-results/2026-10-11 \
+    --contended benchmark-results/2026-10-11/contended-window
 done
 
 echo "=== archive contents ==="

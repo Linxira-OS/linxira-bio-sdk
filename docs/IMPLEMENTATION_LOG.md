@@ -20,6 +20,7 @@
 ## 台账（Ledger）
 
 | 日期 | 能力 / 组件 | 变更 | 动机 | 证据 | 状态 |
+| 2026-10-12 | benchmark 图表工具链（非产品能力） | `figures/render-svgs.py` 由 8 张扩为 12 张/语言并统一版式：新增离散度 CV、判定阶梯（1–10× 与 ≥10× 两段线性，含 1.10× 实质线）、内存倍率、条件对照信噪比；面板/斑马行/圆角条+轨道；装饰元素标 `class="deco"`，校验器据此跳过：`figures/verify-figures.py` 新增四组几何反解（含 30 行条件对照）与实体转义后的行宽测量；`windows/2026-10-11/archive.sh` 增传 `--contended` | 读者反馈：图注拥挤、须线过短、范围提示占比过大；需要能直接读出判定（1.10× 线）与稳定性（CV）的视图；条件图原按原始 Δ% 对 ±带宽作图，被 54% 带宽的行压扁，改为 |Δ|÷带宽的信噪比视图（原始数值仍逐行标注） | `verify-figures.py` 全绿：1055/1055（zh）、1067/1067（en），含 12×2 张图；归档 `bench-20261011-001` | 完成 |
 |---|---|---|---|---|---|
 | 2026-09-10 | `sequence.stats.v1` 三端 | 新增 benchmark-python（Biopython）与 benchmark-r（Biostrings）pack 实现，对齐 Rust golden | M3 三端基线第一步 | pack parity 测试；bench-20260913-001 | current |
 | 2026-09-11 | `expression.differential.v1` | R pack（DESeq2）对标实现入库 | M3 #1 | workflows/org.linxira.bulk-expression-deseq2 | current |
