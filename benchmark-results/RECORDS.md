@@ -187,3 +187,16 @@ Snapshot of the live bilingual post (zh/en markdown + SHA256SUMS) after the 2026
 
 ## 2026-09-19 — variant.stats.v1 joins the three-way benchmark set
 Python (stdlib) and base-R implementations with exact engine parity (mixed.vcf reference, error-message parity, gzip magic-byte support). Local E2E rust 42ms / python 301ms / consistent; R validated via the pack test suite.
+
+## 2026-10-12 — CI-idle rerun of the 2026-10-11 window, with a condition comparison
+
+The 2026-10-11 N=10 window was measured while this host also ran a local CI runner; two jobs
+overlapped the R leg of `fastq.qc`. The whole window was re-run with the runner idle (CI job count
+verified 0 before and at every stage boundary, recorded in `window-log.txt`), the inputs regenerated
+and re-digested (`inputs.sha256`), and every run now carries `started_at`.
+
+Condition comparison (`condition-comparison.tsv`, 30 per-capability/per-backend rows, noise band
+2x(CV_A + CV_B)): **0 rows beyond the band** — the largest shift is -1.79% (`sequence.stats` Python
+leg, band +-10.47%) — so no row was excluded and the article uses the clean batch. Clean medians
+(rust/python/r, ms): `fastq.qc` 1570 / 49 345 / 702 190; `sequence.ssr` 1600 / 2280 / 2 211 405.
+Figure check reproduces locally and on the host: 758/758 (zh), 765/765 (en).

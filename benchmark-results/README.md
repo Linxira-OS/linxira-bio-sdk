@@ -107,7 +107,8 @@ warm/cold 的数字**禁止混排对比**；对比表必须注明来源 `report_
 | （`full-three-way/`，无 JSON summary） | 2026-09-17 | 六项能力全三端扫（3 后端 × 3 重复 = 54 次运行全 ok），仓库 fixture，专用基准机 cores 8-15 pinned；结果在 `runs_raw.csv` / `summary.csv` |
 | （`r-verification/`，无 JSON summary） | 2026-09-18 | `r = 1.000000` 现场复验（SRR1460477，全新拉取与 dump、参数对齐），含 `SHA256SUMS.txt` |
 | （`blog-mirror/`，无 JSON summary） | 2026-10-02 | 云 GPU 双厂商验证的帖子镜像与数据；实验台账在 `docs/engine-evals/gpu-rental-*-2026-10-02.md` |
-| `bench-20261011-001`（**归档生成中**，编号由 summarizer 分配） | 2026-10-11 | **N=10 三端窗口**：8 项能力（含 `fastq.qc`/`sequence.ssr`）各 10 次计时重复 + 记录粒度实验；宿主为低端 NAS（Pentium Gold G7400，powersave，tmpfs 输入）。归档由 `scripts/benchmark/windows/2026-10-11/archive.sh` 一键生成：表 `statistics*.tsv`、图 `blog-mirror/figures/`、输入摘要 `inputs.sha256` |
+| `bench-20261011-001` | 2026-10-11 | **N=10 三端窗口**：8 项能力（含 `fastq.qc`/`sequence.ssr`）各 10 次计时重复 + 记录粒度实验；宿主为低端 x86（Pentium Gold G7400，powersave，tmpfs 输入）。**2026-10-12 在无 CI 作业窗口整窗重跑**（逐阶段 CI 计数记入 `window-log.txt`），逐次 `started_at` 齐全；与有并发批的 30 行对照见 `condition-comparison.tsv`（0 行超噪）。表 `statistics*.tsv`、双语图 `blog-mirror/figures/`、输入摘要 `inputs.sha256` |
+| （`contended-window/`，无 JSON summary） | 2026-10-11 | 同一窗口的首批报告（本机同时承载 CI runner，两次作业落进 `fastq.qc` 的 R 腿）。仅作条件对照臂；对外结论一律以 `bench-20261011-001` 为准 |
 
 > 2026-10-11 一行的归档由 `scripts/benchmark/windows/2026-10-11/archive.sh` 生成；
 > 窗口脚本与 descriptor 一并入库，见 `scripts/benchmark/README.md` 的窗口表。

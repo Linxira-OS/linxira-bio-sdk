@@ -182,6 +182,16 @@ provenance for real-data runs is tracked in
 `docs/BENCHMARK_DATA_SOURCES.md`; implementation iterations (v1/v2
 coexistence, algorithm changes) are logged in `docs/IMPLEMENTATION_LOG.md`.
 
+The current N=10 three-backend window is `benchmark-results/2026-10-11/`
+(`bench-20261011-001`): eight capabilities measured 10 times per backend on a
+low-end x86 host with the CI runner idle and the governor fixed. `sequence.stats`
+is the one case whose gap is detectable but immaterial (1.02x, CI [1.01, 1.11]);
+the rest run 1.43x-200x against the Python arm and 2.24x-1382x against the R arm,
+with peak memory at 1/2.3-1/11.8 (Python) and 1/5.7-1/54.5 (R). An earlier batch
+taken while the host also ran a CI runner was compared row by row: all 30 rows
+fall inside the noise band, so no row was excluded (`condition-comparison.tsv`).
+The bilingual write-up and figures live in that archive's `blog-mirror/`.
+
 ## Source Policy
 
 `GPTomics/bioSkills` is a primary method and example source.
@@ -366,6 +376,15 @@ cargo/clippy——让开发与评审更从容：整类缺陷在程序运行之�
 对比 python 300–330 ms（加速 7.5–8.25 倍），小 fixture 上内存节省约 85%。
 真实数据运行的数据集溯源记录在 `docs/BENCHMARK_DATA_SOURCES.md`；实现迭代
 （v1/v2 共存、算法变更）记录在 `docs/IMPLEMENTATION_LOG.md`。
+
+当前的三端 N=10 窗口是 `benchmark-results/2026-10-11/`
+（`bench-20261011-001`）：八项能力每后端各 10 次计时重复，宿主为低端 x86、
+CI runner 空闲、调频器固定。其中 `sequence.stats` 是唯一「可分辨但不实质」的
+一项（1.02×，CI [1.01, 1.11]）；其余相对 Python 为 1.43×–200×、相对 R 为
+2.24×–1382×，峰值内存为 Python 的 1/2.3–1/11.8、R 的 1/5.7–1/54.5。此前还有
+一批在本机同时承载 CI runner 时测得，两批逐行对照：30 行全部落在噪声带内，
+因此没有排除任何行（`condition-comparison.tsv`）。中英文稿与图在该归档的
+`blog-mirror/` 下。
 
 ### 来源政策
 

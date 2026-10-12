@@ -35,6 +35,10 @@
 | 2026-10-11 | `linxira-bio-core` 输入探测 | `looks_like_sam` 改为要求 SAM 结构证据（FLAG ≤ 0xFFF、RNAME 非纯数字、CIGAR `(\d+[MIDNSHP=X])+` 或 `*`、SEQ 碱基字母或 `*`） | 产品级缺陷：≥11 列的宽计数矩阵被误判为 SAM，worker 会拒绝合法表达矩阵（实测边界 10 列→tsv、11 列→sam） | commit `bfe6fd0` + 回归测试 `wide_numeric_matrix_is_not_mistaken_for_sam` | current |
 | 2026-10-11 | benchmark-r pack（6 处） | R 后端**首次真正执行**后修复 6 个潜伏缺陷：① 裸 `XString` 的 `width()` 派发 ② 测试字面量 23 bp 却断言 22 ③ `start()` 未加命名空间命中 `stats::start` ④ 空 `motif_length_counts` 被序列化成 `[]` ⑤ `set_venn` 按 item 而非 occupancy mask 生成 intersections ⑥ CI 从未运行 benchmark 两包测试 | 测试存在但不在 CI 执行 = 不存在；三端声称缺一端的执行证据 | commits `90d982a`/`dd8e226`/`c567f94`/`9b9e4fa`/`005404c`；NAS 全量门禁 525 测试绿 | current |
 
+| 2026-10-12 | benchmark 报告结构 | `BenchmarkRun.started_at`（RFC 3339 UTC）在 worker 启动前打点，经 `ExecutedRun` 落入报告；schema 里为可空字段（旧报告仍可解析） | 污染归因需要逐次时间戳：只有阶段级窗口比对时，无法判断某一次重复是否被挤占 | commit `12e9f32`；协议往返单测 + 旧报告兼容断言 | current |
+| 2026-10-12 | `scripts/benchmark/` 窗口驱动 | `rerun-clean.sh` 修正 `fastq.qc` 入参名（`fasta=` → `fastq=`，此前被 worker 格式守卫拒绝、产出空报告）；补齐「先 build 后重建输入」顺序；文档化长窗口必须 `setsid nohup` 脱离 SSH 会话（会话断开曾杀掉驱动脚本而 worker 仍在跑） | 一次秒失败的 N=0 报告 + 一次断线事故，都是可预防的流程缺陷 | commits `d7049a7`、`89882a5`；NAS 实跑复现 | current |
+| 2026-10-12 | 跨条件对照工具 | `scripts/benchmark/analysis/compare-conditions.py`：读两组报告，逐能力/后端输出中位数、Δ%、2×(CV_A+CV_B) 噪声带与判定 | 需要回答「CI 抢核是否改动了任何一行」，而不靠肉眼；产品侧对应命令登记为 ROADMAP M2-T11 | 2026-10-11 归档实测：30 行、0 行超噪 | current |
+
 ## v2 迁移模板（Upgrading to v2）
 
 当某能力需要不兼容的算法改动时：
