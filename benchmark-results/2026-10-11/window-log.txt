@@ -1,0 +1,53 @@
+2026-10-11T23:59:58Z preflight: gitea-runner=active jobs_pending_or_running=0 loadavg=1.36 0.73 0.30
+2026-10-11T23:59:58Z waiting for load to settle (now 1.36)
+2026-10-12T00:00:03Z waiting for load to settle (now 1.33)
+2026-10-12T00:00:08Z waiting for load to settle (now 1.30)
+2026-10-12T00:00:13Z waiting for load to settle (now 1.28)
+2026-10-12T00:00:18Z waiting for load to settle (now 1.41)
+2026-10-12T00:00:23Z waiting for load to settle (now 1.38)
+2026-10-12T00:00:28Z waiting for load to settle (now 1.35)
+2026-10-12T00:00:33Z waiting for load to settle (now 1.32)
+2026-10-12T00:00:38Z waiting for load to settle (now 1.30)
+2026-10-12T00:00:43Z waiting for load to settle (now 1.35)
+2026-10-12T00:00:48Z waiting for load to settle (now 1.32)
+2026-10-12T00:00:53Z waiting for load to settle (now 1.30)
+2026-10-12T00:00:58Z waiting for load to settle (now 1.27)
+2026-10-12T00:01:04Z waiting for load to settle (now 1.25)
+2026-10-12T00:01:09Z waiting for load to settle (now 1.23)
+2026-10-12T00:01:14Z waiting for load to settle (now 1.21)
+2026-10-12T00:01:19Z waiting for load to settle (now 1.20)
+2026-10-12T00:01:24Z waiting for load to settle (now 1.18)
+2026-10-12T00:01:29Z waiting for load to settle (now 1.16)
+2026-10-12T00:01:34Z waiting for load to settle (now 1.15)
+2026-10-12T00:01:39Z waiting for load to settle (now 1.22)
+2026-10-12T00:01:44Z waiting for load to settle (now 1.20)
+2026-10-12T00:01:49Z waiting for load to settle (now 1.18)
+2026-10-12T00:01:54Z waiting for load to settle (now 1.17)
+2026-10-12T00:01:59Z regenerating inputs (seeded; digests land in the archive's inputs.sha256)
+2026-10-12T00:02:38Z input sizes: 608M
+2026-10-12T00:03:19Z built at revision 89882a5
+2026-10-12T00:03:19Z start sequence.stats.v1
+2026-10-12T00:03:58Z end sequence.stats.v1 loadavg=2.87 1.66 0.76 jobs=0
+2026-10-12T00:03:58Z start expression.pca.v1
+2026-10-12T00:05:15Z end expression.pca.v1 loadavg=2.49 1.80 0.88 jobs=0
+2026-10-12T00:05:15Z start set.venn.v1
+2026-10-12T00:07:20Z end set.venn.v1 loadavg=2.20 1.95 1.06 jobs=0
+2026-10-12T00:07:20Z start enrichment.overrepresentation.v1
+2026-10-12T00:08:13Z end enrichment.overrepresentation.v1 loadavg=2.24 2.01 1.13 jobs=0
+2026-10-12T00:08:13Z start structure.pdb.summary.v1
+2026-10-12T00:12:11Z end structure.pdb.summary.v1 loadavg=2.24 2.17 1.41 jobs=0
+2026-10-12T00:12:11Z start variant.stats.v1
+2026-10-12T00:14:49Z end variant.stats.v1 loadavg=2.28 2.24 1.57 jobs=0
+2026-10-12T00:14:49Z start granularity one
+2026-10-12T00:15:29Z end granularity one loadavg=2.28 2.24 1.60 jobs=0
+2026-10-12T00:15:29Z start granularity twenty
+2026-10-12T00:16:08Z end granularity twenty loadavg=2.20 2.22 1.62 jobs=0
+2026-10-12T00:16:08Z start granularity many
+2026-10-12T00:16:48Z end granularity many loadavg=2.10 2.19 1.64 jobs=0
+2026-10-12T00:16:48Z start fastq.qc.v1 N=10
+2026-10-12T00:16:48Z end fastq.qc.v1 loadavg=2.10 2.19 1.64 jobs=0
+2026-10-12T00:16:48Z start sequence.ssr.v1 N=10
+2026-10-12T07:03:59Z sequence.ssr.v1 report present
+2026-10-12T07:03:59Z ssr done loadavg=1.50 2.01 2.11 jobs=0
+2026-10-12T07:03:59Z start fastq.qc.v1 N=10 (rerun)
+2026-10-12T09:22:06Z end fastq.qc.v1 loadavg=2.18 2.21 2.18 jobs=0

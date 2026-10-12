@@ -1,0 +1,17 @@
+capability	backend	ratio_all_n	ci_low_all_n	ci_high_all_n	noise_all_n	verdict_all_n	ratio_drop_first	ci_low_drop_first	ci_high_drop_first	noise_drop_first	verdict_drop_first	ratio_middle	ci_low_middle	ci_high_middle	noise_middle	verdict_middle
+sequence.stats.v1	python	1.0185	1.0123	1.1111	0.1003	detectable-immaterial	1.0123	1.0123	1.1111	0.0869	detectable-immaterial	1.0123	1.0123	1.1111	0.0922	detectable-immaterial
+sequence.stats.v1	r	2.2407	2.2346	2.3025	0.1145	material	2.2346	2.2346	2.3580	0.1122	material	2.2407	2.2346	2.3580	0.1170	material
+expression.pca.v1	python	200.5000	133.0000	207.5000	0.5381	material	201.0000	133.0000	207.5000	0.5429	material	160.2000	133.0000	205.5000	0.5030	material
+expression.pca.v1	r	138.5000	92.3333	139.5000	0.5489	material	138.5000	92.3333	139.5000	0.5547	material	110.8000	92.3333	144.5000	0.5571	material
+set.venn.v1	python	18.0000	18.0000	19.0000	0.0528	material	18.0000	18.0000	19.0000	0.0545	material	18.0000	18.0000	19.0000	0.0563	material
+set.venn.v1	r	1107.5000	1090.0000	1127.5000	0.0330	material	1107.0000	1088.0000	1127.0000	0.0311	material	1107.5000	1088.0000	1127.0000	0.0332	material
+enrichment.overrepresentation.v1	python	7.6667	7.3333	7.6667	0.0457	material	7.6667	7.3333	7.6667	0.0467	material	7.5000	7.3333	7.6667	0.0475	material
+enrichment.overrepresentation.v1	r	149.3333	148.6667	156.6667	0.1074	material	149.0000	148.6667	156.6667	0.1055	material	149.3333	148.6667	156.6667	0.1099	material
+structure.pdb.summary.v1	python	26.0000	26.0000	30.0000	0.1795	material	26.0000	26.0000	30.6667	0.1846	material	26.3333	26.0000	30.6667	0.1897	material
+structure.pdb.summary.v1	r	689.3333	683.0000	692.0000	0.0205	material	689.6667	684.0000	693.6667	0.0205	material	689.8333	684.0000	693.6667	0.0218	material
+variant.stats.v1	python	9.5000	9.5000	9.5625	0.0149	material	9.5000	9.5000	9.6250	0.0158	material	9.5000	9.5000	9.5000	0.0141	material
+variant.stats.v1	r	168.7500	164.3750	173.7500	0.0573	material	172.5000	164.3750	173.8750	0.0570	material	173.0000	164.7500	173.8750	0.0556	material
+fastq.qc.v1	python	31.4299	31.0570	31.8248	0.0336	material	31.4459	31.0570	32.0000	0.0340	material	31.3492	31.1424	32.0000	0.0323	material
+fastq.qc.v1	r	447.2548	444.2468	447.4904	0.0082	material	447.4013	444.2468	447.4904	0.0077	material	445.8349	444.2152	447.4554	0.0078	material
+sequence.ssr.v1	python	1.4250	1.3294	1.4500	0.1569	material	1.4250	1.4250	1.4750	0.1291	material	1.4250	1.4250	1.4750	0.1359	material
+sequence.ssr.v1	r	1382.1281	1289.5918	1391.1006	0.1275	material	1382.1000	1381.5563	1391.1006	0.0983	material	1382.1281	1381.5563	1391.1006	0.1035	material

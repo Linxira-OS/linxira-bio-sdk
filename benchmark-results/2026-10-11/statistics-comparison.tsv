@@ -1,0 +1,33 @@
+capability	metric	earlier_report	earlier_value	current_value	current_over_earlier
+sequence.stats.v1	median_wall_ms[rust]	bench-20260913-001	40.000	810.000	20.2500
+sequence.stats.v1	peak_rss_mb[rust]	bench-20260913-001	5.910	5.893	0.9970
+sequence.stats.v1	median_wall_ms[python]	bench-20260913-001	330.000	825.000	2.5000
+sequence.stats.v1	peak_rss_mb[python]	bench-20260913-001	43.828	69.633	1.5888
+sequence.stats.v1	median_wall_ms[r]	bench-20260913-001	2110.000	1815.000	0.8602
+sequence.stats.v1	peak_rss_mb[r]	bench-20260913-001	237.613	321.137	1.3515
+sequence.stats.v1	speedup[python]	bench-20260913-001	8.2500	1.0185	0.1235
+sequence.stats.v1	memory_saving	bench-20260913-001	0.8652	0.9154	
+expression.pca.v1	median_wall_ms[rust]	bench-20260913-001	40.000	20.000	0.5000
+expression.pca.v1	peak_rss_mb[rust]	bench-20260913-001	6.539	8.533	1.3050
+expression.pca.v1	median_wall_ms[python]	bench-20260913-001	300.000	4010.000	13.3667
+expression.pca.v1	peak_rss_mb[python]	bench-20260913-001	43.957	53.396	1.2147
+expression.pca.v1	median_wall_ms[r]	bench-20260913-001	460.000	2770.000	6.0217
+expression.pca.v1	peak_rss_mb[r]	bench-20260913-001	70.934	81.861	1.1541
+expression.pca.v1	speedup[python]	bench-20260913-001	7.5000	200.5000	26.7333
+expression.pca.v1	memory_saving	bench-20260913-001	0.8512	0.8402	
+set.venn.v1	median_wall_ms[rust]	bench-20260913-001	40.000	10.000	0.2500
+set.venn.v1	peak_rss_mb[rust]	bench-20260913-001	6.258	8.266	1.3208
+set.venn.v1	median_wall_ms[python]	bench-20260913-001	310.000	180.000	0.5806
+set.venn.v1	peak_rss_mb[python]	bench-20260913-001	43.785	47.312	1.0806
+set.venn.v1	median_wall_ms[r]	bench-20260913-001	400.000	11075.000	27.6875
+set.venn.v1	peak_rss_mb[r]	bench-20260913-001	70.840	124.684	1.7601
+set.venn.v1	speedup[python]	bench-20260913-001	7.7500	18.0000	2.3226
+set.venn.v1	memory_saving	bench-20260913-001	0.8571	0.8253	
+structure.pdb.summary.v1	median_wall_ms[rust]	bench-20260913-001	40.000	30.000	0.7500
+structure.pdb.summary.v1	peak_rss_mb[rust]	bench-20260913-001	5.992	28.412	4.7415
+structure.pdb.summary.v1	median_wall_ms[python]	bench-20260913-001	320.000	780.000	2.4375
+structure.pdb.summary.v1	peak_rss_mb[python]	bench-20260913-001	43.836	66.252	1.5114
+structure.pdb.summary.v1	median_wall_ms[r]	bench-20260913-001	410.000	20680.000	50.4390
+structure.pdb.summary.v1	peak_rss_mb[r]	bench-20260913-001	70.832	162.836	2.2989
+structure.pdb.summary.v1	speedup[python]	bench-20260913-001	8.0000	26.0000	3.2500
+structure.pdb.summary.v1	memory_saving	bench-20260913-001	0.8633	0.5712	

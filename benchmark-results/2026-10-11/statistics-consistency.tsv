@@ -1,0 +1,9 @@
+capability	verdict	tolerance	precision	backends_with_ok_runs	report	report_path	differences
+sequence.stats.v1	consistent	1e-6 relative (benchmark.run.v1 default)	high	rust,python,r	sequence.stats.v1.benchmark.json	benchmark-results/2026-10-11/sequence.stats.v1.benchmark.json	no differing field paths
+expression.pca.v1	consistent	1e-6 relative (benchmark.run.v1 default)	high	rust,python,r	expression.pca.v1.benchmark.json	benchmark-results/2026-10-11/expression.pca.v1.benchmark.json	no differing field paths
+set.venn.v1	consistent	1e-6 relative (benchmark.run.v1 default)	high	rust,python,r	set.venn.v1.benchmark.json	benchmark-results/2026-10-11/set.venn.v1.benchmark.json	no differing field paths
+enrichment.overrepresentation.v1	consistent	1e-6 relative (benchmark.run.v1 default)	high	rust,python,r	enrichment.overrepresentation.v1.benchmark.json	benchmark-results/2026-10-11/enrichment.overrepresentation.v1.benchmark.json	no differing field paths
+structure.pdb.summary.v1	consistent	1e-6 relative (benchmark.run.v1 default)	high	rust,python,r	structure.pdb.summary.v1.benchmark.json	benchmark-results/2026-10-11/structure.pdb.summary.v1.benchmark.json	no differing field paths
+variant.stats.v1	consistent	1e-6 relative (benchmark.run.v1 default)	high	rust,python,r	variant.stats.v1.benchmark.json	benchmark-results/2026-10-11/variant.stats.v1.benchmark.json	no differing field paths
+fastq.qc.v1	consistent	1e-6 relative (benchmark.run.v1 default)	high	rust,python,r	fastq.qc.v1.benchmark.json	benchmark-results/2026-10-11/fastq.qc.v1.benchmark.json	no differing field paths
+sequence.ssr.v1	consistent	1e-6 relative (benchmark.run.v1 default)	high	rust,python,r	sequence.ssr.v1.benchmark.json	benchmark-results/2026-10-11/sequence.ssr.v1.benchmark.json	no differing field paths

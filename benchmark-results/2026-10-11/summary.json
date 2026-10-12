@@ -1,0 +1,317 @@
+{
+  "schema_version": "1",
+  "report_id": "bench-20261011-001",
+  "generated_at": "2026-10-11",
+  "purpose": "Archived N=10 three-backend window on a low-end x86 host: eight capabilities measured with the Rust engine against Biopython- and Biostrings-based arms, plus a record-granularity experiment testing whether language-boundary crossings explain the sequence.stats parity. Also the first window in which the R backend executed as a real third arm.",
+  "methodology": {
+    "backends_flag": "--backends rust,python,r",
+    "repeat_flag": "--repeat 10",
+    "warmup": "one untimed warmup per backend before the timed repeats; the warmup is excluded from the report, which holds exactly 10 timed runs (run_index 1..10)",
+    "page_cache": "warm",
+    "disclosure": "Serial execution with no concurrent build, lint or archiving; CPU governor fixed at powersave for the whole window; inputs are staged on tmpfs so no disk latency enters the measurement; backend order fixed at rust->python->r, so cross-backend frequency/thermal drift is a known limitation. Ratios hold for this machine and these inputs only; per-run wall times are archived so they can be re-checked."
+  },
+  "engine": "1.1.3",
+  "environment": {
+    "os": "linux",
+    "code_revision": "89882a5a31714e12e0dee4333d20f2b50b0c99c5",
+    "kernel": "7.2.9-1-cachyos",
+    "cpu_model": "Intel(R) Pentium(R) Gold G7400 (2 cores / 4 threads; cpufreq governor fixed at powersave for the whole window)",
+    "total_memory_mb": 15756,
+    "distro": "CachyOS",
+    "engine_version": "1.1.3",
+    "python_version": "Python 3.14.7",
+    "r_version": "R version 4.6.1 (2026-06-24) -- \"Happy Hop\"",
+    "in_container": false,
+    "page_cache": "warm",
+    "precision": "high",
+    "gpu": "not used by this benchmark; the host additionally carries a GTX 750 Ti and an integrated UHD 710 (both exercised only by the separate gpu-lab carrier, out of scope here)",
+    "memory": "15756 MB usable host memory; resident per-phase peak recorded per run (VmHWM)",
+    "storage": "root on btrfs over a 512 GB NVMe (Netac); /tmp is tmpfs (7.7 GB) so every benchmark input is RAM-backed; two spinning disks (ST1000DM003, ST500DM002) present and unused by these runs"
+  },
+  "data_sources": [
+    {
+      "id": "generated-synthetic",
+      "origin": "generated",
+      "reference": "scripts/benchmark/inputs/generate-inputs.py --set synthetic",
+      "note": "random.seed(42); matrix.tsv (2000x40), sets.tsv (20k x 4 sets with repeated occupancy masks), structure.pdb (3000 residues / 24k atoms), variants.vcf (200k records), genes.txt + associations.tsv (5k genes / 45k annotations). Digests in inputs.sha256; byte-identical on Windows/Python 3.13 and Linux/Python 3.14."
+    },
+    {
+      "id": "generated-engine",
+      "origin": "generated",
+      "reference": "scripts/benchmark/inputs/generate-inputs.py --set sequence|reads",
+      "note": "big.fa via the engine simulator (--count 20 --length 5000000 --seed 42); reads200.fq via simulate reads on big.fa (--read-length 150 --coverage 100 --seed 42). Digests in inputs.sha256."
+    },
+    {
+      "id": "generated-granularity",
+      "origin": "generated",
+      "reference": "scripts/benchmark/inputs/generate-inputs.py --set granularity",
+      "note": "numpy default_rng(42); the same ~100 Mb of FASTA as 1x100 Mb, 20x5 Mb and 100k x 1 kb. Digests in inputs.sha256."
+    }
+  ],
+  "entries": [
+    {
+      "id": "sequence-stats-100mb",
+      "capability": "sequence.stats.v1",
+      "dataset_class": "sequence",
+      "dataset": "20 x 5 Mb FASTA (~100 MB), engine-simulated",
+      "data_source_id": "generated-engine",
+      "status": "ok",
+      "consistency": "consistent",
+      "speedup": 1.0185185185185186,
+      "memory_saving": 0.9153764164703242,
+      "precision": "high",
+      "report": "sequence.stats.v1.benchmark.json",
+      "backends": {
+        "rust": {
+          "median_wall_ms": 810.0,
+          "median_peak_rss_mb": 5.892578125,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "python": {
+          "median_wall_ms": 825.0,
+          "median_peak_rss_mb": 69.6328125,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "r": {
+          "median_wall_ms": 1815.0,
+          "median_peak_rss_mb": 321.13671875,
+          "ok_runs": 10,
+          "repeats": 10
+        }
+      }
+    },
+    {
+      "id": "expression-pca-2000x40",
+      "capability": "expression.pca.v1",
+      "dataset_class": "matrix",
+      "dataset": "2000 x 40 count matrix (4 groups x 10 samples)",
+      "data_source_id": "generated-synthetic",
+      "status": "ok",
+      "consistency": "consistent",
+      "speedup": 200.5,
+      "memory_saving": 0.8401916675811112,
+      "precision": "high",
+      "report": "expression.pca.v1.benchmark.json",
+      "backends": {
+        "rust": {
+          "median_wall_ms": 20.0,
+          "median_peak_rss_mb": 8.533203125,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "python": {
+          "median_wall_ms": 4010.0,
+          "median_peak_rss_mb": 53.396484375,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "r": {
+          "median_wall_ms": 2770.0,
+          "median_peak_rss_mb": 81.861328125,
+          "ok_runs": 10,
+          "repeats": 10
+        }
+      }
+    },
+    {
+      "id": "set-venn-20k",
+      "capability": "set.venn.v1",
+      "dataset_class": "other",
+      "dataset": "20k identifiers x 4 sets (repeated occupancy masks)",
+      "data_source_id": "generated-synthetic",
+      "status": "ok",
+      "consistency": "consistent",
+      "speedup": 18.0,
+      "memory_saving": 0.8252972258916776,
+      "precision": "high",
+      "report": "set.venn.v1.benchmark.json",
+      "backends": {
+        "rust": {
+          "median_wall_ms": 10.0,
+          "median_peak_rss_mb": 8.265625,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "python": {
+          "median_wall_ms": 180.0,
+          "median_peak_rss_mb": 47.3125,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "r": {
+          "median_wall_ms": 11075.0,
+          "median_peak_rss_mb": 124.68359375,
+          "ok_runs": 10,
+          "repeats": 10
+        }
+      }
+    },
+    {
+      "id": "enrichment-overrepresentation-5k",
+      "capability": "enrichment.overrepresentation.v1",
+      "dataset_class": "annotation",
+      "dataset": "5k genes / 45k gene-term associations across 300 terms",
+      "data_source_id": "generated-synthetic",
+      "status": "ok",
+      "consistency": "consistent",
+      "speedup": 7.666666666666667,
+      "memory_saving": 0.7544196771714067,
+      "precision": "high",
+      "report": "enrichment.overrepresentation.v1.benchmark.json",
+      "backends": {
+        "rust": {
+          "median_wall_ms": 30.0,
+          "median_peak_rss_mb": 14.9765625,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "python": {
+          "median_wall_ms": 230.0,
+          "median_peak_rss_mb": 60.984375,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "r": {
+          "median_wall_ms": 4480.0,
+          "median_peak_rss_mb": 145.390625,
+          "ok_runs": 10,
+          "repeats": 10
+        }
+      }
+    },
+    {
+      "id": "structure-pdb-summary-24k",
+      "capability": "structure.pdb.summary.v1",
+      "dataset_class": "structure",
+      "dataset": "3000 residues / 24k atoms synthetic PDB with pLDDT column",
+      "data_source_id": "generated-synthetic",
+      "status": "ok",
+      "consistency": "consistent",
+      "speedup": 26.0,
+      "memory_saving": 0.5711506146634828,
+      "precision": "high",
+      "report": "structure.pdb.summary.v1.benchmark.json",
+      "backends": {
+        "rust": {
+          "median_wall_ms": 30.0,
+          "median_peak_rss_mb": 28.412109375,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "python": {
+          "median_wall_ms": 780.0,
+          "median_peak_rss_mb": 66.251953125,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "r": {
+          "median_wall_ms": 20680.0,
+          "median_peak_rss_mb": 162.8359375,
+          "ok_runs": 10,
+          "repeats": 10
+        }
+      }
+    },
+    {
+      "id": "variant-stats-200k",
+      "capability": "variant.stats.v1",
+      "dataset_class": "other",
+      "dataset": "200k VCF records across 5 contigs (SNV/insertion/deletion mix)",
+      "data_source_id": "generated-synthetic",
+      "status": "ok",
+      "consistency": "consistent",
+      "speedup": 9.5,
+      "memory_saving": 0.8654353562005277,
+      "precision": "high",
+      "report": "variant.stats.v1.benchmark.json",
+      "backends": {
+        "rust": {
+          "median_wall_ms": 80.0,
+          "median_peak_rss_mb": 6.17578125,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "python": {
+          "median_wall_ms": 760.0,
+          "median_peak_rss_mb": 45.89453125,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "r": {
+          "median_wall_ms": 13500.0,
+          "median_peak_rss_mb": 122.341796875,
+          "ok_runs": 10,
+          "repeats": 10
+        }
+      }
+    },
+    {
+      "id": "fastq-qc-200mb",
+      "capability": "fastq.qc.v1",
+      "dataset_class": "other",
+      "dataset": "200 MB / 646k reads (150 bp, coverage 100)",
+      "data_source_id": "generated-engine",
+      "status": "ok",
+      "consistency": "consistent",
+      "speedup": 31.429936305732483,
+      "memory_saving": 0.8657558657558657,
+      "precision": "high",
+      "report": "fastq.qc.v1.benchmark.json",
+      "backends": {
+        "rust": {
+          "median_wall_ms": 1570.0,
+          "median_peak_rss_mb": 6.1796875,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "python": {
+          "median_wall_ms": 49345.0,
+          "median_peak_rss_mb": 46.033203125,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "r": {
+          "median_wall_ms": 702190.0,
+          "median_peak_rss_mb": 79.392578125,
+          "ok_runs": 10,
+          "repeats": 10
+        }
+      }
+    },
+    {
+      "id": "sequence-ssr-100mb",
+      "capability": "sequence.ssr.v1",
+      "dataset_class": "sequence",
+      "dataset": "same ~100 MB FASTA as sequence.stats.v1",
+      "data_source_id": "generated-engine",
+      "status": "ok",
+      "consistency": "consistent",
+      "speedup": 1.425,
+      "memory_saving": 0.8607744260509975,
+      "precision": "high",
+      "report": "sequence.ssr.v1.benchmark.json",
+      "backends": {
+        "rust": {
+          "median_wall_ms": 1600.0,
+          "median_peak_rss_mb": 20.9765625,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "python": {
+          "median_wall_ms": 2280.0,
+          "median_peak_rss_mb": 150.666015625,
+          "ok_runs": 10,
+          "repeats": 10
+        },
+        "r": {
+          "median_wall_ms": 2211405.0,
+          "median_peak_rss_mb": 667.470703125,
+          "ok_runs": 10,
+          "repeats": 10
+        }
+      }
+    }
+  ]
+}
