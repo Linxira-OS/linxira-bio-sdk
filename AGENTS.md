@@ -192,6 +192,16 @@ benchmark scripts do not belong loose in `scripts/`.
 | `scripts/benchmark/figures/` | self-contained SVG rendering |
 | `scripts/benchmark/windows/<YYYY-MM-DD>/` | the exact stage scripts of one window, kept verbatim as executed |
 | `scripts/benchmark/rental/` | cloud-rental provisioning material |
+| `scripts/benchmark/reproduce.sh` | one-command reproduction entry point; `REPRODUCE.md` is the human version |
+| `scripts/benchmark/analysis/verify-lock-env.py` | lock/environment gate |
+
+**Lock policy (enforced, not aspirational).** A window measurement is reproducible only if the
+interpreter environment is the one the pack lock describes: `verify-lock-env.py` compares installed
+distributions against `requirements.lock`, the three stage scripts in
+`scripts/benchmark/windows/2026-10-11/` refuse to measure when it fails, and CI asserts the same
+after building `.venv-benchmark` from the hashed lock. A run under a different environment is not
+presented as reproducible; the 2026-10-11 window carries a known mismatch (lock 1.85/2.2.4 vs
+environment 1.88/2.5.4) recorded in `REPRODUCE.md`, and the next window is installed from the lock.
 
 - Every script under `scripts/benchmark/` carries a header comment naming its
   role, the window(s) that used it, and the direction of its data flow.

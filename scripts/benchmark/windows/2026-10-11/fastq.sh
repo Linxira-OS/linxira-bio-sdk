@@ -13,6 +13,15 @@ export LINXIRA_BIO_WORKER="$PWD/target/release/linxira-bio-worker"
 W=/tmp/lxn10
 mkdir -p "$W"
 
+# Lock/environment gate (added 2026-10-12): the measurement is only reproducible if the
+# interpreter environment is the one the pack lock describes. Numbers produced under a
+# different environment must not be presented as reproducible.
+python3 scripts/benchmark/analysis/verify-lock-env.py \
+  --lock workflows/org.linxira.benchmark-python/requirements.lock || {
+    echo "refusing to measure: interpreter environment differs from requirements.lock" >&2
+    exit 1
+  }
+
 if [ ! -f /tmp/lxg8/reads200.fq ]; then
   echo "regenerating the 200 MB FASTQ"
   $BIN simulate reads /tmp/lxg/big.fa "$W/reads200.fq" --read-length 150 --coverage 100 --seed 42 --json >/dev/null

@@ -364,6 +364,10 @@ jobs:
           uv pip install --python "$GITHUB_WORKSPACE/.venv-benchmark/bin/python" \
             --disable-pip-version-check --require-hashes \
             -r workflows/org.linxira.benchmark-python/requirements.lock
+      - name: Assert the benchmark environment matches the hashed lock
+        run: |
+          "$GITHUB_WORKSPACE/.venv-benchmark/bin/python" scripts/benchmark/analysis/verify-lock-env.py \
+            --lock workflows/org.linxira.benchmark-python/requirements.lock
       - name: Run benchmark pack tests (python and r backends)
         run: |
           "$GITHUB_WORKSPACE/.venv-benchmark/bin/python" -m unittest discover \

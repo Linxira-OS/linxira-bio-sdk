@@ -103,33 +103,9 @@ PY
 [ $? -eq 0 ] || fail=1
 
 say "== 3. interpreter arms: installed packages vs the pack locks =="
-"$PY" - <<'PY'
-import pathlib, re, sys
-mismatch = []
-lock = pathlib.Path("workflows/org.linxira.benchmark-python/requirements.lock")
-if lock.is_file():
-    for line in lock.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or line.startswith("--hash"):
-            continue
-        name, _, version = line.partition("==")
-        version = version.split()[0].strip()
-        if not version:
-            continue
-        try:
-            module = __import__(name.replace("-", "_"))
-            installed = getattr(module, "__version__", "?")
-        except Exception:
-            print(f"  ABSENT {name} (lock pins {version})")
-            mismatch.append(name)
-            continue
-        status = "PASS " if installed == version else "DIFF"
-        if installed != version:
-            mismatch.append(name)
-        print(f"  {status} {name}: lock {version} / installed {installed}")
-print("  the lock must govern the run: any DIFF/ABSENT above invalidates a reproduction claim"
-      if mismatch else "  installed packages match the lock")
-PY
+"$PY" scripts/benchmark/analysis/verify-lock-env.py \
+  --lock workflows/org.linxira.benchmark-python/requirements.lock || \
+  warn "the lock does not describe this environment - see REPRODUCE.md > Known gaps"
 
 if [ "$LEVEL" = full ]; then
   say "== 4. the full window (scheduled measurement, not a convenience command) =="

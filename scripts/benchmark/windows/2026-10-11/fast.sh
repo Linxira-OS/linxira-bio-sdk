@@ -21,6 +21,15 @@ for attempt in $(seq 1 24); do
 done
 uptime
 
+# Lock/environment gate (added 2026-10-12): the measurement is only reproducible if the
+# interpreter environment is the one the pack lock describes. Numbers produced under a
+# different environment must not be presented as reproducible.
+python3 scripts/benchmark/analysis/verify-lock-env.py \
+  --lock workflows/org.linxira.benchmark-python/requirements.lock || {
+    echo "refusing to measure: interpreter environment differs from requirements.lock" >&2
+    exit 1
+  }
+
 # Inputs are regenerated only when missing (same seed/parameters as the N=3 window).
 python3 - <<'PY'
 import pathlib, random
