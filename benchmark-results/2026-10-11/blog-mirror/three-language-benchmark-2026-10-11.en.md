@@ -34,9 +34,10 @@ Results use a **two-part, pre-registered rule** (§6.3):
   lower bound stays below the pre-registered 1.10**, so it is **not counted as an advantage**.
 - Rust's **consistent win is memory**: peak RSS is 1/2.3–1/11.8 of Python's and 1/5.7–1/54.5 of R's.
 
-Boundaries up front: this is a **whole-stack comparison** (our Rust engine vs idiomatic third-party
-library implementations plus their language runtimes, measured by the same harness), not a claim
-about "language speed". Every ratio holds only for this machine, these inputs, and this protocol (§11).
+Boundaries up front: this is a **whole-stack comparison**, and "whole stack" needs spelling out — the
+three arms implement **the same algorithm** and differ only in language runtime (same iterator, same
+decorrelation order, same convergence threshold). It therefore measures the **language boundary**, not
+"Rust vs the best available Python tool" (that is a different arm class; see the epilogue, §16). Every ratio holds only for this machine, these inputs, and this protocol (§11).
 One scope statement belongs in the abstract too: **this host has 2 cores / 4 threads and all three
 arms' critical paths were single-threaded** (the engine uses no parallel facility today, CPython has
 the GIL, R's evaluator is single-threaded), so this window **does not exhibit Rust's language-level
@@ -51,6 +52,10 @@ parallelism** — we state only what was measured.
 - A **record-granularity experiment** was added to explain the ≈1× on `sequence.stats` — the original
   hypothesis was **falsified** (§8.5).
 - Data, scripts, tables and figures ship with the repository and can be re-checked item by item (§12).
+- **2026-10-12 factual corrections**: the §8.6 description of the `expression.pca` arms (all three arms run
+  the same hand-written power iteration — not numpy/prcomp), the §6.4/§8.4 trimming wording (verdicts agree;
+  medians move by a timer step), the §4 arm-construction rule, plus the new §16 epilogue (the tool-arm plan)
+  and an explicit statement that **no third-party benchmark suite produced any number here**.
 - **2026-10-12 figure revision**: the set grew from 8 to 12 figures, adding **dispersion (CV)**, the
   **decision ladder** (with the 1.10× material line on a two-panel linear axis), the **memory multiplier**
   and the **condition signal-to-noise** view, under one shared visual system (panels, row bands, rounded
@@ -78,8 +83,28 @@ but a **per-capability, interval-carrying, reproducible comparison**.
 | Backend | Basis | Version |
 | --- | --- | --- |
 | Rust | this repository's engine | v1.1.3 |
-| Python | Biopython (FASTA/FastQ parsing and statistics), numpy | Biopython 1.88 / numpy 2.5.4 |
-| R | Biostrings, `prcomp`, `stats` | Biostrings 2.80.2 / Bioconductor 3.23 / R 4.6.1 |
+| Python | mostly the standard library (`csv`/`gzip`/`math`) + Biopython (FASTA parsing) + `pytrf` (SSR only, a C extension) | CPython 3.14.7 / Biopython **1.88 (measured; the pack lock pins 1.85 — mismatch logged)** / pytrf 1.5.0 |
+| R | mostly base R + Biostrings (reader and its matching C kernels) | R 4.6.1 / Biostrings 2.80.2 / Bioconductor 3.23 |
+
+**How the arms were constructed (stated explicitly here on 2026-10-12; previously it existed only in pack
+source comments).** To make the language boundary the only variable, the three arms implement **the same
+algorithm** and therefore deliberately **avoid ecosystem libraries that would replace it**: `prcomp`,
+`scikit-learn`, `gseapy`, `clusterProfiler`, `bio3d`, `Bio.PDB` and `phyper` are all excluded, each with its
+reason written in the pack source and the capability docs (mainly: their sign conventions, object models or
+rounding differ from the engine, which would break the field-level comparison). Only two things were let
+through: the **parsing layer** (Biopython, Biostrings) and **one C-extension arm** (`sequence.ssr`'s `pytrf`).
+The numbers here therefore answer "**does this algorithm's critical path run in the interpreter or in
+native code**", not "Rust versus the best Python tool". The latter is a different arm class (tool arms such
+as `fastp`/`seqkit`/`pyfastx`), not measured in this window — see the epilogue (§16).
+
+**None of the numbers here come from a third-party benchmark suite.** Third parties appear in exactly two
+roles, neither of which is a suite: ① **orchestrated tools** (19 of the 36 entries in `tools/catalog.json`
+are analysis tools — `bcftools`, `samtools`, `bedtools`, `ncbi-blast`, `diamond`, `hmmer`, `kraken2`,
+`salmon`, `minimap2`, `muscle`, `trimal`, `meme`, `iqtree`, `mcscanx`, `snpeff`, `mkdssp`,
+`kaks-calculator`, `autodock-vina`, `meeko`) — these are **implementations of capabilities**, not arms;
+② **libraries used inside arms** (Biopython, Biostrings, pytrf) — libraries, not suites. So this article
+carries **no** PTS/OpenBenchmarking, SPEC CPU or GIAB+hap.py numbers; those are external anchors we have
+**planned and not executed** in this window — see the epilogue (§16).
 
 **No third-party benchmark suite was used in this window.** Two external calibration paths are
 *planned and not executed*, and are therefore not evidence here:
@@ -157,8 +182,10 @@ CV is still reported per row, but no longer decides anything.
 ### 6.4 Trimming robustness
 
 Besides all 10 repeats, medians and verdicts are recomputed after dropping the first repeat (9) and
-after keeping only the middle 8 (Tables S2 and S3). **All three bases agree on every median and every verdict** —
-no conclusion depends on keeping a particular run.
+after keeping only the middle 8 (Tables S2 and S3). **All three bases agree on every verdict (0 of 16 rows
+change)**; the medians themselves do move by roughly one 10 ms timer step (14 of 24 rows — itemised in
+Table S2). No conclusion depends on keeping a particular run, but "the medians are identical" is not true.
+**Corrected 2026-10-12**: the first version claimed the medians agreed too.
 
 ## 7. Environment
 
@@ -251,8 +278,9 @@ and 1.10 (the materiality floor), and each label carries the verdict.
 
 ### 8.4 Trimming robustness
 
-All three bases agree; see Tables S2 and S3.
-In other words: **no conclusion survives only because a particular run was kept.**
+All three bases agree **on every verdict (0 of 16 rows change)**; the medians move by about one 10 ms timer
+step (14 of 24 rows — see Table S2). In other words: **no conclusion survives only because a particular run
+was kept.**
 
 ![From one capability measurement to a verdict: protocol and decision rule](./figures/en/fig-method.svg)
 
@@ -322,11 +350,15 @@ linear panels (1–10× and ≥10×), and the decision line falls in the lower o
 | Per-item interpreter loop (small in-memory objects) | `set.venn` | 18.0× | 1108× |
 | Per-gene / per-variant interpreter loop | `enrichment`, `variant` | 7.67× / 9.50× | 149× / 169× |
 | Per-atom interpreter loop | `structure.pdb.summary` | 26.0× | 689× |
-| Vectorised numeric library | `expression.pca` | 200× | 138× |
+| Same hand-written power iteration in all three arms (no linear-algebra library) | `expression.pca` | 200× | 138× |
 
 Note the `expression.pca` row: Python is *slower* than R there (200× vs 138×) because both arms run a
-vectorised library (numpy vs `prcomp`) — the gap comes from **the library and its calling
-conventions**, not from the language. That is what "whole-stack comparison" means.
+**all three arms run the same hand-written power iteration** (500 iterations + Gram-Schmidt decorrelation;
+`prcomp` and `scikit-learn` are deliberately excluded — see §4), so this row's gap comes **not from a library**
+but entirely from the runtime boundary: the same scalar loop executed by an interpreter (Python/R) versus in
+native code (Rust). Python is slower than R here (200× vs 138×) because of interpreter loop overhead and
+pure-Python row-by-row `csv` parsing, not because one numeric library is better. **Corrected 2026-10-12**:
+the first version said both arms used vectorised libraries (numpy vs `prcomp`), which the code contradicts.
 
 ### 8.7 Correctness evidence (cross-backend consistency)
 
@@ -446,9 +478,11 @@ One lesson: **a test that exists but never runs in CI does not exist.**
   here, then "Rust is 200× faster *using fewer cores*" only sharpens the point that its **per-core
   efficiency** deserves the emphasis. Many-core scaling would need a separate measurement on a
   core-rich host and is future work.
-- **Whole-stack comparison**, not language vs language: the arms are idiomatic Biopython/Biostrings
-  code plus their runtimes, under one harness. A faster hand-written Python implementation would change
-  the ratios substantially.
+- **Whole-stack comparison**, not language vs language: the three arms are **the same algorithm**
+  implemented in three languages (parity arms), differing only in runtime; the parsing layer uses
+  Biopython/Biostrings and the SSR Python arm uses the C extension `pytrf`. Switching to each ecosystem's
+  standard tools (`fastp`/`seqkit`/`pyfastx`/`scikit-learn`/`prcomp`) changes the ratios substantially —
+  that is a different arm class (tool arms), not measured here.
 - **One machine, one input scale, `powersave`**: a conservative floor, not a general statement. Ratios on
   other CPUs / memory-bandwidth profiles may differ.
 - **Serial backend measurement** carries known frequency/thermal drift; we publish each backend's 10 raw
@@ -565,7 +599,7 @@ will then extend the same protocol with a **core-count scaling curve** (parallel
 knee point) and record the frozen thread count for every measurement point, so that a reader can tell
 an algorithmic gain from a core-count gain.
 
-**Vendors are not equally far along in Rust-for-accelerator support (re-checked 2026-10-12; sources in §16).**
+**Vendors are not equally far along in Rust-for-accelerator support (re-checked 2026-10-12; sources in §17).**
 Two things are routinely conflated: **calling a GPU from Rust** and **writing a kernel in Rust**. The four
 vendors sit in completely different places on those two questions.
 
@@ -592,7 +626,7 @@ vendors sit in completely different places on those two questions.
 Our own execution record needs the same distinction: **what has been run is "one C/C++ kernel source, two
 native toolchains"** — the same kernel suite (copy/triad/histogram/Pearson) compiled by `nvcc` (RTX 4080S,
 sm_89) and `mcc` (MTT S4000), median-of-3, passing every correctness gate, with per-kernel ratios anyone can
-recompute (source in §16). **The Rust-kernel step has not been run**: `cutile-rs` was not on crates.io at the
+recompute (source in §17). **The Rust-kernel step has not been run**: `cutile-rs` was not on crates.io at the
 time, and its dependency chain plus driver gates kept it out of execution; Moore Threads' `cudarc-musa` host
 layer **exists, but we have never measured it** (our `gpu-musa` backend is still a stub). "One Rust source,
 two vendors" is therefore a **route awaiting verification**; what is established is **single-source kernel
@@ -621,9 +655,12 @@ in C primitives; interpreter cost appears only where every element must pass thr
 The advantage follows the workload's shape, not the mere fact that the other arms are interpreted.
 
 **Q2. Were the comparison arms written sub-optimally, inflating the gap?**
-The arms use idiomatic Biopython and Biostrings code; we did not slow them down deliberately. The post
-states explicitly that this is a **whole-stack** comparison and that a hand-written Python
-implementation would change the ratios substantially. We make no blanket claim that "Python is slow".
+First, a correction to a common misreading: the arms are **not** "each language's idiomatic library code";
+they are **the same algorithm** written in three languages (parity arms), with algorithm-replacing libraries
+deliberately excluded (§4). So they were neither deliberately slowed down nor are they Python's best case:
+they measure the language boundary. Switching to each ecosystem's standard tools
+(`fastp`/`seqkit`/`pyfastx`/`scikit-learn`) would move the ratios substantially — that is exactly what the
+epilogue (§16) commits to doing next. We make no blanket claim that "Python is slow".
 
 **Q3. With a single core, is Rust's real advantage simply absent?**
 Yes — and that is stated in the abstract and in §11: the engine contains no parallel facility today,
@@ -667,7 +704,56 @@ fails on any mismatch; each caption carries the "no smoothing, no axis truncatio
 transformation" disclosure, and axes are linear with the truncated range printed on the figure. See
 §13 for how to re-run the checks.
 
-## 16. References
+## 16. Epilogue: tomorrow's second pass — replacing "the same algorithm" with "each language's standard practice"
+
+After writing this up we re-read our three arms line by line and found one thing that has to be said in the
+open — and it decides the next step.
+
+**This window's arms are "one algorithm × three languages", not "three languages' idiomatic code".** To
+collapse the variables down to the runtime boundary, all three arms implement the same algorithm (same
+iterator, same Gram-Schmidt decorrelation order, same convergence threshold) and deliberately exclude the
+ecosystem libraries that would replace it (`prcomp`, `scikit-learn`, `gseapy`, `clusterProfiler`, `bio3d`,
+`phyper`; reasons in §4). The only external native code let through is the parsing layer
+(Biopython/Biostrings) and one C-extension arm (`sequence.ssr`'s `pytrf`).
+
+That is what bounds these numbers: they answer **"does the same algorithm's critical path run in the
+interpreter or in native code"**, not "Rust versus the best Python tool". The counter-example is inside this
+very article: with the C extension `pytrf` on the Python arm, `sequence.ssr`'s gap collapses from the 31×
+class to **1.43×**.
+
+**Tomorrow (2026-10-13) we re-run with more standard code, adding "each language/ecosystem's standard
+practice" as a second arm class (tool arms):** `scikit-learn` and `prcomp` for `expression.pca`,
+`pyfastx`/`seqkit` for `sequence.stats`, `fastp` and `pyfastx` for `fastq.qc`, and ecosystem-standard
+implementations elsewhere, **labelling per row whether the algorithm is equivalent**.
+
+The same pass adds the **third-party anchors** that had been "planned, not executed" — now scheduled:
+① `lzbench` and Squash for compression (single-threaded reference numbers plus fixed-iteration semantics);
+② the PTS `compress-gzip`/`compress-zstd`/`compress-7zip` profiles (quoted with profile revision and run
+command), with results uploaded to OpenBenchmarking for **machine-lineage anchoring** (carrying PTS's own
+comparability caveat: same version, same hardware, same day);
+③ GIAB HG002 + hap.py for correctness truth, **stated separately from any speed claim**.
+Note that PTS still has **no bgzip profile**, so only part of what we measure has a ready-made third-party
+counterpart; where it does not, we say so rather than substituting a different workload.
+
+The two classes are measured separately, tabulated separately and **never mixed**:
+
+- **parity arms (this window)** — same algorithm, measuring the language runtime boundary;
+- **tool arms (next window)** — each ecosystem's standard tools, measuring what a user actually gets.
+
+The protocol does not change (digest-fixed inputs, 1 untimed warm-up + N=10 timed repeats, median +
+bootstrap CI, the two-part verdict, trimming robustness, condition comparison), so the two passes can be
+read side by side — but the two arm classes **must not be compared against each other**. That is the most
+important self-correction of this round: first be clear about what we actually wrote, then talk about speed.
+
+**The same pass fixes three "lock versus environment" mismatches** found while re-reading the code
+(reproducibility defects, not wrong numbers):
+① the Python pack's `requirements.lock` pins `biopython==1.85`/`numpy==2.2.4` while the archived
+environment reports Biopython 1.88 / numpy 2.5.4 — the lock did not govern the run; to be unified next pass;
+② `expression_pca_v1.py`'s docstring claimed `numpy.linalg` did the arithmetic (it never did) — corrected;
+③ the roadmap described the arms as "ecosystem benchmark tools", contradicting the parity arms that actually
+shipped — now a two-class rule in §7.1.
+
+## 17. References
 
 1. NVIDIA. *CUDA Rust platform* (`cuda-oxide`, `cutile-rs` and the runtime crates):
    <https://github.com/NVIDIA/cuda-rust>; announcement: *Introducing CUDA Rust: Two Tracks for Writing GPU
@@ -692,7 +778,7 @@ transformation" disclosure, and axes are linear with the truncated range printed
 7. Software versions used throughout are disclosed in §7; Biopython, Biostrings, numpy, R and CPython are
    cited there as their own project releases.
 
-## 17. Versions and disclosures
+## 18. Versions and disclosures
 
 - **Versions**: first release 2026-10-11; **2026-10-12 rerun**: all eight capabilities re-measured in a
   window with **no CI jobs** (archive `bench-20261011-001`), and every number in this article now comes
@@ -703,8 +789,9 @@ transformation" disclosure, and axes are linear with the truncated range printed
   still re-derived from the same data, and the figure/table check reads 1055/1055 (zh) and 1067/1067 (en).
   Item-by-item changes are in the changelog at the top.
 - **Self-report disclosure**: this is an **author-run benchmark**, not independently replicated by a
-  third party. The comparison arms are third-party **library** implementations (Biopython 1.88,
-  Biostrings 2.80.2, …), **not** a third-party benchmark suite; GIAB + hap.py (correctness truth sets)
+  third party. The comparison arms are **same-algorithm implementations we wrote** (parity arms; the parsing
+  layer uses Biopython 1.88 / Biostrings 2.80.2). They are **not** a third-party benchmark suite, and they are
+  **not** each ecosystem's idiomatic tooling (that is the next window's tool arms, §16); GIAB + hap.py (correctness truth sets)
   and a public hosted benchmark platform (machine-lineage anchoring) are **planned and not executed in
   this window**, so they are not evidence here. Every ratio holds only for this machine, these inputs,
   and this protocol.

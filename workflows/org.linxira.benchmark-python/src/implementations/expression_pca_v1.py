@@ -1,4 +1,4 @@
-"""expression.pca.v1 — independent NumPy implementation.
+"""expression.pca.v1 — independent pure-Python implementation (numpy is imported only to report its version).
 
 A line-for-line port of the Rust engine's PCA
 (engine/crates/linxira-bio-core/src/expression.rs) so the two backends are
@@ -19,8 +19,11 @@ comparable field by field at the 1e-6 relative tolerance:
 
 scikit-learn is deliberately not used here: its SVD sign convention differs,
 and the point of this backend is a field-for-field comparison against the
-engine. ``numpy.linalg`` is used only for elementwise math and ``math`` for
-the sinusoidal start vector, both identical to the Rust port.
+engine. The arithmetic is **pure Python** (``math`` for the sinusoidal start
+vector, builtins for the sums and dots) — ``numpy`` is imported only so the run
+can report its version in the envelope. Corrected 2026-10-12: this docstring
+previously claimed ``numpy.linalg`` performed the elementwise math, which the
+code never did.
 """
 
 from __future__ import annotations

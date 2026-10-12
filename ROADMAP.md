@@ -226,7 +226,7 @@ BED 0-based 半开区间；GFF3/GTF/VCF 1-based 闭区间；JSON 内部统一 1-
 | 磁盘 I/O     | 优先读 `/proc/<pid>/io` 的 `read_bytes/write_bytes`；不可得时标 `null`，禁止伪造                                                                                                                  |
 | 环境 pinning | 报告必须记录：OS/kernel、CPU 型号、内存总量、Rust/Python/R 版本、关键依赖版本（如 DESeq2 版本）、是否容器内                                                                                                            |
 | 一致性判据      | 结构化字段逐项 diff：数值相对误差 ≤1e-6 判 `consistent`；字符串全等；表格类 sha256 相等（排序规范化后）。任一超差 → `inconsistent` 并记录差异字段清单                                                                               |
-| 加速比定义      | `speedup = median_wall(native) / median_wall(rust)`；内存节省 `= 1 - peak_rss(rust)/peak_rss(native)`。原生基准 = 该能力生态对标工具（如 DESeq2），不是自写脚本                                                 |
+| 加速比定义      | `speedup = median_wall(native) / median_wall(rust)`；内存节省 `= 1 - peak_rss(rust)/peak_rss(native)`。**对照臂分两类，必须逐行标注、禁止混排**（2026-10-12 修订）：① **parity arm**——同算法三语言实现，用于测语言运行时边界（须在报告与文章写明"同算法"）；② **tool arm**——各语言/生态的对标工具（如 DESeq2、fastp、seqkit、pyfastx、scikit-learn、prcomp），用于答"用户真实会拿到什么"。两类臂的数字不得放在同一张对比表里比较 |
 | 失败隔离       | 单个能力 benchmark 失败不阻塞整批；`summary.json` 记 `status: failed` + stderr 摘要（截断至 4KB）                                                                                                      |
 
 ### 7.2 任务清单

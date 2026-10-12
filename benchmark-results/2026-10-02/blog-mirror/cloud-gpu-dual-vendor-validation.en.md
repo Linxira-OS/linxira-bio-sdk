@@ -26,7 +26,9 @@ desc: "Pre-launch validation for GPU vendor support in the Linxira Bio SDK, run 
    false alarms.
 3. **The two servers produced byte-identical outputs**: docking, SSR
    mining, the expression chain, enrichment — five classes of output
-   files have identical SHA256 hashes on both machines.
+   files have identical SHA256 hashes on both machines (**preconditions
+   in §3.3**: the docking JSON envelope requires the same `--cpu` on both
+   runs; the pose files are independent of `--cpu`).
 4. **The Rust implementation holds a steady 3.6–4.0× over the traditional
    Python tool** (1 M-base SSR mining, re-measured on three different
    CPUs), with byte-identical output to the reference implementation.
@@ -134,6 +136,20 @@ Docking JSONs, SSR TSVs (1 M bases), same-seed docking reruns, expression
 chain JSONs, enrichment JSONs — **SHA256-identical across the two
 servers**. Different vendor, different CPU, different core count, same
 bytes.
+
+**The preconditions have to be stated (corrected 2026-10-12).** "Byte-identical" here describes *these two
+rounds' configuration*: the only machine-dependent field in the JSON envelope is `result.thread_count`,
+which echoes the requested `--cpu` (the engine always passes it through, `native_tools.rs`), so the JSON is
+byte-identical **only when both runs use the same `--cpu`**. In the later third-round sweep NVIDIA ran
+`--cpu 32` and Moore Threads `--cpu 15`, so every `A_*.json` differs — **and differs only in that field**
+(normalise it and the files are byte-identical).
+
+**What is independent of `--cpu` is the pose file**: the same-seed reruns produce `*_out*.pdbqt`
+(12,180 bytes, SHA256 `6d5830…063e2`) that is byte-identical on both machines *and across different
+`--cpu` settings*; the numeric layer (12 rows of affinity/RMSD) is value-identical on both machines.
+One more honest limit: we did **not** prove libm/ULP independence — only that this workload, with this
+official binary (`vina_1.2.5_linux_x86_64`), produced identical bytes on these two machines; the
+round-one Vina acquisition left no install log.
 
 ## 4 Our speed against the traditional tool
 
