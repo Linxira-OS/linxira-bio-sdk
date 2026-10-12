@@ -735,7 +735,10 @@ class SequenceSsrParityTests(unittest.TestCase):
     def test_matches_the_rust_engine_on_mixed_repeats(self):
         result = self.run_implementation("AAAAAAAAAATATATATATATAT")
         self.assertEqual(result["summary"]["sequence_count"], 1)
-        self.assertEqual(result["summary"]["total_bases"], 22)
+        # `total_bases` counts bases *examined* (the sum of sequence lengths) - the same
+        # definition the engine uses (`*total_bases += sequence_length`) and the R arm
+        # copies; the bases actually covered by SSRs here are 22 = 10 + 12.
+        self.assertEqual(result["summary"]["total_bases"], 23)
         self.assertEqual(result["summary"]["ssr_count"], 2)
         self.assertEqual(result["summary"]["compound_group_count"], 1)
         self.assertEqual(result["summary"]["motif_length_counts"], {"1": 1, "2": 1})

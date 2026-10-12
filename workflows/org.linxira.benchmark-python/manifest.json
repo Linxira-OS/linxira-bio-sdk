@@ -84,7 +84,7 @@
     },
     {
       "path": "tests/test_benchmark_harness.py",
-      "sha256": "f9b3771c9ed3a395dc2425a1506126cec151570ca5891753913a5a5be9501e62"
+      "sha256": "5b19cafa742d7f66ace4a84c2eda9201b46b16bd440a57a6213c2474c2e71341"
     },
     {
       "path": "src/implementations/expression_pca_v1.py",
