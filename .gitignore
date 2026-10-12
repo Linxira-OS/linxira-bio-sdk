@@ -35,3 +35,8 @@ id_ed25519*
 id_ecdsa*
 .env
 .env.*
+
+# Promotion binaries (screen recordings, exports, slide decks) stay out of git; the text
+# sources in promotion/ are tracked and reviewed like code.
+promotion/assets/*
+!promotion/assets/MANIFEST.md

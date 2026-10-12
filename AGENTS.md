@@ -152,6 +152,9 @@ Paths and purposes, for agents working in this repository (not end-user docs):
 - `skill-pack.json` — the import boundary for agent runtimes; every skill
   folder must appear here with its capability ids, otherwise it ships in the
   bundle but stays invisible to agents.
+- `promotion/` — pre-publication material for public content (note texts, video scripts, slide
+  outlines) plus the rules every piece follows; binaries are gitignored under
+  `promotion/assets/` and recorded in its manifest.
 - `gpu-lab/` — standalone (workspace-excluded) Rust GPU experiment carrier
   (probe / bench / gpu-bench); not part of the release workspace.
 
