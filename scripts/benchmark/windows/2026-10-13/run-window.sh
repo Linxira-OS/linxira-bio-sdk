@@ -26,9 +26,18 @@
 #       | ssh <host> 'cat > /tmp/run-window.sh && chmod +x /tmp/run-window.sh &&
 #                     setsid nohup /tmp/run-window.sh > /tmp/run-window-1013.log 2>&1 & echo detached'
 #
-# ALLOW_CI=1     proceed even if CI jobs run or are queued (records the fact)
-# ALLOW_LOAD=1   proceed even if an unrelated process is above 5% CPU (records it)
-# STAGES="..."   which stages to run (default: fast granularity fastq ssr toolarms)
+# ALLOW_CI=1       proceed even if CI jobs run or are queued (records the fact)
+# ALLOW_LOAD=1     proceed even if an unrelated process is above 5% CPU (records it)
+# WAIT_FOR_IDLE=1  instead of refusing, wait for the host to be free and start by itself
+# WAIT_MAX_HOURS=N how long that wait may last (default 48)
+# STAGES="..."     which stages to run (default: fast granularity fastq ssr toolarms)
+#
+# WAIT_FOR_IDLE exists because the host is shared with a long-running SRA refetch
+# (aria2c, started outside this window). The condition is the downloader's absence,
+# not its idleness: aria2c runs with --max-tries=0, so it keeps retrying for days and
+# "no aria2c process" is what marks the refetch as finished. The wait costs no CPU:
+# it re-checks every five minutes, logs each check, and the window proceeds from the
+# same preflight immediately after.
 set -u
 export LC_ALL=C
 export PATH="$HOME/lx-locked-venv/bin:$HOME/.cargo/bin:$PATH"
@@ -61,11 +70,33 @@ fi
 # one the window describes: the first 2026-10-13 attempt found an unrelated bulk
 # downloader (aria2c, ~16% CPU) started outside this window, and measuring beside it
 # would silently publish a contended machine as an idle one.
-heavy="$(ps -eo pcpu,comm --sort=-pcpu --no-headers 2>/dev/null | awk '$1 > 5 {printf "%s %s; ", $1, $2}' | head -c 200)"
-if [ -n "$heavy" ] && [ "${ALLOW_LOAD:-0}" != "1" ]; then
-  echo "refusing to start: process(es) above 5% CPU: $heavy" >&2
-  echo "wait them out, or pass ALLOW_LOAD=1 to record the contention in the log." >&2
-  exit 3
+busy_load() {
+  ps -eo pcpu,comm --sort=-pcpu --no-headers 2>/dev/null | awk '$1 > 5 {printf "%s %s; ", $1, $2}' | head -c 200
+}
+busy_downloads() { pgrep -x aria2c 2>/dev/null | tr '\n' ' '; }
+heavy="$(busy_load)"
+downloads="$(busy_downloads)"
+if [ "${WAIT_FOR_IDLE:-0}" = "1" ]; then
+  waited=0
+  while [ -n "$heavy" ] || [ -n "$downloads" ]; do
+    if [ "$waited" -ge "$(( ${WAIT_MAX_HOURS:-48} * 60 ))" ]; then
+      log "idle wait timed out after ${WAIT_MAX_HOURS:-48}h (heavy='$heavy' aria2c='$downloads')"
+      exit 3
+    fi
+    log "idle wait ${waited}/${WAIT_MAX_HOURS:-48} min: heavy='$heavy' aria2c='$downloads'"
+    sleep 300
+    waited=$((waited + 5))
+    heavy="$(busy_load)"
+    downloads="$(busy_downloads)"
+  done
+  log "host is free: no process above 5% CPU and no aria2c running"
+elif [ -n "$heavy" ] || [ -n "$downloads" ]; then
+  if [ "${ALLOW_LOAD:-0}" != "1" ]; then
+    echo "refusing to start: heavy='$heavy' aria2c='$downloads'" >&2
+    echo "wait it out, pass WAIT_FOR_IDLE=1 to start when free, or ALLOW_LOAD=1 to record the contention." >&2
+    exit 3
+  fi
+  log "ALLOW_LOAD=1: measuring beside heavy='$heavy' aria2c='$downloads' (recorded)"
 fi
 log "busy processes at start: ${heavy:-none}"
 for attempt in $(seq 1 24); do

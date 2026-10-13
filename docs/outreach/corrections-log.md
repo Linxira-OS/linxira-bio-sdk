@@ -11,6 +11,26 @@ honest state of a project that started measuring in public.
 
 ---
 
+## 2026-10-13 — the lock declared an interpreter the measuring host does not run
+
+`workflows/org.linxira.benchmark-python/requirements.lock` carries the line `Runtime: CPython 3.12`, and
+CI installs it into 3.12. The measuring host runs CPython 3.14.7. Nobody had compared those two numbers.
+
+The consequence is sharper than "the environment drifted": the pins cannot install on 3.14 at all.
+`pip download --only-binary=:all: biopython==1.85` answers `from versions: 1.86, 1.87, 1.88`, and the
+1.85 source build fails; `numpy==2.2.4` answers `from versions: 2.3.2, …`. So the archived window's
+`biopython 1.88 / numpy 2.5.4` were not a mistake during setup — they were the newest versions Python
+3.14 accepts. The error was leaving the lock and the host two interpreter generations apart, and then
+describing the result as an environment that merely "did not match".
+
+What changes: the re-run installs the interpreter the lock declares (a user-local CPython 3.12 via `uv`,
+no system package), creates the environment with `uv pip install --require-hashes -r <lock>`, and the
+existing gate (`scripts/benchmark/analysis/verify-lock-env.py`) proves lock == environment before any
+number is measured. The window's `code-label.txt` records the interpreter that actually ran.
+
+Check: `uv python install 3.12`, then `uv pip install --require-hashes -r workflows/org.linxira.benchmark-python/requirements.lock`,
+then `python3 scripts/benchmark/analysis/verify-lock-env.py --lock workflows/org.linxira.benchmark-python/requirements.lock`.
+
 ## 2026-10-12 — the Python pack lock could not be installed by anything
 
 The lock in `workflows/org.linxira.benchmark-python/` pinned `pytrf==1.5.0` with an

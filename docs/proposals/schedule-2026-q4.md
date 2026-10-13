@@ -52,6 +52,18 @@ Two R legs are the entire bill: `sequence.ssr.v1` at 2211 s per run × 10 and `f
   where the window's cost lives, and a Biostrings-idiomatic arm would quantify how much of that
   is "R" versus "our R".
 
+Held 2026-10-13 by the maintainer's call: the window waits until the host-side SRA refetch
+(`aria2c`, started outside this window, 130 EBI runs, 153 GB at the time of writing) has finished, so the
+published numbers are not a contended window. The driver can be armed with `WAIT_FOR_IDLE=1` to start by
+itself once the host is free; the condition is the downloader's absence, not its idleness, because
+`aria2c --max-tries=0` keeps retrying for days.
+
+Interpreter correction (2026-10-13): the lock declares `Runtime: CPython 3.12` while the host runs 3.14.7;
+the pinned `biopython 1.85` / `numpy 2.2.4` have no cp314 wheels, so the environment could never have
+matched. The re-run installs CPython 3.12 user-locally (`uv python install 3.12`) and installs the lock
+into a venv made from it, which is what makes lock == environment true rather than aspirational. See the
+corrections ledger entry of the same date.
+
 Recommendation: do the **full window once**, on a quiet machine, after the lock install, and
 include the tool arms in the same session. Splitting it saves nothing (the interpreter legs
 dominate) and produces two environments to explain.
