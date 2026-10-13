@@ -30,6 +30,12 @@
 # ALLOW_LOAD=1     proceed even if an unrelated process is above 5% CPU (records it)
 # WAIT_FOR_IDLE=1  instead of refusing, wait for the host to be free and start by itself
 # WAIT_MAX_HOURS=N how long that wait may last (default 48)
+# QUIET_CHECKS=N   how many consecutive 5-minute checks must find the host idle before
+#                  the window starts (default 6, i.e. six checks five minutes apart, so
+#                  at least 25 minutes of observed quiet). A single idle sample can land
+#                  in the gap between two of somebody else's jobs - the first check on
+#                  2026-10-13 caught exactly that, an md5sum verifying a finished
+#                  download - and a window started there would be contended.
 # STAGES="..."     which stages to run (default: fast granularity fastq ssr toolarms)
 #
 # WAIT_FOR_IDLE exists because the host is shared with a long-running SRA refetch
@@ -78,18 +84,27 @@ heavy="$(busy_load)"
 downloads="$(busy_downloads)"
 if [ "${WAIT_FOR_IDLE:-0}" = "1" ]; then
   waited=0
-  while [ -n "$heavy" ] || [ -n "$downloads" ]; do
+  quiet=0
+  quiet_checks="${QUIET_CHECKS:-6}"
+  while [ "$quiet" -lt "$quiet_checks" ]; do
     if [ "$waited" -ge "$(( ${WAIT_MAX_HOURS:-48} * 60 ))" ]; then
       log "idle wait timed out after ${WAIT_MAX_HOURS:-48}h (heavy='$heavy' aria2c='$downloads')"
       exit 3
     fi
-    log "idle wait ${waited}/${WAIT_MAX_HOURS:-48} min: heavy='$heavy' aria2c='$downloads'"
+    if [ -z "$heavy" ] && [ -z "$downloads" ]; then
+      quiet=$((quiet + 1))
+      log "idle wait ${waited}/${WAIT_MAX_HOURS:-48} min: quiet streak $quiet/$quiet_checks"
+    else
+      quiet=0
+      log "idle wait ${waited}/${WAIT_MAX_HOURS:-48} min: heavy='$heavy' aria2c='$downloads'"
+    fi
+    [ "$quiet" -ge "$quiet_checks" ] && break
     sleep 300
     waited=$((waited + 5))
     heavy="$(busy_load)"
     downloads="$(busy_downloads)"
   done
-  log "host is free: no process above 5% CPU and no aria2c running"
+  log "host is free: $quiet consecutive checks with no process above 5% CPU and no aria2c"
 elif [ -n "$heavy" ] || [ -n "$downloads" ]; then
   if [ "${ALLOW_LOAD:-0}" != "1" ]; then
     echo "refusing to start: heavy='$heavy' aria2c='$downloads'" >&2
