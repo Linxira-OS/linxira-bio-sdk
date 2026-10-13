@@ -50,6 +50,21 @@
         "{input}"
       ],
       "notes": "The Python parity arm hand-writes the power iteration with stdlib only; this arm is the import a user would actually make. `python3` must be the interpreter that has scikit-learn installed (the pack venv on the measurement host), which the report's version string makes checkable."
+    },
+    "seqkit-stats": {
+      "capability": "sequence.stats.v1",
+      "dataset_class": "sequence",
+      "tool_name": "seqkit",
+      "version_command": [
+        "seqkit",
+        "version"
+      ],
+      "run_command": [
+        "seqkit",
+        "stats",
+        "{input}"
+      ],
+      "notes": "The streaming reference for sequence.stats: seqkit stats reports num_seqs/sum_len/min_len/avg_len/max_len/N50 for FASTA/Q in a single streaming pass, which is the same job our capability does with a record-oriented parser. Subcommand spelling checked against seqkit v2.14.0 with `seqkit stats --help` (it is `stats`, not `stat`); the binary was verified byte-for-byte against the publisher's GitHub API asset digest sha256:3d664ffb48438d1fbd3f3cfc060c71d00368a26435f1c876944aea7fcdff86b5 before install, so this arm answers whether our implementation is slow or whether streaming FASTA statistics are intrinsically slow."
     }
   }
 }
