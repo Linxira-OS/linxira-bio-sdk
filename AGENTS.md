@@ -143,6 +143,9 @@ Paths and purposes, for agents working in this repository (not end-user docs):
 - `docs/proposals/` — design proposals and window plans. Repository-only: not
   staged into the release bundle. Only `docs/capabilities/` and the
   specification documents listed in `packaging/bundle-manifest.json` ship.
+- `docs/BACKLOG.md` — the items that are open but waiting on a decision, a machine
+  or a date, with the next concrete action for each; the durable copy of a working
+  list, so blockers outlive the session that found them.
 - `docs/*.md` (AI_AND_SDK, EXECUTION_POLICY, DATA_FORMATS, …) — engineering
   policies and reference notes.
 - `benchmark-results/` — benchmark archives and the approved blog mirror;
