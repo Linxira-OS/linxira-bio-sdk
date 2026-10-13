@@ -142,15 +142,35 @@ cargo build --release -p linxira-bio-cli -p linxira-bio-worker 2>&1 | tail -2
 log "built at branch=$(git rev-parse --abbrev-ref HEAD) $(git rev-parse --short HEAD) describe=$(git describe --tags --always --dirty)"
 
 echo "=== stages: $STAGES ==="
-if stage fast; then bash scripts/benchmark/windows/2026-10-13/fast.sh; fi
-if stage granularity; then bash scripts/benchmark/windows/2026-10-13/granularity.sh; fi
-if stage fastq; then bash scripts/benchmark/windows/2026-10-13/fastq.sh; fi
-if stage ssr; then bash scripts/benchmark/windows/2026-10-13/ssr.sh; fi
-if stage toolarms; then bash scripts/benchmark/windows/2026-10-13/tool-arms.sh; fi
+# The window runs unattended for hours, so a stage that refuses to measure (a lock,
+# environment or input problem) must not be swallowed: without this, a gate failure
+# would still end in "done" and leave an empty archive that looks like a result.
+failed=""
+run_stage() {
+  name="$1"
+  shift
+  stage "$name" || return 0
+  log "stage $name: start"
+  if "$@"; then
+    log "stage $name: ok"
+  else
+    log "stage $name: FAILED (exit $?)"
+    failed="$failed $name"
+  fi
+}
+run_stage fast bash scripts/benchmark/windows/2026-10-13/fast.sh
+run_stage granularity bash scripts/benchmark/windows/2026-10-13/granularity.sh
+run_stage fastq bash scripts/benchmark/windows/2026-10-13/fastq.sh
+run_stage ssr bash scripts/benchmark/windows/2026-10-13/ssr.sh
+run_stage toolarms bash scripts/benchmark/windows/2026-10-13/tool-arms.sh
 log "loadavg at end: $(cut -d' ' -f1-3 /proc/loadavg)"
 
 echo "=== archive (summary, tables, bilingual figures, figure check) ==="
 bash scripts/benchmark/windows/2026-10-13/archive.sh
 cp "$LOG" benchmark-results/2026-10-13/window-log.txt
 cp "$LABEL" benchmark-results/2026-10-13/code-label.txt
+if [ -n "$failed" ]; then
+  echo "RUN-WINDOW-INCOMPLETE: failed stages:$failed - the archive holds whatever the successful stages produced" | tee -a "$LOG"
+  exit 1
+fi
 echo RUN-WINDOW-DONE
