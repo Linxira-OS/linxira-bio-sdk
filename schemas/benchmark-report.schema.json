@@ -354,6 +354,20 @@
             "null"
           ],
           "description": "Storage topology backing the benchmark I/O: SSD vs HDD per mount, with models."
+        },
+        "code_branch": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Branch the binary was built from; HEAD when the checkout was detached."
+        },
+        "code_describe": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "git describe --tags --always --dirty: names the nearest release tag when one exists, the short commit hash when no release has been published yet, and carries -dirty when the working tree had uncommitted changes."
         }
       }
     },
@@ -390,6 +404,46 @@
         "invocation": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "description": "The bytes the measurement ran on, so a published number can be re-derived. Parity windows record the same identity at the archive level (descriptor.json plus inputs.sha256); a standalone tool-arm report carries its own copy.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Path as staged on the measuring host."
+          },
+          "bytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         }
       }
     }

@@ -27,6 +27,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import platform
 import re
@@ -222,19 +223,26 @@ def environment_block(code_revision: str | None) -> dict:
         "page_cache": "warm",
         "precision": "high" if TIME_BINARY.is_file() else "degraded",
         "code_revision": code_revision,
+        "code_branch": git_label(["rev-parse", "--abbrev-ref", "HEAD"]),
+        "code_describe": git_label(["describe", "--tags", "--always", "--dirty"]),
     }
 
 
-def git_revision() -> str | None:
+def git_label(arguments: list[str]) -> str | None:
+    """Run one git probe for the report's code label; None when git cannot answer."""
     completed = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
+        ["git", *arguments],
         capture_output=True,
         text=True,
         check=False,
         cwd=SCRIPT_DIR,
     )
-    revision = completed.stdout.strip()
-    return revision or None
+    value = completed.stdout.strip()
+    return value or None
+
+
+def git_revision() -> str | None:
+    return git_label(["rev-parse", "HEAD"])
 
 
 def validate_report(report: dict, schema_path: Path) -> None:
@@ -246,6 +254,32 @@ def validate_report(report: dict, schema_path: Path) -> None:
         raise ToolArmError(f"report schema not found: {schema_path}")
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     jsonschema.validate(instance=report, schema=schema)
+
+
+def describe_input(path: Path | None) -> dict[str, object] | None:
+    """Record the bytes a measurement ran on, so the number can be re-derived.
+
+    The parity windows carry this identity at the archive level (descriptor.json plus
+    inputs.sha256); a tool-arm report is standalone and lands on its own, so it holds
+    its own copy of the input path, size and digest.
+    """
+    if path is None:
+        return None
+    digest = hashlib.sha256()
+    size = 0
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+                size += len(chunk)
+    except OSError:
+        return {
+            "path": str(path),
+            "bytes": None,
+            "sha256": None,
+            "note": "input was not readable when the report was written",
+        }
+    return {"path": str(path), "bytes": size, "sha256": digest.hexdigest()}
 
 
 def build_report(
@@ -309,9 +343,12 @@ def build_report(
                 "detail": "GNU time is unavailable: wall time only, peak RSS is null",
             }
         )
+    input_path = getattr(arguments, "input", None)
+    input_record = describe_input(Path(input_path) if input_path else None)
     return {
         "schema_version": "1",
         "capability": entry["capability"],
+        "inputs": [input_record] if input_record else [],
         "dataset_class": entry.get("dataset_class", "other"),
         "arm_class": "tool",
         "tool": {"name": entry["tool_name"], "version": version, "invocation": invocation},

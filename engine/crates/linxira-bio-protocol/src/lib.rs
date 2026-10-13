@@ -652,6 +652,14 @@ pub struct BenchmarkEnvironment {
     /// evaluation is tied to the code that produced it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code_revision: Option<String>,
+    /// Branch the binary was built from; `HEAD` when the checkout was detached.
+    #[serde(default)]
+    pub code_branch: Option<String>,
+    /// `git describe --tags --always --dirty`: names the nearest release tag when one
+    /// exists, the short commit hash when the project has published no release yet, and
+    /// carries a `-dirty` suffix when the working tree had uncommitted changes.
+    #[serde(default)]
+    pub code_describe: Option<String>,
     /// GPU model and driver as disclosed by the host; even CPU-only
     /// workloads disclose it so readers can rule out accelerator effects.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1208,6 +1216,8 @@ mod tests {
             environment: BenchmarkEnvironment {
                 os: "linux".to_owned(),
                 code_revision: Some("0123456789abcdef".to_owned()),
+                code_branch: Some("main".to_owned()),
+                code_describe: Some("0123456".to_owned()),
                 gpu: None,
                 memory: None,
                 storage: None,

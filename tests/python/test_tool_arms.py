@@ -9,6 +9,7 @@ arm classes out of one table or figure (ROADMAP 7.1).
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import sys
 import tempfile
@@ -116,6 +117,13 @@ class ToolArmRunnerTests(unittest.TestCase):
         # The recorded invocation is the substituted argv, which is what makes a
         # disagreement attributable to the call rather than guessed.
         self.assertIn(str(self.input_path), report["tool"]["invocation"])
+        # The measurement's input identity travels with the report: a standalone
+        # tool-arm report has no window descriptor beside it to lean on.
+        recorded = report["inputs"]
+        self.assertEqual(len(recorded), 1)
+        self.assertEqual(recorded[0]["sha256"], hashlib.sha256(self.input_path.read_bytes()).hexdigest())
+        self.assertEqual(recorded[0]["bytes"], self.input_path.stat().st_size)
+
         backend = report["backends"][0]
         self.assertEqual(backend["repeats"], 3)
         self.assertEqual(len(backend["runs"]), 3)
