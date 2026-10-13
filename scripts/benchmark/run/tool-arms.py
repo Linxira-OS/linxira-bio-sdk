@@ -343,7 +343,10 @@ def build_report(
                 "detail": "GNU time is unavailable: wall time only, peak RSS is null",
             }
         )
-    input_path = getattr(arguments, "input", None)
+    raw_input = getattr(arguments, "input", None)
+    # Record the path the tool was actually invoked on (resolved), not the string as
+    # typed: the invocation and the runs already use the resolved path.
+    input_path = str(Path(raw_input).resolve()) if raw_input else None
     input_record = describe_input(Path(input_path) if input_path else None)
     return {
         "schema_version": "1",

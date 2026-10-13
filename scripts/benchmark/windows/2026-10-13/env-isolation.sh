@@ -32,8 +32,13 @@
 # Run (detached, in an idle slot):
 #     cat scripts/benchmark/windows/2026-10-13/env-isolation.sh \
 #       | ssh <host> 'cat > /tmp/env-isolation.sh && chmod +x /tmp/env-isolation.sh &&
-#                     setsid nohup /tmp/env-isolation.sh > /tmp/env-isolation.log 2>&1 & echo detached'
+#                     setsid nohup /tmp/env-isolation.sh > /tmp/env-isolation.out 2>&1 & echo detached'
+#
+# Note: stdout/err go to /tmp/env-isolation.out while log() appends to
+# /tmp/env-isolation.log; they are deliberately different files so that two writers
+# never share one fd (the archived copy is env-isolation-log.txt).
 set -u
+set -o pipefail   # without this, `cmd | tail -1 || guard` never fires: the status is tail's
 export LC_ALL=C
 export PATH="$HOME/bin:$HOME/.cargo/bin:$PATH"
 cd "$HOME/linxira-bio-sdk" || exit 1
@@ -53,7 +58,7 @@ busy_load() { ps -eo pcpu,comm --sort=-pcpu --no-headers 2>/dev/null | awk '$1 >
 heavy="$(busy_load)"
 if [ -n "$heavy" ] || pgrep -x aria2c >/dev/null 2>&1; then
   echo "refusing to measure: heavy='$heavy' aria2c='$(pgrep -c aria2c 2>/dev/null || echo 0)'" >&2
-  echo "run this in an idle daytime slot (or set WAIT_FOR_IDLE=1 and wait)." >&2
+  echo "run this in an idle daytime slot; this experiment does not implement a wait mode." >&2
   exit 3
 fi
 
@@ -82,19 +87,35 @@ cell_env() {
 }
 
 for cell in A B C; do
-  IFS='|' read -r py spec kind <<<"$(cell_env "$cell")"
+  IFS='|' read -r py _spec kind <<<"$(cell_env "$cell")"
   VENV="$HOME/lx-iso-$cell"
   echo "=== cell $cell: python $py + $kind pins ==="
   rm -rf "$VENV"
-  uv venv --python "$py" "$VENV" 2>&1 | tail -1 || { log "cell $cell: could not create a $py venv"; continue; }
-  if [ "$kind" = "locked" ]; then
-    uv pip install --python "$VENV/bin/python" --require-hashes -r "$LOCK" 2>&1 | tail -2
-  else
-    uv pip install --python "$VENV/bin/python" biopython==1.88 numpy==2.5.4 2>&1 | tail -2
+  # Each step's status is checked before any pipe: a cell whose interpreter or pins
+  # failed to install must NOT be measured, because PATH would fall back to the host
+  # python and the report would be filed under a cell label whose environment was
+  # never used - exactly the confusion this experiment exists to remove.
+  if ! uv venv --python "$py" "$VENV" >"$VENV.log" 2>&1; then
+    log "cell $cell: could not create a $py venv (see $VENV.log); cell skipped, not measured"
+    continue
   fi
-  # Record the realised environment, not the requested one: a cell that silently
-  # resolved to different versions would invalidate the comparison.
-  "$VENV/bin/python" -c "import sys, Bio, numpy; print('cell $cell realised:', sys.version.split()[0], 'biopython', Bio.__version__, 'numpy', numpy.__version__)" 2>&1 | tee -a "$LOG"
+  if [ "$kind" = "locked" ]; then
+    if ! uv pip install --python "$VENV/bin/python" --require-hashes -r "$LOCK" >"$VENV.install.log" 2>&1; then
+      log "cell $cell: locked install failed (see $VENV.install.log); cell skipped, not measured"
+      continue
+    fi
+  else
+    if ! uv pip install --python "$VENV/bin/python" biopython==1.88 numpy==2.5.4 >"$VENV.install.log" 2>&1; then
+      log "cell $cell: newest-pin install failed (see $VENV.install.log); cell skipped, not measured"
+      continue
+    fi
+  fi
+  # Record the realised environment, not the requested one, and refuse to measure when
+  # the probe fails.
+  if ! "$VENV/bin/python" -c "import sys, Bio, numpy; print('cell $cell realised:', sys.version.split()[0], 'biopython', Bio.__version__, 'numpy', numpy.__version__)" 2>&1 | tee -a "$LOG"; then
+    log "cell $cell: interpreter probe failed; cell skipped, not measured"
+    continue
+  fi
   for cap in $CAPS; do
     case "$cap" in
       sequence.stats.v1) input="fasta=$W/big.fa"; cls=sequence ;;
@@ -112,12 +133,13 @@ for cell in A B C; do
   for cap in $CAPS; do
     f="$OUT/out-$cell-$cap/$cap.benchmark.json"
     [ -f "$f" ] || { log "cell $cell $cap: MISSING report"; continue; }
-    python3 - "$f" <<'PY' | tee -a "$LOG"
+    python3 - "$cell" "$cap" "$f" <<'PY' | tee -a "$LOG"
 import json, sys
-r = json.load(open(sys.argv[1], encoding='utf-8'))
+cell, cap, path = sys.argv[1], sys.argv[2], sys.argv[3]
+r = json.load(open(path, encoding='utf-8'))
 b = r['backends'][0]
 env = r['environment']
-print(f"  {sys.argv[1].split('/')[1]:34} median {b['median_wall_ms']:>8.0f} ms  rss {b['median_peak_rss_mb'] or float('nan'):>6.1f} MB  n={b['repeats']}  py={env.get('python_version')}")
+print(f"  cell {cell}  {cap:22} median {b['median_wall_ms']:>8.0f} ms  rss {b['median_peak_rss_mb'] or float('nan'):>6.1f} MB  n={b['repeats']}  py={env.get('python_version')}")
 PY
   done
 done

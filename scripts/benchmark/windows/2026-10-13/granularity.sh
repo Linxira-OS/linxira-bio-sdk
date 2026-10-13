@@ -7,6 +7,15 @@
 # ---------------------------------------------------------------------------
 export LC_ALL=C
 export PATH="$HOME/lx-locked-venv/bin:$PATH"
+
+# Lock/environment gate, same as the other stages: the granularity python leg runs in the
+# locked environment too, and a run without this stage's gate would silently measure the
+# host interpreter when granularity is the only stage selected.
+python3 scripts/benchmark/analysis/verify-lock-env.py \
+  --lock workflows/org.linxira.benchmark-python/requirements.lock || {
+    echo "refusing to measure: interpreter environment differs from requirements.lock" >&2
+    exit 2
+  }
 cd "$HOME/linxira-bio-sdk" || exit 1
 BIN=./target/release/linxira-bio
 export LINXIRA_BIO_WORKER="$PWD/target/release/linxira-bio-worker"

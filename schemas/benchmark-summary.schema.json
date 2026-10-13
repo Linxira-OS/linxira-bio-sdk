@@ -183,20 +183,46 @@
           "type": "string"
         },
         "code_revision": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Exact source revision (git sha) the evaluation ran on."
         },
         "gpu": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "GPU model and driver as disclosed by the host; null/omitted when not captured."
         },
         "memory": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "RAM generation and speed as disclosed by the host (e.g. DDR3-1600, LPDDR5X-8533)."
         },
         "storage": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Storage topology backing the benchmark I/O: SSD vs HDD per mount, with models."
+        },
+        "code_branch": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Branch the binary was built from; HEAD when the checkout was detached."
+        },
+        "code_describe": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "git describe --tags --always --dirty: names the nearest release tag when one exists, the short commit hash when no release has been published yet, and carries -dirty when the working tree had uncommitted changes."
         }
       }
     },

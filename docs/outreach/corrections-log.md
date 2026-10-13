@@ -18,10 +18,10 @@ CI installs it into 3.12. The measuring host runs CPython 3.14.7. Nobody had com
 
 The consequence is sharper than "the environment drifted": the pins cannot install on 3.14 at all.
 `pip download --only-binary=:all: biopython==1.85` answers `from versions: 1.86, 1.87, 1.88`, and the
-1.85 source build fails; `numpy==2.2.4` answers `from versions: 2.3.2, …`. So the archived window's
-`biopython 1.88 / numpy 2.5.4` were not a mistake during setup — they were the newest versions Python
-3.14 accepts. The error was leaving the lock and the host two interpreter generations apart, and then
-describing the result as an environment that merely "did not match".
+1.85 source build fails; `numpy==2.2.4` answers `from versions: 2.3.2, …`. So the library versions that
+window ran with (`biopython 1.88 / numpy 2.5.4`) were not a mistake during setup — they were the newest
+versions Python 3.14 accepts. The error was leaving the lock and the host two interpreter generations
+apart, and then describing the result as an environment that merely "did not match".
 
 What changes: the re-run installs the interpreter the lock declares (a user-local CPython 3.12 via `uv`,
 no system package), creates the environment with `uv pip install --require-hashes -r <lock>`, and the
@@ -30,6 +30,21 @@ number is measured. The window's `code-label.txt` records the interpreter that a
 
 Check: `uv python install 3.12`, then `uv pip install --require-hashes -r workflows/org.linxira.benchmark-python/requirements.lock`,
 then `python3 scripts/benchmark/analysis/verify-lock-env.py --lock workflows/org.linxira.benchmark-python/requirements.lock`.
+
+## 2026-10-13 — we attributed a version pair to an archive that never recorded it
+
+Both the second article's draft and the entry above originally said the *archived* environment blocks
+carry `biopython 1.88 / numpy 2.5.4`. They do not: every report in `benchmark-results/2026-10-11/`
+records only the interpreter (`Python 3.14.7`) and the R version. The library versions were real — they
+were what that environment had installed — but their only written source is the previous article's
+environment note and `REPRODUCE.md`, not the measurement archive.
+
+A reader following the citation would have found the claim false. Found by the article review pass
+(the first run of the pre-publication checks now recorded in `AGENTS.md`), fixed in the draft and here.
+
+What changes: the wording now names the real source, and the underlying gap is registered as work —
+the environment block should record the measured library versions (interpreter *and* pinned packages),
+so the next window's archive can be checked on that point without reading prose.
 
 ## 2026-10-12 — the Python pack lock could not be installed by anything
 

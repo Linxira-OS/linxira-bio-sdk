@@ -93,10 +93,10 @@ if [ "${WAIT_FOR_IDLE:-0}" = "1" ]; then
     fi
     if [ -z "$heavy" ] && [ -z "$downloads" ]; then
       quiet=$((quiet + 1))
-      log "idle wait ${waited}/${WAIT_MAX_HOURS:-48} min: quiet streak $quiet/$quiet_checks"
+      log "idle wait (waited ${waited} min of ${WAIT_MAX_HOURS:-48} h): quiet streak $quiet/$quiet_checks"
     else
       quiet=0
-      log "idle wait ${waited}/${WAIT_MAX_HOURS:-48} min: heavy='$heavy' aria2c='$downloads'"
+      log "idle wait (waited ${waited} min of ${WAIT_MAX_HOURS:-48} h): heavy='$heavy' aria2c='$downloads'"
     fi
     [ "$quiet" -ge "$quiet_checks" ] && break
     sleep 300
@@ -182,10 +182,14 @@ log "loadavg at end: $(cut -d' ' -f1-3 /proc/loadavg)"
 
 echo "=== archive (summary, tables, bilingual figures, figure check) ==="
 bash scripts/benchmark/windows/2026-10-13/archive.sh
-cp "$LOG" benchmark-results/2026-10-13/window-log.txt
-cp "$LABEL" benchmark-results/2026-10-13/code-label.txt
+# The verdict must be written into the log BEFORE the log is copied into the archive,
+# otherwise the archived log ends without saying whether the window finished.
 if [ -n "$failed" ]; then
   echo "RUN-WINDOW-INCOMPLETE: failed stages:$failed - the archive holds whatever the successful stages produced" | tee -a "$LOG"
-  exit 1
+else
+  echo RUN-WINDOW-DONE | tee -a "$LOG"
 fi
-echo RUN-WINDOW-DONE
+cp "$LOG" benchmark-results/2026-10-13/window-log.txt
+cp "$LABEL" benchmark-results/2026-10-13/code-label.txt
+[ -n "$failed" ] && exit 1
+exit 0

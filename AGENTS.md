@@ -238,6 +238,36 @@ environment 1.88/2.5.4) recorded in `REPRODUCE.md`, and the next window is insta
 - Keep protected, clinical, and controlled-access data out of public services
   unless the user supplies an approved data-governance path.
 
+## Pre-Publication Checks
+
+Before a commit or push, run **one or two** review subagents — at least one, never more
+than two — and record what they checked:
+
+1. **Code and claims** (always): does the implementation actually do what the commit
+   message, the schema, the docs and the article say it does? A claim that cannot be
+   verified is either resolved or removed before the commit lands.
+2. **Prose and numbers** (whenever the commit touches a document that will be published):
+   does every number match its archive, does the argument follow from the measurements,
+   and are the writing rules below respected?
+
+This is cheap and it has already paid: the first pass in this session caught a claim that
+read well but could not be checked (a column list asserted from a truncated `--help`) and a
+label that a stale build could have carried into a report.
+
+**Documents carry their review state.** Any document intended for publication (article
+mirrors under `benchmark-results/<date>/blog-mirror/`, capability pages, `README.md`,
+`COMMERCIAL.md`, site posts) opens with an HTML comment — invisible once rendered — of the
+form:
+
+```html
+<!-- 发布前检查 / pre-publication check: pending | passed(code, prose) | 未核项: <what is still unverified> -->
+```
+
+`pending` means the check has not run; `passed(code, prose)` names which reviews ran; any
+item that is still unverified is listed rather than implied away. The marker is updated or
+removed as part of the publication step, and a document that reaches the site with
+`pending` in it is a process failure.
+
 ## Validation
 
 Run these checks before reporting a capability complete:
