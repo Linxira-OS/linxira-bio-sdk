@@ -6697,8 +6697,29 @@ fn optional_report_array<'a>(value: &'a Value, key: &str) -> Result<Option<&'a [
     }
 }
 
+/// Pre-publication markers are HTML comments: process state, not documentation, so a
+/// marker must never surface as a label in the offline documentation pane (the docs-site
+/// generator skips the same lines). Returns true when the line must not be rendered —
+/// because it sits inside a comment block or opens one. A line inside a fenced code block
+/// is left alone, exactly like the generator.
+fn skips_markdown_line(line: &str, in_code_block: bool, in_html_comment: &mut bool) -> bool {
+    if in_code_block {
+        return false;
+    }
+    if *in_html_comment {
+        *in_html_comment = !line.trim_end().ends_with("-->");
+        return true;
+    }
+    if line.trim_start().starts_with("<!--") {
+        *in_html_comment = !line.trim_end().ends_with("-->");
+        return true;
+    }
+    false
+}
+
 fn render_markdown_document(ui: &mut egui::Ui, document: &str) {
     let mut in_code_block = false;
+    let mut in_html_comment = false;
     for line in document.lines() {
         if line.starts_with("```") {
             in_code_block = !in_code_block;
@@ -6706,7 +6727,12 @@ fn render_markdown_document(ui: &mut egui::Ui, document: &str) {
         }
         if in_code_block {
             ui.monospace(line);
-        } else if let Some(heading) = line.strip_prefix("# ") {
+            continue;
+        }
+        if skips_markdown_line(line, in_code_block, &mut in_html_comment) {
+            continue;
+        }
+        if let Some(heading) = line.strip_prefix("# ") {
             ui.heading(heading);
         } else if let Some(heading) = line.strip_prefix("## ") {
             ui.add_space(8.0);
@@ -7755,5 +7781,52 @@ mod tests {
                 "text": "Example license text\n"
             }]
         })
+    }
+}
+
+#[cfg(test)]
+mod markdown_comment_tests {
+    use super::skips_markdown_line;
+
+    #[test]
+    fn single_line_marker_is_skipped() {
+        let mut in_comment = false;
+        assert!(skips_markdown_line(
+            "<!-- pending -->",
+            false,
+            &mut in_comment
+        ));
+        assert!(!in_comment, "a closed marker must not open a block");
+        assert!(!skips_markdown_line("# Title", false, &mut in_comment));
+        assert!(!skips_markdown_line("Body text.", false, &mut in_comment));
+    }
+
+    #[test]
+    fn block_marker_is_skipped_until_it_closes() {
+        let mut in_comment = false;
+        assert!(skips_markdown_line("<!--", false, &mut in_comment));
+        assert!(skips_markdown_line(
+            "     未核项: the English mirror",
+            false,
+            &mut in_comment
+        ));
+        assert!(skips_markdown_line("-->", false, &mut in_comment));
+        assert!(!in_comment, "the closing line must end the block");
+        assert!(!skips_markdown_line(
+            "Visible text.",
+            false,
+            &mut in_comment
+        ));
+    }
+
+    #[test]
+    fn a_fenced_code_block_is_left_alone() {
+        let mut in_comment = false;
+        assert!(!skips_markdown_line(
+            "<!-- not a marker here -->",
+            true,
+            &mut in_comment
+        ));
+        assert!(!in_comment);
     }
 }

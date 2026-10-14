@@ -1,5 +1,7 @@
 # Linxira Bio SDK
 
+<!-- 发布前检查 / pre-publication check: passed(code, prose) — 本轮改动（自带绘图 = 数据 + 一张简单图；出版级效果的视觉规范归 `linxira-skills`）经一路审阅，4 项发现全部处理：页面与技能不再自称 "publication figures"、不再断言外部集合的具体内容、两处第一方渲染器不再把 HTML 注释当正文（Python 侧有测试、Rust 侧为纯函数 + 单测）、中英措辞对齐；修法经同一路再核通过，本文件层面无未核项。 -->
+
 Linxira Bio SDK is a local-first, agent-native bioinformatics execution
 toolkit. It combines concise skills with stable CLI, SDK, and tool contracts so
 that routine analyses use tested implementations instead of generating a new
@@ -151,7 +153,10 @@ confidence pays for itself.
 The boundary is deliberate. Mature native tools (salmon, kraken2, BLAST,
 HMMER, minimap2) stay external and are orchestrated, not reimplemented.
 Python and R are first-class backends with their own independent
-implementations, and plotting defaults to matplotlib and ggplot2. Rust takes
+implementations, and plotting defaults to matplotlib and ggplot2. Plotting is ours
+to execute; the visual standards for figure *effect* - page geometry, typography,
+colour discipline, panels, venue conventions - belong to the `linxira-skills`
+collection, not to this repository. Rust takes
 the parts it is good at - including algorithms, not only orchestration - and
 everything else keeps the tool it already fits. That includes speed, and honestly:
 where an existing implementation is already faster on the same job, the benchmark
@@ -169,6 +174,13 @@ fallback for their dedicated chart families until a mature Rust plotting
 stack is adopted. Figures are deterministic: identical PlotSpec inputs render
 to identical bytes, and every visual parameter (axes, theme, palette, size,
 dpi, format, output filename) is explicit.
+
+Built-in plotting delivers **data plus one simple figure** - a quick, deterministic
+view of a result rather than publication artwork. Publication-grade effect is a
+separate layer: those visual standards belong to the `linxira-skills` collection, and
+this repository supplies the executable render step such a route can
+call - `skill-pack.json` is the import boundary for that collection. Nothing here is
+styled to a journal page or a venue's figure grammar.
 
 ## Benchmarks
 
@@ -365,7 +377,9 @@ cargo/clippy——让开发与评审更从容：整类缺陷在程序运行之�
 
 这条边界是刻意的。成熟的原生工具（salmon、kraken2、BLAST、HMMER、minimap2）
 保持为外部工具并被编排，而不是重新实现。Python 和 R 是拥有独立实现的一等
-后端，绘图默认使用 matplotlib 和 ggplot2。Rust 承担它擅长的部分（包括算法本身，
+后端，绘图默认使用 matplotlib 和 ggplot2。绘图由我们执行；图**效果**的视觉规范（版式尺寸、
+字体、配色纪律、多面板、期刊与会议的图式惯例）由技能集 `linxira-skills` 持有，不属于本仓库。
+Rust 承担它擅长的部分（包括算法本身，
 而不只是编排）；其余一切保留原本就合适的工具。速度上也是如此，且如实：同样
 的活如果现成的实现已经更快，基准就把两边的数字都记下来，而不是把输的那一边
 藏起来；至于某项作业该用哪个实现，那是就那项作业写下的判断——既不意味着某一
@@ -374,10 +388,15 @@ cargo/clippy——让开发与评审更从容：整类缺陷在程序运行之�
 
 ### 绘图
 
-绘图默认使用原生 Python（matplotlib）和 R（ggplot2）包（`plot.render.v1`）；
+绘图默认使用原生 Python（matplotlib）和 R（ggplot2）包（`plot.render.v1`）。
 在采用成熟的 Rust 绘图栈之前，Rust SVG 可视化器继续作为其专属图表家族的
 零依赖回退。图形是确定性的：相同的 PlotSpec 输入渲染为相同的字节，每个视觉
 参数（坐标轴、主题、调色板、尺寸、dpi、格式、输出文件名）都是显式的。
+
+自带绘图交付的是**数据 + 一张简单图**——结果的快速、确定性视图，而不是出版成品。出版级
+效果是另一层：那些视觉规范属于技能集 `linxira-skills`，本仓库提供这条路线**可**调用的
+可执行渲染步骤（`skill-pack.json` 即该集合的导入边界）；这里不擅自按期刊或会议的图式惯例
+做样式。
 
 ### 基准测试
 

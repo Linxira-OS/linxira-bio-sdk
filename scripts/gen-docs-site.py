@@ -111,6 +111,7 @@ def render_markdown(text: str) -> str:
     paragraph: list[str] | None = None
     list_items: list[list[str]] | None = None
     index = 0
+    in_html_comment = False
 
     def flush() -> None:
         nonlocal paragraph, list_items
@@ -127,6 +128,17 @@ def render_markdown(text: str) -> str:
 
     while index < len(lines):
         line = lines[index]
+        # Pre-publication markers are HTML comments: process state, not documentation.
+        # Without this they reach the generated page as escaped paragraph text.
+        stripped = line.strip()
+        if in_html_comment:
+            in_html_comment = not stripped.endswith("-->")
+            index += 1
+            continue
+        if stripped.startswith("<!--"):
+            in_html_comment = not stripped.endswith("-->")
+            index += 1
+            continue
         fence = FENCE_RE.match(line)
         if fence:
             flush()

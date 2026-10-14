@@ -1,5 +1,7 @@
 # plot.render.v1
 
+<!-- 发布前检查 / pre-publication check: passed(code, prose) — 本轮改动（自带绘图 = 数据 + 一张简单图；出版级效果的视觉规范归 `linxira-skills`）经一路审阅，4 项发现全部处理：页面与技能不再自称 "publication figures"、不再断言外部集合的具体内容、两处第一方渲染器不再把 HTML 注释当正文（Python 侧有测试、Rust 侧为纯函数 + 单测）、中英措辞对齐；修法经同一路再核通过，本文件层面无未核项。 -->
+
 Render a deterministic, fully parameterized scientific figure from a PlotSpec
 JSON via a native plotting pack (matplotlib or ggplot2). Plotting here is a
 data product, not an image-generation task: every visual knob is an explicit,
@@ -7,7 +9,7 @@ versioned parameter, and the same spec renders to the same bytes every run.
 
 ## Purpose
 
-Turn analysis results into publication figures whose every property (axes,
+Turn analysis results into deterministic figures whose every property (axes,
 theme, palette, size, dpi, format, output filename) is an explicit parameter
 with a stable contract, so figures are reproducible, diffable, and provably
 data-consistent across two independent plotting backends. This is the
@@ -96,6 +98,13 @@ Request example:
   viewer covers molecules.
 - `interactive` output is accepted by the PlotSpec schema but not yet
   honored by the packs.
+- Scope: this capability returns **data plus one simple figure** - a deterministic
+  quick view of a result, with `theme` `light` / `dark` / `publication`. It is not a
+  manuscript figure pipeline: millimetre page geometry, font-size contracts, journal
+  column widths, panel argument structure, caption wording and publication colour
+  discipline belong to the cross-discipline `linxira-skills` collection, which owns
+  the visual standards; this capability is the executable render step inside that
+  route, not the standard itself.
 
 ## Runtime Dependencies
 

@@ -1,6 +1,6 @@
 ---
 name: render-bio-plots
-description: Render deterministic, fully parameterized scientific figures (scatter, line, bar, box, violin, heatmap) from a PlotSpec JSON via native matplotlib or ggplot2 packs. Use when an agent needs a publication figure with explicit axes, theme, palette, size, dpi, format, and caller-chosen output filename, or must prove two plotting backends show identical data. Not for interactive structure viewing or AI image generation.
+description: Render deterministic, fully parameterized scientific figures (scatter, line, bar, box, violin, heatmap) from a PlotSpec JSON via native matplotlib or ggplot2 packs. Use when an agent needs a deterministic figure of an analysis result with explicit axes, theme, palette, size, dpi, format, and caller-chosen output filename, or must prove two plotting backends show identical data. Not for interactive structure viewing or AI image generation.
 ---
 
 # Render Bio Plots
@@ -41,3 +41,8 @@ description: Render deterministic, fully parameterized scientific figures (scatt
   `status: "error"` with a message, never a partial figure.
 - Palettes map per backend (`set2` → matplotlib Set2 / RColorBrewer Set2);
   unknown names fall back to Set2 with a warning in the result.
+- Scope: the deliverable is **data plus one simple figure**, sized and themed by the
+  explicit PlotSpec knobs. Publication figure *effect* — journal page geometry,
+  typography, colour discipline, panel structure, venue conventions — is not this
+  skill's job; those visual standards live in the cross-discipline `linxira-skills`
+  collection, and this skill supplies the executable render step.

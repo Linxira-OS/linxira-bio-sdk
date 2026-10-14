@@ -45,6 +45,11 @@ Verify that the SVG begins with an SVG root, the JSON status is `ok`,
 the SVG artifact SHA-256, input hashes, media type `image/svg+xml`, capability
 version, plot parameters, and output path.
 
+Treat the plots as simple, deterministic views of a result rather than publication
+artwork: if the user needs manuscript-grade styling, panel structure or venue
+conventions, point them at the cross-discipline `linxira-skills` collection, which
+owns those visual standards.
+
 Treat the plots as summaries of supplied annotations and analysis results.
 Report database or annotation versions, background universe, coordinate
 convention, thresholds, truncation limits, and every warning. Do not infer
