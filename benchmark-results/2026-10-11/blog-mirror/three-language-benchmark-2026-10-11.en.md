@@ -56,6 +56,9 @@ parallelism** — we state only what was measured.
   the same hand-written power iteration — not numpy/prcomp), the §6.4/§8.4 trimming wording (verdicts agree;
   medians move by a timer step), the §4 arm-construction rule, plus the new §16 epilogue (the tool-arm plan)
   and an explicit statement that **no third-party benchmark suite produced any number here**.
+- **2026-10-14 wording correction**: the §4 arm-table caption read "third-party implementations, not ours",
+  contradicting §18's "same-algorithm implementations we wrote"; the caption now states it. No number, table
+  or figure changed.
 - **2026-10-12 figure revision**: the set grew from 8 to 12 figures, adding **dispersion (CV)**, the
   **decision ladder** (with the 1.10× material line on a two-panel linear axis), the **memory multiplier**
   and the **condition signal-to-noise** view, under one shared visual system (panels, row bands, rounded
@@ -78,7 +81,8 @@ but a **per-capability, interval-carrying, reproducible comparison**.
 
 ## 4. Related work and third-party disclosure
 
-**Comparison arms used in this window** (third-party implementations, not ours):
+**Comparison arms used in this window** (same-algorithm implementations written for this benchmark;
+third-party code enters only as the parsing layer and, for `sequence.ssr`, one C extension):
 
 | Backend | Basis | Version |
 | --- | --- | --- |
@@ -787,7 +791,10 @@ shipped — now a two-class rule in §7.1.
   set grew from 8 to 12 figures per language (adding dispersion/CV, the decision ladder, the memory
   multiplier, and the condition signal-to-noise view) under one shared visual system; every number is
   still re-derived from the same data, and the figure/table check reads 1055/1055 (zh) and 1067/1067 (en).
-  Item-by-item changes are in the changelog at the top.
+  Item-by-item changes are in the changelog at the top. **2026-10-14**: the §4 arm-table caption read
+  "third-party implementations, not ours", which contradicted §18's "same-algorithm implementations we
+  wrote" (§4's construction paragraph says the latter; it was added there on 2026-10-12); the caption now
+  states it. Wording only - no number, table or figure changed.
 - **Self-report disclosure**: this is an **author-run benchmark**, not independently replicated by a
   third party. The comparison arms are **same-algorithm implementations we wrote** (parity arms; the parsing
   layer uses Biopython 1.88 / Biostrings 2.80.2). They are **not** a third-party benchmark suite, and they are

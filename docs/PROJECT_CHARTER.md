@@ -19,8 +19,10 @@ that invoke them. It supports four consumers through one capability contract:
 
 1. Researchers use the CLI.
 2. Workflows use structured requests and results.
-3. Python programs use the planned native bindings.
-4. Agents use the skill pack and planned MCP server.
+3. Python programs use the Python SDK (`sdk/`, a subprocess client at v0.1.0);
+   native bindings are planned once the CLI contract stabilises.
+4. Agents use the skill pack and the MCP server (`linxira-bio-mcp`, stdio
+   JSON-RPC).
 
 `linxira-skills` remains the general control plane for cross-discipline routing,
 installation, Linux, HPC, cloud, browser, research governance, and delivery.

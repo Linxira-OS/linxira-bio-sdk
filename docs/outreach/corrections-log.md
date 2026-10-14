@@ -47,6 +47,44 @@ pre-fix label; the artefact behind it is cited from the article (§7.2) and from
 **Still open.** The redundant second hash per repetition (decision), the same classifier shape in
 `fastq.rs::add_base` (registered as M5-T11), and the re-measured window.
 
+## 2026-10-14 — internal contradictions we found while answering an outside critique
+
+We asked a reviewing agent to check an outside critique claim by claim, and had it report against the
+repository rather than in our favour. Five of its findings are contradictions *inside* our own documents; all
+five are fixed in the same pass. They are recorded here because a disagreement between two of our own files
+is the cheapest thing for a hostile reader to quote.
+
+- **The 2026-10-11 article contradicted itself about the comparison arms.** The §4 arm table caption read
+  "third-party implementations, not ours" while §18 read "same-algorithm implementations we wrote (parity
+  arms)"; §4's construction paragraph says the latter (it was added there on 2026-10-12). The caption now
+  states it. Wording only.
+- **A promotion row overstated the catalogue.** `promotion/plan.md` said "132 available capabilities";
+  `capabilities/catalog.json` holds 132 in total — 129 available, 1 experimental, 2 planned.
+- **The charter described shipped surfaces as planned.** `docs/PROJECT_CHARTER.md` said "planned native
+  bindings" and "planned MCP server" while the Python SDK ships a subprocess client at v0.1.0 and the MCP
+  server is an implemented stdio JSON-RPC binary; `README.md` (both languages) said the Python SDK was
+  planned. Both now state what exists, without path-style references into the core tree (the methods tree is
+  checked for self-containment).
+- **A backlog line about the pre-publication marker was stale**, claiming only one document carried the
+  marker. It also named two skill bodies that do not carry it — an earlier commit message claimed they did,
+  which is where the line went wrong. The line now names the files that do (`README.md`, the
+  `plot.render.v1` capability pages), and the article mirror and the engine ledger are recorded separately.
+- **The README's benchmark summary named an earlier window as current.** `README.md` (both languages) said
+  the current N=10 window was `bench-20261011-001` and quoted only its verdicts. The current window is
+  `bench-20261013-001`, re-measured under the interpreter the pack lock describes, and one verdict moved
+  there: `sequence.stats` goes from detectable-but-immaterial (1.02x) to material (2.2778x, CI
+  [2.2716, 2.3210]). Both halves now name both windows, state the moved verdict, and add that the Rust
+  leg's branch-misprediction defect (found 2026-10-14) needs a further window before its corrected numbers
+  can be quoted.
+
+**Check.** `git show <this commit>`; `capabilities/catalog.json`; `promotion/plan.md`;
+`benchmark-results/2026-10-11/blog-mirror/three-language-benchmark-2026-10-11.{en,zh}.md` §4 and §18;
+`benchmark-results/2026-10-13/` (the moved verdict); `docs/PROJECT_CHARTER.md`; `README.md`;
+`docs/BACKLOG.md`.
+
+**Still open.** The published copy of the 2026-10-11 article on the site still carries the old caption;
+correcting it needs the site checkout, and the same pass will re-run the site build.
+
 ## 2026-10-13 — the lock declared an interpreter the measuring host does not run
 
 `workflows/org.linxira.benchmark-python/requirements.lock` carries the line `Runtime: CPython 3.12`, and

@@ -7,7 +7,7 @@ here. `README.md` in this directory holds the rules every piece follows.
 
 | Asset | Why it is promotable | Where the evidence lives |
 | --- | --- | --- |
-| One CLI, **132 available capabilities**, 46 skills, 36 tools, local-first, no cloud needed | "I can run a real analysis on my own machine tonight" | `capabilities/catalog.json`, `skills/` |
+| One CLI, **132 capabilities (129 available, 1 experimental, 2 planned)**, 46 skills, 36 tools, local-first, no cloud needed | "I can run a real analysis on my own machine tonight" | `capabilities/catalog.json`, `skills/` |
 | A **three-language benchmark** with a reproduction package, a known-gaps list and a self-correction ledger | almost nobody publishes their own error list; that is the differentiator | `benchmark-results/2026-10-11/`, `REPRODUCE.md`, `docs/outreach/corrections-log.md` |
 | **Honest losses**: pyfastx 27× faster than our Rust arm, R's `prcomp` 18.5× faster than the R arm we wrote, scikit-learn 5.5× faster than our Python arm | the hook that makes the rest credible. Labelled precisely: cross-class comparisons (different output sets), so recorded losses — not routing verdicts, and not a claim that one side wins everywhere. **Pre-fix readings**: our side of the two `sequence.stats` ratios contained a branch-misprediction defect, located and fixed on 2026-10-14 (see the self-correction ledger); the post-fix ratios wait for a re-measured window | `benchmark-results/2026-10-12/README.md` |
 | A **machine-lineage anchor**: the box is ordinary, checked against zstd's own published table (0.47× / 0.69×) | pre-empts "your numbers are meaningless because your machine is weird" | `benchmark-results/2026-10-12/machine-anchor/` |

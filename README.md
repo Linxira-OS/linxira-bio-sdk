@@ -29,7 +29,7 @@ browser, and delivery workflows.
 - `engine/`: Rust compute runtime; C++ kernels only after a benchmark justifies them
 - `skill-pack.json`: import boundary for agent runtimes and `linxira-skills`
 - `linxira-bio-ui`: native Rust desktop application without a WebView
-- Python SDK: planned after the CLI contract stabilizes
+- Python SDK: a subprocess client ships in the tree (`sdk/python/`); native bindings are planned after the CLI contract stabilizes
 - `linxira-bio-mcp`: stdio JSON-RPC MCP server (initialize / tools list /
   tools call / resources list+read; tool calls execute worker jobs). Point an
   MCP client at the binary; capability ids from `capabilities/catalog.json`
@@ -201,15 +201,24 @@ provenance for real-data runs is tracked in
 `docs/BENCHMARK_DATA_SOURCES.md`; implementation iterations (v1/v2
 coexistence, algorithm changes) are logged in `docs/IMPLEMENTATION_LOG.md`.
 
-The current N=10 three-backend window is `benchmark-results/2026-10-11/`
-(`bench-20261011-001`): eight capabilities measured 10 times per backend on a
-low-end x86 host with the CI runner idle and the governor fixed. `sequence.stats`
-is the one case whose gap is detectable but immaterial (1.02x, CI [1.01, 1.11]);
-the rest run 1.43x-200x against the Python arm and 2.24x-1382x against the R arm,
-with peak memory at 1/2.3-1/11.8 (Python) and 1/5.7-1/54.5 (R). An earlier batch
-taken while the host also ran a CI runner was compared row by row: all 30 rows
-fall inside the noise band, so no row was excluded (`condition-comparison.tsv`).
-The bilingual write-up and figures live in that archive's `blog-mirror/`.
+The current N=10 three-backend window is `benchmark-results/2026-10-13/`
+(`bench-20261013-001`), re-measured under the interpreter the pack lock
+describes; the window before it (`bench-20261011-001`, same host, same inputs)
+is `benchmark-results/2026-10-11/`, whose bilingual write-up and figures live in
+that archive's `blog-mirror/`. One verdict moved between the two: `sequence.stats`
+was detectable but immaterial in 2026-10-11 (1.02x, CI [1.01, 1.11]) and is
+**material** in 2026-10-13 (2.2778x, CI [2.2716, 2.3210]), because that
+capability's Python leg is sensitive to the interpreter generation. In the
+2026-10-11 window the eight capabilities' ratios spanned 1.43x-200x against the
+Python arm and 2.24x-1382x against the R arm, with peak memory at 1/2.3-1/11.8
+(Python) and 1/5.7-1/54.5 (R); the 2026-10-13 archive carries the re-measured
+tables. An
+earlier batch taken while the host also ran a CI runner was compared row by row:
+all 30 rows fall inside the noise band, so no row was excluded
+(`condition-comparison.tsv`). After the 2026-10-13 window, the Rust leg of
+`sequence.stats` was found to contain a per-base branch-misprediction defect
+(~518 ms of its 810 ms) and fixed on 2026-10-14; the corrected numbers require a
+new window, so none are quoted here.
 
 ## Source Policy
 
@@ -270,7 +279,7 @@ HPC 场景受支持的 Linux 家族。macOS 目前不是经过测试或打包的
 - `engine/`：Rust 计算运行时；C++ 内核仅在基准数据证明必要时引入
 - `skill-pack.json`：面向 Agent 运行时和 `linxira-skills` 的导入边界
 - `linxira-bio-ui`：不依赖 WebView 的原生 Rust 桌面应用
-- Python SDK：计划在 CLI 契约稳定之后提供
+- Python SDK：仓库内已提供 subprocess 客户端（`sdk/python/`）；原生绑定计划在 CLI 契约稳定之后提供
 - `linxira-bio-mcp`：stdio JSON-RPC MCP 服务器（initialize / tools list /
   tools call / resources list+read；工具调用会执行 worker 作业）。将 MCP
   客户端指向该二进制即可；`capabilities/catalog.json` 中的能力 id 即工具名
@@ -414,14 +423,19 @@ Rust 承担它擅长的部分（包括算法本身，
 真实数据运行的数据集溯源记录在 `docs/BENCHMARK_DATA_SOURCES.md`；实现迭代
 （v1/v2 共存、算法变更）记录在 `docs/IMPLEMENTATION_LOG.md`。
 
-当前的三端 N=10 窗口是 `benchmark-results/2026-10-11/`
-（`bench-20261011-001`）：八项能力每后端各 10 次计时重复，宿主为低端 x86、
-CI runner 空闲、调频器固定。其中 `sequence.stats` 是唯一「可分辨但不实质」的
-一项（1.02×，CI [1.01, 1.11]）；其余相对 Python 为 1.43×–200×、相对 R 为
-2.24×–1382×，峰值内存为 Python 的 1/2.3–1/11.8、R 的 1/5.7–1/54.5。此前还有
-一批在本机同时承载 CI runner 时测得，两批逐行对照：30 行全部落在噪声带内，
-因此没有排除任何行（`condition-comparison.tsv`）。中英文稿与图在该归档的
-`blog-mirror/` 下。
+当前的三端 N=10 窗口是 `benchmark-results/2026-10-13/`
+（`bench-20261013-001`），按 pack 锁声明的解释器重测；其前一个窗口
+（`bench-20261011-001`，同宿主、同输入）是 `benchmark-results/2026-10-11/`，
+中英文稿与图在该归档的 `blog-mirror/` 下。两窗之间有一项判定发生移动：
+`sequence.stats` 在 2026-10-11 是「可分辨但不实质」（1.02×，CI [1.01, 1.11]），
+在 2026-10-13 为**实质**（2.2778×，CI [2.2716, 2.3210]）——该项的 Python 腿对
+解释器代际敏感。2026-10-11 窗口中八项能力的比值跨度为：相对 Python
+1.43×–200×、相对 R 2.24×–1382×，峰值内存为 Python 的 1/2.3–1/11.8、R 的 1/5.7–1/54.5；
+2026-10-13 归档给出重测后的表。此前还有一批在本机同时承载 CI runner 时测得，
+两批逐行对照：30 行全部落在噪声带内，因此没有排除任何行
+（`condition-comparison.tsv`）。2026-10-13 窗口之后，`sequence.stats` 的 Rust 侧
+被发现含一个逐碱基分支预测失败缺陷（占其 810 ms 中的约 518 ms），已于
+2026-10-14 修复；改正后的数字需要一个新窗口，故此处不引用。
 
 ### 来源政策
 

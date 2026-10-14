@@ -58,4 +58,15 @@ new archive README went through its own claims review).
 | Item | Blocker | Next action |
 | --- | --- | --- |
 | The English mirror of the 2026-10-13 article | The Chinese draft carries the archive's numbers; the site publishes bilingual pairs, and the English side has not been written | Needs the publish decision first — if the piece goes out, the English mirror is part of that step, not a separate piece of work |
-| Registry sweep for the pre-publication marker | Only the 2026-10-13 article mirror carries the marker so far; `README.md`, `COMMERCIAL.md` and the capability pages predate the rule | Add the marker when each is next touched, not as a separate sweep |
+| Registry sweep for the pre-publication marker | It is present in `README.md`, the `plot.render.v1` capability pages and the 2026-10-13 article mirror; the engine ledger carries a "not applicable" note instead. It is absent from `COMMERCIAL.md`, the other capability pages and `docs/outreach/corrections-log.md` | Add the marker when each is next touched, not as a separate sweep |
+
+## Follow-ups from the 2026-10-14 claim sweep (open work, not blocked)
+
+| Item | Where | Next action |
+| --- | --- | --- |
+| "132 available capabilities" — the same defect as the fixed `promotion/plan.md` row | `promotion/README.md:10`; `promotion/notes/xiaohongshu/02-一台旧电脑.md:5` | Say 132 in total, 129 available |
+| Window dated 2026-10-11 quoted without a window label | `promotion/notes/xiaohongshu/01-基准实测.md:29-30`; `promotion/notes/xiaohongshu/02-一台旧电脑.md:17,20,32,44-45`; `promotion/slides/01-overview/outline.md:15-16`; `promotion/videos/01-three-way-benchmark/script.md:15,18,21,22` | Label each set with its window, or replace with the current window's numbers |
+| Reviewer route reproduces only the 2026-10-11 archive | `docs/outreach/reviewer-brief.md:16-17,36,39,42-43,47-52` | Add the 2026-10-13 window and its moved verdict |
+| "the 2026-10-13 window will be re-measured" | `docs/outreach/criticism-request-post.md:22` (EN) and `:100` (ZH) | The 2026-10-13 window is archived; what is pending is a post-fix window |
+| Undated capability snapshot ("117 available", "112 of 117 Rust-only") | `docs/TOOLKIT_GAPS.md:5,44,81,86` | Date-stamp the snapshot or refresh it against the catalogue (129 available) |
+| Shipped surfaces still read as future-tense | `docs/CAPABILITY_ROADMAP.md:43-45` (milestone 0.2: "Python bindings", "MCP server") | Mark the Python client and the MCP server as shipped, or scope the milestone to native bindings |
