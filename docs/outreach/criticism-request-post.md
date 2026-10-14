@@ -22,6 +22,14 @@ reach for — on the same machine and inputs. We lost:
 | `sequence.stats` on a 100 MB FASTA | Rust, 810 ms, 5.9 MB RSS | `pyfastx stat` 2.3.1, **30.0 ms**, 17.4 MB | the tool is **27× faster** |
 | `expression.pca` on a 2000 × 40 matrix | R, 2770 ms (hand-written power iteration) | R `prcomp`, **150.0 ms** | the idiom is **18.5× faster** |
 
+We record these losses rather than hide them, and we label what they are: cross-class
+comparisons, where the two sides do not produce the same output set (the `pyfastx` row is an
+indexed read against our scan; the PCA row is a library against our hand-written implementation).
+Our boundary rule - call an existing implementation when it is already faster **on the same job**
+- only applies once a same-job comparison exists, and for these two rows it does not yet. Measuring
+that is the open work item; until then the loss stands as a recorded number, not as a verdict about
+whose implementation a job should use. (See the README's "On Rust" section for the boundary rule.)
+
 So the sentence "R is slow" in our article was about the implementation *we* wrote, not about
 R; and our `sequence.stats` row is a statement about our scan, not about what reading a FASTA
 can cost. Both readings were in the text as cross-language claims. That is the class of

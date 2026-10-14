@@ -152,7 +152,14 @@ The boundary is deliberate. Mature native tools (salmon, kraken2, BLAST,
 HMMER, minimap2) stay external and are orchestrated, not reimplemented.
 Python and R are first-class backends with their own independent
 implementations, and plotting defaults to matplotlib and ggplot2. Rust takes
-the parts it is good at; everything else keeps the tool it already fits.
+the parts it is good at - including algorithms, not only orchestration - and
+everything else keeps the tool it already fits. That includes speed, and honestly:
+where an existing implementation is already faster on the same job, the benchmark
+records both numbers instead of hiding the one we lose, and deciding which
+implementation a job should use is then a documented judgement about that job -
+not a claim that one side wins everywhere, and not an automatic routing. The two
+arm classes exist so that those numbers keep their provenance: a tool arm stores no
+ratio against our engine, and the two are never rendered as one comparison.
 
 ## Plotting
 
@@ -358,8 +365,12 @@ cargo/clippy——让开发与评审更从容：整类缺陷在程序运行之�
 
 这条边界是刻意的。成熟的原生工具（salmon、kraken2、BLAST、HMMER、minimap2）
 保持为外部工具并被编排，而不是重新实现。Python 和 R 是拥有独立实现的一等
-后端，绘图默认使用 matplotlib 和 ggplot2。Rust 承担它擅长的部分；其余一切
-保留原本就合适的工具。
+后端，绘图默认使用 matplotlib 和 ggplot2。Rust 承担它擅长的部分（包括算法本身，
+而不只是编排）；其余一切保留原本就合适的工具。速度上也是如此，且如实：同样
+的活如果现成的实现已经更快，基准就把两边的数字都记下来，而不是把输的那一边
+藏起来；至于某项作业该用哪个实现，那是就那项作业写下的判断——既不意味着某一
+方处处都赢，也不是一条自动选路。两类对照臂的存在是为了让两边的数字各自保有
+来源：工具臂不对我们的引擎存比值，两类数字也从不被并成一张对比。
 
 ### 绘图
 

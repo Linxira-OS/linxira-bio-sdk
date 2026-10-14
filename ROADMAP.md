@@ -31,7 +31,7 @@
 2. 4TB 原始数据、SRR 归档、受控/研究数据**永不进 Git 仓库**；仅回传
    `benchmark-results/<date>/summary.json + summary.md` 与图表。来源引用见
    [docs/BENCHMARK\_DATA\_SOURCES.md](docs/BENCHMARK_DATA_SOURCES.md)。
-3. 原生优先（遵 `AGENTS.md`）：成熟原生工具能做的算法不自研；Rust 承担编排、契约、IO 加速。
+3. 原生优先（遵 `AGENTS.md`）：成熟原生工具能做的算法不自研；其余按**能力归属**决定（2026-10-14 明确口径）——能高效实现且无合适原生对照的算法由 Rust 承担（含编排、契约、IO 加速，且不限于这些：现有能力中多数为 Rust 实现），生态里现成实现已经更快或更合适的直接调用现成实现。
 4. 三份独立实现仅覆盖「生态强依赖」能力；纯 Rust 已高效且无原生对照者不补。
 5. Java 当前为 0 且不新增，除非 benchmark 证明明确收益（C++ 同理，遵 `AGENTS.md` 的 benchmark 前置门槛）。
 6. 每个里程碑出口必须满足 §12 通用门槛（fmt/clippy/test 三绿 + `validate-repository.py` + CI 三平台 + CLI 冒烟）。
@@ -235,6 +235,7 @@ tool 报告进 parity 表并另出 `tool-arms.tsv`，`verify-figures.py` 以 `--
 tool arm 报告内不存跨类比值（`speedup`/`memory_saving` 为 null），跨类比较只允许以标注类别的
 散文出现 |
 | 发布前检查     | 每次提交/推送前开 **1–2 路**审阅子代理：① 代码-说法（实现是否真做了提交信息/schema/文档/文章所称的事）② 文章-数字与逻辑（每个数字能否回到归档、论证是否成立、写作规则是否遵守）。发现要么修掉、要么把该说法删掉；可发布文档带 HTML 注释形式的检查状态（`pending` / `passed(code, prose)` / `未核项`），见 [AGENTS.md](AGENTS.md)。**2026-10-13 首次执行**：21 项发现，其中一项（`code_branch`/`code_describe` 未进 summary schema）会让当窗归档直接过不了校验，已修并新增 schema 脱钩测试 |
+| 能力归属原则    | **大多数算法用 Rust 加速；生态里现成的实现已经更快/更合适的地方，直接调用现成实现（包括原生命令行工具），不重写**（2026-10-14 明确口径）。因此"某个工具比我们的 Rust 臂快"是**可用结论而非缺陷**：记下两边数字（tool arm + parity arm），**选路是就那项作业写下的判断**（人写、有依据），既不是"某一方处处都赢"，也不是一条自动选路——`runtime-preferences.json` 的 `default_backend` 只在 rust/python/r 三臂之内生效，工具臂**不可**被选为后端。两类臂分离与 `--tool-arms` 独立出表的目的，是让**两边的数字各自保有来源、不被并成一张对比**（工具臂不存跨类比值的机制正为此）。能力页的"纯 Rust 本地能力"是对**该能力的默认后端**的事实陈述，不是整体定位声明 |
 | 环境记录完整性  | 报告必须记录**解释器与关键依赖的实际版本**（不只是解释器），且 summary 的 `environment` 块必须能容纳报告能产出的全部键与值类型（由 `tests/python/test_schema_coupling.py` 守住）。**2026-10-13 发现**：归档只记录了解释器版本、库版本只存在于散文里；且 4 个键在报告允许 null 而 summary 不允许，任一报告写 null 即破校验 |
 | 失败隔离       | 单个能力 benchmark 失败不阻塞整批；`summary.json` 记 `status: failed` + stderr 摘要（截断至 4KB）                                                                                                      |
 
@@ -390,7 +391,7 @@ async fn main() -> std::io::Result<()> {
 | M5-T6  | **复核 P4 存量**：coordinate/domain/functional 的 `read_to_end` 按数据类别改流式，大文件不可整读                                                                                                                                                                                                                                                     | P4       | 大样本冒烟内存峰值下降；小文件结果不变                                                                                                     |
 | M5-T7  | 生信库评估记录：对 seq\_io/needletail/noodles-bgzf/libdeflater 立 G1/G2 基准，输出 `docs/engine-evals/` 结论，标注 `[x]` 或「未达标准」。**benchmark 对比口径明确化**：Rust 并行解压 vs **7z 并行解压**（原生，非单线程系统工具），避免"Rust 并行 vs 单线程"的失衡对比；7z 版本记录进环境 pinning                                                                                                            | —        | 文档存在且 G1–G5 每项有结论；`docs/engine-evals/7z-<date>.md` 记录 Rust-bgzf/libdeflater vs 7z 的 wall/RSS/一致性                        |
 | M5-T8  | CLI 并发 IO 冒烟 + CI 新增解析/解压并发冒烟步骤（含 7z 路径：可用时走 7z、缺失时回退）                                                                                                                                                                                                                                                                         | —        | CI 三平台绿；不回归现有 E2E                                                                                                       |
-| M5-T10 | **`sequence.stats` 热路径 profile**：把 810 ms 拆成读取、记录构造、统计聚合三段（同机同输入，perf/criterion + 分段中间计时），据此决定是否优化。**动因**：工具臂 `pyfastx stat` 在同一 100 MB 输入上 30.0 ms（约 3.4 GB/s，含其自身进程启动），我们约 125 MB/s；差距不在 I/O（tmpfs + 热缓存），在记录级开销与逐碱基扫描。**任何实现改动都要另开测量窗口并保留旧读数**，不覆盖已发布数字 | `docs/engine-evals/` 记录三段耗时与结论；若优化，新窗口归档与旧归档并存，文章按标注类别的散文更新 |
+| M5-T10 | **`sequence.stats` 热路径 profile —— 用来定分界，不是用来补短板**：把 810 ms 拆成读取、记录构造、统计聚合三段（同机同输入，perf/criterion + 分段中间计时）。**动因**：工具臂 `pyfastx stat` 在同一 100 MB 输入上 30.0 ms（约 3.4 GB/s，含其自身进程启动），我们约 125 MB/s；差距不在 I/O（tmpfs + 热缓存），在记录级开销与逐碱基扫描。按 §7.1 的能力归属原则，结论可以是"这一项交给工具"——profile 的作用是把"哪些继续自己做、哪些交给生态"写成有依据的记录，而不是先假定必须由我们优化。**任何实现改动都要另开测量窗口并保留旧读数**，不覆盖已发布数字 | `docs/engine-evals/` 记录三段耗时与选路结论；若优化，新窗口归档与旧归档并存，文章按标注类别的散文更新 |
 | M5-T9  | 文档：在 [AGENTS.md](AGENTS.md)/`docs/performance.md` 写明"解压并行（BGZF/libdeflater/7z、优先 7z 原生多线程）、计算用 Rayon、IO 用 Tokio+thread\_io、生信格式 IO 按 §9.3 门引入"；README 增声明「压缩/解压优先复用原生多线程 7z，Rust 并行引擎作为兜底与基准」                                                                                                                                  | —        | validate 脚本绿；README 增「并发能力」说明                                                                                           |
 
 > **DETERMINISM 红线**：所有 benchmark 数值比较用同一输入、同一线程数、同一分块顺序；多线程归约

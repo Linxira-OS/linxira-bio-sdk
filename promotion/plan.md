@@ -9,7 +9,7 @@ here. `README.md` in this directory holds the rules every piece follows.
 | --- | --- | --- |
 | One CLI, **132 available capabilities**, 46 skills, 36 tools, local-first, no cloud needed | "I can run a real analysis on my own machine tonight" | `capabilities/catalog.json`, `skills/` |
 | A **three-language benchmark** with a reproduction package, a known-gaps list and a self-correction ledger | almost nobody publishes their own error list; that is the differentiator | `benchmark-results/2026-10-11/`, `REPRODUCE.md`, `docs/outreach/corrections-log.md` |
-| **Honest losses**: pyfastx 27× faster than our Rust arm, R's `prcomp` 18.5× faster than the R arm we wrote, scikit-learn 5.5× faster than our Python arm | the hook that makes the rest credible | `benchmark-results/2026-10-12/README.md` |
+| **Honest losses**: pyfastx 27× faster than our Rust arm, R's `prcomp` 18.5× faster than the R arm we wrote, scikit-learn 5.5× faster than our Python arm | the hook that makes the rest credible. Labelled precisely: cross-class comparisons (different output sets), so recorded losses — not routing verdicts, and not a claim that one side wins everywhere | `benchmark-results/2026-10-12/README.md` |
 | A **machine-lineage anchor**: the box is ordinary, checked against zstd's own published table (0.47× / 0.69×) | pre-empts "your numbers are meaningless because your machine is weird" | `benchmark-results/2026-10-12/machine-anchor/` |
 | Research-use-only medical capabilities and GPU work (docking, Vina, dual-vendor kernels) | a second audience: 生信/计算化学 students and interviewers | the GPU article and `docs/engine-evals/` |
 

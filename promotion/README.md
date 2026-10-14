@@ -15,7 +15,10 @@ them: **every number in a promotion piece traces to an archived report or to a c
 viewer can run.** No number invented for a thumbnail, no "up to Nx" without the archive row
 next to it, and the pieces where we lose (pyfastx is 27× faster than our own Rust arm on the
 same FASTA) are the ones we lead with, because a benchmark that only reports wins reads as
-advertising.
+advertising. We lead with them and we label them precisely: they are cross-class comparisons (the two sides do
+not produce the same output set), so they are recorded losses rather than routing verdicts. The
+boundary rule - call an existing implementation when it is already faster **on the same job** -
+applies once a same-job comparison exists; measuring one for these rows is the open work item.
 
 ## What lives where
 
