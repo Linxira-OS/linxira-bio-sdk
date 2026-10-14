@@ -41,8 +41,9 @@
 ### 0.2 SDK And Agent Tools
 
 - explicitly approved environment installation with checksums and rollback;
-- Python bindings;
-- MCP server generated from capability contracts;
+- Python bindings (a subprocess client ships today at v0.1.0; native bindings remain the milestone);
+- MCP server generated from capability contracts (a stdio JSON-RPC server that exposes the capability
+  catalogue ships today; "generated" remains the milestone);
 - Codex and OpenCode installation smoke tests;
 - stable structured result schema.
 

@@ -19,8 +19,8 @@ reach for — on the same machine and inputs. We lost:
 
 | arm | our own parity arm | ecosystem tool | result |
 | --- | --- | --- | --- |
-| `sequence.stats` on a 100 MB FASTA | Rust, 810 ms, 5.9 MB RSS | `pyfastx stat` 2.3.1, **30.0 ms**, 17.4 MB | the tool is **27× faster** (pre-fix reading: most of our 810 ms turned out to be a branch-misprediction defect, fixed 2026-10-14; the 2026-10-13 window will be re-measured) |
-| `expression.pca` on a 2000 × 40 matrix | R, 2770 ms (hand-written power iteration) | R `prcomp`, **150.0 ms** | the idiom is **18.5× faster** |
+| `sequence.stats` on a 100 MB FASTA | Rust, 810 ms, 5.9 MB RSS | `pyfastx stat` 2.3.1, **30.0 ms**, 17.4 MB | the tool is **27× faster** (pre-fix reading: most of our 810 ms turned out to be a branch-misprediction defect, fixed 2026-10-14; the 2026-10-13 window is already archived, and a post-fix window is pending) |
+| `expression.pca` on a 2000 × 40 matrix | R, 2770 ms (hand-written power iteration) | R `prcomp`, **150.0 ms** | the idiom is **18.5× faster** (arm median from the 2026-10-11 window, tool reading from the 2026-10-12 session) |
 
 We record these losses rather than hide them, and we label what they are: cross-class
 comparisons, where the two sides do not produce the same output set (the `pyfastx` row is an
@@ -54,8 +54,9 @@ mistake we want pointed out, and we would rather point out the first instance ou
 
 ```bash
 git clone <this repository> && cd <it>
-git checkout 89882a5a31714e12e0dee4333d20f2b50b0c99c5   # the archived revision
 scripts/benchmark/reproduce.sh --smoke                   # inputs must regenerate byte-identically
+                                                         # (run at the repository tip; the archived
+                                                         #  revision predates this script)
 ```
 
 Then `docs/outreach/reviewer-brief.md` lists the four checks (inputs reproducible, arms
@@ -97,8 +98,8 @@ If this thread fills with praise, we posted in the wrong place, and we will move
 
 | 对照臂 | 我们自己的 parity 臂 | 生态工具 | 结果 |
 | --- | --- | --- | --- |
-| 100 MB FASTA 上的 `sequence.stats` | Rust 810 ms、5.9 MB | `pyfastx stat` 2.3.1、**30.0 ms**、17.4 MB | 工具**快 27×**（改前读数：我们这一侧的 810 ms 里大部分是逐碱基分支预测失败这一缺陷，2026-10-14 已修复；2026-10-13 窗口将重跑） |
-| 2000×40 矩阵上的 `expression.pca` | R 手写幂迭代 2770 ms | R `prcomp`、**150.0 ms** | 惯用法**快 18.5×** |
+| 100 MB FASTA 上的 `sequence.stats` | Rust 810 ms、5.9 MB | `pyfastx stat` 2.3.1、**30.0 ms**、17.4 MB | 工具**快 27×**（改前读数：我们这一侧的 810 ms 里大部分是逐碱基分支预测失败这一缺陷，2026-10-14 已修复；2026-10-13 窗口已归档，待跑的是修正后的新窗口） |
+| 2000×40 矩阵上的 `expression.pca` | R 手写幂迭代 2770 ms | R `prcomp`、**150.0 ms** | 惯用法**快 18.5×**（手臂中位数取 2026-10-11 窗口，工具读数取 2026-10-12 会话） |
 
 也就是说，文章里"R 慢"那句话讲的是**我们写的那个 R 实现**，不是 R；`sequence.stats` 那一行讲的
 是我们的扫描实现，而不是读 FASTA 的可达成本。这两句原本是作为跨语言结论写出来的。这正是我们
@@ -119,8 +120,8 @@ If this thread fills with praise, we posted in the wrong place, and we will move
 
 ```bash
 git clone <本仓库> && cd <它>
-git checkout 89882a5a31714e12e0dee4333d20f2b50b0c99c5   # 归档修订版
 scripts/benchmark/reproduce.sh --smoke                   # 输入必须逐字节重现
+                                                         # （在仓库 tip 跑；归档修订版早于该脚本）
 ```
 
 随后 `docs/outreach/reviewer-brief.md` 列出四项检查（输入可复现、三臂在整份结果对象上 1e-6 内

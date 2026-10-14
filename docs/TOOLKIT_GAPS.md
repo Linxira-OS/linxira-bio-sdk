@@ -1,5 +1,14 @@
 # Toolkit gap assessment: pipelines, three-way coverage, Rust crate sufficiency
 
+> **Snapshot date**: every count below is a 2026-09-14 snapshot — the catalogue then held 117 available
+> capabilities; today it holds 129 available of 132. The gaps themselves are still open: there is still no
+> DAG runner, and the three-way pack set has grown from five implementations to eight, so the shortfall is
+> narrower but not closed. The in-tree source of truth is `capabilities/catalog.json`.
+>
+> **快照日期**：本文所有计数都是 2026-09-14 的快照（当时目录为 117 项 available；现为 132 项中的 129 项）。
+> 缺口本身仍未关闭：仍无 DAG 编排器，三端实现自快照以来由 5 项增至 8 项——缺口变窄但没关上；
+> 以 `capabilities/catalog.json` 为准。
+
 > Purpose: answer three planning questions — (1) does the toolkit support
 > multi-step chained analyses today and what is missing; (2) which of the
 > 117 available capabilities still lack Python/R implementations; (3) is the

@@ -22,9 +22,12 @@ this repository, not as user error.
 
 ```bash
 git clone https://github.com/Linxira-OS/linxira-bio-sdk && cd linxira-bio-sdk
-git checkout 89882a5          # the revision the archive was produced with (see step 2)
 bash scripts/benchmark/reproduce.sh --smoke
 ```
+
+Do **not** check out `89882a5…` to run this route: that is the revision the 2026-10-11 archive was
+produced with (the smoke check prints it from the archived reports), but it predates both this script
+and the archive files, which landed afterwards.
 
 It performs three checks and exits non-zero on any failure:
 
