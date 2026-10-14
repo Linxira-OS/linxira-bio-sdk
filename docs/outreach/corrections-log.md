@@ -77,7 +77,7 @@ is the cheapest thing for a hostile reader to quote.
   leg's branch-misprediction defect (found 2026-10-14) needs a further window before its corrected numbers
   can be quoted.
 
-**Check.** `git show <this commit>`; `capabilities/catalog.json`; `promotion/plan.md`;
+**Check.** `git show c02a220`; `capabilities/catalog.json`; `promotion/plan.md`;
 `benchmark-results/2026-10-11/blog-mirror/three-language-benchmark-2026-10-11.{en,zh}.md` §4 and §18;
 `benchmark-results/2026-10-13/` (the moved verdict); `docs/PROJECT_CHARTER.md`; `README.md`;
 `docs/BACKLOG.md`.
