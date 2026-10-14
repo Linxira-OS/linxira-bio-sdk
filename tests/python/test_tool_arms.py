@@ -115,8 +115,14 @@ class ToolArmRunnerTests(unittest.TestCase):
         self.assertEqual(report["tool"]["name"], "synthetic tool")
         self.assertEqual(report["tool"]["version"], "synthetic 9.9.9")
         # The recorded invocation is the substituted argv, which is what makes a
-        # disagreement attributable to the call rather than guessed.
-        self.assertIn(str(self.input_path), report["tool"]["invocation"])
+        # disagreement attributable to the call rather than guessed. The runner records
+        # the *resolved* input path (tool-arms.py resolves before joining the argv), so
+        # compare resolved forms: on the Windows CI runner a temporary directory comes
+        # back as an 8.3 short name (RUNNER~1) while the child process sees the long one,
+        # and that spelling difference is not what this assertion is about. A substring
+        # check also survives paths that contain spaces, which re-splitting the joined
+        # argv would not.
+        self.assertIn(str(self.input_path.resolve()), report["tool"]["invocation"])
         # The measurement's input identity travels with the report: a standalone
         # tool-arm report has no window descriptor beside it to lean on.
         recorded = report["inputs"]

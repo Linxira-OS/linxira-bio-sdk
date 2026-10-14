@@ -257,6 +257,11 @@ This is cheap and it has already paid: the first pass in this session caught a c
 read well but could not be checked (a column list asserted from a truncated `--help`) and a
 label that a stale build could have carried into a report.
 
+A push is not done when it lands: confirm on `gh run list` that the run for *that* commit
+is green before reporting the work complete. On 2026-10-13 two pushes were reported green on
+the strength of an older run, while their own runs were failing on a Windows-only test
+fragility (an 8.3 short temp path). "CI was green earlier" is not evidence about this commit.
+
 **Documents carry their review state.** Any document intended for publication (article
 mirrors under `benchmark-results/<date>/blog-mirror/`, capability pages, `README.md`,
 `COMMERCIAL.md`, site posts) opens with an HTML comment — invisible once rendered — of the
