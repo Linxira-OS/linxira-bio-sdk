@@ -58,8 +58,10 @@ is the cheapest thing for a hostile reader to quote.
   "third-party implementations, not ours" while §18 read "same-algorithm implementations we wrote (parity
   arms)"; §4's construction paragraph says the latter (it was added there on 2026-10-12). The caption now
   states it. Wording only.
-- **A promotion row overstated the catalogue.** `promotion/plan.md` said "132 available capabilities";
-  `capabilities/catalog.json` holds 132 in total — 129 available, 1 experimental, 2 planned.
+- **A promotion row overstated the catalogue.** `promotion/plan.md` said "132 available capabilities"; the
+  same wording sat in `promotion/README.md` and in `promotion/notes/xiaohongshu/02-一台旧电脑.md` (only that
+  note). All three now state the breakdown: `capabilities/catalog.json` holds 132 in total — 129 available,
+  1 experimental, 2 planned.
 - **The charter described shipped surfaces as planned.** `docs/PROJECT_CHARTER.md` said "planned native
   bindings" and "planned MCP server" while the Python SDK ships a subprocess client at v0.1.0 and the MCP
   server is an implemented stdio JSON-RPC binary; `README.md` (both languages) said the Python SDK was
@@ -78,6 +80,7 @@ is the cheapest thing for a hostile reader to quote.
   can be quoted.
 
 **Check.** `git show c02a220`; `capabilities/catalog.json`; `promotion/plan.md`;
+`promotion/README.md`; `promotion/notes/xiaohongshu/02-一台旧电脑.md`; `docs/FIGURE_COVERAGE.md`;
 `benchmark-results/2026-10-11/blog-mirror/three-language-benchmark-2026-10-11.{en,zh}.md` §4 and §18;
 `benchmark-results/2026-10-13/` (the moved verdict); `docs/PROJECT_CHARTER.md`; `README.md`;
 `docs/BACKLOG.md`.

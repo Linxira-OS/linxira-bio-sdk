@@ -4,7 +4,8 @@
 > + 22 真实公开数据；第七篇为 Nature 风格重绘对照，不新增图型）。
 > 口径：**图型级**映射（一个图型可能对应多张图；小节含双图的按图型归并）。
 > Source: the seven-post chart compendium; type-level mapping against
-> `capabilities/catalog.json` (113 available).
+> `capabilities/catalog.json` (113 available when this matrix was assembled on 2026-09-13; 129 as of
+> 2026-10-14).
 
 状态图例：✅ 现在就能端到端分析（数据读入 + 统计 + 结果表/原生可视化）；
 🟡 数据侧已可分析、出图等 M1 绘图 pack（matplotlib/ggplot2）；❌ 能力缺口

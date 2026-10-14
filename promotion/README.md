@@ -7,7 +7,7 @@ Text lives in git; binaries do not (see "What lives where").
 
 | Track | Subject | Where it lands | What it must not do |
 | --- | --- | --- | --- |
-| **系统** | The toolkit: one CLI, 132 available capabilities, local-first, deterministic output, skills for agents | walkthroughs, architecture explainers, "run this analysis locally in one command" | imply model/GPU magic where the capability is a native tool |
+| **系统** | The toolkit: one CLI, 132 capabilities (129 available, 1 experimental, 2 planned), local-first, deterministic output, skills for agents | walkthroughs, architecture explainers, "run this analysis locally in one command" | imply model/GPU magic where the capability is a native tool |
 | **工具** | The three-language benchmark and the tool arms: what Rust/Python/R and the ecosystem tools actually cost on this hardware | data-led notes and videos, the results themselves | claim generality beyond one machine, one input shape, N≥10 |
 
 The two tracks share one rule, which is the whole reason anyone should believe either of

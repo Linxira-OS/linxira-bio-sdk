@@ -64,7 +64,6 @@ new archive README went through its own claims review).
 
 | Item | Where | Next action |
 | --- | --- | --- |
-| "132 available capabilities" — the same defect as the fixed `promotion/plan.md` row | `promotion/README.md:10`; `promotion/notes/xiaohongshu/02-一台旧电脑.md:5` | Say 132 in total, 129 available |
 | Window dated 2026-10-11 quoted without a window label | `promotion/notes/xiaohongshu/01-基准实测.md:29-30`; `promotion/notes/xiaohongshu/02-一台旧电脑.md:17,20,32,44-45`; `promotion/slides/01-overview/outline.md:15-16`; `promotion/videos/01-three-way-benchmark/script.md:15,18,21,22` | Label each set with its window, or replace with the current window's numbers |
 | Reviewer route reproduces only the 2026-10-11 archive | `docs/outreach/reviewer-brief.md:16-17,36,39,42-43,47-52` | Add the 2026-10-13 window and its moved verdict |
 | "the 2026-10-13 window will be re-measured" | `docs/outreach/criticism-request-post.md:22` (EN) and `:100` (ZH) | The 2026-10-13 window is archived; what is pending is a post-fix window |
