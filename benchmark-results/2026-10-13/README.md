@@ -118,7 +118,7 @@ lives in the 3.14 environment, so the arm was run on 2026-10-14 with that interp
 first on `PATH` (recorded in the report's environment block). Three arms out of a
 four-arm registry is a silent failure mode; a gate for it is in `docs/BACKLOG.md`.
 
-Three caveats, all of them stated because the numbers invite more than they support:
+Four caveats, all of them stated because the numbers invite more than they support:
 
 1. **These are not the same job.** Our `sequence.stats.v1` also reports `au_n`,
    `gc_percent` and `n_count`; `pyfastx stat` reads a FASTA it has already indexed
@@ -129,7 +129,12 @@ Three caveats, all of them stated because the numbers invite more than they supp
    ten runs of the fast arms are identical to the 10 ms digit (IQR 0.000 ms,
    CV 0.00%). The parity arms use the engine's own millisecond timer, which is why
    one class is quoted as prose and the two are never rendered in one table or figure.
-3. **One tool measured differently in the previous round.** The 2026-10-12 round
+3. **Our own side of these ratios was defective.** The Rust arm's 810 ms in this archive was
+   dominated by a per-base branch that mispredicts on random sequence; found by decomposing the
+   number and fixed on 2026-10-14 (CLI path 0.66 s -> 0.14 s, pipeline 810 -> 280 ms, probe
+   readings). This archive keeps the pre-fix readings as the record of the code that produced
+   them; the post-fix window is pending. See the 2026-10-14 ledger in `docs/engine-evals/`.
+4. **One tool measured differently in the previous round.** The 2026-10-12 round
    recorded `pyfastx stat` at 30.0 ms on the same nominal input
    (`benchmark-results/2026-10-12/README.md`); this window records 10.0 ms. Both
    archives are correct about their own session; **the difference is not yet

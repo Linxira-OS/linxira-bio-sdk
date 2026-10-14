@@ -13,7 +13,7 @@ Text lives in git; binaries do not (see "What lives where").
 The two tracks share one rule, which is the whole reason anyone should believe either of
 them: **every number in a promotion piece traces to an archived report or to a command a
 viewer can run.** No number invented for a thumbnail, no "up to Nx" without the archive row
-next to it, and the pieces where we lose (pyfastx is 27× faster than our own Rust arm on the
+next to it, and the pieces where we lose (pre-fix readings: pyfastx is 27× faster than our own Rust arm on the
 same FASTA) are the ones we lead with, because a benchmark that only reports wins reads as
 advertising. We lead with them and we label them precisely: they are cross-class comparisons (the two sides do
 not produce the same output set), so they are recorded losses rather than routing verdicts. The

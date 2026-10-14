@@ -19,7 +19,7 @@ reach for — on the same machine and inputs. We lost:
 
 | arm | our own parity arm | ecosystem tool | result |
 | --- | --- | --- | --- |
-| `sequence.stats` on a 100 MB FASTA | Rust, 810 ms, 5.9 MB RSS | `pyfastx stat` 2.3.1, **30.0 ms**, 17.4 MB | the tool is **27× faster** |
+| `sequence.stats` on a 100 MB FASTA | Rust, 810 ms, 5.9 MB RSS | `pyfastx stat` 2.3.1, **30.0 ms**, 17.4 MB | the tool is **27× faster** (pre-fix reading: most of our 810 ms turned out to be a branch-misprediction defect, fixed 2026-10-14; the 2026-10-13 window will be re-measured) |
 | `expression.pca` on a 2000 × 40 matrix | R, 2770 ms (hand-written power iteration) | R `prcomp`, **150.0 ms** | the idiom is **18.5× faster** |
 
 We record these losses rather than hide them, and we label what they are: cross-class
@@ -97,7 +97,7 @@ If this thread fills with praise, we posted in the wrong place, and we will move
 
 | 对照臂 | 我们自己的 parity 臂 | 生态工具 | 结果 |
 | --- | --- | --- | --- |
-| 100 MB FASTA 上的 `sequence.stats` | Rust 810 ms、5.9 MB | `pyfastx stat` 2.3.1、**30.0 ms**、17.4 MB | 工具**快 27×** |
+| 100 MB FASTA 上的 `sequence.stats` | Rust 810 ms、5.9 MB | `pyfastx stat` 2.3.1、**30.0 ms**、17.4 MB | 工具**快 27×**（改前读数：我们这一侧的 810 ms 里大部分是逐碱基分支预测失败这一缺陷，2026-10-14 已修复；2026-10-13 窗口将重跑） |
 | 2000×40 矩阵上的 `expression.pca` | R 手写幂迭代 2770 ms | R `prcomp`、**150.0 ms** | 惯用法**快 18.5×** |
 
 也就是说，文章里"R 慢"那句话讲的是**我们写的那个 R 实现**，不是 R；`sequence.stats` 那一行讲的

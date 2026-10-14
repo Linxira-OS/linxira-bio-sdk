@@ -11,6 +11,42 @@ honest state of a project that started measuring in public.
 
 ---
 
+## 2026-10-14 — we explained a ratio before splitting the number, and our side of it was defective
+
+**What we said.** Section 7.1 of the 2026-10-13 draft explained the `sequence.stats` gap to
+`pyfastx` as "我们的记录级开销与逐碱基扫描", and the promotion material carried the 27x / 81x
+ratios as a loss to own. (The 2026-10-11 article's verdict for that capability - "可分辨但不构成
+实质差距" - concerns a different quantity, Rust against Python inside that window: it stands as that
+window's record under that window's interpreter, and the re-measured window decides what holds now.)
+
+**What was actually true.** Splitting 810 ms closes in three terms: the in-process CLI path 0.66 s (which already contains
+~10 ms of input reading and ~518 ms of per-base branch misprediction - a defect, now fixed), plus
+two SHA-256 passes that the benchmark harness runs per timed repetition (~130 ms, a measurement
+convention, open decision), plus under 10 ms of worker spawn and request construction (below the
+timer resolution): 0.66 + 0.13 + <0.01 = 810 ms. Our first explanation - one `String` allocation per line - was killed by
+measurement: unwrapping the same bases moved the CLI path by tens of milliseconds.
+
+**Why it happened.** Neither the measurement nor the code review was wrong; the *explanation*
+was written before the number was decomposed. That is now a standing rule: any "why is it slow"
+claim is preceded by per-phase readings.
+
+**What changed.** `fasta_stats` classifies through a compile-time 256-byte table and accumulates
+branchlessly (case equivalence structural, stats JSON byte-identical on the real input). Measured
+on the same host and input: CLI path 0.66 s -> 0.14 s, benchmark pipeline 810 -> 280 ms. Both are
+probe readings; numbers for publication require a new window, and the 2026-10-13 archive keeps
+the pre-fix readings as its own record.
+
+**What was relabelled.** Every place that quotes those ratios - the article draft, the promotion
+notes, the slide and video outlines, the outreach post (both language tables) - now carries the
+pre-fix label; the artefact behind it is cited from the article (§7.2) and from `promotion/plan.md`.
+
+**Check.** `git show 1000091` (the fix, the ledger and the probe);
+`docs/engine-evals/sequence-stats-branch-cost-2026-10-14.md`;
+`scripts/benchmark/analysis/profile-sequence-scan.rs`.
+
+**Still open.** The redundant second hash per repetition (decision), the same classifier shape in
+`fastq.rs::add_base` (registered as M5-T11), and the re-measured window.
+
 ## 2026-10-13 — the lock declared an interpreter the measuring host does not run
 
 `workflows/org.linxira.benchmark-python/requirements.lock` carries the line `Runtime: CPython 3.12`, and

@@ -12,7 +12,7 @@
 | # | 画面 | 旁白（要点，非逐字稿） | 屏幕内容 |
 | --- | --- | --- | --- |
 | 1 | 封面卡 | — | 「我们跟你在用的工具比了，我们输了」；副标题：2 核旧机器 · N=10 · 输入可逐字节复现 |
-| 2 | 三行结果卡 | 三行数字先说结论：读 100 MB FASTA，`pyfastx` 30.0 ms，我们的 Rust 30.0 vs 810 ms 之一 | 三行大字号对比 + 「27×」 |
+| 2 | 三行结果卡 | 三行数字先说结论：读 100 MB FASTA，`pyfastx` 30.0 ms，我们的 Rust 30.0 vs 810 ms 之一 | 三行大字号对比 + 「27×」（字幕注明：改前读数，我方缺陷已修复） |
 | 3 | 终端录屏 | 交代机器：Pentium Gold G7400，2 核 4 线程，15 GiB，governor `powersave`（负载下实测 3.7 GHz） | `cat /proc/cpuinfo \| head`, `nproc`, `cat .../scaling_cur_freq` |
 | 4 | 终端录屏 | 演示生成输入并校验 sha256：「输入是生成的，不是下载的——所以任何人能在自己机器上复现」 | `python scripts/benchmark/inputs/generate-inputs.py --set sequence --out /tmp/x`，`sha256sum` 对照 `inputs.sha256` |
 | 5 | 表格卡 | 三语言全景（parity 臂）：`sequence.stats` 810 / 825 / 1815 ms；`expression.pca` 20 / 4010 / 2770 ms | 归档 `statistics.tsv` 截图，逐行高亮 |

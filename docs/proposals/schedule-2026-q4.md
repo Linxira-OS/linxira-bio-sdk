@@ -2,6 +2,8 @@
 
 2026-10-13. Maintainer's decisions recorded here so the calendar is not re-litigated per task.
 
+- **补测窗口（修复后）**：`sequence.stats` 的实现缺陷已于 2026-10-14 修复，2026-10-13 归档保留改前读数。发布新数字前需整窗重跑（约 9 小时：`fast` + `granularity` + `fastq` + `ssr`，其中 `ssr` 6.1 h），按既有规则放在**白天整段**（夜间归维护者作业）。**2026-10-14 在 NAS 上现场核到**（本机 `ssh nas` 的读数，不是仓库产物）：`refetch` 目录 130 个文件、`OK=130 MISS=0` 且带 `.refetch_ALL_OK`，另有启动自检文件 `tier1_v2/R2_VERIFY.txt` 记 `BOOT_VERIFY_OK=30 BAD=0`；`systemctl list-timers` 只有常规系统定时器、无用户 crontab。按该次核查，机器条件已满足，只差整段时段（该读数会随时间失效，开跑前再核一次）。
+
 ## The three dates
 
 | When | What | Why this boundary |

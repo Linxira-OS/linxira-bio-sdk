@@ -13,7 +13,7 @@
 | 4 | 执行模型 | 本地执行、确定性输出、版本化 schema | CLI 三层（能力/工作流/报告）+ 132 项能力清单示例 | `capabilities/catalog.json` |
 | 5 | Benchmark 方法学 | 我们把"怎么测"当产品做 | 机器块 + N≥10 + bootstrap CI + 10 ms 时钟口径 + 输入 sha256 | `benchmark-results/2026-10-11/inputs.sha256` |
 | 6 | 三语言实测（parity 臂） | 同算法三实现，测的是语言运行时边界 | 两行对照：`sequence.stats` 810/825/1815 ms；`expression.pca` 20/4010/2770 ms | `statistics.tsv` |
-| 7 | 生态工具对照（tool arm） | 用户真正拿到的是什么 | pyfastx 30.0 ms（27× 快于我们）、R `prcomp` 150 ms、scikit-learn 725 ms | `tool-arms.tsv` |
+| 7 | 生态工具对照（tool arm） | 用户真正拿到的是什么 | pyfastx 30.0 ms（27× 快于我们，**改前读数**）、R `prcomp` 150 ms、scikit-learn 725 ms | `tool-arms.tsv` + 2026-10-14 台账 |
 | 8 | 我们输在哪 | 承认失败是方法的一部分 | 三行失败 + 一句"文章里'R 慢'指我们写的 R 实现" | 同上 + 文章勘误 |
 | 9 | 可复现性 | 五分钟自证，而不是相信 | `reproduce.sh --smoke` 输出（9/9 输入 sha256 一致）+ issue 模板 | `REPRODUCE.md` |
 | 10 | 自我更正台账 | 只增不删，含一次厂商说法撤回 | 三条代表错误（锁文件、内存未测、撤回） | `docs/outreach/corrections-log.md` |
