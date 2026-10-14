@@ -27,18 +27,29 @@ Last updated: 2026-10-14.
 ## Waiting on a machine
 
 The measuring host is currently serving other work, and the maintainer's standing
-instruction is that measurements run in idle daytime slots, not at night.
+instruction is that measurements run in idle daytime slots, not at night. Two items that
+were here are done as of 2026-10-14: the tool arms (pyfastx 10.0 ms, seqkit 30.0 ms, R
+`prcomp` 120.0 ms, N=10, each report carrying `arm_class=tool` and a null cross-class
+ratio) and the Python-leg environment isolation (interpreter generation, not package
+version: cells A and B agree, cell C differs — see the window archive).
 
 | Item | Blocker | Next action |
 | --- | --- | --- |
-| Window archive: summary, statistics tables, bilingual figures, figure check | Needs a short idle slot on the measuring host (the step hashes the staged inputs, so it runs where they live). The measurement itself is finished — eight capabilities × three backends × N=10, reports staged and copied off the machine | Run `STAGES="toolarms"` through the driver, then `archive.sh`, in an idle daytime slot |
-| Tool arms in this window — pyfastx, R `prcomp`, scikit-learn, seqkit | Same slot. seqkit v2.14.0 is installed and digest-verified; its `stats` argv still needs checking against the installed version before the registry entry is used | One command, ~10 minutes |
-| Python-leg environment isolation | Same slot; script ready (`scripts/benchmark/windows/2026-10-13/env-isolation.sh`), three cells, ~3 minutes | Run it; the result separates interpreter from pin versions for the −19.0%…+123.6% swing |
-| `sequence.stats` hot-path profile | Same slot (same machine, same input, or the numbers are not comparable) | Ranked in ROADMAP §9.4 as M5-T10 |
+| A same-output-set comparison for the tool-arm rows | The cross-class rows (`pyfastx stat`, R `prcomp`) do not produce the same output set as our arms, so no routing judgement can be written from them — the boundary rule needs a same-job pair first. Needs the measuring host | Measure one: make the tool emit our columns (`au_n`, `gc_percent`, `n_count`) or run `pyfastx` without its prebuilt `.fxi` index, same input, same slot. Until then those two rows stand as recorded numbers only |
+| A gate for a silently missing tool arm | The registry has four arms; on 2026-10-13 the first pass produced three and said nothing, because the runner resolves `python3` through the locked venv and the version probe for scikit-learn failed there (`tool-arms.sh` prepends that venv to `PATH`). The arm was measured on 2026-10-14 in the environment that has the package, but a registry arm that produces no report is still invisible to the pipeline | Make `tool-arms.sh` compare the registry's tool ids against the reports it produced and fail on a shortfall, then re-run in the next window |
+| The mechanism behind the interpreter lever | The 2026-10-13 isolation experiment showed CPython 3.14.7 is 2.24× faster than 3.12.15 on `sequence.stats.v1` (and 1.23× slower on `expression.pca.v1`) with the same packages, but not *why* — a C-extension build difference and a parsing-path difference are both consistent with the data. Deciding what to do about it (documented versions, not code) needs no machine; explaining it does | Profile the two interpreters on the same host and input (`py-spy`/`perf` on the python leg), then either record the mechanism or write it down as unexplained |
+| `sequence.stats` hot-path profile | Same slot (same machine, same input, or the numbers are not comparable) | Ranked in ROADMAP §9.4 as M5-T10; its purpose is deciding the boundary, not repairing a shortfall |
+
+Two items that were here are done as of 2026-10-14: the archive (summary, statistics
+tables with bootstrap CIs, 11 bilingual figures each re-checked value by value, the
+tool-arm table and the isolation cells, all recorded in
+`benchmark-results/2026-10-13/README.md`) and the re-review of the pre-publication
+fixes (the first pass's 21 findings were fixed, the fixes were re-checked, and the
+new archive README went through its own claims review).
 
 ## Waiting on an event
 
 | Item | Blocker | Next action |
 | --- | --- | --- |
-| Re-review after the fixes | The 21 findings from the first pre-publication pass are applied, but the fixes themselves were not re-reviewed (`benchmark-results/2026-10-13/blog-mirror/locked-environment-rerun-2026-10-13.zh.md`, header marker) | Spawn one review pass after the archive lands and the numbers in the draft are final |
+| The English mirror of the 2026-10-13 article | The Chinese draft carries the archive's numbers; the site publishes bilingual pairs, and the English side has not been written | Needs the publish decision first — if the piece goes out, the English mirror is part of that step, not a separate piece of work |
 | Registry sweep for the pre-publication marker | Only the 2026-10-13 article mirror carries the marker so far; `README.md`, `COMMERCIAL.md` and the capability pages predate the rule | Add the marker when each is next touched, not as a separate sweep |

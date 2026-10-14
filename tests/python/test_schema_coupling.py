@@ -69,3 +69,54 @@ class SchemaCouplingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def methodology_properties() -> dict:
+    schema = json.loads(SUMMARY_SCHEMA.read_text(encoding="utf-8"))
+    return schema["properties"]["methodology"]["properties"]
+
+
+class DescriptorMethodologyTest(unittest.TestCase):
+    """A window descriptor's methodology block must fit the summary schema.
+
+    `summarize-reports.py` copies `descriptor["methodology"]` verbatim into the
+    summary, and the summary schema sets `additionalProperties: false`. So a key
+    added to a descriptor and not to the schema is discovered by the repository
+    validator *after* the archive has been built - which is what happened on
+    2026-10-13: the descriptor carried `code_label` and the schema did not, and the
+    archive the measuring host produced was rejected on the way in. Same failure
+    mode as `code_branch` / `code_describe` above, one stage further down the chain.
+
+    This walks the committed descriptors rather than a sample, so the guard covers
+    every window that has been run.
+    """
+
+    def descriptors(self) -> list[pathlib.Path]:
+        found = sorted((REPO_ROOT / "scripts" / "benchmark" / "windows").glob("*/descriptor.json"))
+        self.assertTrue(found, "no window descriptors found")
+        return found
+
+    def test_descriptor_methodology_keys_are_allowed(self):
+        allowed = set(methodology_properties())
+        for path in self.descriptors():
+            methodology = json.loads(path.read_text(encoding="utf-8")).get("methodology") or {}
+            unexpected = sorted(set(methodology) - allowed)
+            self.assertEqual(
+                [],
+                unexpected,
+                f"{path.relative_to(REPO_ROOT)} writes methodology keys the summary schema "
+                f"rejects: {unexpected}",
+            )
+
+    def test_descriptor_methodology_carries_every_required_key(self):
+        required = set(
+            json.loads(SUMMARY_SCHEMA.read_text(encoding="utf-8"))["properties"]["methodology"]["required"]
+        )
+        for path in self.descriptors():
+            methodology = json.loads(path.read_text(encoding="utf-8")).get("methodology") or {}
+            missing = sorted(required - set(methodology))
+            self.assertEqual(
+                [],
+                missing,
+                f"{path.relative_to(REPO_ROOT)} is missing required methodology keys: {missing}",
+            )

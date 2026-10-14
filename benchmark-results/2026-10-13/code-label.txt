@@ -1,0 +1,11 @@
+branch:     main
+commit:     f3b9f17a13ee79b5875f8ff1fc17b85050f2200b
+describe:   f3b9f17
+release:    no release tag exists for this project yet; describe carries the short commit hash instead of a tag
+tree:       clean
+lock:       sha256 9b396669f36620825f657b9859dc8b82baa6fd8c9fbf6561f2ef95573da484bb
+python:     Python 3.12.15 at /home/bhys/lx-locked-venv/bin/python3
+biopython:  1.85
+numpy:      2.2.4
+R:          R version 4.6.1 (2026-06-24) -- "Happy Hop"
+Biostrings: 2.80.2

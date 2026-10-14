@@ -59,6 +59,10 @@
         },
         "disclosure": {
           "type": "string"
+        },
+        "code_label": {
+          "type": "string",
+          "description": "The self-label of the code that produced the window: branch, commit, describe, tree state, lock digest and the measured interpreter/library versions, as baked into the binary at build time (2026-10-13 window onward). Optional, so archives that predate it stay valid."
         }
       }
     },

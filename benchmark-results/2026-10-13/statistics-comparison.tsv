@@ -1,0 +1,65 @@
+capability	metric	earlier_report	earlier_value	current_value	current_over_earlier
+sequence.stats.v1	median_wall_ms[rust]	bench-20261011-001	810.000	810.000	1.0000
+sequence.stats.v1	peak_rss_mb[rust]	bench-20261011-001	5.893	5.867	0.9957
+sequence.stats.v1	median_wall_ms[python]	bench-20261011-001	825.000	1845.000	2.2364
+sequence.stats.v1	peak_rss_mb[python]	bench-20261011-001	69.633	63.451	0.9112
+sequence.stats.v1	median_wall_ms[r]	bench-20261011-001	1815.000	1810.000	0.9972
+sequence.stats.v1	peak_rss_mb[r]	bench-20261011-001	321.137	321.193	1.0002
+sequence.stats.v1	speedup[python]	bench-20261011-001	1.0185	2.2778	2.2364
+sequence.stats.v1	memory_saving	bench-20261011-001	0.9154	0.9075	
+expression.pca.v1	median_wall_ms[rust]	bench-20261011-001	20.000	20.000	1.0000
+expression.pca.v1	peak_rss_mb[rust]	bench-20261011-001	8.533	8.465	0.9920
+expression.pca.v1	median_wall_ms[python]	bench-20261011-001	4010.000	3250.000	0.8105
+expression.pca.v1	peak_rss_mb[python]	bench-20261011-001	53.396	47.146	0.8830
+expression.pca.v1	median_wall_ms[r]	bench-20261011-001	2770.000	2745.000	0.9910
+expression.pca.v1	peak_rss_mb[r]	bench-20261011-001	81.861	81.805	0.9993
+expression.pca.v1	speedup[python]	bench-20261011-001	200.5000	162.5000	0.8105
+expression.pca.v1	memory_saving	bench-20261011-001	0.8402	0.8205	
+set.venn.v1	median_wall_ms[rust]	bench-20261011-001	10.000	10.000	1.0000
+set.venn.v1	peak_rss_mb[rust]	bench-20261011-001	8.266	8.275	1.0012
+set.venn.v1	median_wall_ms[python]	bench-20261011-001	180.000	150.000	0.8333
+set.venn.v1	peak_rss_mb[python]	bench-20261011-001	47.312	40.877	0.8640
+set.venn.v1	median_wall_ms[r]	bench-20261011-001	11075.000	11035.000	0.9964
+set.venn.v1	peak_rss_mb[r]	bench-20261011-001	124.684	124.701	1.0001
+set.venn.v1	speedup[python]	bench-20261011-001	18.0000	15.0000	0.8333
+set.venn.v1	memory_saving	bench-20261011-001	0.8253	0.7976	
+enrichment.overrepresentation.v1	median_wall_ms[rust]	bench-20261011-001	30.000	30.000	1.0000
+enrichment.overrepresentation.v1	peak_rss_mb[rust]	bench-20261011-001	14.977	14.965	0.9992
+enrichment.overrepresentation.v1	median_wall_ms[python]	bench-20261011-001	230.000	200.000	0.8696
+enrichment.overrepresentation.v1	peak_rss_mb[python]	bench-20261011-001	60.984	55.137	0.9041
+enrichment.overrepresentation.v1	median_wall_ms[r]	bench-20261011-001	4480.000	4425.000	0.9877
+enrichment.overrepresentation.v1	peak_rss_mb[r]	bench-20261011-001	145.391	145.438	1.0003
+enrichment.overrepresentation.v1	speedup[python]	bench-20261011-001	7.6667	6.6667	0.8696
+enrichment.overrepresentation.v1	memory_saving	bench-20261011-001	0.7544	0.7286	
+structure.pdb.summary.v1	median_wall_ms[rust]	bench-20261011-001	30.000	30.000	1.0000
+structure.pdb.summary.v1	peak_rss_mb[rust]	bench-20261011-001	28.412	29.723	1.0461
+structure.pdb.summary.v1	median_wall_ms[python]	bench-20261011-001	780.000	700.000	0.8974
+structure.pdb.summary.v1	peak_rss_mb[python]	bench-20261011-001	66.252	66.361	1.0017
+structure.pdb.summary.v1	median_wall_ms[r]	bench-20261011-001	20680.000	20555.000	0.9940
+structure.pdb.summary.v1	peak_rss_mb[r]	bench-20261011-001	162.836	162.814	0.9999
+structure.pdb.summary.v1	speedup[python]	bench-20261011-001	26.0000	23.3333	0.8974
+structure.pdb.summary.v1	memory_saving	bench-20261011-001	0.5712	0.5521	
+variant.stats.v1	median_wall_ms[rust]	bench-20261011-001	80.000	80.000	1.0000
+variant.stats.v1	peak_rss_mb[rust]	bench-20261011-001	6.176	6.203	1.0044
+variant.stats.v1	median_wall_ms[python]	bench-20261011-001	760.000	710.000	0.9342
+variant.stats.v1	peak_rss_mb[python]	bench-20261011-001	45.895	39.734	0.8658
+variant.stats.v1	median_wall_ms[r]	bench-20261011-001	13500.000	13455.000	0.9967
+variant.stats.v1	peak_rss_mb[r]	bench-20261011-001	122.342	122.312	0.9998
+variant.stats.v1	speedup[python]	bench-20261011-001	9.5000	8.8750	0.9342
+variant.stats.v1	memory_saving	bench-20261011-001	0.8654	0.8439	
+fastq.qc.v1	median_wall_ms[rust]	bench-20261011-001	1570.000	1560.000	0.9936
+fastq.qc.v1	peak_rss_mb[rust]	bench-20261011-001	6.180	6.061	0.9807
+fastq.qc.v1	median_wall_ms[python]	bench-20261011-001	49345.000	50910.000	1.0317
+fastq.qc.v1	peak_rss_mb[python]	bench-20261011-001	46.033	40.729	0.8848
+fastq.qc.v1	median_wall_ms[r]	bench-20261011-001	702190.000	699795.000	0.9966
+fastq.qc.v1	peak_rss_mb[r]	bench-20261011-001	79.393	80.521	1.0142
+fastq.qc.v1	speedup[python]	bench-20261011-001	31.4299	32.6346	1.0383
+fastq.qc.v1	memory_saving	bench-20261011-001	0.8658	0.8512	
+sequence.ssr.v1	median_wall_ms[rust]	bench-20261011-001	1600.000	1590.000	0.9938
+sequence.ssr.v1	peak_rss_mb[rust]	bench-20261011-001	20.977	20.939	0.9982
+sequence.ssr.v1	median_wall_ms[python]	bench-20261011-001	2280.000	2330.000	1.0219
+sequence.ssr.v1	peak_rss_mb[python]	bench-20261011-001	150.666	144.385	0.9583
+sequence.ssr.v1	median_wall_ms[r]	bench-20261011-001	2211405.000	2200800.000	0.9952
+sequence.ssr.v1	peak_rss_mb[r]	bench-20261011-001	667.471	667.432	0.9999
+sequence.ssr.v1	speedup[python]	bench-20261011-001	1.4250	1.4654	1.0284
+sequence.ssr.v1	memory_saving	bench-20261011-001	0.8608	0.8550	

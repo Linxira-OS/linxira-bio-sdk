@@ -1,0 +1,186 @@
+{
+  "schema_version": "1",
+  "capability": "sequence.stats.v1",
+  "inputs": [
+    {
+      "path": "/tmp/lxn13/big.fa",
+      "bytes": 101667131,
+      "sha256": "9f8a4cb46eb11eca49ad40108648541d13d03a50a79889a90977fe505c044e78"
+    }
+  ],
+  "dataset_class": "sequence",
+  "arm_class": "tool",
+  "tool": {
+    "name": "seqkit",
+    "version": "seqkit v2.14.0",
+    "invocation": "seqkit stats /tmp/lxn13/big.fa"
+  },
+  "backends": [
+    {
+      "backend": "seqkit-stats",
+      "repeats": 10,
+      "median_wall_ms": 30.0,
+      "min_wall_ms": 30.0,
+      "max_wall_ms": 30.0,
+      "iqr_wall_ms": 0.0,
+      "median_peak_rss_mb": 26.876953125,
+      "median_cpu_ms": 30.0,
+      "runs": [
+        {
+          "backend": "seqkit-stats",
+          "run_index": 1,
+          "wall_ms": 30.0,
+          "cpu_ms": 30.0,
+          "peak_rss_mb": 32.50390625,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 924,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "seqkit-stats",
+          "run_index": 2,
+          "wall_ms": 30.0,
+          "cpu_ms": 30.0,
+          "peak_rss_mb": 32.2265625,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 924,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "seqkit-stats",
+          "run_index": 3,
+          "wall_ms": 30.0,
+          "cpu_ms": 30.0,
+          "peak_rss_mb": 26.109375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 924,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "seqkit-stats",
+          "run_index": 4,
+          "wall_ms": 30.0,
+          "cpu_ms": 30.0,
+          "peak_rss_mb": 27.20703125,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 924,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "seqkit-stats",
+          "run_index": 5,
+          "wall_ms": 30.0,
+          "cpu_ms": 30.0,
+          "peak_rss_mb": 25.66015625,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 924,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "seqkit-stats",
+          "run_index": 6,
+          "wall_ms": 30.0,
+          "cpu_ms": 40.0,
+          "peak_rss_mb": 26.01171875,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 923,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "seqkit-stats",
+          "run_index": 7,
+          "wall_ms": 30.0,
+          "cpu_ms": 40.0,
+          "peak_rss_mb": 26.546875,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 924,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "seqkit-stats",
+          "run_index": 8,
+          "wall_ms": 30.0,
+          "cpu_ms": 40.0,
+          "peak_rss_mb": 27.30078125,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 924,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "seqkit-stats",
+          "run_index": 9,
+          "wall_ms": 30.0,
+          "cpu_ms": 30.0,
+          "peak_rss_mb": 32.07421875,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 924,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "seqkit-stats",
+          "run_index": 10,
+          "wall_ms": 30.0,
+          "cpu_ms": 40.0,
+          "peak_rss_mb": 26.53515625,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 924,
+          "ok": true,
+          "error_summary": null
+        }
+      ]
+    }
+  ],
+  "speedup": null,
+  "memory_saving": null,
+  "consistency": "not-applicable",
+  "findings": [
+    {
+      "field": "arm_class",
+      "detail": "tool arm: an ecosystem tool measured on the same machine, input and protocol as the parity arms. No cross-implementation comparison is stored in this report (speedup/memory_saving are null) because ROADMAP 7.1 keeps the two arm classes in separate, labelled tables."
+    },
+    {
+      "field": "engine_version",
+      "detail": "names the tool-arm runner, not the analysis engine, for this report"
+    },
+    {
+      "field": "parity_comparison",
+      "detail": "the arm this tool stands in for is `sequence.stats.v1`; the parity implementation of that capability is hand-written in each language"
+    }
+  ],
+  "environment": {
+    "os": "linux",
+    "kernel": "7.2.9-1-cachyos",
+    "cpu_model": "Intel(R) Pentium(R) Gold G7400",
+    "total_memory_mb": 15756,
+    "distro": "CachyOS",
+    "engine_version": "tool-arm-runner/1",
+    "python_version": "3.12.15",
+    "r_version": null,
+    "in_container": false,
+    "page_cache": "warm",
+    "precision": "high",
+    "code_revision": "d8d60fd49565908d68279205210d87c14a4b5520",
+    "code_branch": "main",
+    "code_describe": "d8d60fd"
+  },
+  "sampled_at": "2026-10-14T01:51:16.103545Z"
+}

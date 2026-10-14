@@ -62,21 +62,28 @@ cp "$S"/sequence.stats.v1.granularity-*.benchmark.json "$S"/sequence.stats.v1.gr
   benchmark-results/2026-10-13/ 2>/dev/null || true
 
 echo "=== statistics tables ==="
+# --comparison takes an *earlier* window: this run exists to be compared with the
+# unlocked one, so the comparison table and the two-window series are this window
+# against 2026-10-11. Pointing it at our own summary (as the first assembly of this
+# script did) makes every ratio 1.0000 and the series figure plot one window twice.
 python3 scripts/benchmark/analysis/statistics-tables.py \
   --summary benchmark-results/2026-10-13/summary.json \
   --reports benchmark-results/2026-10-13 \
   --output-dir benchmark-results/2026-10-13 \
-  --comparison benchmark-results/2026-10-13/summary.json
+  --comparison benchmark-results/2026-10-11/summary.json
 
 echo "=== figures (zh + en from the same numbers) ==="
 mkdir -p benchmark-results/2026-10-13/blog-mirror/figures/zh benchmark-results/2026-10-13/blog-mirror/figures/en
+# No --contended here: that experiment (a deliberately contended batch) belongs to the
+# 2026-10-11 window and its figure is archived there. This window's "condition" story is
+# the interpreter isolation, which has no figure renderer - it is recorded as tables under
+# env-isolation/ instead of being dressed up as a plot.
 for lang in zh en; do
   python3 scripts/benchmark/figures/render-svgs.py --lang "$lang" \
     --summary benchmark-results/2026-10-13/summary.json \
     --reports benchmark-results/2026-10-13 \
-    --comparison benchmark-results/2026-10-13/summary.json \
+    --comparison benchmark-results/2026-10-11/summary.json \
     --granularity benchmark-results/2026-10-13 \
-    --contended benchmark-results/2026-10-11/contended-window \
     --output "benchmark-results/2026-10-13/blog-mirror/figures/$lang"
 done
 
@@ -86,9 +93,8 @@ for lang in zh en; do
     --figures "benchmark-results/2026-10-13/blog-mirror/figures/$lang" \
     --summary benchmark-results/2026-10-13/summary.json \
     --reports benchmark-results/2026-10-13 \
-    --comparison benchmark-results/2026-10-13/summary.json \
-    --granularity benchmark-results/2026-10-13 \
-    --contended benchmark-results/2026-10-11/contended-window
+    --comparison benchmark-results/2026-10-11/summary.json \
+    --granularity benchmark-results/2026-10-13
 done
 
 echo "=== archive contents ==="

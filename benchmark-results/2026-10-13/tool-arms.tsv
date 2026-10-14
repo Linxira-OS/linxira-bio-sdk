@@ -1,0 +1,5 @@
+capability	dataset_class	arm_class	tool	tool_version	n	median_wall_ms	iqr_wall_ms	cv_percent	median_peak_rss_mb	sampled_at	invocation
+expression.pca.v1	matrix	tool	scikit-learn PCA	scikit-learn 1.9.1	10	700.000	0.000	3.13	139.301	2026-10-14T02:10:55.738802Z	python3 /home/bhys/linxira-bio-sdk/scripts/benchmark/run/tool-arms/commands/py-sklearn-pca.py /tmp/lxn13/matrix.tsv
+expression.pca.v1	matrix	tool	R prcomp (stats package)	4.6.1	10	120.000	0.000	0.00	78.984	2026-10-14T01:51:15.465824Z	Rscript --vanilla /home/bhys/linxira-bio-sdk/scripts/benchmark/run/tool-arms/commands/r-prcomp.R /tmp/lxn13/matrix.tsv
+sequence.stats.v1	sequence	tool	pyfastx	pyfastx version 2.3.1	10	10.000	0.000	0.00	15.189	2026-10-14T01:51:13.891920Z	pyfastx stat /tmp/lxn13/big.fa
+sequence.stats.v1	sequence	tool	seqkit	seqkit v2.14.0	10	30.000	0.000	0.00	26.877	2026-10-14T01:51:16.103545Z	seqkit stats /tmp/lxn13/big.fa

@@ -29,21 +29,23 @@ repository-development assets. The agent documentation that *does* ship lives in
 
 | Script | Role | Windows used |
 | --- | --- | --- |
-| `inputs/generate-inputs.py` | Synthetic tables (`random.seed(42)`), granularity FASTAs (numpy `default_rng(42)`), engine-simulated FASTA/FASTQ. | 2026-10-11 |
+| `inputs/generate-inputs.py` | Synthetic tables (`random.seed(42)`), granularity FASTAs (numpy `default_rng(42)`), engine-simulated FASTA/FASTQ. | 2026-10-11, 2026-10-13 |
 | `run/run-linux.sh` | One-command Linux matrix: dataset manifest → `benchmark run` → archive + runtime-preference write-back (ROADMAP M2-T6). | 2026-09-14, 2026-09-18, and every later Linux window |
 | `run/tier23-bench.sh` | Batched `expression.quantify.v1` cross-check vs stored reference quant outputs, per-run wall/user/sys accounting. | 2026-09-14 |
 | `run/quantify-bench.sh` | Single-sample quantify cross-check (identifier parity, NumReads within 1%, TPM Pearson ≥ 0.995). | 2026-09-14 |
 | `run/tier1v2-biolab.sh` | tier1_v2 batch `bench-20260914-002` against the thesis pipeline's own salmon 2.7.0 outputs. Git-ignored: hardcodes that lab machine's mounts. | 2026-09-14 |
-| `analysis/summarize-reports.py` | Builds `summary.json` + `summary.md` from per-capability reports and an environment descriptor; validates against the summary schema. | 2026-09-13, 2026-09-14, 2026-09-18, 2026-10-02, 2026-10-11 |
+| `analysis/summarize-reports.py` | Builds `summary.json` + `summary.md` from per-capability reports and an environment descriptor; validates against the summary schema. | 2026-09-13, 2026-09-14, 2026-09-18, 2026-10-02, 2026-10-11, 2026-10-13 |
 | `analysis/compare-conditions.py` | Repository-side stopgap for cross-condition/cross-window comparison; superseded by ROADMAP M2-T11 (`benchmark compare`). | 2026-10-11 |
 | `analysis/statistics.py` | Standalone TSV statistics: N, median, IQR, CV, ratio, bootstrap 95% CI, two-part verdict, plus trimming-robustness and cross-window tables. | 2026-10-11 |
 | `analysis/tier23-summarize.py` | Aggregates the tier23-bench CSV into a comparison table. | 2026-09-14 |
 | `analysis/update-runtime-preferences.py` | Writes the measured backend rows of `runtime-preferences.json` from reports. | 2026-10-04, 2026-10-11 |
-| `run/tool-arms.py` | Ecosystem-tool arm producer: same protocol as the parity arms (GNU `time -v`, warmup, N ≥ 10), writes a schema-validated report with `arm_class=tool` and the verbatim invocation. Refuses fewer than 10 repeats without `--allow-short`; never stores a cross-class ratio. | 2026-10-12 |
+| `run/tool-arms.py` | Ecosystem-tool arm producer: same protocol as the parity arms (GNU `time -v`, warmup, N ≥ 10), writes a schema-validated report with `arm_class=tool` and the verbatim invocation. Refuses fewer than 10 repeats without `--allow-short`; never stores a cross-class ratio. Note the timer it uses with GNU `time -v` is quantized to 10 ms, which is one more reason cross-class numbers stay prose. | 2026-10-12, 2026-10-13 |
 | `run/tool-arms/tools.json` | The tool registry: exact argv and version command per tool, verified against the installed version before landing. | 2026-10-12 |
-| `analysis/verify-lock-env.py` | Lock/environment gate: compares installed distributions against a pack's hashed `requirements.lock` and exits non-zero on any difference. Wired into the three 2026-10-11 stage scripts (pre-flight) and into CI after `.venv-benchmark` is built, so "the lock did not govern the run" is now a hard error. | 2026-10-12 |
+| `analysis/verify-lock-env.py` | Lock/environment gate: compares installed distributions against a pack's hashed `requirements.lock` and exits non-zero on any difference. Wired into the five 2026-10-13 stage scripts (pre-flight) and into CI after `.venv-benchmark` is built, so "the lock did not govern the run" is now a hard error. | 2026-10-12, 2026-10-13 |
 | `reproduce.sh` | One-command reproduction entry point for a published window: `--smoke` checks revision identity, regenerates the archived inputs and compares sha256 against `inputs.sha256`, and diffs installed interpreter packages against the pack locks (verified 9/9 inputs byte-identical); `--full` prints the scheduled window commands and the expected medians. Documented in `REPRODUCE.md`. | 2026-10-12 (archive `bench-20261011-001`) |
-| `figures/render-svgs.py` | Renders the publication figure set — 12 per language: absolute medians, memory, ratio CI, repeat stability, dispersion (CV), layered speedup, the 1.10× ladder, memory ratio, two-window series, record granularity, condition comparison (needs `--contended`), and the protocol/decision diagram. | 2026-10-11 (compares against 2026-09-13; ladder/memory-ratio/dispersion/condition added 2026-10-12) |
+| `analysis/statistics-tables.py` | Turns the archive into TSVs: medians with bootstrap CIs, the two-part verdict, trimming robustness, a cross-window comparison table, and - via `--tool-arms` - a class-labelled table that is never merged into the parity tables. `--comparison` takes an *earlier* summary. | 2026-10-11, 2026-10-13 |
+| `figures/render-svgs.py` | Renders the publication figure set — 12 per language: absolute medians, memory, ratio CI, repeat stability, dispersion (CV), layered speedup, the 1.10× ladder, memory ratio, two-window series, record granularity, condition comparison (needs `--contended`), and the protocol/decision diagram. | 2026-10-11 (compares against 2026-09-13; ladder/memory-ratio/dispersion/condition added 2026-10-12), 2026-10-13 (11 figures per language; `--contended` omitted because that experiment belongs to the 2026-10-11 window) |
+| `figures/verify-figures.py` | Re-derives every number a figure shows from the summary, reports and tables, and fails otherwise; `--expected-class` refuses to check the other arm class. | 2026-10-11, 2026-10-13 |
 | `rental/prepare-bundle.py` | Assembles the upload bundle for a rented GPU instance. | 2026-10-02 |
 
 ## Windows
@@ -55,6 +57,7 @@ repository-development assets. The agent documentation that *does* ship lives in
 | 2026-09-18 | laptop | reproducibility pass written up as the first article | `run/run-linux.sh` | `benchmark-results/2026-09-18/` |
 | 2026-10-02 | rented cloud GPU | dual-vendor GPU validation and docking study | `rental/*` | `benchmark-results/2026-10-02/` |
 | 2026-10-04 | NAS (Pentium Gold G7400) | first real execution of the R backend, N=3, three capabilities' r-leg data written back | `windows/2026-10-04/*` | `docs/engine-evals/local-nas-g7400-window-2026-10-04.md` |
+| 2026-10-13 | NAS (Pentium Gold G7400) | locked-environment re-run of the 2026-10-11 window (eight capabilities × three backends × N=10, python arm inside a uv-installed CPython 3.12 from the lock), plus the record-granularity experiment, the ecosystem-tool arms and the python-leg interpreter isolation. Measurements finished 2026-10-13 and the host was handed back the same night; tool arms, isolation and archive resumed on 2026-10-14 after a reboot wiped `/tmp` | `windows/2026-10-13/*` (`run-window.sh`, `fast.sh`, `granularity.sh`, `fastq.sh`, `ssr.sh`, `tool-arms.sh`, `env-isolation.sh`, `resume-after-reboot.sh`, `descriptor.json`, `archive.sh`) | `benchmark-results/2026-10-13/` |
 | 2026-10-11 | NAS (Pentium Gold G7400) | archived N=10 three-backend window: six fast capabilities, `fastq.qc`, `sequence.ssr`, plus the record-granularity experiment | `windows/2026-10-11/*` (`fast.sh`, `fastq.sh`, `ssr.sh`, `granularity.sh`, `descriptor.json`, `archive.sh`), `inputs/generate-inputs.py`, `analysis/statistics-tables.py`, `figures/render-svgs.py` | `benchmark-results/2026-10-11/` |
 
 ## Adding a window
@@ -69,7 +72,9 @@ repository-development assets. The agent documentation that *does* ship lives in
    digests can be reproduced.
 3. Archive with `analysis/summarize-reports.py` (validating against
    `schemas/benchmark-summary.schema.json`), then statistics and figures.
-4. Re-run `figures/verify-figures.py`: every number a figure shows must be
-   re-derivable from the archive, and the script fails otherwise.
+4. Re-run `figures/verify-figures.py` and store its output in the archive as
+   `figure-check.txt`: every number a figure shows must be re-derivable from the
+   archive, the script fails otherwise, and since the archive is the evidence the
+   check result belongs in it rather than only in a terminal (added 2026-10-13).
 5. Commit inputs, stage scripts, descriptor, archive and figures in the same
    change, so the window can be re-checked without the machine it ran on.

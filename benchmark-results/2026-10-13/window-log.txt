@@ -1,0 +1,27 @@
+2026-10-13T05:05:59Z preflight: gitea-runner=active jobs_pending_or_running=0 loadavg=1.23 1.50 1.60
+2026-10-13T05:05:59Z idle wait 0/168 min: heavy='8.2 md5sum; ' aria2c=''
+2026-10-13T05:07:25Z preflight: gitea-runner=active jobs_pending_or_running=0 loadavg=1.18 1.43 1.57
+2026-10-13T05:07:25Z idle wait 0/168 min: heavy='10.6 md5sum; ' aria2c=''
+2026-10-13T05:12:25Z idle wait 5/168 min: heavy='15.4 md5sum; ' aria2c=''
+2026-10-13T05:17:25Z idle wait 10/168 min: heavy='6.7 md5sum; ' aria2c=''
+2026-10-13T05:22:25Z idle wait 15/168 min: heavy='13.4 md5sum; ' aria2c=''
+2026-10-13T05:27:25Z idle wait 20/168 min: heavy='100 ps; 8.3 md5sum; ' aria2c=''
+2026-10-13T05:32:25Z idle wait 25/168 min: heavy='9.1 md5sum; ' aria2c=''
+2026-10-13T05:37:25Z idle wait 30/168 min: heavy='8.8 md5sum; ' aria2c=''
+2026-10-13T05:42:25Z idle wait 35/168 min: quiet streak 1/6
+2026-10-13T05:47:25Z idle wait 40/168 min: quiet streak 2/6
+2026-10-13T05:51:03Z preflight: gitea-runner=active jobs_pending_or_running=0 loadavg=0.10 0.27 0.71
+2026-10-13T05:51:03Z idle wait 0/168 min: quiet streak 1/1
+2026-10-13T05:51:03Z host is free: 1 consecutive checks with no process above 5% CPU and no aria2c
+2026-10-13T05:51:03Z busy processes at start: none
+2026-10-13T05:51:03Z load settled at 0.10
+2026-10-13T05:51:03Z regenerating inputs (seeded; digests land in the archive's inputs.sha256)
+2026-10-13T05:51:41Z input sizes: 608M
+2026-10-13T05:52:19Z built at branch=main f3b9f17 describe=f3b9f17
+2026-10-13T05:52:19Z stage fast: start
+2026-10-13T06:04:41Z stage fast: ok
+2026-10-13T06:04:41Z stage granularity: start
+2026-10-13T06:07:49Z stage granularity: ok
+2026-10-13T06:07:49Z stage fastq: start
+2026-10-13T08:25:43Z stage fastq: ok
+2026-10-13T08:25:43Z stage ssr: start

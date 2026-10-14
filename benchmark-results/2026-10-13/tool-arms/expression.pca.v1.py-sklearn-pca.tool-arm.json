@@ -1,0 +1,186 @@
+{
+  "schema_version": "1",
+  "capability": "expression.pca.v1",
+  "inputs": [
+    {
+      "path": "/tmp/lxn13/matrix.tsv",
+      "bytes": 280723,
+      "sha256": "273755e5eca0ae14d150365271dda778666109341ec0826baa01b7dc7bd76345"
+    }
+  ],
+  "dataset_class": "matrix",
+  "arm_class": "tool",
+  "tool": {
+    "name": "scikit-learn PCA",
+    "version": "scikit-learn 1.9.1",
+    "invocation": "python3 /home/bhys/linxira-bio-sdk/scripts/benchmark/run/tool-arms/commands/py-sklearn-pca.py /tmp/lxn13/matrix.tsv"
+  },
+  "backends": [
+    {
+      "backend": "py-sklearn-pca",
+      "repeats": 10,
+      "median_wall_ms": 700.0,
+      "min_wall_ms": 700.0,
+      "max_wall_ms": 770.0,
+      "iqr_wall_ms": 0.0,
+      "median_peak_rss_mb": 139.30078125,
+      "median_cpu_ms": 1350.0,
+      "runs": [
+        {
+          "backend": "py-sklearn-pca",
+          "run_index": 1,
+          "wall_ms": 700.0,
+          "cpu_ms": 1350.0,
+          "peak_rss_mb": 139.3203125,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 920,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "py-sklearn-pca",
+          "run_index": 2,
+          "wall_ms": 700.0,
+          "cpu_ms": 1350.0,
+          "peak_rss_mb": 139.34375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 920,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "py-sklearn-pca",
+          "run_index": 3,
+          "wall_ms": 700.0,
+          "cpu_ms": 1360.0,
+          "peak_rss_mb": 139.09375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 920,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "py-sklearn-pca",
+          "run_index": 4,
+          "wall_ms": 700.0,
+          "cpu_ms": 1350.0,
+          "peak_rss_mb": 139.30859375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 920,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "py-sklearn-pca",
+          "run_index": 5,
+          "wall_ms": 700.0,
+          "cpu_ms": 1350.0,
+          "peak_rss_mb": 139.1875,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 920,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "py-sklearn-pca",
+          "run_index": 6,
+          "wall_ms": 700.0,
+          "cpu_ms": 1350.0,
+          "peak_rss_mb": 139.29296875,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 920,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "py-sklearn-pca",
+          "run_index": 7,
+          "wall_ms": 700.0,
+          "cpu_ms": 1360.0,
+          "peak_rss_mb": 139.1015625,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 920,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "py-sklearn-pca",
+          "run_index": 8,
+          "wall_ms": 700.0,
+          "cpu_ms": 1360.0,
+          "peak_rss_mb": 139.36328125,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 920,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "py-sklearn-pca",
+          "run_index": 9,
+          "wall_ms": 700.0,
+          "cpu_ms": 1350.0,
+          "peak_rss_mb": 139.69921875,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 920,
+          "ok": true,
+          "error_summary": null
+        },
+        {
+          "backend": "py-sklearn-pca",
+          "run_index": 10,
+          "wall_ms": 770.0,
+          "cpu_ms": 1390.0000000000002,
+          "peak_rss_mb": 139.12109375,
+          "disk_read_bytes": 0,
+          "disk_write_bytes": 0,
+          "output_bytes": 920,
+          "ok": true,
+          "error_summary": null
+        }
+      ]
+    }
+  ],
+  "speedup": null,
+  "memory_saving": null,
+  "consistency": "not-applicable",
+  "findings": [
+    {
+      "field": "arm_class",
+      "detail": "tool arm: an ecosystem tool measured on the same machine, input and protocol as the parity arms. No cross-implementation comparison is stored in this report (speedup/memory_saving are null) because ROADMAP 7.1 keeps the two arm classes in separate, labelled tables."
+    },
+    {
+      "field": "engine_version",
+      "detail": "names the tool-arm runner, not the analysis engine, for this report"
+    },
+    {
+      "field": "parity_comparison",
+      "detail": "the arm this tool stands in for is `expression.pca.v1`; the parity implementation of that capability is hand-written in each language"
+    }
+  ],
+  "environment": {
+    "os": "linux",
+    "kernel": "7.2.9-1-cachyos",
+    "cpu_model": "Intel(R) Pentium(R) Gold G7400",
+    "total_memory_mb": 15756,
+    "distro": "CachyOS",
+    "engine_version": "tool-arm-runner/1",
+    "python_version": "3.14.7",
+    "r_version": null,
+    "in_container": false,
+    "page_cache": "warm",
+    "precision": "high",
+    "code_revision": "d8d60fd49565908d68279205210d87c14a4b5520",
+    "code_branch": "main",
+    "code_describe": "d8d60fd-dirty"
+  },
+  "sampled_at": "2026-10-14T02:10:55.738802Z"
+}
