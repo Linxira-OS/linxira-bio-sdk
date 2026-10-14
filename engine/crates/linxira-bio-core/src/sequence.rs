@@ -62,6 +62,43 @@ impl From<io::Error> for FastaError {
     }
 }
 
+/// Per-byte classification, one table lookup instead of a branch per base.
+///
+/// Bit 0: canonical base (A/T/U/G/C), bit 1: G/C, bit 2: N, bit 3: counted as a
+/// sequence byte (every non-whitespace byte, matching the previous
+/// `bytes().filter(|b| !b.is_ascii_whitespace())`).
+///
+/// The previous loop matched on `base.to_ascii_uppercase()` per base. On random
+/// sequence that branch is unpredictable every time, and branch misprediction - not
+/// I/O and not the counting - was the cost: measured on a 101.7 MB, 1.67 M-line FASTA,
+/// the branchy loop took ~642 ms on random ACGT against 168-184 ms on an all-A or
+/// ACGT-cyclic file of the same size, while the same scan with this table takes
+/// ~124 ms (read-only I/O: ~10 ms). The table is built with `to_ascii_uppercase`, so
+/// it is case-equivalent by construction rather than by a second hand-written mapping.
+const BASE_CLASS: [u8; 256] = {
+    let mut table = [0_u8; 256];
+    let mut byte = 0_usize;
+    while byte < 256 {
+        let value = byte as u8;
+        if !value.is_ascii_whitespace() {
+            let upper = value.to_ascii_uppercase();
+            let mut class = 8_u8;
+            if matches!(upper, b'A' | b'T' | b'U' | b'G' | b'C') {
+                class |= 1;
+            }
+            if matches!(upper, b'G' | b'C') {
+                class |= 2;
+            }
+            if upper == b'N' {
+                class |= 4;
+            }
+            table[byte] = class;
+        }
+        byte += 1;
+    }
+    table
+};
+
 pub fn fasta_stats(reader: impl BufRead) -> Result<SequenceStats, FastaError> {
     let mut lengths = Vec::new();
     let mut current_length = None;
@@ -92,17 +129,12 @@ pub fn fasta_stats(reader: impl BufRead) -> Result<SequenceStats, FastaError> {
             .as_mut()
             .ok_or(FastaError::SequenceBeforeHeader { line: line_number })?;
 
-        for base in trimmed.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
-            *length += 1;
-            match base.to_ascii_uppercase() {
-                b'G' | b'C' => {
-                    gc_bases += 1;
-                    canonical_bases += 1;
-                }
-                b'A' | b'T' | b'U' => canonical_bases += 1,
-                b'N' => n_count += 1,
-                _ => {}
-            }
+        for &base in trimmed.as_bytes() {
+            let class = BASE_CLASS[base as usize];
+            *length += u64::from(class >> 3 & 1);
+            canonical_bases += u64::from(class & 1);
+            gc_bases += u64::from(class >> 1 & 1);
+            n_count += u64::from(class >> 2 & 1);
         }
     }
 
@@ -224,6 +256,44 @@ mod tests {
         let error = fasta_stats(Cursor::new(b"\n")).expect_err("empty input must fail");
 
         assert!(matches!(error, FastaError::NoRecords));
+    }
+
+    #[test]
+    fn counts_bases_case_insensitively_and_treats_u_as_canonical() {
+        let stats = fasta_stats(Cursor::new(b">mixed\nACGTUNacgtun\n")).expect("valid FASTA");
+
+        assert_eq!(stats.total_bases, 12);
+        assert_eq!(stats.n_count, 2, "one N and one n");
+        // 10 canonical bases (A/C/G/T/U in either case), 4 of them G or C.
+        assert!((stats.gc_percent - 40.0).abs() < 1e-9);
+        assert!((stats.n_percent - (2.0 / 12.0) * 100.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn interior_whitespace_is_not_a_sequence_byte_but_other_bytes_are() {
+        let spaced = fasta_stats(Cursor::new(b">gapped\nAC GT\n")).expect("valid FASTA");
+        assert_eq!(spaced.total_bases, 4, "interior whitespace is skipped");
+        assert!((spaced.gc_percent - 50.0).abs() < 1e-9);
+
+        // A gap character is counted as a sequence byte (length) but classified as
+        // neither canonical nor N, which is what the previous match arm `_ => {}` did.
+        let gapped = fasta_stats(Cursor::new(b">gap\nAC-GT\n")).expect("valid FASTA");
+        assert_eq!(gapped.total_bases, 5);
+        assert_eq!(gapped.n_count, 0);
+        assert!(
+            (gapped.gc_percent - 50.0).abs() < 1e-9,
+            "2 of 4 canonical bases"
+        );
+    }
+
+    #[test]
+    fn uppercase_and_lowercase_input_agree() {
+        let upper = fasta_stats(Cursor::new(b">a\nACGTACGTNN\n")).expect("valid FASTA");
+        let lower = fasta_stats(Cursor::new(b">a\nacgtacgtnn\n")).expect("valid FASTA");
+
+        assert_eq!(upper.total_bases, lower.total_bases);
+        assert_eq!(upper.n_count, lower.n_count);
+        assert!((upper.gc_percent - lower.gc_percent).abs() < 1e-12);
     }
 
     #[test]

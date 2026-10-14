@@ -38,7 +38,7 @@ version: cells A and B agree, cell C differs — see the window archive).
 | A same-output-set comparison for the tool-arm rows | The cross-class rows (`pyfastx stat`, R `prcomp`) do not produce the same output set as our arms, so no routing judgement can be written from them — the boundary rule needs a same-job pair first. Needs the measuring host | Measure one: make the tool emit our columns (`au_n`, `gc_percent`, `n_count`) or run `pyfastx` without its prebuilt `.fxi` index, same input, same slot. Until then those two rows stand as recorded numbers only |
 | A gate for a silently missing tool arm | The registry has four arms; on 2026-10-13 the first pass produced three and said nothing, because the runner resolves `python3` through the locked venv and the version probe for scikit-learn failed there (`tool-arms.sh` prepends that venv to `PATH`). The arm was measured on 2026-10-14 in the environment that has the package, but a registry arm that produces no report is still invisible to the pipeline | Make `tool-arms.sh` compare the registry's tool ids against the reports it produced and fail on a shortfall, then re-run in the next window |
 | The mechanism behind the interpreter lever | The 2026-10-13 isolation experiment showed CPython 3.14.7 is 2.24× faster than 3.12.15 on `sequence.stats.v1` (and 1.23× slower on `expression.pca.v1`) with the same packages, but not *why* — a C-extension build difference and a parsing-path difference are both consistent with the data. Deciding what to do about it (documented versions, not code) needs no machine; explaining it does | Profile the two interpreters on the same host and input (`py-spy`/`perf` on the python leg), then either record the mechanism or write it down as unexplained |
-| `sequence.stats` hot-path profile | Same slot (same machine, same input, or the numbers are not comparable) | Ranked in ROADMAP §9.4 as M5-T10; its purpose is deciding the boundary, not repairing a shortfall |
+| Re-measure the window after the `sequence.stats` fix | The fix (branchless classification) changes this capability's numbers: the pipeline went 810 -> 280 ms on the same host and input. Published numbers must come from a window, not from a one-off probe. Needs the measuring host for a full window (~9 h with `sequence.ssr`), and the old archive stays as the record of the old code | Run the window driver in the next idle daytime slot; `benchmark-results/2026-10-13/` keeps the pre-fix readings |
 
 Two items that were here are done as of 2026-10-14: the archive (summary, statistics
 tables with bootstrap CIs, 11 bilingual figures each re-checked value by value, the
@@ -46,6 +46,12 @@ tool-arm table and the isolation cells, all recorded in
 `benchmark-results/2026-10-13/README.md`) and the re-review of the pre-publication
 fixes (the first pass's 21 findings were fixed, the fixes were re-checked, and the
 new archive README went through its own claims review).
+
+## Waiting on a decision
+
+| Item | Blocker | Next action |
+| --- | --- | --- |
+| The benchmark hashes every input twice per timed repetition | `validate_v2_inputs` and `finalize_v2_input_hashes` each run a full SHA-256 over the input (66 ms measured for 101.7 MB), so 130 ms of every measured run is provenance rather than capability. Changing it changes what a report's timed window covers | Decide whether provenance is computed once per window (or declared by the caller, which `BenchmarkRequest::write` deliberately avoids today) and, if so, re-measure in a window rather than editing the harness quietly |
 
 ## Waiting on an event
 
