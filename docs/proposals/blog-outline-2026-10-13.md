@@ -63,10 +63,11 @@ machine did not run* (zh: 《我们以为锁钉住了环境：锁声明的是机
    reproduce X".
    Anchor: `REPRODUCE.md`, `.github/workflows/ci.yml`, `.github/ISSUE_TEMPLATE/reproduction-failure.yml`.
 
-8. **What we are not doing yet.** No release-shaped act before the repository is six months
-   public (2027-01-21): no `v1.1.4`, no crates.io publish, no JOSS submission. Reason stated
-   plainly: the correction rate is still high enough that publishing a version number would
-   freeze claims we are still finding errors in.
+8. **What we are not doing yet.** No product release before the repository is six months
+   public (2027-01-21): no crates.io publish, no JOSS submission, no announcement. Reason
+   stated plainly: the correction rate is still high enough that publishing a version number
+   would freeze claims we are still finding errors in. (`v1.1.4` exists only as a technical
+   tag used to verify the packaging sync; it is not a shipping announcement.)
 
 ## Constraints carried from the first article
 

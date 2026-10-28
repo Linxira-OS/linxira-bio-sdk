@@ -16,6 +16,11 @@ JOSS follows the same floor: its review criteria want a public development histo
 six months plus community evidence, and both point at the same date. Nothing about the code
 needs to wait; only the *release-shaped acts* do.
 
+**Exception recorded 2026-10-28.** `v1.1.4` was tagged and published as a *technical* release
+solely to exercise the `Linxira-OS/packages` auto-sync chain (release → dispatch → bump PR).
+It is not announced as a product release, not published to crates.io, and does not move the
+JOSS floor; the 2027-01-21 boundary still applies to anything that reads as "we are shipping".
+
 ## What "structural repair" means concretely (October)
 
 1. **Environment truth**: the pack lock is fixed and CI asserts lock == environment

@@ -22,7 +22,7 @@ Last updated: 2026-10-14.
 | fastp: which route | Package, source build, or `cutadapt` in its place — the decision was left to the maintainer. Evidence: upstream ships no binary asset, and the file that looked like a download in `~/bin` is a nine-byte `Not Found` page | Pick one; seqkit already covers the streaming-reference question |
 | GIAB HG002 + hap.py correctness gate | Needs approval of the $25 rental window (`docs/proposals/rental-window-plan-2026-10-12.md`: chr20 scope, 24 h, inputs pinned) | Approve the budget; the run is then scripted |
 | Third-party anchors beyond zstd/OpenSSL | Silesia is unreachable from this network (measured: 32 KB in 60 s, parts reset). PTS/OpenBenchmarking uploads are public actions | Drop `silesia.zip` onto the measuring host (~2 minutes of work), or approve the uploads |
-| Release-shaped acts | Rule: nothing before the repository is six months public (2027-01-21) — no `v1.1.4`, no crates.io, no JOSS | Nothing to do until the date; the prerequisites are tracked in `docs/proposals/schedule-2026-q4.md` |
+| Release-shaped acts | 2026-10-28: the maintainer approved one technical release (`v1.1.4`) to exercise the packages auto-sync chain; no announcement, no crates.io, no JOSS. Product promotion still waits until the repository is six months public (2027-01-21) | Nothing else until the date; the prerequisites are tracked in `docs/proposals/schedule-2026-q4.md` |
 
 ## Waiting on a machine
 
