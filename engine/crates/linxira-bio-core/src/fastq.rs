@@ -318,7 +318,9 @@ pub fn fastq_qc(
     let mut accumulator = QcAccumulator::default();
 
     loop {
-        if let Some(limit) = options.max_reads && accumulator.read_count >= limit {
+        if let Some(limit) = options.max_reads
+            && accumulator.read_count >= limit
+        {
             break;
         }
         let Some(header_line) = reader.next_line(&mut line)? else {
@@ -614,7 +616,9 @@ fn finish_metrics(
             options.max_cycles
         ));
     }
-    if let Some(limit) = options.max_reads && accumulator.read_count >= limit {
+    if let Some(limit) = options.max_reads
+        && accumulator.read_count >= limit
+    {
         warnings.push(format!(
             "read limit {limit} applied; metrics cover only the first {limit} read(s)"
         ));
