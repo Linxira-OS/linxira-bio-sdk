@@ -75,7 +75,10 @@ impl From<io::Error> for FastaError {
 /// ACGT-cyclic file of the same size, while the same scan with this table takes
 /// ~124 ms (read-only I/O: ~10 ms). The table is built with `to_ascii_uppercase`, so
 /// it is case-equivalent by construction rather than by a second hand-written mapping.
-const BASE_CLASS: [u8; 256] = {
+///
+/// `fastq.rs` reads bits 1 and 2 to classify bases in `fastq.qc`, so a change to those
+/// two bits changes both kernels; they are pinned by a test there.
+pub(crate) const BASE_CLASS: [u8; 256] = {
     let mut table = [0_u8; 256];
     let mut byte = 0_usize;
     while byte < 256 {

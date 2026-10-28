@@ -1,3 +1,4 @@
+use crate::sequence::BASE_CLASS;
 use flate2::read::MultiGzDecoder;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -7,6 +8,49 @@ use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 
 pub const DEFAULT_MAX_CYCLES: usize = 500;
+
+/// Bit 1 of `BASE_CLASS`: G/C. Bit 2: N. The remaining bits belong to the FASTA path.
+const CLASS_GC: u8 = 0b0000_0010;
+const CLASS_N: u8 = 0b0000_0100;
+
+/// Quality bit fields of `QUAL_CLASS`, one per threshold `add_quality` applies.
+const QUAL_Q20_PHRED33: u8 = 0b0000_0001;
+const QUAL_Q30_PHRED33: u8 = 0b0000_0010;
+const QUAL_Q20_PHRED64: u8 = 0b0000_0100;
+const QUAL_Q30_PHRED64: u8 = 0b0000_1000;
+
+/// Per-byte quality classification: one table lookup instead of four comparisons per
+/// quality byte.
+///
+/// Created while fixing the same shape in the base scan (see `BASE_CLASS` in
+/// `sequence.rs`): the thresholds below were four data-dependent comparisons per byte,
+/// and two of them (`>= 53`, `>= 63`) sit where real read quality actually falls, so the
+/// branch predictor has no stable answer. The bits are the comparison results, in the
+/// order `add_quality` applied them, and a test asserts table against comparisons across
+/// the whole byte range.
+const QUAL_CLASS: [u8; 256] = {
+    let mut table = [0_u8; 256];
+    let mut byte = 0_usize;
+    while byte < 256 {
+        let quality = byte as u8;
+        let mut class = 0_u8;
+        if quality >= 53 {
+            class |= QUAL_Q20_PHRED33;
+        }
+        if quality >= 63 {
+            class |= QUAL_Q30_PHRED33;
+        }
+        if quality >= 84 {
+            class |= QUAL_Q20_PHRED64;
+        }
+        if quality >= 94 {
+            class |= QUAL_Q30_PHRED64;
+        }
+        table[byte] = class;
+        byte += 1;
+    }
+    table
+};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum QualityEncodingMode {
@@ -352,6 +396,8 @@ fn parse_sequence<R: BufRead>(
             return Err(malformed(record, line_number, "sequence line is empty"));
         }
 
+        let mut gc_line = 0_u64;
+        let mut n_line = 0_u64;
         for (column, &base) in line.iter().enumerate() {
             if !base.is_ascii_graphic() {
                 return Err(malformed(
@@ -363,22 +409,51 @@ fn parse_sequence<R: BufRead>(
                     ),
                 ));
             }
-            add_base(
-                accumulator,
-                sequence_length,
-                base,
-                max_cycles,
+            let class = BASE_CLASS[base as usize];
+            let is_gc = u64::from((class & CLASS_GC) >> 1);
+            let is_n = u64::from((class & CLASS_N) >> 2);
+            gc_line += is_gc;
+            n_line += is_n;
+            let cycle_position = sequence_length.saturating_add(column as u64);
+            if let Some(cycle) = cycle_index(cycle_position, max_cycles) {
+                ensure_cycle(&mut accumulator.cycles, cycle);
+                let cycle_accumulator = &mut accumulator.cycles[cycle];
+                cycle_accumulator.base_count += 1;
+                cycle_accumulator.gc_count += is_gc;
+                cycle_accumulator.n_count += is_n;
+            }
+        }
+        // The counts are folded once per line instead of once per base: the totals are
+        // identical, and the only case where the error surfaces at a different moment is
+        // an overflow in the middle of a line, which no input can reach at u64.
+        accumulator.gc_count = accumulator.gc_count.checked_add(gc_line).ok_or_else(|| {
+            malformed(
                 record,
                 line_number,
-            )?;
-            sequence_length = sequence_length.checked_add(1).ok_or_else(|| {
-                malformed(
-                    record,
-                    line_number,
-                    "sequence length exceeds the supported range",
-                )
-            })?;
-        }
+                "GC base count exceeds the supported range",
+            )
+        })?;
+        accumulator.n_count = accumulator.n_count.checked_add(n_line).ok_or_else(|| {
+            malformed(
+                record,
+                line_number,
+                "N base count exceeds the supported range",
+            )
+        })?;
+        let line_length = u64::try_from(line.len()).map_err(|_| {
+            malformed(
+                record,
+                line_number,
+                "sequence length exceeds the supported range",
+            )
+        })?;
+        sequence_length = sequence_length.checked_add(line_length).ok_or_else(|| {
+            malformed(
+                record,
+                line_number,
+                "sequence length exceeds the supported range",
+            )
+        })?;
     }
 }
 
@@ -477,56 +552,14 @@ fn parse_quality<R: BufRead>(
     Ok(())
 }
 
-fn add_base(
-    accumulator: &mut QcAccumulator,
-    cycle: u64,
-    base: u8,
-    max_cycles: usize,
-    record: u64,
-    line: u64,
-) -> Result<(), FastqError> {
-    let upper = base.to_ascii_uppercase();
-    if matches!(upper, b'G' | b'C') {
-        accumulator.gc_count = accumulator
-            .gc_count
-            .checked_add(1)
-            .ok_or_else(|| malformed(record, line, "GC base count exceeds the supported range"))?;
-    } else if upper == b'N' {
-        accumulator.n_count = accumulator
-            .n_count
-            .checked_add(1)
-            .ok_or_else(|| malformed(record, line, "N base count exceeds the supported range"))?;
-    }
-
-    let Some(cycle) = cycle_index(cycle, max_cycles) else {
-        return Ok(());
-    };
-    ensure_cycle(&mut accumulator.cycles, cycle);
-    let cycle_accumulator = &mut accumulator.cycles[cycle];
-    cycle_accumulator.base_count += 1;
-    if matches!(upper, b'G' | b'C') {
-        cycle_accumulator.gc_count += 1;
-    } else if upper == b'N' {
-        cycle_accumulator.n_count += 1;
-    }
-    Ok(())
-}
-
 fn add_quality(accumulator: &mut QcAccumulator, cycle: u64, quality: u8, max_cycles: usize) {
+    let class = QUAL_CLASS[quality as usize];
     accumulator.quality_ascii_sum += u128::from(quality);
     accumulator.minimum_quality_ascii = accumulator.minimum_quality_ascii.min(quality);
-    if quality >= 53 {
-        accumulator.q20_phred33_count += 1;
-    }
-    if quality >= 63 {
-        accumulator.q30_phred33_count += 1;
-    }
-    if quality >= 84 {
-        accumulator.q20_phred64_count += 1;
-    }
-    if quality >= 94 {
-        accumulator.q30_phred64_count += 1;
-    }
+    accumulator.q20_phred33_count += u64::from(class & QUAL_Q20_PHRED33);
+    accumulator.q30_phred33_count += u64::from((class & QUAL_Q30_PHRED33) >> 1);
+    accumulator.q20_phred64_count += u64::from((class & QUAL_Q20_PHRED64) >> 2);
+    accumulator.q30_phred64_count += u64::from((class & QUAL_Q30_PHRED64) >> 3);
 
     let Some(cycle) = cycle_index(cycle, max_cycles) else {
         return;
@@ -534,18 +567,10 @@ fn add_quality(accumulator: &mut QcAccumulator, cycle: u64, quality: u8, max_cyc
     ensure_cycle(&mut accumulator.cycles, cycle);
     let cycle_accumulator = &mut accumulator.cycles[cycle];
     cycle_accumulator.quality_ascii_sum += u128::from(quality);
-    if quality >= 53 {
-        cycle_accumulator.q20_phred33_count += 1;
-    }
-    if quality >= 63 {
-        cycle_accumulator.q30_phred33_count += 1;
-    }
-    if quality >= 84 {
-        cycle_accumulator.q20_phred64_count += 1;
-    }
-    if quality >= 94 {
-        cycle_accumulator.q30_phred64_count += 1;
-    }
+    cycle_accumulator.q20_phred33_count += u64::from(class & QUAL_Q20_PHRED33);
+    cycle_accumulator.q30_phred33_count += u64::from((class & QUAL_Q30_PHRED33) >> 1);
+    cycle_accumulator.q20_phred64_count += u64::from((class & QUAL_Q20_PHRED64) >> 2);
+    cycle_accumulator.q30_phred64_count += u64::from((class & QUAL_Q30_PHRED64) >> 3);
 }
 
 fn finish_metrics(
@@ -706,7 +731,9 @@ fn mean_quality(quality_ascii_sum: u128, base_count: u64, quality_offset: u8) ->
 #[cfg(test)]
 mod tests {
     use super::{
-        FastqError, FastqQcOptions, QualityEncoding, QualityEncodingMode, fastq_qc, fastq_qc_path,
+        BASE_CLASS, CLASS_GC, CLASS_N, FastqError, FastqQcOptions, QUAL_CLASS, QUAL_Q20_PHRED33,
+        QUAL_Q20_PHRED64, QUAL_Q30_PHRED33, QUAL_Q30_PHRED64, QualityEncoding, QualityEncodingMode,
+        fastq_qc, fastq_qc_path,
     };
     use flate2::Compression;
     use flate2::write::{DeflateEncoder, GzEncoder};
@@ -927,5 +954,41 @@ mod tests {
             (actual - expected).abs() < 1e-9,
             "expected {expected}, got {actual}"
         );
+    }
+
+    /// `fastq.qc` reads bits 1 and 2 of `sequence::BASE_CLASS`. This pins those two bits
+    /// against the per-base comparisons the scan used before it became table-driven, across
+    /// every byte, so a change to the shared table cannot silently change QC counts.
+    #[test]
+    fn base_class_bits_match_the_previous_per_base_comparisons() {
+        for byte in 0_u16..=255 {
+            let value = byte as u8;
+            let upper = value.to_ascii_uppercase();
+            let class = BASE_CLASS[value as usize];
+            assert_eq!(
+                (class & CLASS_GC) != 0,
+                matches!(upper, b'G' | b'C'),
+                "GC bit differs for 0x{value:02x}"
+            );
+            assert_eq!(
+                (class & CLASS_N) != 0,
+                upper == b'N',
+                "N bit differs for 0x{value:02x}"
+            );
+        }
+    }
+
+    /// `QUAL_CLASS` replaced four comparisons per quality byte; this pins the table against
+    /// that comparison form for every byte.
+    #[test]
+    fn quality_class_bits_match_the_previous_per_byte_comparisons() {
+        for byte in 0_u16..=255 {
+            let quality = byte as u8;
+            let class = QUAL_CLASS[quality as usize];
+            assert_eq!((class & QUAL_Q20_PHRED33) != 0, quality >= 53);
+            assert_eq!((class & QUAL_Q30_PHRED33) != 0, quality >= 63);
+            assert_eq!((class & QUAL_Q20_PHRED64) != 0, quality >= 84);
+            assert_eq!((class & QUAL_Q30_PHRED64) != 0, quality >= 94);
+        }
     }
 }
