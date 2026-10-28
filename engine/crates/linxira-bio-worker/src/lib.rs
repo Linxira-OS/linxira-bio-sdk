@@ -5724,6 +5724,7 @@ fn fastq_options_v1(request: &JobRequest) -> WorkerResult<FastqQcOptions> {
     Ok(FastqQcOptions {
         max_cycles: optional_usize_parameter(request, "max_cycles")?.unwrap_or(DEFAULT_MAX_CYCLES),
         quality_encoding: parse_quality_encoding(request.parameters.get("quality_encoding"))?,
+        max_reads: optional_usize_parameter(request, "max_reads")?.map(|value| value as u64),
     })
 }
 
@@ -5732,6 +5733,7 @@ fn fastq_options_v2(request: &JobRequestV2) -> WorkerResult<FastqQcOptions> {
         max_cycles: optional_v2_usize_parameter(request, "max_cycles")?
             .unwrap_or(DEFAULT_MAX_CYCLES),
         quality_encoding: parse_quality_encoding(request.parameters.get("quality_encoding"))?,
+        max_reads: optional_v2_usize_parameter(request, "max_reads")?.map(|value| value as u64),
     })
 }
 

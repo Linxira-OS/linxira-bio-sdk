@@ -43,6 +43,8 @@ VCF, BED-intersection, expression-matrix, and PDB metrics, and exports
 structured result tables as CSV, TSV, JSON, JSONL, or XLSX:
 
 ```bash
+cargo run -p linxira-bio-cli -- --version
+cargo run -p linxira-bio-cli -- version --json
 cargo run -p linxira-bio-cli -- environment audit --json
 cargo run -p linxira-bio-cli -- environment plan sequence-search --mode managed-user --json
 cargo run -p linxira-bio-cli -- runtime catalog --json
@@ -51,6 +53,7 @@ cargo run -p linxira-bio-cli -- dataset inspect tests/fixtures/data-inspection/v
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
 cargo run -p linxira-bio-cli -- fastq qc tests/fixtures/fastq-qc/valid.fastq --json
+cargo run -p linxira-bio-cli -- fastq qc huge.fastq.gz --max-reads 100000 --json
 cargo run -p linxira-bio-cli -- alignment qc tests/fixtures/alignment-qc/valid.sam --json
 cargo run -p linxira-bio-cli -- alignment bam-cram-qc sample.bam alignment-stats.tsv --json
 cargo run -p linxira-bio-cli -- alignment coverage sample.bam coverage.tsv --json
@@ -291,6 +294,8 @@ HPC 场景受支持的 Linux 家族。macOS 目前不是经过测试或打包的
 结果表导出为 CSV、TSV、JSON、JSONL 或 XLSX：
 
 ```bash
+cargo run -p linxira-bio-cli -- --version
+cargo run -p linxira-bio-cli -- version --json
 cargo run -p linxira-bio-cli -- environment audit --json
 cargo run -p linxira-bio-cli -- environment plan sequence-search --mode managed-user --json
 cargo run -p linxira-bio-cli -- runtime catalog --json
@@ -299,6 +304,7 @@ cargo run -p linxira-bio-cli -- dataset inspect tests/fixtures/data-inspection/v
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
 cargo run -p linxira-bio-cli -- fastq qc tests/fixtures/fastq-qc/valid.fastq --json
+cargo run -p linxira-bio-cli -- fastq qc huge.fastq.gz --max-reads 100000 --json
 cargo run -p linxira-bio-cli -- alignment qc tests/fixtures/alignment-qc/valid.sam --json
 cargo run -p linxira-bio-cli -- alignment bam-cram-qc sample.bam alignment-stats.tsv --json
 cargo run -p linxira-bio-cli -- alignment coverage sample.bam coverage.tsv --json

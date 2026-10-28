@@ -67,6 +67,9 @@ pub enum QualityEncodingMode {
 pub struct FastqQcOptions {
     pub max_cycles: usize,
     pub quality_encoding: QualityEncodingMode,
+    /// Stop after this many records. `None` scans the whole file.
+    #[serde(default)]
+    pub max_reads: Option<u64>,
 }
 
 impl Default for FastqQcOptions {
@@ -74,6 +77,7 @@ impl Default for FastqQcOptions {
         Self {
             max_cycles: DEFAULT_MAX_CYCLES,
             quality_encoding: QualityEncodingMode::Auto,
+            max_reads: None,
         }
     }
 }
@@ -313,7 +317,15 @@ pub fn fastq_qc(
     let mut line = Vec::new();
     let mut accumulator = QcAccumulator::default();
 
-    while let Some(header_line) = reader.next_line(&mut line)? {
+    loop {
+        if let Some(limit) = options.max_reads {
+            if accumulator.read_count >= limit {
+                break;
+            }
+        }
+        let Some(header_line) = reader.next_line(&mut line)? else {
+            break;
+        };
         let record = accumulator.read_count + 1;
         let identifier = parse_header(&line, record, header_line)?.to_vec();
         let sequence_length = parse_sequence(
@@ -604,6 +616,13 @@ fn finish_metrics(
             options.max_cycles
         ));
     }
+    if let Some(limit) = options.max_reads {
+        if accumulator.read_count >= limit {
+            warnings.push(format!(
+                "read limit {limit} applied; metrics cover only the first {limit} read(s)"
+            ));
+        }
+    }
 
     let use_phred64 = applied_quality_offset == 64;
     let q20_count = if use_phred64 {
@@ -763,6 +782,43 @@ mod tests {
         assert_eq!(metrics.quality_encoding, QualityEncoding::Phred33);
         assert_eq!(metrics.applied_quality_offset, 33);
         assert!(metrics.warnings.is_empty());
+    }
+
+    #[test]
+    fn read_limit_stops_after_the_requested_records() {
+        let input = b"@r1\nACGT\n+\nIIII\n@r2\nAC\n+\nII\n@r3\nA\n+\nI\n";
+        let options = FastqQcOptions {
+            max_reads: Some(2),
+            ..FastqQcOptions::default()
+        };
+        let metrics = fastq_qc(Cursor::new(input), options).expect("limited FASTQ");
+
+        assert_eq!(metrics.read_count, 2);
+        assert_eq!(metrics.total_bases, 6);
+        assert!(
+            metrics
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("read limit 2"))
+        );
+    }
+
+    #[test]
+    fn read_limit_above_the_record_count_adds_no_warning() {
+        let input = b"@r1\nACGT\n+\nIIII\n";
+        let options = FastqQcOptions {
+            max_reads: Some(10),
+            ..FastqQcOptions::default()
+        };
+        let metrics = fastq_qc(Cursor::new(input), options).expect("FASTQ below the limit");
+
+        assert_eq!(metrics.read_count, 1);
+        assert!(
+            metrics
+                .warnings
+                .iter()
+                .all(|warning| !warning.contains("read limit"))
+        );
     }
 
     #[test]

@@ -290,6 +290,9 @@ fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
             println!("{}", usage());
             Ok(())
         }
+        [flag] if matches!(flag.as_str(), "-V" | "--version") => print_version(false),
+        [command] if command == "version" => print_version(false),
+        [command, json] if command == "version" && json == "--json" => print_version(true),
         [command] if command == "capabilities" => print_capabilities(false),
         [command, json] if command == "capabilities" && json == "--json" => {
             print_capabilities(true)
@@ -3762,6 +3765,17 @@ fn print_fastq_qc(arguments: &[String]) -> Result<(), Box<dyn Error>> {
                     .get(index)
                     .ok_or("--max-cycles requires a value")?
                     .parse()?;
+            }
+            "--max-reads" => {
+                index += 1;
+                let limit: u64 = arguments
+                    .get(index)
+                    .ok_or("--max-reads requires a value")?
+                    .parse()?;
+                if limit == 0 {
+                    return Err("--max-reads must be at least 1".into());
+                }
+                options.max_reads = Some(limit);
             }
             "--quality-encoding" => {
                 index += 1;
@@ -9180,9 +9194,30 @@ fn print_stats_json(stats: &SequenceStats) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn version_line() -> String {
+    format!("linxira-bio {}", env!("CARGO_PKG_VERSION"))
+}
+
+fn print_version(json: bool) -> Result<(), Box<dyn Error>> {
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "name": "linxira-bio",
+                "version": env!("CARGO_PKG_VERSION"),
+            })
+        );
+    } else {
+        println!("{}", version_line());
+    }
+    Ok(())
+}
+
 fn usage() -> &'static str {
     concat!(
         "usage:\n",
+        "  linxira-bio --version\n",
+        "  linxira-bio version [--json]\n",
         "  linxira-bio capabilities [--json]\n",
         "  linxira-bio doctor [--json]\n",
         "  linxira-bio environment audit [--json]\n",
@@ -9214,7 +9249,7 @@ fn usage() -> &'static str {
         "  linxira-bio chemistry dock <receptor.pdbqt> <ligand.pdbqt> <output.pdbqt> --center-x F --center-y F --center-z F --size-x F --size-y F --size-z F [--seed N] [--exhaustiveness 8] [--num-modes 9] [--cpu N] [--json]\n",
         "  linxira-bio medical survival <cohort.csv|tsv> <output-directory> --time-column COLUMN --event-column COLUMN --group-column COLUMN --reference-level LEVEL [--json]\n",
         "  linxira-bio primer epcr <reference.fasta[.gz]> <primers.tsv> <output.tsv> [--min-amplicon N] [--max-amplicon N] [--max-hits N] [--json]\n",
-        "  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--json]\n",
+        "  linxira-bio fastq qc <input.fastq[.gz]> [--quality-encoding MODE] [--max-cycles N] [--max-reads N] [--json]\n",
         "  linxira-bio fastq trim <input.fastq[.gz]> <output.fastq> [--min-quality N] [--min-length N] [--quality-encoding phred+33|phred+64] [--json]\n",
         "  linxira-bio fastq adapter-trim <input.fastq[.gz]> <output.fastq> [--adapter SEQ ...] [--min-overlap N] [--min-length N] [--json]\n",
         "  linxira-bio fastq deduplicate <input.fastq[.gz]> <output.fastq> [--header-umi-delimiter TEXT | --sequence-prefix-umi N] [--json]\n",
@@ -9411,5 +9446,16 @@ mod workflow_catalog_tests {
             packs: vec![pack("org.linxira.example", "sequence.convert.v1", &[])],
         };
         validate_workflow_catalog(&catalog).expect("alias-free pack remains valid");
+    }
+}
+
+#[cfg(test)]
+mod version_tests {
+    #[test]
+    fn reports_the_compiled_package_version() {
+        assert_eq!(
+            super::version_line(),
+            format!("linxira-bio {}", env!("CARGO_PKG_VERSION"))
+        );
     }
 }
