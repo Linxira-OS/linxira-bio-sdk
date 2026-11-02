@@ -7,7 +7,7 @@ package:
 
 source:
   url: https://github.com/Linxira-OS/linxira-bio-sdk/releases/download/v{{ version }}/linxira-bio-sdk-{{ version }}.tar.gz
-  sha256: TO_BE_FILLED
+  sha256: db276538e684f7020000362d131c15cae2615f805eae85c0765f53f800727168
 
 build:
   number: 0

@@ -21,16 +21,17 @@ so `linxira-bio workflow run` can find the bundled packs.
 crates that are not installed by this package. `THIRDPARTY.yml` is therefore
 broader than the headless payload; a future split workspace can narrow it.
 
-Before submitting, replace `TO_BE_FILLED` with the SHA-256 of the source
-tarball and replace the `recipe-maintainers` entry with the maintainer's
-GitHub handle.
+The checked-in recipe is pinned to the `v1.1.5` release-asset tarball
+`linxira-bio-sdk-1.1.5.tar.gz` and its SHA-256. When retargeting, replace both
+the version and the checksum, and keep `recipe-maintainers` set to the
+maintainer's GitHub handle.
 
 ## Publication gate
 
-Do not submit this recipe yet: `docs/proposals/schedule-2026-q4.md` defers
-package publication until 2027-01-21. Retarget `version` and the source tag to
-the release that contains the CLI `--help` and SDK packaging changes before
-submitting.
+The 2027-01-21 package-publication gate was overridden on 2026-11-02 for an
+adoption trial, recorded in `docs/proposals/schedule-2026-q4.md`. This recipe
+targets `v1.1.5`; submit it through a `bioconda-recipes` pull request only
+after the release asset exists and the source-repository CI is green.
 
 ## Local validation
 
