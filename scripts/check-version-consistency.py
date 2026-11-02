@@ -79,13 +79,19 @@ def _release_tag() -> str | None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--root",
+        type=Path,
+        default=ROOT,
+        help="repository or checkout root to inspect",
+    )
+    parser.add_argument(
         "--tag",
         help="release tag to check; defaults to GITHUB_REF_NAME on tag builds",
     )
     args = parser.parse_args()
 
     try:
-        versions = _read_versions(ROOT)
+        versions = _read_versions(args.root.resolve())
     except (OSError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
