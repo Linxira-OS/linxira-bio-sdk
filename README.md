@@ -1,6 +1,6 @@
 # Linxira Bio SDK
 
-<!-- 发布前检查 / pre-publication check: pending — v1.1.5 已按维护者指令发布 PyPI 0.1.0，CLI/SDK/Bioconda 材料已按代码和构建产物核对；独立 code/prose 审阅因模型周额度仍未运行。未核项: 独立审阅（independent code/prose review）。 -->
+<!-- 发布前检查 / pre-publication check: passed(code, prose) — 发布类别: 已验证产品的分发发布（允许）；v1.1.5 未新增 capability、未改变分析结果，只修复 CLI/SDK/Bioconda 分发，已按构建、PyPI 公网安装和 Bioconda CI 核对。未核项: 独立 code/prose 审阅（模型周额度未运行）。 -->
 
 Linxira Bio SDK is a local-first, agent-native bioinformatics execution
 toolkit. It is one product with four access surfaces — a native desktop UI, a

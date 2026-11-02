@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | **October 2026** | Structural repair: correctness of what already exists, environment/lock alignment, the benchmark window re-run, tool arms, anchors | "10月份是结构性代码修复期间" — no new capability surface, only making existing claims true |
 | **November 2026** | Content production and publishing starts (小红书, B站, the criticism request) | the maintainer's call: content can go out before the product does, because content is about the work, not about a release |
-| **≥ 2027-01-21** | Earliest product release and anything that reads as "we are shipping" (v1.1.4, JOSS submission, package publication) | the repository's first public commit is 2026-07-21, so six months of public history completes on **2027-01-21**; the maintainer's rule is "至少仓库公布 6 个月之后再做" |
+| **≥ 2027-01-21** | Earliest feature release and anything that reads as "we are shipping" (new capabilities, product announcement, JOSS submission) | the repository's first public commit is 2026-07-21, so six months of public history completes on **2027-01-21**; the maintainer's rule is "至少仓库公布 6 个月之后再做" |
 
 JOSS follows the same floor: its review criteria want a public development history of at least
 six months plus community evidence, and both point at the same date. Nothing about the code
@@ -23,8 +23,23 @@ JOSS floor; the 2027-01-21 boundary still applies to anything that reads as "we 
 
 **Exception recorded 2026-11-02.** The maintainer directed a package-publication trial to
 measure adoption: release `v1.1.5`, publish `linxira-bio-sdk` to PyPI, and submit
-`linxira-bio` to Bioconda. This is a deliberate override of the 2027-01-21 boundary for this
-trial, not a redefinition of it; the JOSS floor and the six-month public-history rule remain.
+`linxira-bio` to Bioconda. This is a verified-product distribution release under the
+classification below, not a feature release; the JOSS floor and the six-month public-history
+rule remain.
+
+## Release classes while the date gate is in force
+
+The gate classifies by content, not by channel:
+
+- **Verified-product distribution release — allowed.** The behavior is already verified; the
+  release only changes delivery: packaging, installers, CLI/SDK/MCP surfaces, catalog
+  inclusion, documentation, and channel metadata. No capability id is added and no analysis
+  result changes. Publishing such a package is a distribution act, not a feature release.
+- **Feature release — not allowed before 2027-01-21.** Adds a capability, changes analysis
+  behavior, or widens the product surface. It waits for the date gate.
+
+`v1.1.5` is classified under this rule: scoped CLI help, SDK packaging/catalog discovery, and
+the Bioconda packaging path; it adds no capability id and changes no analysis result.
 
 ## What "structural repair" means concretely (October)
 

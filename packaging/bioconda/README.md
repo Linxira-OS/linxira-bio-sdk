@@ -28,9 +28,10 @@ maintainer's GitHub handle.
 
 ## Publication gate
 
-The 2027-01-21 package-publication gate was overridden on 2026-11-02 for an
-adoption trial, recorded in `docs/proposals/schedule-2026-q4.md`. This recipe
-targets `v1.1.5` and is submitted as
+The 2027-01-21 gate permits verified-product distribution releases and still
+blocks feature releases, as recorded in `docs/proposals/schedule-2026-q4.md`.
+This recipe is a verified-product distribution release: it adds no capability
+and changes no analysis result. It targets `v1.1.5` and is submitted as
 [`bioconda/bioconda-recipes#71073`](https://github.com/bioconda/bioconda-recipes/pull/71073).
 Lint, ARM, Linux, and OSX-64 checks pass. The PR is blocked on the required
 Bioconda review and merge; merging publishes the package to the bioconda
