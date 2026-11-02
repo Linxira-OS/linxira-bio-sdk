@@ -96,10 +96,9 @@ print(result.status, result.result)
 ```
 
 Set `LINXIRA_BIO_WORKER` or put `linxira-bio-worker` on `PATH` if discovery
-fails. The SDK requires Python 3.9+ and ships in release archives under
-`sdk/python/`; from a source checkout, install it with
-`python -m pip install sdk/python`. The PyPI distribution name is
-`linxira-bio-sdk`; it is not yet published.
+fails. The SDK requires Python 3.9+ and a local native worker. Install the
+client from PyPI with `python -m pip install linxira-bio-sdk`, or from a source
+checkout with `python -m pip install sdk/python`.
 
 ### Distribution status
 
@@ -423,9 +422,9 @@ print(result.status, result.result)
 ```
 
 如果自动发现失败，设置 `LINXIRA_BIO_WORKER` 或把 `linxira-bio-worker` 放到
-`PATH`。SDK 要求 Python 3.9+，随发布归档放在 `sdk/python/`；从源码安装可用
-`python -m pip install sdk/python`。PyPI 分发包名为 `linxira-bio-sdk`，
-尚未发布。
+`PATH`。SDK 要求 Python 3.9+，并且需要本地原生 worker。客户端可从 PyPI 安装：
+`python -m pip install linxira-bio-sdk`；从源码安装可用
+`python -m pip install sdk/python`。
 
 ### 分发状态
 
