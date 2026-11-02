@@ -57,7 +57,7 @@ new archive README went through its own claims review).
 
 | Item | Blocker | Next action |
 | --- | --- | --- |
-| Bioconda / PyPI publication | The maintainer overrode the 2027-01-21 gate on 2026-11-02 for an adoption trial. `v1.1.5` is the source release; `packaging/bioconda/` passes a local Linux `conda-build` + test in WSL, and the PyPI wheel passes. Remaining: release source asset + SHA-256, Bioconda CI, and the PyPI upload token | Upload the `v1.1.5` source asset, fill its SHA-256, open the `bioconda-recipes` PR, and upload `linxira-bio-sdk` 0.1.0 to PyPI |
+| Bioconda / PyPI publication | The maintainer overrode the 2027-01-21 gate on 2026-11-02 for an adoption trial. `linxira-bio-sdk` 0.1.0 is published on PyPI. `v1.1.5` is the source release; the Bioconda PR is open at `bioconda/bioconda-recipes#71073`, with lint fixes pushed and CI running. The conda package is not yet in the bioconda channel | Wait for Bioconda CI and maintainer merge; then verify `conda install -c bioconda linxira-bio` and record adoption evidence |
 | The English mirror of the 2026-10-13 article | The Chinese draft carries the archive's numbers; the site publishes bilingual pairs, and the English side has not been written | Needs the publish decision first — if the piece goes out, the English mirror is part of that step, not a separate piece of work |
 | Registry sweep for the pre-publication marker | It is present in `README.md`, the `plot.render.v1` capability pages and the 2026-10-13 article mirror; the engine ledger carries a "not applicable" note instead. It is absent from `COMMERCIAL.md`, the other capability pages and `docs/outreach/corrections-log.md` | Add the marker when each is next touched, not as a separate sweep |
 

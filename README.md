@@ -1,6 +1,6 @@
 # Linxira Bio SDK
 
-<!-- 发布前检查 / pre-publication check: pending — v1.1.5 发布材料、CLI scoped help、SDK wheel 与 Bioconda 本地构建均已按代码和构建产物核对；独立 code/prose 审阅因模型周额度暂不可用，维护者按 2026-11-02 例外决定先发布。未核项: 独立审阅（independent code/prose review）。 -->
+<!-- 发布前检查 / pre-publication check: pending — v1.1.5 已按维护者指令发布 PyPI 0.1.0，CLI/SDK/Bioconda 材料已按代码和构建产物核对；独立 code/prose 审阅因模型周额度仍未运行。未核项: 独立审阅（independent code/prose review）。 -->
 
 Linxira Bio SDK is a local-first, agent-native bioinformatics execution
 toolkit. It is one product with four access surfaces — a native desktop UI, a
@@ -106,10 +106,11 @@ fails. The SDK requires Python 3.9+ and ships in release archives under
 Release archives are published on GitHub Releases for Windows, Debian, and
 Arch. The current bundle manifest includes the CLI, worker, MCP server, native
 UI, Python SDK, capability catalog, skills, workflows, docs, and license
-notices. No Bioconda or PyPI package is published yet. An unsubmitted,
-locally conda-built Bioconda recipe is prepared under `packaging/bioconda/`; it
-targets `linux-64` only. Bioconda does not build native Windows packages, so a
-conda package would target Linux only.
+notices. The Python SDK is published on PyPI as `linxira-bio-sdk` 0.1.0. A
+locally conda-built Bioconda recipe is submitted as a pull request under
+`packaging/bioconda/`; it targets `linux-64` only, and the package is not yet
+available from the bioconda channel. Bioconda does not build native Windows
+packages, so a conda package targets Linux only.
 
 ## Current Capabilities
 
@@ -430,10 +431,10 @@ print(result.status, result.result)
 
 发布归档通过 GitHub Releases 提供 Windows、Debian 和 Arch 版本；当前打包
 清单包含 CLI、worker、MCP 服务器、原生 UI、Python SDK、能力目录、技能、
-工作流、文档和许可证声明。目前尚未发布 Bioconda 或 PyPI 包；
-`packaging/bioconda/` 下已准备尚未提交、但已在本地完成 conda 构建的 recipe，
-只面向 `linux-64`。Bioconda 不构建原生 Windows 包，因此 conda 包只能面向
-Linux。
+工作流、文档和许可证声明。Python SDK 已发布到 PyPI，包名为
+`linxira-bio-sdk` 0.1.0；`packaging/bioconda/` 下的 recipe 已在本地完成
+conda 构建并提交为 pull request，只面向 `linux-64`，目前尚未进入 bioconda
+channel。Bioconda 不构建原生 Windows 包，因此 conda 包只能面向 Linux。
 
 ### 当前能力
 
