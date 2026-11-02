@@ -22,7 +22,7 @@ jobs:
         shell: pwsh
         run: |
           $rVersion = '4.6.1'
-          $rUrl = "https://cran.r-project.org/bin/windows/base/R-$rVersion-win.exe"
+          $rUrl = "https://cran.r-project.org/bin/windows/base/old/$rVersion/R-$rVersion-win.exe"
           $rInstaller = "$env:RUNNER_TEMP\R-$rVersion-win.exe"
           Invoke-WebRequest -Uri $rUrl -OutFile $rInstaller -RetryIntervalSec 10 -MaximumRetryCount 3
           Start-Process -FilePath $rInstaller -ArgumentList '/VERYSILENT /DIR=C:\R /NOICONS /NORESTART' -Wait
