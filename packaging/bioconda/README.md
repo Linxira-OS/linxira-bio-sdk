@@ -32,8 +32,8 @@ The 2027-01-21 package-publication gate was overridden on 2026-11-02 for an
 adoption trial, recorded in `docs/proposals/schedule-2026-q4.md`. This recipe
 targets `v1.1.5` and is submitted as
 [`bioconda/bioconda-recipes#71073`](https://github.com/bioconda/bioconda-recipes/pull/71073).
-Lint and the ARM check pass; the Linux build and maintainer merge are pending.
-Merging the PR publishes the package to the bioconda channel.
+Lint, the ARM check, and the Linux build pass; the OSX-64 check and maintainer
+merge are pending. Merging the PR publishes the package to the bioconda channel.
 
 ## Local validation
 
