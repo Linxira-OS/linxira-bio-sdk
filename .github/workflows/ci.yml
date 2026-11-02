@@ -8,6 +8,13 @@ permissions:
   contents: read
 
 jobs:
+  version-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check release versions
+        run: python scripts/check-version-consistency.py
+
   windows-gnu:
     runs-on: windows-latest
     steps:
@@ -528,7 +535,7 @@ jobs:
           --platform arch --output build/notices/arch
 
   publish:
-    needs: [windows-gnu, debian-bookworm, arch-linux]
+    needs: [version-consistency, windows-gnu, debian-bookworm, arch-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

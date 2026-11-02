@@ -287,6 +287,7 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo run -p linxira-bio-cli -- sequence stats tests/fixtures/sequences/tiny.fa --json
+python scripts/check-version-consistency.py
 ```
 
 Use the skill creator validator for every changed folder under `skills/`.

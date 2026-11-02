@@ -35,8 +35,9 @@ The next SDK publication uses the then-current product version (for example
 2. Set the Python SDK distribution metadata and the Bioconda recipe to the
    same version.
 3. Tag `vX.Y.Z`.
-4. Run the version-equality check before publishing. A mismatch must fail the
-   release rather than produce another mapping row.
+4. Run the version-equality check before publishing; CI runs it on every push
+   and release tag. A mismatch must fail the release rather than produce
+   another mapping row.
 
 ## Why not independent versions
 
