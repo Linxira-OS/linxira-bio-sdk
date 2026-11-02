@@ -10,7 +10,7 @@ this file holds only what is blocked and why.
 disappears; it is never deleted to make the list look shorter. Each row names the
 next concrete action, not a wish.
 
-Last updated: 2026-10-14.
+Last updated: 2026-11-02.
 
 ## Waiting on the maintainer
 
@@ -22,7 +22,7 @@ Last updated: 2026-10-14.
 | fastp: which route | Package, source build, or `cutadapt` in its place — the decision was left to the maintainer. Evidence: upstream ships no binary asset, and the file that looked like a download in `~/bin` is a nine-byte `Not Found` page | Pick one; seqkit already covers the streaming-reference question |
 | GIAB HG002 + hap.py correctness gate | Needs approval of the $25 rental window (`docs/proposals/rental-window-plan-2026-10-12.md`: chr20 scope, 24 h, inputs pinned) | Approve the budget; the run is then scripted |
 | Third-party anchors beyond zstd/OpenSSL | Silesia is unreachable from this network (measured: 32 KB in 60 s, parts reset). PTS/OpenBenchmarking uploads are public actions | Drop `silesia.zip` onto the measuring host (~2 minutes of work), or approve the uploads |
-| Release-shaped acts | 2026-10-28: the maintainer approved one technical release (`v1.1.4`) to exercise the packages auto-sync chain; no announcement, no crates.io, no JOSS. Product promotion still waits until the repository is six months public (2027-01-21) | Nothing else until the date; the prerequisites are tracked in `docs/proposals/schedule-2026-q4.md` |
+| Release-shaped acts | 2026-10-28: the maintainer approved one technical release (`v1.1.4`) to exercise the packages auto-sync chain. 2026-11-02: the maintainer overrode the 2027-01-21 gate for a package-publication trial (`v1.1.5`, PyPI SDK, Bioconda) to measure adoption; no product announcement and no JOSS submission | Run the trial, record adoption evidence, and keep the 2027-01-21 floor for product promotion; prerequisites are in `docs/proposals/schedule-2026-q4.md` |
 
 ## Waiting on a machine
 
@@ -57,6 +57,7 @@ new archive README went through its own claims review).
 
 | Item | Blocker | Next action |
 | --- | --- | --- |
+| Bioconda / PyPI publication | The maintainer overrode the 2027-01-21 gate on 2026-11-02 for an adoption trial. `v1.1.5` is the source release; `packaging/bioconda/` passes a local Linux `conda-build` + test in WSL, and the PyPI wheel passes. Remaining: release source asset + SHA-256, Bioconda CI, and the PyPI upload token | Upload the `v1.1.5` source asset, fill its SHA-256, open the `bioconda-recipes` PR, and upload `linxira-bio-sdk` 0.1.0 to PyPI |
 | The English mirror of the 2026-10-13 article | The Chinese draft carries the archive's numbers; the site publishes bilingual pairs, and the English side has not been written | Needs the publish decision first — if the piece goes out, the English mirror is part of that step, not a separate piece of work |
 | Registry sweep for the pre-publication marker | It is present in `README.md`, the `plot.render.v1` capability pages and the 2026-10-13 article mirror; the engine ledger carries a "not applicable" note instead. It is absent from `COMMERCIAL.md`, the other capability pages and `docs/outreach/corrections-log.md` | Add the marker when each is next touched, not as a separate sweep |
 

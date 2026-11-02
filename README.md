@@ -1,11 +1,12 @@
 # Linxira Bio SDK
 
-<!-- 发布前检查 / pre-publication check: passed(code, prose) — 本轮改动（自带绘图 = 数据 + 一张简单图；出版级效果的视觉规范归 `linxira-skills`）经一路审阅，4 项发现全部处理：页面与技能不再自称 "publication figures"、不再断言外部集合的具体内容、两处第一方渲染器不再把 HTML 注释当正文（Python 侧有测试、Rust 侧为纯函数 + 单测）、中英措辞对齐；修法经同一路再核通过，本文件层面无未核项。 -->
+<!-- 发布前检查 / pre-publication check: pending — v1.1.5 发布材料、CLI scoped help、SDK wheel 与 Bioconda 本地构建均已按代码和构建产物核对；独立 code/prose 审阅因模型周额度暂不可用，维护者按 2026-11-02 例外决定先发布。未核项: 独立审阅（independent code/prose review）。 -->
 
 Linxira Bio SDK is a local-first, agent-native bioinformatics execution
-toolkit. It combines concise skills with stable CLI, SDK, and tool contracts so
-that routine analyses use tested implementations instead of generating a new
-script for every run.
+toolkit. It is one product with four access surfaces — a native desktop UI, a
+CLI, a stdio MCP server, and a Python SDK — over one versioned capability and
+job contract, so routine analyses use tested implementations instead of
+generating a new script for every run.
 
 Windows is the primary desktop and beginner-facing platform. Debian and Arch
 are the supported Linux families for workstation, server, and HPC use. macOS is
@@ -21,19 +22,94 @@ their shared runtime. It does not replace `linxira-skills`, which remains the
 cross-discipline skill router and installer for research, Linux, HPC, cloud,
 browser, and delivery workflows.
 
-## Product Surfaces
+## Software Form and Access Surfaces
 
-- `linxira-bio`: command-line interface for people and workflows
-- `skills/`: agent instructions bound to versioned capabilities
-- `capabilities/`: machine-readable capability catalog
-- `engine/`: Rust compute runtime; C++ kernels only after a benchmark justifies them
-- `skill-pack.json`: import boundary for agent runtimes and `linxira-skills`
-- `linxira-bio-ui`: native Rust desktop application without a WebView
-- Python SDK: a subprocess client ships in the tree (`sdk/python/`); native bindings are planned after the CLI contract stabilizes
-- `linxira-bio-mcp`: stdio JSON-RPC MCP server (initialize / tools list /
-  tools call / resources list+read; tool calls execute worker jobs). Point an
-  MCP client at the binary; capability ids from `capabilities/catalog.json`
-  are the tool names
+Linxira Bio is one engine and one capability catalog with several clients, not
+a collection of unrelated tools. All four user-facing surfaces run analyses
+through the same worker implementation and the same versioned job/result
+contract; the result envelope is the same everywhere (`job_id`, `capability`,
+`status`, `result`, `provenance`, `warnings`).
+
+| Surface | Entry point | Form | Use it for |
+| --- | --- | --- | --- |
+| Native desktop UI | `linxira-bio-ui` | egui/eframe desktop window, no WebView; guided and expert modes | Interactive file selection, result charts, PDB/mmCIF structure viewing |
+| CLI | `linxira-bio` | One-shot commands with text or JSON output | Shell scripts, pipelines, HPC jobs |
+| MCP server | `linxira-bio-mcp` | Newline-delimited JSON-RPC 2.0 over stdio | Agent clients that speak MCP |
+| Python SDK | `sdk/python/linxira_bio` | Pure-Python subprocess client for `linxira-bio-worker` | Notebooks and Python automation |
+| Worker (shared) | `linxira-bio-worker` | JSON job request in, result envelope out | Shared execution contract; launched by MCP/SDK, linked by CLI/UI |
+
+The UI is a desktop application, not a web front end. The MCP server is a local
+stdio process, not a hosted service. The Python SDK is a client, not a second
+engine. Local analysis does not require a network connection.
+
+Repository boundaries: `engine/` is the Rust compute runtime (C++ kernels only
+after a benchmark justifies them); `capabilities/` is the machine-readable
+catalog; `skills/` holds agent instructions bound to versioned capabilities;
+`skill-pack.json` is the import boundary for agent runtimes and
+`linxira-skills`.
+
+### Surface quick starts
+
+CLI:
+
+```bash
+linxira-bio --version
+linxira-bio capabilities --json
+linxira-bio sequence stats tests/fixtures/sequences/tiny.fa --json
+linxira-bio sequence stats --help   # command-scoped usage
+```
+
+Native UI:
+
+```bash
+linxira-bio-ui
+linxira-bio-ui tests/fixtures/structure-pdb-summary/alphafold-style.pdb
+```
+
+MCP — point a client at the binary:
+
+```json
+{
+  "mcpServers": {
+    "linxira-bio": {
+      "command": "/absolute/path/to/linxira-bio-mcp"
+    }
+  }
+}
+```
+
+Tool names are capability ids with `.` replaced by `_`: `sequence.stats.v1`
+becomes `sequence_stats_v1`. The server also exposes `resources/list` and
+`resources/read` for local files; the list is rooted at its working directory.
+
+Python SDK:
+
+```python
+from linxira_bio import LinxiraClient
+
+client = LinxiraClient()  # or worker_bin="/path/to/linxira-bio-worker"
+result = client.execute(
+    "sequence.stats.v1",
+    {"fasta": "tests/fixtures/sequences/tiny.fa"},
+)
+print(result.status, result.result)
+```
+
+Set `LINXIRA_BIO_WORKER` or put `linxira-bio-worker` on `PATH` if discovery
+fails. The SDK requires Python 3.9+ and ships in release archives under
+`sdk/python/`; from a source checkout, install it with
+`python -m pip install sdk/python`. The PyPI distribution name is
+`linxira-bio-sdk`; it is not yet published.
+
+### Distribution status
+
+Release archives are published on GitHub Releases for Windows, Debian, and
+Arch. The current bundle manifest includes the CLI, worker, MCP server, native
+UI, Python SDK, capability catalog, skills, workflows, docs, and license
+notices. No Bioconda or PyPI package is published yet. An unsubmitted,
+locally conda-built Bioconda recipe is prepared under `packaging/bioconda/`; it
+targets `linux-64` only. Bioconda does not build native Windows packages, so a
+conda package would target Linux only.
 
 ## Current Capabilities
 
@@ -259,9 +335,10 @@ telemetry. Contributions require the terms in `CONTRIBUTING.md`.
 
 ## 简体中文
 
-Linxira Bio SDK 是一个本地优先、面向 Agent 的生物信息学执行工具包。它将
-简明的技能与稳定的 CLI、SDK 和工具契约结合，使常规分析使用经过测试的实现，
-而不是为每次运行临时生成新脚本。
+Linxira Bio SDK 是一个本地优先、面向 Agent 的生物信息学执行工具包。它是同
+一款产品的四种访问形态——原生桌面 UI、CLI、stdio MCP 服务器和 Python SDK
+——共享同一套带版本的能力与作业契约，使常规分析使用经过测试的实现，而不是
+为每次运行临时生成新脚本。
 
 Windows 是主要的桌面与入门用户平台。Debian 与 Arch 是面向工作站、服务器和
 HPC 场景受支持的 Linux 家族。macOS 目前不是经过测试或打包的目标。
@@ -274,18 +351,89 @@ HPC 场景受支持的 Linux 家族。macOS 目前不是经过测试或打包的
 `linxira-skills`，后者仍是面向研究、Linux、HPC、云、浏览器和交付工作流的
 跨学科技能路由器与安装器。
 
-### 产品形态
+### 软件形态与访问接口
 
-- `linxira-bio`：面向人员和工作流的命令行界面
-- `skills/`：绑定到带版本能力上的 Agent 指令
-- `capabilities/`：机器可读的能力目录
-- `engine/`：Rust 计算运行时；C++ 内核仅在基准数据证明必要时引入
-- `skill-pack.json`：面向 Agent 运行时和 `linxira-skills` 的导入边界
-- `linxira-bio-ui`：不依赖 WebView 的原生 Rust 桌面应用
-- Python SDK：仓库内已提供 subprocess 客户端（`sdk/python/`）；原生绑定计划在 CLI 契约稳定之后提供
-- `linxira-bio-mcp`：stdio JSON-RPC MCP 服务器（initialize / tools list /
-  tools call / resources list+read；工具调用会执行 worker 作业）。将 MCP
-  客户端指向该二进制即可；`capabilities/catalog.json` 中的能力 id 即工具名
+Linxira Bio 是「一个引擎 + 一份能力目录 + 多种客户端」，不是一组互不相关的
+工具。四种面向用户的形态都通过同一份 worker 实现和同一套带版本的作业/结果
+契约执行分析；结果信封在各处一致（`job_id`、`capability`、`status`、`result`、
+`provenance`、`warnings`）。
+
+| 形态 | 入口 | 运行方式 | 适用场景 |
+| --- | --- | --- | --- |
+| 原生桌面 UI | `linxira-bio-ui` | egui/eframe 桌面窗口，不依赖 WebView；引导与专家两种密度 | 交互式选文件、结果图表、PDB/mmCIF 结构查看 |
+| CLI | `linxira-bio` | 单次命令，文本或 JSON 输出 | Shell 脚本、流水线、HPC 作业 |
+| MCP 服务器 | `linxira-bio-mcp` | stdio 上的逐行 JSON-RPC 2.0 | 支持 MCP 的 Agent 客户端 |
+| Python SDK | `sdk/python/linxira_bio` | 面向 `linxira-bio-worker` 的纯 Python subprocess 客户端 | Notebook 与 Python 自动化 |
+| Worker（共享） | `linxira-bio-worker` | 输入 JSON 作业，输出结果信封 | 共享执行契约；由 MCP/SDK 启动，CLI/UI 以库方式调用 |
+
+UI 是桌面应用，不是 Web 前端；MCP 服务器是本地 stdio 进程，不是托管服务；
+Python SDK 是客户端，不是第二套引擎。本地分析不需要网络连接。
+
+仓库边界：`engine/` 是 Rust 计算运行时（C++ 内核仅在基准数据证明必要时
+引入）；`capabilities/` 是机器可读的能力目录；`skills/` 存放绑定到带版本能力
+上的 Agent 指令；`skill-pack.json` 是面向 Agent 运行时和 `linxira-skills` 的
+导入边界。
+
+### 各形态的快速开始
+
+CLI：
+
+```bash
+linxira-bio --version
+linxira-bio capabilities --json
+linxira-bio sequence stats tests/fixtures/sequences/tiny.fa --json
+linxira-bio sequence stats --help   # 输出该命令的 usage
+```
+
+原生 UI：
+
+```bash
+linxira-bio-ui
+linxira-bio-ui tests/fixtures/structure-pdb-summary/alphafold-style.pdb
+```
+
+MCP——把客户端指向该二进制：
+
+```json
+{
+  "mcpServers": {
+    "linxira-bio": {
+      "command": "/absolute/path/to/linxira-bio-mcp"
+    }
+  }
+}
+```
+
+工具名是能力 id 把 `.` 换成 `_`：`sequence.stats.v1` 对应
+`sequence_stats_v1`。服务器还提供 `resources/list` 与 `resources/read`，
+用于读取本地文件；列表以其工作目录为根。
+
+Python SDK：
+
+```python
+from linxira_bio import LinxiraClient
+
+client = LinxiraClient()  # 或 worker_bin="/path/to/linxira-bio-worker"
+result = client.execute(
+    "sequence.stats.v1",
+    {"fasta": "tests/fixtures/sequences/tiny.fa"},
+)
+print(result.status, result.result)
+```
+
+如果自动发现失败，设置 `LINXIRA_BIO_WORKER` 或把 `linxira-bio-worker` 放到
+`PATH`。SDK 要求 Python 3.9+，随发布归档放在 `sdk/python/`；从源码安装可用
+`python -m pip install sdk/python`。PyPI 分发包名为 `linxira-bio-sdk`，
+尚未发布。
+
+### 分发状态
+
+发布归档通过 GitHub Releases 提供 Windows、Debian 和 Arch 版本；当前打包
+清单包含 CLI、worker、MCP 服务器、原生 UI、Python SDK、能力目录、技能、
+工作流、文档和许可证声明。目前尚未发布 Bioconda 或 PyPI 包；
+`packaging/bioconda/` 下已准备尚未提交、但已在本地完成 conda 构建的 recipe，
+只面向 `linux-64`。Bioconda 不构建原生 Windows 包，因此 conda 包只能面向
+Linux。
 
 ### 当前能力
 

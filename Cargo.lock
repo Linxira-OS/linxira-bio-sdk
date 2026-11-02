@@ -1846,7 +1846,7 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "linxira-bio-cli"
-version = "1.1.4"
+version = "1.1.5"
 dependencies = [
  "linxira-bio-core",
  "linxira-bio-export",
@@ -1861,7 +1861,7 @@ dependencies = [
 
 [[package]]
 name = "linxira-bio-core"
-version = "1.1.4"
+version = "1.1.5"
 dependencies = [
  "csv",
  "flate2",
@@ -1874,7 +1874,7 @@ dependencies = [
 
 [[package]]
 name = "linxira-bio-export"
-version = "1.1.4"
+version = "1.1.5"
 dependencies = [
  "csv",
  "rust_xlsxwriter",
@@ -1886,7 +1886,7 @@ dependencies = [
 
 [[package]]
 name = "linxira-bio-mcp"
-version = "1.1.4"
+version = "1.1.5"
 dependencies = [
  "linxira-bio-protocol",
  "serde",
@@ -1895,7 +1895,7 @@ dependencies = [
 
 [[package]]
 name = "linxira-bio-output"
-version = "1.1.4"
+version = "1.1.5"
 dependencies = [
  "flate2",
  "linxira-bio-export",
@@ -1906,7 +1906,7 @@ dependencies = [
 
 [[package]]
 name = "linxira-bio-protocol"
-version = "1.1.4"
+version = "1.1.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -1914,7 +1914,7 @@ dependencies = [
 
 [[package]]
 name = "linxira-bio-ui"
-version = "1.1.4"
+version = "1.1.5"
 dependencies = [
  "eframe",
  "flate2",
@@ -1930,7 +1930,7 @@ dependencies = [
 
 [[package]]
 name = "linxira-bio-worker"
-version = "1.1.4"
+version = "1.1.5"
 dependencies = [
  "linxira-bio-core",
  "linxira-bio-export",

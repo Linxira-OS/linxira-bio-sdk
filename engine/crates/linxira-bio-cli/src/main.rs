@@ -285,11 +285,11 @@ impl std::fmt::Display for CliError {
 impl Error for CliError {}
 
 fn run(arguments: Vec<String>) -> Result<(), Box<dyn Error>> {
+    if let Some(help) = command_help(&arguments) {
+        println!("{help}");
+        return Ok(());
+    }
     match arguments.as_slice() {
-        [help] if matches!(help.as_str(), "-h" | "--help") => {
-            println!("{}", usage());
-            Ok(())
-        }
         [flag] if matches!(flag.as_str(), "-V" | "--version") => print_version(false),
         [command] if command == "version" => print_version(false),
         [command, json] if command == "version" && json == "--json" => print_version(true),
@@ -9211,6 +9211,40 @@ fn print_version(json: bool) -> Result<(), Box<dyn Error>> {
         println!("{}", version_line());
     }
     Ok(())
+}
+
+/// Return command-scoped usage when `-h` or `--help` is requested anywhere in
+/// the argument list. The first two non-flag words identify the command; a
+/// command group such as `sequence` matches every `sequence ...` line. An
+/// unrecognized command falls back to the full usage so help never fails.
+fn command_help(arguments: &[String]) -> Option<String> {
+    if !arguments
+        .iter()
+        .any(|argument| matches!(argument.as_str(), "-h" | "--help"))
+    {
+        return None;
+    }
+    let command: Vec<&str> = arguments
+        .iter()
+        .filter(|argument| !argument.starts_with('-'))
+        .take(2)
+        .map(String::as_str)
+        .collect();
+    if command.is_empty() {
+        return Some(usage().to_owned());
+    }
+    let prefix = format!("  linxira-bio {}", command.join(" "));
+    let mut help = String::from("usage:\n");
+    for line in usage().lines().skip(1) {
+        if line.starts_with(&prefix) {
+            help.push_str(line);
+            help.push('\n');
+        }
+    }
+    if help == "usage:\n" {
+        return Some(usage().to_owned());
+    }
+    Some(help)
 }
 
 fn usage() -> &'static str {

@@ -202,8 +202,8 @@ class LinxiraClient:
         Search order:
         1. LINXIRA_BIO_WORKER environment variable
         2. PATH (which on Windows)
-        3. Build output directories relative to the project root
-        4. Project root release directories
+        3. The release bundle root next to `sdk/python/`
+        4. Build output directories relative to the project root
         """
         env_path = os.environ.get("LINXIRA_BIO_WORKER")
         if env_path and Path(env_path).is_file():
@@ -225,13 +225,17 @@ class LinxiraClient:
         package_dir = Path(__file__).resolve().parent
         project_root = package_dir.parent.parent.parent
 
-        # Check common build output locations
+        # Check the release bundle root and common build output locations.
         candidates = [
+            project_root / self.WORKER_BINARY_NAME,
+            project_root / "bin" / self.WORKER_BINARY_NAME,
             project_root / "target" / "release" / self.WORKER_BINARY_NAME,
             project_root / "target" / "debug" / self.WORKER_BINARY_NAME,
         ]
         if os.name == "nt":
             candidates.extend([
+                project_root / (self.WORKER_BINARY_NAME + ".exe"),
+                project_root / "bin" / (self.WORKER_BINARY_NAME + ".exe"),
                 project_root / "target" / "release" / (self.WORKER_BINARY_NAME + ".exe"),
                 project_root / "target" / "debug" / (self.WORKER_BINARY_NAME + ".exe"),
             ])

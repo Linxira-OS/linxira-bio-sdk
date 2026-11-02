@@ -1,13 +1,32 @@
 [project]
-name = "linxira-bio"
+name = "linxira-bio-sdk"
 version = "0.1.0"
-description = "Linxira Bio SDK - Programmatic access to bioinformatics capabilities"
+description = "Programmatic Python access to Linxira Bio capabilities"
+readme = "README.md"
 requires-python = ">=3.9"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "Linxira" }]
+keywords = ["bioinformatics", "sdk", "mcp", "cli"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/Linxira-OS/linxira-bio-sdk"
+Repository = "https://github.com/Linxira-OS/linxira-bio-sdk"
+Issues = "https://github.com/Linxira-OS/linxira-bio-sdk/issues"
+
 [build-system]
-requires = ["setuptools>=64"]
-build-backend = "setuptools.backends._legacy:_Backend"
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["linxira_bio*"]
+
+[tool.setuptools.package-data]
+linxira_bio = ["data/*.json"]

@@ -5,6 +5,7 @@ ensuring the SDK is always in sync with the latest catalog without code changes.
 """
 
 import re
+import types
 from typing import Any, Optional
 
 
@@ -117,7 +118,7 @@ class DynamicAPI:
             method = _make_capability_method(cap_id)
             method.__doc__ = _generate_docstring(cap)
 
-            setattr(self, method_name, method)
+            setattr(self, method_name, types.MethodType(method, self))
             self._capabilities[method_name] = cap_id
 
     def list_methods(self) -> dict:
@@ -211,7 +212,7 @@ class AutoClient:
             method = _make_capability_method(cap_id)
             method.__doc__ = _generate_docstring(cap)
 
-            setattr(self, method_name, method)
+            setattr(self, method_name, types.MethodType(method, self))
             self._capabilities[method_name] = cap_id
 
     def list_methods(self) -> dict:

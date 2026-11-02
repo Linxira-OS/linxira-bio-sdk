@@ -5,6 +5,7 @@ temp/
 .cache/
 build/
 target/
+*.egg-info/
 .agents/
 .codex/
 .mimosa/

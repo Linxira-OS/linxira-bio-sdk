@@ -48,6 +48,35 @@ fn prints_top_level_help_successfully() {
 }
 
 #[test]
+fn prints_command_scoped_help_for_a_subcommand() {
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "stats", "--help"])
+        .output()
+        .expect("run sequence stats help");
+
+    assert!(output.status.success(), "subcommand help must succeed");
+    assert!(output.stderr.is_empty(), "subcommand help must use stdout");
+    let stdout = String::from_utf8(output.stdout).expect("UTF-8 help output");
+    assert!(stdout.contains("linxira-bio sequence stats"));
+    assert!(!stdout.contains("linxira-bio fastq qc"));
+    assert!(!stdout.contains("linxira-bio export table"));
+}
+
+#[test]
+fn prints_command_group_help_for_a_prefix() {
+    let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
+        .args(["sequence", "--help"])
+        .output()
+        .expect("run sequence group help");
+
+    assert!(output.status.success(), "group help must succeed");
+    let stdout = String::from_utf8(output.stdout).expect("UTF-8 help output");
+    assert!(stdout.contains("linxira-bio sequence stats"));
+    assert!(stdout.contains("linxira-bio sequence reverse-complement"));
+    assert!(!stdout.contains("linxira-bio fastq qc"));
+}
+
+#[test]
 fn lists_bundled_workflow_packs_without_claiming_installation() {
     let output = Command::new(env!("CARGO_BIN_EXE_linxira-bio"))
         .args(["workflow", "packs", "--json"])

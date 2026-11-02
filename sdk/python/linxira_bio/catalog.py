@@ -2,26 +2,71 @@
 
 import json
 import os
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Optional
 
 
 def _default_catalog_path() -> Path:
-    """Find the capabilities catalog.json relative to this package."""
-    # sdk/python/linxira_bio/catalog.py -> ../../.. -> capabilities/catalog.json
-    package_dir = Path(__file__).resolve().parent
-    # Try relative to the package directory first
-    candidate = package_dir.parent.parent.parent / "capabilities" / "catalog.json"
-    if candidate.is_file():
-        return candidate
-    # Try the environment variable
+    """Find the capabilities catalog.json.
+
+    Search order:
+    1. ``LINXIRA_BIO_CATALOG``
+    2. ``linxira_bio/data/catalog.json`` packaged with the SDK
+    3. The repository layout used during development
+    4. ``linxira-bio capabilities --json`` when the native CLI is installed
+    """
     env_path = os.environ.get("LINXIRA_BIO_CATALOG")
     if env_path:
         env_candidate = Path(env_path)
         if env_candidate.is_file():
             return env_candidate
-    # Fall back to the relative path (let it fail if missing)
-    return candidate
+
+    package_dir = Path(__file__).resolve().parent
+    packaged = package_dir / "data" / "catalog.json"
+    if packaged.is_file():
+        return packaged
+
+    # sdk/python/linxira_bio/catalog.py -> ../../.. -> capabilities/catalog.json
+    return package_dir.parent.parent.parent / "capabilities" / "catalog.json"
+
+
+def _catalog_from_cli() -> Optional[list]:
+    """Load the catalog from an installed ``linxira-bio`` executable."""
+    candidates = []
+    configured = os.environ.get("LINXIRA_BIO_CLI")
+    if configured:
+        candidates.append(configured)
+    found = shutil.which("linxira-bio")
+    if found:
+        candidates.append(found)
+    worker = os.environ.get("LINXIRA_BIO_WORKER")
+    if worker:
+        worker_path = Path(worker)
+        cli_name = "linxira-bio.exe" if worker_path.suffix.lower() == ".exe" else "linxira-bio"
+        candidates.append(str(worker_path.with_name(cli_name)))
+
+    for cli in candidates:
+        try:
+            process = subprocess.run(
+                [cli, "capabilities", "--json"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if process.returncode != 0 or not process.stdout.strip():
+            continue
+        try:
+            payload = json.loads(process.stdout)
+        except json.JSONDecodeError:
+            continue
+        capabilities = payload.get("capabilities")
+        if isinstance(capabilities, list):
+            return capabilities
+    return None
 
 
 def get_catalog(catalog_path: Optional[str] = None) -> list:
@@ -37,15 +82,28 @@ def get_catalog(catalog_path: Optional[str] = None) -> list:
     Returns:
         List of capability dicts.
     """
-    path = Path(catalog_path) if catalog_path else _default_catalog_path()
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"Capability catalog not found at {path}. "
-            f"Set LINXIRA_BIO_CATALOG or provide catalog_path."
-        )
-    with open(path, "r", encoding="utf-8") as fh:
-        catalog = json.load(fh)
-    return catalog.get("capabilities", [])
+    if catalog_path:
+        path = Path(catalog_path)
+        if not path.is_file():
+            raise FileNotFoundError(f"Capability catalog not found at {path}.")
+        with open(path, "r", encoding="utf-8") as fh:
+            catalog = json.load(fh)
+        return catalog.get("capabilities", [])
+
+    path = _default_catalog_path()
+    if path.is_file():
+        with open(path, "r", encoding="utf-8") as fh:
+            catalog = json.load(fh)
+        return catalog.get("capabilities", [])
+
+    runtime_catalog = _catalog_from_cli()
+    if runtime_catalog is not None:
+        return runtime_catalog
+
+    raise FileNotFoundError(
+        f"Capability catalog not found at {path}. "
+        f"Set LINXIRA_BIO_CATALOG, put linxira-bio on PATH, or provide catalog_path."
+    )
 
 
 def list_capabilities(

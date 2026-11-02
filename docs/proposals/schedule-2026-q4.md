@@ -21,6 +21,11 @@ solely to exercise the `Linxira-OS/packages` auto-sync chain (release → dispat
 It is not announced as a product release, not published to crates.io, and does not move the
 JOSS floor; the 2027-01-21 boundary still applies to anything that reads as "we are shipping".
 
+**Exception recorded 2026-11-02.** The maintainer directed a package-publication trial to
+measure adoption: release `v1.1.5`, publish `linxira-bio-sdk` to PyPI, and submit
+`linxira-bio` to Bioconda. This is a deliberate override of the 2027-01-21 boundary for this
+trial, not a redefinition of it; the JOSS floor and the six-month public-history rule remain.
+
 ## What "structural repair" means concretely (October)
 
 1. **Environment truth**: the pack lock is fixed and CI asserts lock == environment

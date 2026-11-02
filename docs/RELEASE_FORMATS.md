@@ -10,9 +10,9 @@
 ## 0. What we already have
 
 - `scripts/stage-release.py` + `packaging/bundle-manifest.json`: stages
-  sources (docs/schemas/skills/workflows/licenses) + three platform binaries
-  (linxira-bio, -worker, -ui) into a staging root, writes sha256 locks; CI
-  already runs it for Windows.
+  sources (docs/schemas/skills/sdk/workflows/licenses) + four platform binaries
+  (linxira-bio, -worker, -mcp, -ui) into a staging root, writes sha256 locks;
+  CI already runs it for Windows.
 - The Rust binaries are self-contained for **their own** functionality;
   delegated native tools (salmon, fasterq-dump, samtools, …) are discovered
   at runtime and reported by `environment audit` — release packages must
